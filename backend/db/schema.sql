@@ -101,6 +101,7 @@ CREATE TABLE import_jobs (
     id TEXT PRIMARY KEY,
     source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
     staged_path TEXT NOT NULL,
+    original_name TEXT NOT NULL DEFAULT '',
     selected_table TEXT NOT NULL DEFAULT '',
     mapping_json TEXT NOT NULL DEFAULT '{}',
     state TEXT NOT NULL,

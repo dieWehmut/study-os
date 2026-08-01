@@ -167,6 +167,39 @@ func (s *Store) ListKnowledgeItems(ctx context.Context, options models.Knowledge
 	return items, nil
 }
 
+// ListKnowledgeItemsForDedup returns only the fields needed to compare an
+// incoming candidate. It intentionally has no UI page limit: imports must not
+// silently miss a duplicate after the first page of the knowledge library.
+func (s *Store) ListKnowledgeItemsForDedup(ctx context.Context) ([]models.KnowledgeItem, error) {
+	return listKnowledgeItemsForDedup(ctx, s.db)
+}
+
+func (s *TxStore) ListKnowledgeItemsForDedup(ctx context.Context) ([]models.KnowledgeItem, error) {
+	return listKnowledgeItemsForDedup(ctx, s.tx)
+}
+
+func listKnowledgeItemsForDedup(ctx context.Context, database queryer) ([]models.KnowledgeItem, error) {
+	rows, err := database.QueryContext(ctx, `
+		SELECT id, item_type, term, part_of_speech, concise_definition, fingerprint
+		FROM knowledge_items ORDER BY id ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("list knowledge items for dedup: %w", err)
+	}
+	defer rows.Close()
+	items := make([]models.KnowledgeItem, 0)
+	for rows.Next() {
+		var item models.KnowledgeItem
+		if err := rows.Scan(&item.ID, &item.ItemType, &item.Term, &item.PartOfSpeech, &item.ConciseDefinition, &item.Fingerprint); err != nil {
+			return nil, fmt.Errorf("scan knowledge item for dedup: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate knowledge items for dedup: %w", err)
+	}
+	return items, nil
+}
+
 func (s *Store) CreatePrompt(ctx context.Context, prompt models.Prompt) error {
 	return createPrompt(ctx, s.db, prompt)
 }

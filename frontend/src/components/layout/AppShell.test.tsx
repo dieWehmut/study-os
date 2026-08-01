@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import App from "@/App"
+import { navigationForPath } from "./navigation"
 
 describe("application shell", () => {
   beforeEach(() => {
@@ -16,7 +17,7 @@ describe("application shell", () => {
     ["/", "今日"],
     ["/knowledge", "知识库"],
     ["/memory", "记忆"],
-    ["/practice", "练习"],
+    ["/import", "导入"],
     ["/settings", "设置"],
   ])("renders the %s route and navigation label %s", (route, label) => {
     render(
@@ -27,6 +28,23 @@ describe("application shell", () => {
 
     expect(screen.getByRole("main")).toBeInTheDocument()
     expect(screen.getAllByText(label).length).toBeGreaterThan(0)
+  })
+
+  it("keeps the legacy practice route reachable without adding it to primary navigation", () => {
+    render(
+      <MemoryRouter initialEntries={["/practice"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole("main")).toBeInTheDocument()
+    expect(screen.getByText("检测空间")).toBeInTheDocument()
+    expect(screen.queryAllByRole("link", { name: "练习" })).toHaveLength(0)
+  })
+
+  it("does not treat similar path prefixes as active navigation routes", () => {
+    expect(navigationForPath("/knowledgeable").path).toBe("/")
+    expect(navigationForPath("/knowledge/item-1").path).toBe("/knowledge")
   })
 
   it("marks the current route and exposes mobile navigation labels", () => {

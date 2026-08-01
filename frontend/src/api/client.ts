@@ -62,20 +62,56 @@ export async function apiRequest<T>(
   init?: RequestInit,
 ): Promise<T> {
   const { baseUrl, token } = await resolveApiConfig()
+  const headers = new Headers(init?.headers)
+  if (!headers.has("Accept")) headers.set("Accept", "application/json")
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`)
+  if (init?.body && !(typeof FormData !== "undefined" && init.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  // Keep a plain object so callers and tests can inspect auth headers while
+  // normalizing the browser's case-insensitive header names exactly once.
+  const requestHeaders: Record<string, string> = {}
+  headers.forEach((value, key) => {
+    switch (key.toLowerCase()) {
+      case "accept":
+        requestHeaders.Accept = value
+        break
+      case "authorization":
+        requestHeaders.Authorization = value
+        break
+      case "content-type":
+        requestHeaders["Content-Type"] = value
+        break
+      default:
+        requestHeaders[key] = value
+    }
+  })
+
   const response = await fetch(`${baseUrl}${path.startsWith("/") ? path : `/${path}`}`, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
+    headers: requestHeaders,
   })
 
   if (!response.ok) {
-    throw new ApiError(response.status, `请求失败（${response.status}）`)
+    let message = `请求失败（${response.status}）`
+    const text = await response.text()
+    if (text) {
+      try {
+        const payload: unknown = JSON.parse(text)
+        if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
+          message = payload.error
+        } else {
+          message = text
+        }
+      } catch {
+        message = text
+      }
+    }
+    throw new ApiError(response.status, message)
   }
 
   if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  const text = await response.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }

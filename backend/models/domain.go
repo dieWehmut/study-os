@@ -89,3 +89,37 @@ type DomainEvent struct {
 	PayloadJSON json.RawMessage `json:"payload"`
 	OccurredAt  time.Time       `json:"occurred_at"`
 }
+
+// ImportJob records a server-owned staged import and its current workflow state.
+type ImportJob struct {
+	ID            string          `json:"id"`
+	SourceID      string          `json:"source_id,omitempty"`
+	StagedPath    string          `json:"-"`
+	OriginalName  string          `json:"original_name,omitempty"`
+	SelectedTable string          `json:"selected_table,omitempty"`
+	MappingJSON   json.RawMessage `json:"mapping"`
+	State         string          `json:"state"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
+// ImportRow retains the source row and its normalized import decision.
+type ImportRow struct {
+	ID                    string          `json:"id"`
+	ImportJobID           string          `json:"import_job_id"`
+	RowNumber             int             `json:"row_number"`
+	RawJSON               json.RawMessage `json:"raw"`
+	NormalizedJSON        json.RawMessage `json:"normalized"`
+	Disposition           string          `json:"disposition"`
+	LinkedKnowledgeItemID string          `json:"linked_knowledge_item_id,omitempty"`
+}
+
+type DedupReview struct {
+	ID                      string     `json:"id"`
+	ImportRowID             string     `json:"import_row_id"`
+	ExistingKnowledgeItemID string     `json:"existing_knowledge_item_id"`
+	State                   string     `json:"state"`
+	Resolution              string     `json:"resolution,omitempty"`
+	CreatedAt               time.Time  `json:"created_at"`
+	ResolvedAt              *time.Time `json:"resolved_at,omitempty"`
+}

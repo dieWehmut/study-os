@@ -2,14 +2,18 @@ package db_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"study-os/backend/db"
 	"study-os/backend/models"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestStoreMigratesAndPersistsCoreRecordsAcrossReopen(t *testing.T) {
@@ -236,6 +240,76 @@ func TestStoreAppliesMigrationsOnceAndEnablesSQLiteSafetyPragmas(t *testing.T) {
 	}
 	if busyTimeout < 5000 {
 		t.Fatalf("busy_timeout = %d, want at least 5000", busyTimeout)
+	}
+}
+
+func TestStoreUpgradesSchemaVersionOneWithOriginalName(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open legacy sqlite: %v", err)
+	}
+	_, err = legacy.ExecContext(ctx, `
+		CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+		INSERT INTO schema_migrations(version, applied_at) VALUES (1, '2026-08-01T00:00:00Z');
+		CREATE TABLE import_jobs (
+			id TEXT PRIMARY KEY,
+			source_id TEXT,
+			staged_path TEXT NOT NULL,
+			selected_table TEXT NOT NULL DEFAULT '',
+			mapping_json TEXT NOT NULL DEFAULT '{}',
+			state TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);`)
+	if err != nil {
+		_ = legacy.Close()
+		t.Fatalf("create legacy schema: %v", err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatalf("close legacy sqlite: %v", err)
+	}
+
+	store, err := db.Open(ctx, path)
+	if err != nil {
+		t.Fatalf("upgrade legacy store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	var hasOriginalName int
+	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('import_jobs') WHERE name = 'original_name'`).Scan(&hasOriginalName); err != nil {
+		t.Fatalf("inspect upgraded columns: %v", err)
+	}
+	if hasOriginalName != 1 {
+		t.Fatalf("original_name column count = %d, want 1", hasOriginalName)
+	}
+	var migrationCount int
+	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil {
+		t.Fatalf("count upgraded migrations: %v", err)
+	}
+	if migrationCount != 2 {
+		t.Fatalf("migration count = %d, want 2", migrationCount)
+	}
+}
+
+func TestStoreRejectsUnsupportedFutureMigration(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "future.db")
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open future sqlite: %v", err)
+	}
+	if _, err := legacy.ExecContext(ctx, `
+		CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+		INSERT INTO schema_migrations(version, applied_at) VALUES (3, '2026-08-01T00:00:00Z');`); err != nil {
+		_ = legacy.Close()
+		t.Fatalf("create future migration marker: %v", err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatalf("close future sqlite: %v", err)
+	}
+	if _, err := db.Open(ctx, path); err == nil || !strings.Contains(err.Error(), "unsupported schema migration version") {
+		t.Fatalf("future migration error = %v", err)
 	}
 }
 

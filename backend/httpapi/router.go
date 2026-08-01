@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -19,16 +21,20 @@ import (
 
 	"study-os/backend/app"
 	"study-os/backend/db"
+	"study-os/backend/importer"
 	"study-os/backend/memory"
 	"study-os/backend/models"
 )
 
 var requestID atomic.Uint64
 
+const maxImportJSONBytes int64 = 64 << 10
+
 func NewRouter(application *app.App) http.Handler {
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
 	router.Use(loopbackHostOnly)
+	router.Use(trustedOriginOnly)
 	router.Route("/api", func(api chi.Router) {
 		api.Get("/health", func(response http.ResponseWriter, request *http.Request) {
 			if application == nil || application.Store == nil {
@@ -56,8 +62,197 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/dashboard", func(response http.ResponseWriter, request *http.Request) {
 			handleDashboard(response, request, application)
 		})
+		api.Post("/imports", func(response http.ResponseWriter, request *http.Request) {
+			handleImportUpload(response, request, application)
+		})
+		api.Get("/imports/{importID}", func(response http.ResponseWriter, request *http.Request) {
+			handleImportGet(response, request, application)
+		})
+		api.Post("/imports/{importID}/preview", func(response http.ResponseWriter, request *http.Request) {
+			handleImportPreview(response, request, application)
+		})
+		api.Post("/imports/{importID}/commit", func(response http.ResponseWriter, request *http.Request) {
+			handleImportCommit(response, request, application)
+		})
+		api.Get("/knowledge", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeList(response, request, application)
+		})
+		api.Get("/knowledge/{knowledgeID}", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeGet(response, request, application)
+		})
 	})
 	return router
+}
+
+func importService(application *app.App) (*importer.Service, error) {
+	if application == nil || application.Store == nil {
+		return nil, errors.New("application unavailable")
+	}
+	return importer.NewService(application.Store, application.Config.DataDir), nil
+}
+
+func handleImportUpload(response http.ResponseWriter, request *http.Request, application *app.App) {
+	service, err := importService(application)
+	if err != nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	request.Body = http.MaxBytesReader(response, request.Body, importer.MaxImportBytes+(1<<20))
+	if err := request.ParseMultipartForm(importer.MaxImportBytes + (1 << 20)); err != nil {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "invalid multipart upload"})
+		return
+	}
+	file, header, err := request.FormFile("file")
+	if err != nil {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "multipart file field is required"})
+		return
+	}
+	defer file.Close()
+	result, err := service.Upload(request.Context(), io.LimitReader(file, importer.MaxImportBytes+1), header.Filename, request.FormValue("table"))
+	if err != nil {
+		writeImportError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusCreated, result)
+}
+
+func handleImportGet(response http.ResponseWriter, request *http.Request, application *app.App) {
+	service, err := importService(application)
+	if err != nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	result, err := service.Get(request.Context(), chi.URLParam(request, "importID"))
+	if err != nil {
+		writeImportError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, result)
+}
+
+func handleImportPreview(response http.ResponseWriter, request *http.Request, application *app.App) {
+	service, err := importService(application)
+	if err != nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	var input struct {
+		Mapping importer.Mapping `json:"mapping"`
+	}
+	request.Body = http.MaxBytesReader(response, request.Body, maxImportJSONBytes)
+	if err := decodeRequest(request, &input); err != nil {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	result, err := service.Preview(request.Context(), chi.URLParam(request, "importID"), input.Mapping)
+	if err != nil {
+		writeImportError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, result)
+}
+
+func handleImportCommit(response http.ResponseWriter, request *http.Request, application *app.App) {
+	service, err := importService(application)
+	if err != nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	var input struct {
+		Resolutions map[string]string `json:"resolutions"`
+	}
+	if request.ContentLength != 0 {
+		request.Body = http.MaxBytesReader(response, request.Body, maxImportJSONBytes)
+		if err := decodeRequest(request, &input); err != nil {
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+	}
+	for _, resolution := range input.Resolutions {
+		if resolution != "merge" && resolution != "new_sense" && resolution != "reject" {
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": "resolution must be merge, new_sense, or reject"})
+			return
+		}
+	}
+	result, err := service.Commit(request.Context(), chi.URLParam(request, "importID"), input.Resolutions)
+	if err != nil {
+		writeImportError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, result)
+}
+
+func handleKnowledgeList(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	items, err := application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
+		Query: request.URL.Query().Get("q"), Limit: parseLimit(request.URL.Query().Get("limit"), 100, 500), Offset: parseOffset(request.URL.Query().Get("offset")),
+	})
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+}
+
+func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	item, err := application.Store.GetKnowledgeItem(request.Context(), chi.URLParam(request, "knowledgeID"))
+	if err != nil {
+		writeStoreError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, item)
+}
+
+func writeImportError(response http.ResponseWriter, err error) {
+	if errors.Is(err, db.ErrNotFound) {
+		writeJSON(response, http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+	message := strings.ToLower(err.Error())
+	status := http.StatusInternalServerError
+	if strings.Contains(message, "already committed") || strings.Contains(message, "must be previewed") {
+		status = http.StatusConflict
+	} else if isImportClientError(message) {
+		status = http.StatusBadRequest
+	}
+	if status == http.StatusInternalServerError {
+		writeJSON(response, status, map[string]string{"error": "import operation failed"})
+		return
+	}
+	writeJSON(response, status, map[string]string{"error": err.Error()})
+}
+
+func isImportClientError(message string) bool {
+	for _, marker := range []string{
+		"unsupported import extension",
+		"upload body is empty",
+		"import exceeds",
+		"import must be a regular file",
+		"read csv ",
+		"duplicate csv header",
+		"csv ",
+		"decode jsonl row",
+		"jsonl ",
+		"sqlite import",
+		"sqlite table",
+		"mapping",
+		"source column",
+		"term and definition are required",
+		"item_type",
+		"import preview has no rows",
+	} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 type reviewPromptResponse struct {
@@ -449,6 +644,12 @@ func decodeRequest(request *http.Request, target any) error {
 	if err := decoder.Decode(target); err != nil {
 		return fmt.Errorf("decode JSON request: %w", err)
 	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("decode JSON request: request must contain one JSON value")
+		}
+		return fmt.Errorf("decode JSON request: %w", err)
+	}
 	return nil
 }
 
@@ -462,6 +663,14 @@ func parseLimit(value string, fallback, maximum int) int {
 	}
 	if parsed > maximum {
 		return maximum
+	}
+	return parsed
+}
+
+func parseOffset(value string) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0
 	}
 	return parsed
 }
@@ -504,6 +713,31 @@ func loopbackHostOnly(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(response, request)
 	})
+}
+
+func trustedOriginOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		origin := strings.TrimSpace(request.Header.Get("Origin"))
+		if origin == "" || isTrustedOrigin(origin) {
+			next.ServeHTTP(response, request)
+			return
+		}
+		http.Error(response, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+	})
+}
+
+func isTrustedOrigin(origin string) bool {
+	if origin == "http://wails.localhost" || origin == "wails://wails" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil {
+		return false
+	}
+	if parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	return isLoopbackHost(parsed.Host)
 }
 
 func isLoopbackHost(hostPort string) bool {

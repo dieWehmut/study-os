@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 1
+const currentSchemaVersion = 2
 
 type openOptions struct {
 	seedFixtures bool
@@ -105,20 +105,95 @@ func migrate(ctx context.Context, database *sql.DB) error {
 		)`); err != nil {
 		return fmt.Errorf("create migration table: %w", err)
 	}
-	var applied int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, currentSchemaVersion).Scan(&applied); err != nil {
-		return fmt.Errorf("check migration version: %w", err)
+	versions, err := migrationVersions(ctx, tx)
+	if err != nil {
+		return err
 	}
-	if applied == 0 {
+	for _, version := range versions {
+		if version > currentSchemaVersion || version < 1 {
+			return fmt.Errorf("unsupported schema migration version %d", version)
+		}
+	}
+	if len(versions) == 0 {
 		if _, err := tx.ExecContext(ctx, schemaSQL); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", currentSchemaVersion, err)
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`, currentSchemaVersion); err != nil {
-			return fmt.Errorf("record schema version: %w", err)
+		if err := recordMigration(ctx, tx, currentSchemaVersion); err != nil {
+			return err
+		}
+	} else if containsVersion(versions, currentSchemaVersion) {
+		if !hasColumn(ctx, tx, "import_jobs", "original_name") {
+			return errors.New("schema version 2 is recorded but import_jobs.original_name is missing")
+		}
+	} else {
+		if len(versions) != 1 || versions[0] != 1 {
+			return fmt.Errorf("unsupported schema migration sequence %v", versions)
+		}
+		if !hasColumn(ctx, tx, "import_jobs", "original_name") {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE import_jobs ADD COLUMN original_name TEXT NOT NULL DEFAULT ''`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", currentSchemaVersion, err)
+			}
+		}
+		if err := recordMigration(ctx, tx, currentSchemaVersion); err != nil {
+			return err
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit migration: %w", err)
 	}
 	return nil
+}
+
+func migrationVersions(ctx context.Context, tx *sql.Tx) ([]int, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT version FROM schema_migrations ORDER BY version ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("list migration versions: %w", err)
+	}
+	defer rows.Close()
+	versions := make([]int, 0)
+	for rows.Next() {
+		var version int
+		if err := rows.Scan(&version); err != nil {
+			return nil, fmt.Errorf("scan migration version: %w", err)
+		}
+		versions = append(versions, version)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate migration versions: %w", err)
+	}
+	return versions, nil
+}
+
+func recordMigration(ctx context.Context, tx *sql.Tx, version int) error {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`, version); err != nil {
+		return fmt.Errorf("record schema version: %w", err)
+	}
+	return nil
+}
+
+func containsVersion(versions []int, target int) bool {
+	for _, version := range versions {
+		if version == target {
+			return true
+		}
+	}
+	return false
+}
+
+func hasColumn(ctx context.Context, tx *sql.Tx, table, column string) bool {
+	rows, err := tx.QueryContext(ctx, `PRAGMA table_info(`+table+`)`)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, columnType string
+		var notNull, primaryKey int
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err == nil && name == column {
+			return true
+		}
+	}
+	return false
 }

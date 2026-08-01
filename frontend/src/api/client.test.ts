@@ -78,4 +78,37 @@ describe("resolveApiBase", () => {
       }),
     )
   })
+
+  it("leaves multipart headers to the browser for FormData bodies", async () => {
+    const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ job_id: "job-1" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    )
+    const body = new FormData()
+    body.append("file", new File(["term,definition\nhello,你好\n"], "words.csv", { type: "text/csv" }))
+
+    await apiRequest<{ job_id: string }>("/imports", { method: "POST", body })
+
+    const [, request] = fetchSpy.mock.calls[0]
+    const headers = new Headers(request?.headers)
+    expect(headers.get("Accept")).toBe("application/json")
+    expect(headers.get("Content-Type")).toBeNull()
+  })
+
+  it("surfaces a JSON error returned by the API", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "term and definition are required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }),
+    )
+
+    await expect(apiRequest("/imports/job-1/preview", { method: "POST", body: "{}" })).rejects.toMatchObject({
+      name: "ApiError",
+      status: 400,
+      message: "term and definition are required",
+    })
+  })
 })
