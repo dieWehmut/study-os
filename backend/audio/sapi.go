@@ -50,6 +50,21 @@ func (provider *SAPIProvider) Generate(ctx context.Context, request Request, des
 	if executable == "" {
 		executable = "powershell.exe"
 	}
+	command := newSAPICommand(ctx, executable, request, destination)
+	if output, err := command.CombinedOutput(); err != nil {
+		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return ctx.Err()
+		}
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			message = err.Error()
+		}
+		return fmt.Errorf("%w: %s", ErrGeneratorUnavailable, message)
+	}
+	return nil
+}
+
+func newSAPICommand(ctx context.Context, executable string, request Request, destination string) *exec.Cmd {
 	// Values travel through the child process environment, never through script
 	// interpolation, which prevents a term or destination becoming PowerShell code.
 	script := `$output = [Environment]::GetEnvironmentVariable('STUDY_OS_SAPI_OUTPUT')
@@ -71,17 +86,7 @@ try {
 		"STUDY_OS_SAPI_TERM="+request.Term,
 		"STUDY_OS_SAPI_VOICE="+request.Voice,
 	)
-	if output, err := command.CombinedOutput(); err != nil {
-		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return ctx.Err()
-		}
-		message := strings.TrimSpace(string(output))
-		if message == "" {
-			message = err.Error()
-		}
-		return fmt.Errorf("%w: %s", ErrGeneratorUnavailable, message)
-	}
-	return nil
+	return command
 }
 
 func utf16LE(value string) []byte {
