@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -64,6 +65,19 @@ func (a *DesktopApp) Startup(ctx context.Context) {
 	application, err := backendapp.New(ctx, backendapp.Options{Config: cfg, DBPath: dbPath, DataDir: dataDir})
 	if err != nil {
 		a.startErr = fmt.Errorf("create backend: %w", err)
+		return
+	}
+	backupService := application.Backups
+	result, _, err := backupService.CreateDailyIfNeeded(ctx, dbPath)
+	if err != nil {
+		_ = application.Close()
+		a.startErr = fmt.Errorf("create startup backup: %w", err)
+		return
+	}
+	// Recording is idempotent so an existing backup can repair missing metadata.
+	if _, err := application.RecordBackup(ctx, result); err != nil {
+		_ = application.Close()
+		a.startErr = fmt.Errorf("record startup backup: %w", err)
 		return
 	}
 	listener, err := net.Listen("tcp", cfg.ListenAddress)
@@ -180,7 +194,7 @@ func desktopAPIHandler(token string, next http.Handler) http.Handler {
 	authenticated := requireBearer(token, next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin != "" && origin != "http://wails.localhost" && origin != "wails://wails" {
+		if origin != "" && !isDesktopOriginAllowed(origin) {
 			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
@@ -197,4 +211,20 @@ func desktopAPIHandler(token string, next http.Handler) http.Handler {
 		}
 		authenticated.ServeHTTP(w, r)
 	})
+}
+
+func isDesktopOriginAllowed(origin string) bool {
+	if origin == "http://wails.localhost" || origin == "wails://wails" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

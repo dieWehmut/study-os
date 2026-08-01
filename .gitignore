@@ -15,6 +15,9 @@ dist-ssr
 backend.exe
 study-os.exe
 *.tsbuildinfo
+/build/
+frontend/wailsjs/
+frontend/package.json.md5
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

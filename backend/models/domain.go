@@ -90,6 +90,15 @@ type DomainEvent struct {
 	OccurredAt  time.Time       `json:"occurred_at"`
 }
 
+type BackupRecord struct {
+	ID        string    `json:"id"`
+	Category  string    `json:"category"`
+	Path      string    `json:"path"`
+	SHA256    string    `json:"sha256"`
+	SizeBytes int64     `json:"size_bytes"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ImportJob records a server-owned staged import and its current workflow state.
 type ImportJob struct {
 	ID            string          `json:"id"`

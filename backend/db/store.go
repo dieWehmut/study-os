@@ -458,6 +458,66 @@ func (s *TxStore) AppendDomainEvent(ctx context.Context, event models.DomainEven
 	return appendDomainEvent(ctx, s.tx, event)
 }
 
+func (s *Store) CreateBackupRecord(ctx context.Context, record models.BackupRecord) error {
+	return createBackupRecord(ctx, s.db, record)
+}
+
+func (s *TxStore) CreateBackupRecord(ctx context.Context, record models.BackupRecord) error {
+	return createBackupRecord(ctx, s.tx, record)
+}
+
+func createBackupRecord(ctx context.Context, database queryer, record models.BackupRecord) error {
+	createdAt := record.CreatedAt.UTC()
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	if strings.TrimSpace(record.ID) == "" || strings.TrimSpace(record.Category) == "" || strings.TrimSpace(record.Path) == "" || strings.TrimSpace(record.SHA256) == "" {
+		return errors.New("backup record id, category, path, and checksum are required")
+	}
+	_, err := database.ExecContext(ctx, `
+		INSERT INTO backup_records(id, category, path, sha256, size_bytes, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			category = excluded.category,
+			path = excluded.path,
+			sha256 = excluded.sha256,
+			size_bytes = excluded.size_bytes,
+			created_at = excluded.created_at`, record.ID, record.Category, record.Path, record.SHA256, record.SizeBytes, formatTime(createdAt))
+	if err != nil {
+		return fmt.Errorf("create backup record %q: %w", record.ID, err)
+	}
+	return nil
+}
+
+func (s *Store) ListBackupRecords(ctx context.Context, limit int) ([]models.BackupRecord, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, category, path, sha256, size_bytes, created_at
+		FROM backup_records ORDER BY created_at DESC, id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list backup records: %w", err)
+	}
+	defer rows.Close()
+	records := make([]models.BackupRecord, 0)
+	for rows.Next() {
+		var record models.BackupRecord
+		var createdAt string
+		if err := rows.Scan(&record.ID, &record.Category, &record.Path, &record.SHA256, &record.SizeBytes, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan backup record: %w", err)
+		}
+		if record.CreatedAt, err = parseTime(createdAt); err != nil {
+			return nil, fmt.Errorf("parse backup record time: %w", err)
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate backup records: %w", err)
+	}
+	return records, nil
+}
+
 func appendDomainEvent(ctx context.Context, database queryer, event models.DomainEvent) error {
 	occurredAt := event.OccurredAt.UTC()
 	if occurredAt.IsZero() {

@@ -20,6 +20,7 @@ import (
 	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
 	"study-os/backend/app"
+	"study-os/backend/backup"
 	"study-os/backend/db"
 	"study-os/backend/importer"
 	"study-os/backend/memory"
@@ -80,8 +81,63 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/knowledge/{knowledgeID}", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeGet(response, request, application)
 		})
+		api.Post("/backups", func(response http.ResponseWriter, request *http.Request) {
+			handleBackupCreate(response, request, application)
+		})
+		api.Get("/backups", func(response http.ResponseWriter, request *http.Request) {
+			handleBackupList(response, request, application)
+		})
 	})
 	return router
+}
+
+func handleBackupCreate(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil || application.Backups == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "backup service unavailable"})
+		return
+	}
+	var input struct {
+		Category string `json:"category"`
+	}
+	if request.ContentLength != 0 {
+		request.Body = http.MaxBytesReader(response, request.Body, maxImportJSONBytes)
+		if err := decodeRequest(request, &input); err != nil {
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+	}
+	category := backup.Category(input.Category)
+	if input.Category == "" {
+		category = backup.Daily
+	}
+	if category != backup.Daily && category != backup.PreUpdate {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "category must be daily or pre-update"})
+		return
+	}
+	result, err := application.Backups.Create(request.Context(), application.Config.DBPath, category)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "create backup failed"})
+		return
+	}
+	record, err := application.RecordBackup(request.Context(), result)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "record backup failed"})
+		return
+	}
+	writeJSON(response, http.StatusCreated, map[string]any{"id": record.ID, "category": record.Category, "result": result, "record": record})
+}
+
+func handleBackupList(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	records, err := application.Store.ListBackupRecords(request.Context(), parseLimit(request.URL.Query().Get("limit"), 50, 100))
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "list backups failed"})
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"items": records, "count": len(records)})
 }
 
 func importService(application *app.App) (*importer.Service, error) {
