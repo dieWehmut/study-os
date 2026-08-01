@@ -1,0 +1,106 @@
+import { fireEvent, render, screen } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+import Home from "./Home"
+
+const mocks = vi.hoisted(() => ({
+  getDashboard: vi.fn(),
+  seedDemo: vi.fn(),
+}))
+
+vi.mock("@/api/dashboard", () => mocks)
+
+describe("Today page", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getDashboard.mockResolvedValue({
+      knowledge_count: 1,
+      prompt_count: 3,
+      due_count: 3,
+      attempt_count: 4,
+      reviewed_today: 2,
+      current_streak: 3,
+      provider: "mock",
+      offline: true,
+    })
+    mocks.seedDemo.mockResolvedValue({
+      status: "seeded",
+      knowledge_id: "demo-knowledge-abandon",
+      prompt_count: 3,
+    })
+  })
+
+  it("shows live progress and links to the focused memory session", async () => {
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText("3 个待复习")) .toBeInTheDocument()
+    expect(screen.getByText("1 个知识点")) .toBeInTheDocument()
+    expect(screen.getByText("Mock AI · 离线可用")) .toBeInTheDocument()
+
+    expect(screen.getByRole("link", { name: "开始复习" })).toHaveAttribute("href", "/memory")
+  })
+
+  it("loads a usable example into an empty library", async () => {
+    mocks.getDashboard
+      .mockResolvedValueOnce({
+        knowledge_count: 0,
+        prompt_count: 0,
+        due_count: 0,
+        attempt_count: 0,
+        reviewed_today: 0,
+        current_streak: 0,
+        provider: "mock",
+        offline: true,
+      })
+      .mockResolvedValueOnce({
+        knowledge_count: 1,
+        prompt_count: 3,
+        due_count: 3,
+        attempt_count: 0,
+        reviewed_today: 0,
+        current_streak: 0,
+        provider: "mock",
+        offline: true,
+      })
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole("button", { name: "载入英语示例" }))
+    expect(mocks.seedDemo).toHaveBeenCalledOnce()
+    expect(await screen.findByText("3 个待复习")) .toBeInTheDocument()
+  })
+
+  it("shows a retry action when the local backend is unavailable", async () => {
+    mocks.getDashboard
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({
+        knowledge_count: 1,
+        prompt_count: 3,
+        due_count: 2,
+        attempt_count: 0,
+        reviewed_today: 0,
+        current_streak: 0,
+        provider: "mock",
+        offline: true,
+      })
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("\u65e0\u6cd5\u8bfb\u53d6\u5b66\u4e60\u8fdb\u5ea6")
+    fireEvent.click(screen.getByRole("button", { name: "\u91cd\u8bd5" }))
+    expect(await screen.findByText("2 \u4e2a\u5f85\u590d\u4e60")).toBeInTheDocument()
+  })
+})
