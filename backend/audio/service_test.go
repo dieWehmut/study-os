@@ -217,6 +217,21 @@ func TestResolveMissingAssetIsRecoverable(t *testing.T) {
 	}
 }
 
+func TestResolveExistingDoesNotInvokeGenerator(t *testing.T) {
+	generator := &recordingGenerator{content: []byte("generated")}
+	service, err := NewService(t.TempDir(), WithGenerator(generator))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.ResolveExisting(context.Background(), Request{Term: "unknown"})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("error = %v, want ErrNotFound", err)
+	}
+	if generator.calls != 0 {
+		t.Fatalf("generator calls = %d, want none", generator.calls)
+	}
+}
+
 func TestSAPIProviderReturnsRecoverableErrorOffWindows(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the unavailable boundary is platform-specific")

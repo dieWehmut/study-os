@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -339,6 +341,50 @@ func TestFixturesAreSeededOnlyWhenExplicitlyRequested(t *testing.T) {
 	}
 	if len(items) == 0 {
 		t.Fatal("explicit fixture seed produced no knowledge items")
+	}
+}
+
+func TestReconcileBackupRecordsCountsAllLiveFilesAndRemovesStaleMetadata(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	store, err := db.Open(ctx, filepath.Join(root, "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	now := time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC)
+	for index := 0; index < 105; index++ {
+		path := filepath.Join(root, fmt.Sprintf("backup-%03d.db", index))
+		if err := os.WriteFile(path, []byte("backup"), 0o600); err != nil {
+			t.Fatalf("write backup %d: %v", index, err)
+		}
+		if err := store.CreateBackupRecord(ctx, models.BackupRecord{
+			ID: fmt.Sprintf("backup-%03d", index), Category: "daily", Path: path,
+			SHA256: strings.Repeat("a", 64), SizeBytes: 6, CreatedAt: now.Add(time.Duration(index) * time.Second),
+		}); err != nil {
+			t.Fatalf("record backup %d: %v", index, err)
+		}
+	}
+	if err := store.CreateBackupRecord(ctx, models.BackupRecord{
+		ID: "stale", Category: "daily", Path: filepath.Join(root, "missing.db"),
+		SHA256: strings.Repeat("b", 64), SizeBytes: 1, CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("record stale backup: %v", err)
+	}
+
+	count, err := store.ReconcileBackupRecords(ctx)
+	if err != nil {
+		t.Fatalf("reconcile backups: %v", err)
+	}
+	if count != 105 {
+		t.Fatalf("live backup count = %d, want 105", count)
+	}
+	var staleCount int
+	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM backup_records WHERE id = 'stale'`).Scan(&staleCount); err != nil {
+		t.Fatalf("count stale metadata: %v", err)
+	}
+	if staleCount != 0 {
+		t.Fatalf("stale metadata count = %d, want 0", staleCount)
 	}
 }
 

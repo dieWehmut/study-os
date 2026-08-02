@@ -127,6 +127,17 @@ func CacheKey(request Request) string {
 }
 
 func (service *Service) Resolve(ctx context.Context, request Request) (Asset, error) {
+	return service.resolve(ctx, request, true)
+}
+
+// ResolveExisting returns local or cached audio without invoking a generator.
+// Read-only HTTP endpoints use it so a cross-site GET cannot start a process or
+// grow the cache as a side effect.
+func (service *Service) ResolveExisting(ctx context.Context, request Request) (Asset, error) {
+	return service.resolve(ctx, request, false)
+}
+
+func (service *Service) resolve(ctx context.Context, request Request, generate bool) (Asset, error) {
 	if err := ctx.Err(); err != nil {
 		return Asset{}, err
 	}
@@ -159,7 +170,7 @@ func (service *Service) Resolve(ctx context.Context, request Request) (Asset, er
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Asset{}, err
 	}
-	if service.generator == nil {
+	if !generate || service.generator == nil {
 		return Asset{}, fmt.Errorf("%w: no local file, cached file, or generator", ErrNotFound)
 	}
 
@@ -190,7 +201,15 @@ func (service *Service) Resolve(ctx context.Context, request Request) (Asset, er
 }
 
 func (service *Service) Open(ctx context.Context, request Request) (*Opened, error) {
-	asset, err := service.Resolve(ctx, request)
+	return service.openResolved(service.Resolve(ctx, request))
+}
+
+// OpenExisting opens local or cached audio without invoking a generator.
+func (service *Service) OpenExisting(ctx context.Context, request Request) (*Opened, error) {
+	return service.openResolved(service.ResolveExisting(ctx, request))
+}
+
+func (service *Service) openResolved(asset Asset, err error) (*Opened, error) {
 	if err != nil {
 		return nil, err
 	}

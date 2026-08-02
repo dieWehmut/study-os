@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -498,6 +499,58 @@ func (s *Store) ListBackupRecords(ctx context.Context, limit int) ([]models.Back
 		FROM backup_records ORDER BY created_at DESC, id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list backup records: %w", err)
+	}
+	defer rows.Close()
+	records := make([]models.BackupRecord, 0)
+	for rows.Next() {
+		var record models.BackupRecord
+		var createdAt string
+		if err := rows.Scan(&record.ID, &record.Category, &record.Path, &record.SHA256, &record.SizeBytes, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan backup record: %w", err)
+		}
+		if record.CreatedAt, err = parseTime(createdAt); err != nil {
+			return nil, fmt.Errorf("parse backup record time: %w", err)
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate backup records: %w", err)
+	}
+	return records, nil
+}
+
+// ReconcileBackupRecords removes metadata for backup files that retention or
+// an external cleanup has already removed, and returns the number of live
+// records. Paths are server-owned values written by RecordBackup.
+func (s *Store) ReconcileBackupRecords(ctx context.Context) (int, error) {
+	records, err := s.listAllBackupRecords(ctx)
+	if err != nil {
+		return 0, err
+	}
+	live := 0
+	for _, record := range records {
+		info, statErr := os.Lstat(record.Path)
+		if statErr == nil {
+			if info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
+				live++
+				continue
+			}
+		} else if !errors.Is(statErr, os.ErrNotExist) {
+			return 0, fmt.Errorf("inspect backup record %q: %w", record.ID, statErr)
+		}
+		if _, deleteErr := s.db.ExecContext(ctx, `DELETE FROM backup_records WHERE id = ?`, record.ID); deleteErr != nil {
+			return 0, fmt.Errorf("delete stale backup record %q: %w", record.ID, deleteErr)
+		}
+	}
+	return live, nil
+}
+
+func (s *Store) listAllBackupRecords(ctx context.Context) ([]models.BackupRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, category, path, sha256, size_bytes, created_at
+		FROM backup_records ORDER BY created_at DESC, id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list all backup records: %w", err)
 	}
 	defer rows.Close()
 	records := make([]models.BackupRecord, 0)

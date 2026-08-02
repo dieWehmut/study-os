@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"study-os/backend/audio"
 	"study-os/backend/backup"
 	"study-os/backend/config"
 	"study-os/backend/db"
@@ -23,6 +24,7 @@ type App struct {
 	Config  config.Config
 	Store   *db.Store
 	Backups *backup.Service
+	Audio   *audio.Service
 }
 
 func New(ctx context.Context, options Options) (*App, error) {
@@ -44,10 +46,19 @@ func New(ctx context.Context, options Options) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open application store: %w", err)
 	}
+	audioService, err := audio.NewService(filepath.Join(cfg.DataDir, "audio-cache"),
+		audio.WithLocalDir(filepath.Join(cfg.DataDir, "audio")),
+		audio.WithGenerator(audio.NewSAPIProvider()),
+	)
+	if err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("create audio service: %w", err)
+	}
 	return &App{
 		Config:  cfg,
 		Store:   store,
 		Backups: backup.NewService(filepath.Join(cfg.DataDir, "backups")),
+		Audio:   audioService,
 	}, nil
 }
 

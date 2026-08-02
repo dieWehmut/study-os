@@ -48,6 +48,24 @@ func NewRouter(application *app.App) http.Handler {
 			}
 			writeJSON(response, http.StatusOK, map[string]string{"status": "ok"})
 		})
+		api.Get("/system/status", func(response http.ResponseWriter, request *http.Request) {
+			handleSystemStatus(response, request, application)
+		})
+		api.Patch("/settings", func(response http.ResponseWriter, request *http.Request) {
+			handleSettingsPatch(response, request, application)
+		})
+		api.Get("/agent/status", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentStatus(response, request, application)
+		})
+		api.Post("/agent/generate", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentGenerate(response, request, application)
+		})
+		api.Get("/audio", func(response http.ResponseWriter, request *http.Request) {
+			handleAudio(response, request, application)
+		})
+		api.Post("/audio", func(response http.ResponseWriter, request *http.Request) {
+			handleAudioGenerate(response, request, application)
+		})
 		api.Post("/demo/seed", func(response http.ResponseWriter, request *http.Request) {
 			handleDemoSeed(response, request, application)
 		})
@@ -130,6 +148,10 @@ func handleBackupCreate(response http.ResponseWriter, request *http.Request, app
 func handleBackupList(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	if _, err := application.Store.ReconcileBackupRecords(request.Context()); err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "reconcile backups failed"})
 		return
 	}
 	records, err := application.Store.ListBackupRecords(request.Context(), parseLimit(request.URL.Query().Get("limit"), 50, 100))
