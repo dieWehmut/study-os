@@ -1,7 +1,7 @@
 import path from "node:path"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
-import { defineConfig } from "vitest/config"
+import { defaultExclude, defineConfig } from "vitest/config"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -19,5 +19,6 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.tsx",
     css: true,
+    exclude: [...defaultExclude, "e2e/**"],
   },
 })
