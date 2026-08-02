@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Study OS</title>
+  <rect width="512" height="512" rx="128" fill="#102216"/>
+  <path d="M112 128c0-22 18-40 40-40h208c22 0 40 18 40 40v256c0 22-18 40-40 40H152c-22 0-40-18-40-40V128Z" fill="#27c43a"/>
+  <path d="M168 168h176v36H168zm0 68h124v36H168zm0 68h150v36H168z" fill="#f5fff6"/>
+  <circle cx="344" cy="326" r="54" fill="#102216"/>
+  <path d="m318 326 18 18 34-42" fill="none" stroke="#f5fff6" stroke-linecap="round" stroke-linejoin="round" stroke-width="20"/>
+</svg>

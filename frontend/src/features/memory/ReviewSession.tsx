@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { CheckCircle2, Headphones, RotateCcw, Volume2 } from "lucide-react"
 
+import { playPronunciation } from "@/api/audio"
 import { answerReview, getDueReviews, overrideAttempt } from "@/api/reviews"
 import type { DueReview, ReviewEvaluation } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
@@ -30,6 +31,7 @@ export function ReviewSession() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [audioSource, setAudioSource] = useState<"file" | "browser" | "unavailable" | null>(null)
 
   useEffect(() => {
     let active = true
@@ -82,10 +84,9 @@ export function ReviewSession() {
     setError("")
   }
 
-  function speakTerm() {
-    if (!current || !("speechSynthesis" in window)) return
-    window.speechSynthesis.cancel()
-		window.speechSynthesis.speak(new SpeechSynthesisUtterance(current.prompt.question))
+  async function speakTerm() {
+    if (!current) return
+    setAudioSource(await playPronunciation(current.prompt.question))
   }
 
   if (loading) {
@@ -131,7 +132,7 @@ export function ReviewSession() {
               ) : null}
             </div>
 						{current.prompt.prompt_type === "en_to_zh" ? (
-							<Button variant="outline" size="icon-lg" aria-label="播放发音" onClick={speakTerm}>
+							<Button variant="outline" size="icon-lg" aria-label="播放发音" onClick={() => void speakTerm()}>
 								<Volume2 aria-hidden="true" />
 							</Button>
 						) : null}
@@ -154,6 +155,8 @@ export function ReviewSession() {
             />
           </label>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {audioSource === "browser" ? <p className="text-xs text-muted-foreground" role="status">Audio file unavailable; browser speech fallback used.</p> : null}
+          {audioSource === "unavailable" ? <p className="text-xs text-muted-foreground" role="status">No pronunciation audio is available.</p> : null}
 
           {evaluation ? (
             <div className="flex flex-col gap-4 rounded-xl border bg-muted/35 p-4" aria-live="polite">
