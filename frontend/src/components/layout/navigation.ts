@@ -15,7 +15,7 @@ export interface NavigationItem {
 }
 
 export const primaryNavigation: NavigationItem[] = [
-  { path: "/", label: "今日", description: "今天的学习入口", icon: House },
+  { path: "/", label: "首页", description: "今天的学习入口", icon: House },
   { path: "/knowledge", label: "知识库", description: "词汇与知识 Wiki", icon: BookOpenText },
   { path: "/memory", label: "记忆", description: "按计划完成复习", icon: BrainCircuit },
   { path: "/import", label: "导入", description: "导入与整理学习资料", icon: ImportIcon },

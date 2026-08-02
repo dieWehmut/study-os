@@ -1,7 +1,5 @@
-import { Sparkles } from "lucide-react"
 import { useLocation } from "react-router-dom"
 
-import { Badge } from "@/components/ui/badge"
 import { navigationForPath } from "./navigation"
 import { ThemeToggle } from "./ThemeToggle"
 
@@ -16,13 +14,9 @@ export function Header() {
           <p className="truncate font-heading text-base font-semibold tracking-tight">{current.label}</p>
           <p className="hidden truncate text-xs text-muted-foreground sm:block">{current.description}</p>
         </div>
-				<div className="flex items-center gap-2">
-					<Badge variant="outline" className="hidden gap-1.5 bg-background/70 sm:inline-flex">
-						<Sparkles aria-hidden="true" data-icon="inline-start" />
-						Mock AI
-					</Badge>
-					<ThemeToggle />
-				</div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   )

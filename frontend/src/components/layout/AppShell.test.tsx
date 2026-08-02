@@ -14,7 +14,7 @@ describe("application shell", () => {
   })
 
   it.each([
-    ["/", "今日"],
+    ["/", "首页"],
     ["/knowledge", "知识库"],
     ["/memory", "记忆"],
     ["/import", "导入"],
