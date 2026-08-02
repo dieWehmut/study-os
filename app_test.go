@@ -50,7 +50,7 @@ func TestDesktopAPIHandlerAnswersAllowedCORSPreflightWithoutBearer(t *testing.T)
 	request := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
 	request.Header.Set("Origin", "http://wails.localhost")
 	request.Header.Set("Access-Control-Request-Method", http.MethodGet)
-	request.Header.Set("Access-Control-Request-Headers", "authorization")
+	request.Header.Set("Access-Control-Request-Headers", "authorization, x-study-os-request")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -59,6 +59,9 @@ func TestDesktopAPIHandlerAnswersAllowedCORSPreflightWithoutBearer(t *testing.T)
 	}
 	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "http://wails.localhost" {
 		t.Fatalf("allow origin = %q", got)
+	}
+	if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type, X-Study-OS-Request" {
+		t.Fatalf("allow headers = %q", got)
 	}
 }
 
