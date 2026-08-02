@@ -137,4 +137,63 @@ describe("ImportWizard", () => {
 
     expect(await screen.findByText("term is required")).toBeInTheDocument()
   })
+
+  it("lets the learner retry after a failed preview", async () => {
+    mocks.previewImport.mockRejectedValueOnce(new Error("映射无效"))
+    const { container } = render(<ImportWizard />)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(["word,meaning"], "words.csv")] } })
+    fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
+    fireEvent.change(await screen.findByLabelText("term 源列"), { target: { value: "word" } })
+    fireEvent.change(screen.getByLabelText("definition 源列"), { target: { value: "meaning" } })
+    fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("映射无效")
+    fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
+
+    expect(await screen.findByText("exact_duplicate")).toBeInTheDocument()
+    expect(mocks.previewImport).toHaveBeenCalledTimes(2)
+  })
+
+  it("lets the learner retry after a failed commit", async () => {
+    mocks.commitImport.mockRejectedValueOnce(new Error("提交失败"))
+    const { container } = render(<ImportWizard />)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(["word,meaning\nabandon,放弃\n"], "words.csv")] } })
+    fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
+    fireEvent.change(await screen.findByLabelText("term 源列"), { target: { value: "word" } })
+    fireEvent.change(screen.getByLabelText("definition 源列"), { target: { value: "meaning" } })
+    fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
+
+    const resolution = await screen.findByLabelText("第 2 行处理方式")
+    fireEvent.change(resolution, { target: { value: "merge" } })
+    fireEvent.click(screen.getByRole("button", { name: "提交导入" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent("提交失败")
+
+    fireEvent.click(screen.getByRole("button", { name: "提交导入" }))
+    expect(await screen.findByText(/已导入 1 条知识点/)).toBeInTheDocument()
+    expect(mocks.commitImport).toHaveBeenCalledTimes(2)
+  })
+
+  it("keeps the previous inspection when a SQLite table re-upload fails", async () => {
+    const sqliteInspection = {
+      ...inspection,
+      format: "sqlite" as const,
+      tables: ["words"],
+      selected_table: "",
+    }
+    mocks.uploadImport
+      .mockResolvedValueOnce({ job_id: "job-1", inspection: sqliteInspection })
+      .mockRejectedValueOnce(new Error("表读取失败"))
+    const { container } = render(<ImportWizard />)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(["sqlite"], "words.sqlite")] } })
+    fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
+    fireEvent.change(await screen.findByLabelText("SQLite 数据表"), { target: { value: "words" } })
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("表读取失败")
+    expect(screen.getByLabelText("SQLite 数据表")).toHaveValue("")
+    expect(screen.getByText(/job-1/)).toBeInTheDocument()
+    expect(mocks.uploadImport).toHaveBeenCalledTimes(2)
+  })
 })

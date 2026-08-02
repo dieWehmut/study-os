@@ -3,7 +3,12 @@ export type Theme = "light" | "dark"
 export const themeStorageKey = "study-os-theme"
 
 export function preferredTheme(): Theme {
-  const saved = localStorage.getItem(themeStorageKey)
+  let saved: string | null = null
+  try {
+    saved = localStorage.getItem(themeStorageKey)
+  } catch {
+    // Storage can be unavailable (private mode, disabled cookies); fall back to the system.
+  }
   if (saved === "light" || saved === "dark") return saved
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
 }
@@ -20,6 +25,10 @@ export function initializeTheme(): Theme {
 }
 
 export function saveTheme(theme: Theme): void {
-  localStorage.setItem(themeStorageKey, theme)
+  try {
+    localStorage.setItem(themeStorageKey, theme)
+  } catch {
+    // Persistence is best-effort; the in-memory theme still applies.
+  }
   applyTheme(theme)
 }

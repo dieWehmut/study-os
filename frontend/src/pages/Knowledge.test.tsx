@@ -87,4 +87,74 @@ describe("Knowledge page", () => {
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith({ query: "missing", limit: 100, offset: 0 }))
     expect(await screen.findByText("没有找到匹配的知识点")).toBeInTheDocument()
   })
+
+  it("exposes the knowledge list with list semantics", async () => {
+    const { container } = render(<Knowledge />)
+
+    const list = await screen.findByRole("list", { name: "知识点列表" })
+    expect(list).toBeInTheDocument()
+    expect(container.querySelectorAll('[role="listitem"]')).toHaveLength(1)
+  })
+
+  it("ignores a stale detail response after switching items", async () => {
+    const items = [
+      {
+        id: "k1",
+        item_type: "word_sense",
+        term: "alpha",
+        concise_definition: "第一个",
+      },
+      {
+        id: "k2",
+        item_type: "word_sense",
+        term: "beta",
+        concise_definition: "第二个",
+      },
+    ]
+    mocks.listKnowledge.mockResolvedValue({ count: 2, items })
+    let resolveFirst!: (item: unknown) => void
+    let resolveSecond!: (item: unknown) => void
+    mocks.getKnowledge
+      .mockImplementationOnce(
+        () => new Promise((resolve) => {
+          resolveFirst = resolve
+        }),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => {
+          resolveSecond = resolve
+        }),
+      )
+
+    render(<Knowledge />)
+    fireEvent.click(await screen.findByRole("button", { name: /beta/ }))
+
+    resolveFirst({ id: "k1", item_type: "word_sense", term: "alpha", concise_definition: "第一个", detailed_markdown: "STALE MARKDOWN" })
+    await Promise.resolve()
+    expect(screen.queryByText("STALE MARKDOWN")).not.toBeInTheDocument()
+
+    resolveSecond({ id: "k2", item_type: "word_sense", term: "beta", concise_definition: "第二个", detailed_markdown: "FRESH MARKDOWN" })
+    fireEvent.click(await screen.findByRole("tab", { name: "详细 Wiki" }))
+    expect(await screen.findByText("FRESH MARKDOWN")).toBeInTheDocument()
+    expect(screen.queryByText("STALE MARKDOWN")).not.toBeInTheDocument()
+  })
+
+  it("keeps the summary usable when detail retrieval fails", async () => {
+    mocks.listKnowledge.mockResolvedValueOnce({
+      count: 1,
+      items: [{
+        id: "k1",
+        item_type: "word_sense",
+        term: "abandon",
+        concise_definition: "放弃；抛弃",
+      }],
+    })
+    mocks.getKnowledge.mockRejectedValueOnce(new Error("offline"))
+
+    render(<Knowledge />)
+
+    expect(await screen.findByRole("heading", { name: "abandon" })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("tab", { name: "详细 Wiki" }))
+    expect(await screen.findByText(/还没有详细 Wiki/)).toBeInTheDocument()
+  })
 })
