@@ -7,6 +7,10 @@ on:
         description: Release version without the v prefix
         required: true
         type: string
+      notes:
+        description: Release notes in Markdown (optional; falls back to CHANGELOG.md)
+        required: false
+        type: string
   push:
     tags:
       - "v*"
@@ -131,11 +135,30 @@ jobs:
           $version = if ('${{ github.event.inputs.version }}') { '${{ github.event.inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
           $base = "https://github.com/${{ github.repository }}/releases/download/v$version"
           ./scripts/package-release.ps1 -Version $version -BaseUrl $base | Out-Host
+      - name: Prepare release notes
+        shell: pwsh
+        env:
+          NOTES: ${{ github.event.inputs.notes }}
+        run: |
+          $version = if ('${{ github.event.inputs.version }}') { '${{ github.event.inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
+          if ($env:NOTES) {
+            Set-Content -LiteralPath 'release-notes.md' -Value $env:NOTES -Encoding UTF8
+          } else {
+            $changelog = Get-Content -LiteralPath 'CHANGELOG.md' -Raw
+            $pattern = "(?ms)^## v?$([regex]::Escape($version))\s*$.*?(?=^## |\z)"
+            $match = [regex]::Match($changelog, $pattern)
+            if ($match.Success) {
+              Set-Content -LiteralPath 'release-notes.md' -Value $match.Value.Trim() -Encoding UTF8
+            } else {
+              Set-Content -LiteralPath 'release-notes.md' -Value "## v$version" -Encoding UTF8
+            }
+          }
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.event.inputs.version) }}
           draft: false
-          generate_release_notes: true
+          generate_release_notes: false
+          body_path: release-notes.md
           files: |
             release/*.zip
             release/*.sha256

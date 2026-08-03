@@ -1,6 +1,6 @@
 # Study OS
 
-Study OS 是一个本地优先、可定制、Agent-native 的高中自学 Web 应用。
+Study OS 是一个本地优先、可定制、Agent-native 的自学 Web 应用。
 v0.2 在英语记忆闭环（导入 → 去重 → 记忆 → 他评 → FSRS）之上补上了真实 AI
 接入、厂商化配置、词库清洗管线、云端发音与新的记忆题型。
 
@@ -75,7 +75,7 @@ pnpm --dir frontend build
 wails build -clean
 ```
 
-安装 / 更新见 [docs/release.md](docs/release.md)，一键安装：
+安装 / 更新一键脚本：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
@@ -96,13 +96,6 @@ powershell -ExecutionPolicy Bypass -File install.ps1
    ```
    之后双击桌面「学习系统」：自动启动本地后端并打开 PWA 界面；关闭浏览器窗口后后端会自动退出，不占资源。
 3. 自动更新：后端启动后定期检查 GitHub Releases，发现新版本时前端弹出更新说明与「立即更新」；设置页也有「检查更新」按钮。更新仓库可用 `STUDY_OS_UPDATE_REPO` 配置（默认 `dieWehmut/study-os`）。
-
-## 文档
-
-- [架构](docs/architecture.md)
-- [数据模型](docs/data-model.md)
-- [发布与安装](docs/release.md)
-- [v0.1 设计](docs/superpowers/specs/2026-08-01-study-os-v0.1-design.md)
 
 ## v0.2 明确不含
 

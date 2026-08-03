@@ -1,7 +1,7 @@
 {
   "name": "学习系统",
   "short_name": "学习系统",
-  "description": "本地优先、Agent 原生的高中自学工作台。",
+  "description": "本地优先、Agent 原生的自学工作台。",
   "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",
