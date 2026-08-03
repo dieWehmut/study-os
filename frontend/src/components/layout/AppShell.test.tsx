@@ -61,6 +61,20 @@ describe("application shell", () => {
     expect(screen.getByRole("navigation", { name: "移动导航" })).toBeInTheDocument()
   })
 
+  it("removes verbose nav descriptions and lets the sidebar stretch", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText("今天的学习入口")).not.toBeInTheDocument()
+    const handle = screen.getByRole("separator", { name: "调整侧栏宽度" })
+    fireEvent.keyDown(handle, { key: "ArrowRight" })
+    const sidebar = container.querySelector("aside")
+    expect(sidebar?.getAttribute("style")).toContain("272px")
+  })
+
   it("switches the page theme from the header and persists the choice", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>

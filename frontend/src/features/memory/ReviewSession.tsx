@@ -52,13 +52,16 @@ export function ReviewSession() {
   }, [])
 
   const current = queue[index]
+  const isChoicePrompt =
+    current?.prompt.prompt_type === "context_cloze" && (current.prompt.options?.length ?? 0) > 0
 
-  async function submitAnswer() {
-    if (!current || !answer.trim() || submitting) return
+  async function submitAnswer(payload?: string) {
+    const value = payload ?? answer.trim()
+    if (!current || !value || submitting) return
     setSubmitting(true)
     setError("")
     try {
-      setEvaluation(await answerReview(current.prompt.id, answer.trim(), undefined))
+      setEvaluation(await answerReview(current.prompt.id, value, undefined))
     } catch {
       setError("答案未能保存，请重试；当前输入不会丢失。")
     } finally {
@@ -141,20 +144,44 @@ export function ReviewSession() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4 pt-2">
-          <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="review-answer">
-            你的答案
-            <Textarea
-              id="review-answer"
-              value={answer}
-              disabled={Boolean(evaluation)}
-              onChange={(event) => setAnswer(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void submitAnswer()
-              }}
-              placeholder="写下你真正能说出的答案（Ctrl + Enter 提交）"
-              className="min-h-28 resize-y text-base"
-            />
-          </label>
+          {isChoicePrompt ? (
+            <fieldset className="grid gap-2" aria-label="选择答案">
+              <legend className="text-sm font-medium">选一个最合适的词</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {current.prompt.options?.map((option) => {
+                  const isCorrect = evaluation?.expected_answers.includes(option) ?? false
+                  return (
+                    <Button
+                      key={option}
+                      type="button"
+                      variant={isCorrect ? "default" : "outline"}
+                      size="lg"
+                      disabled={Boolean(evaluation) || submitting}
+                      onClick={() => void submitAnswer(option)}
+                      className="h-12 justify-start px-4 font-mono text-sm"
+                    >
+                      {option}
+                    </Button>
+                  )
+                })}
+              </div>
+            </fieldset>
+          ) : (
+            <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="review-answer">
+              你的答案
+              <Textarea
+                id="review-answer"
+                value={answer}
+                disabled={Boolean(evaluation)}
+                onChange={(event) => setAnswer(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void submitAnswer()
+                }}
+                placeholder="写下你真正能说出的答案（Ctrl + Enter 提交）"
+                className="min-h-28 resize-y text-base"
+              />
+            </label>
+          )}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           {audioSource === "browser" ? <p className="text-xs text-muted-foreground" role="status">Audio file unavailable; browser speech fallback used.</p> : null}
           {audioSource === "unavailable" ? <p className="text-xs text-muted-foreground" role="status">No pronunciation audio is available.</p> : null}
@@ -195,7 +222,7 @@ export function ReviewSession() {
           </span>
           {evaluation ? (
             <Button onClick={nextPrompt}>下一题</Button>
-          ) : (
+          ) : isChoicePrompt ? null : (
             <Button disabled={!answer.trim() || submitting} onClick={() => void submitAnswer()}>
               {submitting ? <RotateCcw aria-hidden="true" className="animate-spin" /> : null}
               提交答案

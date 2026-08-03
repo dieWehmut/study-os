@@ -83,6 +83,7 @@ export interface ReviewPrompt {
   knowledge_item_id: string
   prompt_type: string
   question: string
+  options?: string[]
 }
 
 export interface ReviewKnowledge {

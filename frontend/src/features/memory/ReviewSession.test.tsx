@@ -96,4 +96,41 @@ describe("ReviewSession", () => {
     expect(await screen.findByText("离线模式已记录你的答案。")).toBeInTheDocument()
     expect(screen.queryByText(/参考答案/)).not.toBeInTheDocument()
   })
+
+  it("offers four choices for cloze guessing and submits the picked word", async () => {
+    mocks.getDueReviews.mockResolvedValueOnce({
+      items: [
+        {
+          due_at: "2026-08-01T10:00:00Z",
+          knowledge: { id: "k1", item_type: "word_sense" },
+          prompt: {
+            id: "p3",
+            knowledge_item_id: "k1",
+            prompt_type: "context_cloze",
+            question: "They had to _____ the damaged car.",
+            options: ["abandon", "resilient", "fluent", "serendipity"],
+          },
+        },
+      ],
+    })
+    mocks.answerReview.mockResolvedValueOnce({
+      attempt_id: "a3",
+      outcome: "correct",
+      rating: 3,
+      feedback: "正确。",
+      due_at: "2026-08-02T10:00:00Z",
+      expected_answers: ["abandon"],
+    })
+    render(<ReviewSession />)
+
+    expect(await screen.findByRole("button", { name: "abandon" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "resilient" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "fluent" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "serendipity" })).toBeInTheDocument()
+    expect(screen.queryByLabelText("你的答案")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "abandon" }))
+    await waitFor(() => expect(mocks.answerReview).toHaveBeenCalledWith("p3", "abandon", undefined))
+    expect(await screen.findByText("正确。")).toBeInTheDocument()
+  })
 })

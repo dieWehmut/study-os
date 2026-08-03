@@ -39,6 +39,7 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 				ID              string   `json:"id"`
 				Type            string   `json:"prompt_type"`
 				AcceptedAnswers []string `json:"accepted_answers"`
+				Options         []string `json:"options"`
 			} `json:"prompt"`
 			Knowledge struct {
 				ItemType          string `json:"item_type"`
@@ -68,6 +69,20 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 		}
 		if item.Prompt.Type != "context_cloze" && item.Knowledge.Example != "" {
 			t.Fatalf("due response leaked example outside cloze prompt: %#v", item.Knowledge)
+		}
+		if item.Prompt.Type == "context_cloze" {
+			if len(item.Prompt.Options) != 4 {
+				t.Fatalf("cloze options = %#v, want 4 choices", item.Prompt.Options)
+			}
+			found := false
+			for _, option := range item.Prompt.Options {
+				if option == "abandon" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("cloze options missing the correct term: %#v", item.Prompt.Options)
+			}
 		}
 	}
 

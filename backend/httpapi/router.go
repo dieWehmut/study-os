@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -367,10 +370,11 @@ func isImportClientError(message string) bool {
 }
 
 type reviewPromptResponse struct {
-	ID              string `json:"id"`
-	KnowledgeItemID string `json:"knowledge_item_id"`
-	PromptType      string `json:"prompt_type"`
-	Question        string `json:"question"`
+	ID              string   `json:"id"`
+	KnowledgeItemID string   `json:"knowledge_item_id"`
+	PromptType      string   `json:"prompt_type"`
+	Question        string   `json:"question"`
+	Options         []string `json:"options,omitempty"`
 }
 
 // reviewKnowledgeResponse contains only metadata needed before answering.
@@ -526,6 +530,7 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 				KnowledgeItemID: prompt.KnowledgeItemID,
 				PromptType:      prompt.PromptType,
 				Question:        prompt.Question,
+				Options:         clozeOptions(request.Context(), application.Store, prompt, item),
 			},
 			Knowledge: reviewKnowledgeResponse{
 				ID:            item.ID,
@@ -539,6 +544,68 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 		})
 	}
 	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+}
+
+var clozeFallbackPool = []string{
+	"resilient", "fluent", "serendipity", "diligent", "ambiguous",
+	"coherent", "subtle", "vivid", "reluctant", "sincere",
+}
+
+// clozeOptions builds four deterministic choices for cloze-style guessing:
+// the correct term plus three distractors from the knowledge base, padded
+// from a small fallback pool when the library is still nearly empty. Non-word
+// items keep the free-text cloze and receive no options.
+func clozeOptions(ctx context.Context, store *db.Store, prompt models.Prompt, item models.KnowledgeItem) []string {
+	if prompt.PromptType != string(memory.PromptContextCloze) || !wordLikeItem(item.ItemType) {
+		return nil
+	}
+	correct := item.Term
+	seen := map[string]bool{strings.ToLower(strings.TrimSpace(correct)): true}
+	options := []string{correct}
+	distractors, err := store.ListDistractorTerms(ctx, item.ID, 3)
+	if err != nil {
+		distractors = nil
+	}
+	for _, term := range distractors {
+		key := strings.ToLower(strings.TrimSpace(term))
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		options = append(options, term)
+		if len(options) == 4 {
+			break
+		}
+	}
+	for _, term := range clozeFallbackPool {
+		if len(options) == 4 {
+			break
+		}
+		key := strings.ToLower(strings.TrimSpace(term))
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		options = append(options, term)
+	}
+	if len(options) < 4 {
+		return options
+	}
+	sort.SliceStable(options, func(i, j int) bool {
+		left := sha256.Sum256([]byte(prompt.ID + "\x00" + options[i]))
+		right := sha256.Sum256([]byte(prompt.ID + "\x00" + options[j]))
+		return hex.EncodeToString(left[:]) < hex.EncodeToString(right[:])
+	})
+	return options
+}
+
+func wordLikeItem(itemType string) bool {
+	switch strings.ToLower(strings.TrimSpace(itemType)) {
+	case "word_sense", "phrase", "collocation":
+		return true
+	default:
+		return false
+	}
 }
 
 func handleAnswer(response http.ResponseWriter, request *http.Request, application *app.App) {

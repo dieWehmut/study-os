@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
 
@@ -105,22 +106,22 @@ export default function Knowledge() {
             <CardTitle className="text-base">搜索知识库</CardTitle>
             <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-group">
               知识分组
-              <select
+              <Select
                 id="knowledge-group"
-                aria-label="知识分组"
+                ariaLabel="知识分组"
                 value={group}
-                onChange={(event) => {
-                  setGroup(event.target.value)
+                onValueChange={(value) => {
+                  setGroup(value)
                   setLoading(true)
                   setError("")
                 }}
-                className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="">全部</option>
-                {groups.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}</option>
-                ))}
-              </select>
+                placeholder="全部"
+                options={[
+                  { value: "", label: "全部" },
+                  ...groups.map((item) => ({ value: item.id, label: item.name })),
+                ]}
+                className="min-w-36"
+              />
             </label>
           </div>
           <label className="relative block" htmlFor="knowledge-search">

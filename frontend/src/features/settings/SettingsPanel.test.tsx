@@ -115,7 +115,10 @@ describe("SettingsPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "编辑配置" }))
     const keyInput = screen.getByLabelText("API Key")
     fireEvent.change(keyInput, { target: { value: "sk-live-secret" } })
-    fireEvent.change(screen.getByLabelText("推理模型"), { target: { value: "deepseek-v4-pro" } })
+    fireEvent.click(screen.getByRole("combobox", { name: "推理模型" }))
+    const option = await screen.findByRole("option", { name: "deepseek-v4-pro" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
     fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
 
     await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({

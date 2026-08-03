@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import { MAX_DAILY_LIMIT, MIN_DAILY_LIMIT, normalizeDailyLimit } from "@/lib/settings"
 import { useSettingsStore } from "@/store/useSettingsStore"
 
@@ -173,31 +174,33 @@ export default function SettingsPanel() {
                   <div className="grid grid-cols-2 gap-2">
                     <label className="grid gap-1 text-xs font-medium" htmlFor="ds-model">
                       模型
-                      <select
+                      <Select
                         id="ds-model"
-                        aria-label="模型"
+                        ariaLabel="模型"
                         value={modelDraft}
-                        onChange={(event) => setModelDraft(event.target.value)}
-                        className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                      >
-                        <option value="">默认（deepseek-v4-flash）</option>
-                        <option value="deepseek-v4-flash">deepseek-v4-flash</option>
-                        <option value="deepseek-v4-pro">deepseek-v4-pro</option>
-                      </select>
+                        onValueChange={setModelDraft}
+                        placeholder="默认（deepseek-v4-flash）"
+                        options={[
+                          { value: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+                          { value: "deepseek-v4-pro", label: "deepseek-v4-pro" },
+                        ]}
+                        className="w-full min-w-0"
+                      />
                     </label>
                     <label className="grid gap-1 text-xs font-medium" htmlFor="ds-reasoning-model">
                       推理模型
-                      <select
+                      <Select
                         id="ds-reasoning-model"
-                        aria-label="推理模型"
+                        ariaLabel="推理模型"
                         value={reasoningModelDraft}
-                        onChange={(event) => setReasoningModelDraft(event.target.value)}
-                        className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                      >
-                        <option value="">默认（deepseek-v4-pro）</option>
-                        <option value="deepseek-v4-pro">deepseek-v4-pro</option>
-                        <option value="deepseek-v4-flash">deepseek-v4-flash</option>
-                      </select>
+                        onValueChange={setReasoningModelDraft}
+                        placeholder="默认（deepseek-v4-pro）"
+                        options={[
+                          { value: "deepseek-v4-pro", label: "deepseek-v4-pro" },
+                          { value: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+                        ]}
+                        className="w-full min-w-0"
+                      />
                     </label>
                   </div>
                   <label className="grid gap-1 text-xs font-medium" htmlFor="ds-base-url">

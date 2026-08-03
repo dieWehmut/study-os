@@ -134,6 +134,32 @@ func (s *Store) ListItemsByGroup(ctx context.Context, groupID string, limit, off
 	return items, rows.Err()
 }
 
+// ListDistractorTerms returns distinct word-like terms usable as wrong options
+// for a cloze/guessing prompt, excluding the current item.
+func (s *Store) ListDistractorTerms(ctx context.Context, excludeID string, limit int) ([]string, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 10
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT DISTINCT term FROM knowledge_items
+		WHERE id != ? AND item_type IN ('word_sense', 'phrase', 'collocation')
+		ORDER BY term ASC
+		LIMIT ?`, excludeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	terms := make([]string, 0, limit)
+	for rows.Next() {
+		var term string
+		if err := rows.Scan(&term); err != nil {
+			return nil, err
+		}
+		terms = append(terms, term)
+	}
+	return terms, rows.Err()
+}
+
 func (s *Store) UpsertAudioAsset(ctx context.Context, asset models.AudioAsset) error {
 	createdAt := asset.CreatedAt
 	if createdAt.IsZero() {

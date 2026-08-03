@@ -167,7 +167,10 @@ describe("Knowledge page", () => {
     mocks.listKnowledge.mockResolvedValueOnce({ count: 0, items: [] })
     render(<Knowledge />)
 
-    fireEvent.change(await screen.findByLabelText("知识分组"), { target: { value: "g1" } })
+    fireEvent.click(await screen.findByRole("combobox", { name: "知识分组" }))
+    const option = await screen.findByRole("option", { name: "abandon 词族" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith({ query: "", group: "g1", limit: 100, offset: 0 }))
   })
 })
