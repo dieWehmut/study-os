@@ -160,7 +160,16 @@ export function ReviewSession() {
           {audioSource === "unavailable" ? <p className="text-xs text-muted-foreground" role="status">No pronunciation audio is available.</p> : null}
 
           {evaluation ? (
-            <div className="flex flex-col gap-4 rounded-xl border bg-muted/35 p-4" aria-live="polite">
+            <div
+              className={
+                evaluation.outcome === "correct"
+                  ? "flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/5 p-4"
+                  : evaluation.outcome === "partial"
+                    ? "flex flex-col gap-4 rounded-xl border border-accent/45 bg-accent/20 p-4"
+                    : "flex flex-col gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+              }
+              aria-live="polite"
+            >
               <div className="flex items-center gap-2">
                 <Badge variant={evaluation.outcome === "incorrect" ? "destructive" : "default"}>
                   {evaluation.outcome === "correct" ? "正确" : evaluation.outcome === "partial" ? "部分正确" : "需要重学"}

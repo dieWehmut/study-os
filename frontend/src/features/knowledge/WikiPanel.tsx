@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
+import { BookOpenText } from "lucide-react"
 
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
@@ -14,8 +15,11 @@ interface WikiPanelProps {
 export function WikiPanel({ item }: WikiPanelProps) {
   if (!item) {
     return (
-      <Card className="min-h-64 border-dashed">
-        <CardContent className="grid min-h-64 place-items-center text-center text-sm text-muted-foreground">选择一个知识点查看 Wiki</CardContent>
+      <Card className="grid min-h-64 place-items-center border-dashed">
+        <CardContent className="grid justify-items-center gap-2 text-center text-sm text-muted-foreground">
+          <BookOpenText aria-hidden="true" className="size-6 text-primary/50" />
+          <span>选择一个知识点查看 Wiki</span>
+        </CardContent>
       </Card>
     )
   }
@@ -28,7 +32,7 @@ export function WikiPanel({ item }: WikiPanelProps) {
           {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
           {item.tags?.map((tag) => <Badge key={tag} variant="ghost">#{tag}</Badge>)}
         </div>
-        <h2 className="font-heading text-3xl font-medium tracking-tight">{item.term}</h2>
+        <h2 className="font-heading text-3xl font-semibold tracking-tight">{item.term}</h2>
         {item.part_of_speech || item.pronunciation ? (
           <CardDescription>{[item.part_of_speech, item.pronunciation].filter(Boolean).join(" · ")}</CardDescription>
         ) : null}

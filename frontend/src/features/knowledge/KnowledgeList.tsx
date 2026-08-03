@@ -22,10 +22,11 @@ export function KnowledgeList({ items, loading = false, onSelect, selectedId }: 
           <button
             type="button"
             aria-pressed={item.id === selectedId}
+            aria-current={item.id === selectedId ? "true" : undefined}
             onClick={() => onSelect(item)}
             className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Card className={item.id === selectedId ? "ring-2 ring-primary/45" : "hover:bg-muted/35"} size="sm">
+            <Card className={item.id === selectedId ? "ring-2 ring-primary/50 shadow-sm" : "transition-colors hover:bg-muted/40"} size="sm">
               <CardHeader className="gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="truncate text-base">{item.term}</CardTitle>

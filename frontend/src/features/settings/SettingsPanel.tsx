@@ -81,12 +81,31 @@ export default function SettingsPanel() {
         </CardHeader>
         <CardContent className="grid gap-3">
           {vendors.map((vendor) => (
-            <div key={vendor.id} className="grid gap-2 rounded-lg border border-border bg-muted/25 px-3 py-2">
+            <div key={vendor.id} className={vendor.active ? "grid gap-2 rounded-xl border border-primary/30 bg-primary/4 px-3 py-2.5" : "grid gap-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5"}>
               <div className="flex items-center justify-between gap-3">
-                <strong className="text-sm">{vendor.display_name}</strong>
-                <Badge variant={vendor.active ? "default" : vendor.implemented ? "secondary" : "outline"}>
-                  {vendor.active ? "当前" : vendor.implemented ? "已接入" : "待接入"}
-                </Badge>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className={vendor.active ? "size-2 shrink-0 rounded-full bg-primary" : vendor.implemented ? "size-2 shrink-0 rounded-full bg-muted-foreground/50" : "size-2 shrink-0 rounded-full border border-muted-foreground/40"} />
+                  <strong className="truncate text-sm">{vendor.display_name}</strong>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {vendor.active ? (
+                    <Badge variant="default">当前</Badge>
+                  ) : vendor.implemented ? (
+                    <Badge variant="secondary">已接入</Badge>
+                  ) : (
+                    <Badge variant="outline">待接入</Badge>
+                  )}
+                  {vendor.implemented ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {!vendor.active ? (
+                        <Button size="xs" variant="outline" onClick={() => void switchProvider(vendor.id)}>设为当前</Button>
+                      ) : null}
+                      <Button size="xs" variant="outline" disabled={isTestingProvider} onClick={() => void testProvider(vendor.id)}>
+                        测试连通性
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
               {vendor.implemented && vendor.id !== "mock" ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -96,16 +115,11 @@ export default function SettingsPanel() {
               ) : null}
               {vendor.base_url ? <code className="break-all text-xs text-muted-foreground">{vendor.base_url}</code> : null}
               {vendor.models && vendor.models.length > 0 ? (
-                <p className="text-xs text-muted-foreground">模型：{vendor.models.join(" / ")}</p>
-              ) : null}
-              {vendor.implemented ? (
-                <div className="flex flex-wrap gap-2">
-                  {!vendor.active ? (
-                    <Button size="sm" variant="outline" onClick={() => void switchProvider(vendor.id)}>设为当前</Button>
-                  ) : null}
-                  <Button size="sm" variant="outline" disabled={isTestingProvider} onClick={() => void testProvider(vendor.id)}>
-                    测试连通性
-                  </Button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">模型：</span>
+                  {vendor.models.map((model) => (
+                    <span key={model} className="rounded-md border border-border bg-background/70 px-1.5 py-0.5 font-mono text-[0.68rem] text-muted-foreground">{model}</span>
+                  ))}
                 </div>
               ) : null}
             </div>

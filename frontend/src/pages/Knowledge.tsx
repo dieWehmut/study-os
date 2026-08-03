@@ -101,9 +101,30 @@ export default function Knowledge() {
 
       <Card>
         <CardHeader className="gap-3">
-          <CardTitle className="text-base">搜索知识库</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base">搜索知识库</CardTitle>
+            <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-group">
+              知识分组
+              <select
+                id="knowledge-group"
+                aria-label="知识分组"
+                value={group}
+                onChange={(event) => {
+                  setGroup(event.target.value)
+                  setLoading(true)
+                  setError("")
+                }}
+                className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <option value="">全部</option>
+                {groups.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <label className="relative block" htmlFor="knowledge-search">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="knowledge-search"
               type="search"
@@ -112,27 +133,8 @@ export default function Knowledge() {
               placeholder="搜索词汇或定义…"
               value={query}
               onChange={(event) => updateQuery(event.target.value)}
-              className="pl-9"
+              className="h-10 pl-9"
             />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium" htmlFor="knowledge-group">
-            知识分组
-            <select
-              id="knowledge-group"
-              aria-label="知识分组"
-              value={group}
-              onChange={(event) => {
-                setGroup(event.target.value)
-                setLoading(true)
-                setError("")
-              }}
-              className="w-fit rounded-md border border-border bg-background px-3 py-1.5 text-sm"
-            >
-              <option value="">全部</option>
-              {groups.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
           </label>
         </CardHeader>
         <CardContent>

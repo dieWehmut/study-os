@@ -78,7 +78,7 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 			Count:     backupCount,
 		},
 		App: appStatus{
-			Version:  "0.1.0-dev",
+			Version:  "0.2.0-dev",
 			Platform: runtime.GOOS + "/" + runtime.GOARCH,
 		},
 	}

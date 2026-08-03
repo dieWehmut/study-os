@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowRight, CalendarCheck2, CloudOff, Flame, LibraryBig } from "lucide-react"
+import { ArrowRight, CalendarCheck2, CloudOff, Flame, LibraryBig, Sparkles } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { getDashboard, seedDemo } from "@/api/dashboard"
@@ -23,18 +23,18 @@ export default function Home() {
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard)
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
-	const [error, setError] = useState("")
+  const [error, setError] = useState("")
 
   async function refreshDashboard() {
-		setLoading(true)
-		setError("")
-		try {
-			setDashboard(await getDashboard())
-		} catch {
-			setError("\u65e0\u6cd5\u8bfb\u53d6\u5b66\u4e60\u8fdb\u5ea6\uff0c\u8bf7\u786e\u8ba4\u672c\u5730\u540e\u7aef\u6b63\u5728\u8fd0\u884c\u3002")
-		} finally {
-			setLoading(false)
-		}
+    setLoading(true)
+    setError("")
+    try {
+      setDashboard(await getDashboard())
+    } catch {
+      setError("无法读取学习进度，请确认本地后端正在运行。")
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -43,9 +43,9 @@ export default function Home() {
       .then((value) => {
         if (active) setDashboard(value)
       })
-			.catch(() => {
-				if (active) setError("\u65e0\u6cd5\u8bfb\u53d6\u5b66\u4e60\u8fdb\u5ea6\uff0c\u8bf7\u786e\u8ba4\u672c\u5730\u540e\u7aef\u6b63\u5728\u8fd0\u884c\u3002")
-			})
+      .catch(() => {
+        if (active) setError("无法读取学习进度，请确认本地后端正在运行。")
+      })
       .finally(() => {
         if (active) setLoading(false)
       })
@@ -56,12 +56,12 @@ export default function Home() {
 
   async function loadDemo() {
     setSeeding(true)
-		setError("")
+    setError("")
     try {
       await seedDemo()
       await refreshDashboard()
-		} catch {
-			setError("\u82f1\u8bed\u793a\u4f8b\u6ca1\u6709\u8f7d\u5165\uff0c\u8bf7\u91cd\u8bd5\u3002")
+    } catch {
+      setError("英语示例没有载入，请重试。")
     } finally {
       setSeeding(false)
     }
@@ -75,55 +75,70 @@ export default function Home() {
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">把新知识变成可记住的进度</h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">只检测值得记忆的内容；每次作答都会留下他评、反馈和下一次复习安排。</p>
         </div>
-        <Link className={buttonVariants({ size: "lg" })} to="/memory">
-          开始复习 <ArrowRight data-icon="inline-end" />
-        </Link>
       </div>
 
-		{error ? (
-			<div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/35 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-				<span>{error}</span>
-				<Button variant="outline" size="sm" disabled={loading} onClick={() => void refreshDashboard()}>重试</Button>
-			</div>
-		) : null}
+      {error ? (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/35 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" disabled={loading} onClick={() => void refreshDashboard()}>重试</Button>
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-sm font-normal text-muted-foreground">待复习</CardTitle>
-            <CalendarCheck2 aria-hidden="true" className="text-primary" />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="relative overflow-hidden lg:col-span-2">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-primary/8 to-transparent" />
+          <CardHeader className="gap-3">
+            <CardTitle className="text-sm font-normal text-muted-foreground">今天要巩固</CardTitle>
+            <p className="font-heading text-5xl font-semibold tracking-tight sm:text-6xl">
+              {loading ? "—" : `${dashboard.due_count} 个待复习`}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              今日已完成 {dashboard.reviewed_today} 次检测 · 连续学习 {dashboard.current_streak} 天
+            </p>
           </CardHeader>
-          <CardContent><p className="text-3xl font-semibold">{loading ? "…" : `${dashboard.due_count} 个待复习`}</p></CardContent>
+          <CardContent className="flex flex-wrap items-center gap-3">
+            <Link className={buttonVariants({ size: "lg" })} to="/memory">
+              开始复习<ArrowRight data-icon="inline-end" />
+            </Link>
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              {dashboard.offline ? <CloudOff aria-hidden="true" className="size-4 text-primary" /> : <Sparkles aria-hidden="true" className="size-4 text-primary" />}
+              {dashboard.provider === "mock" ? "Mock AI" : dashboard.provider} · {dashboard.offline ? "离线可用" : "在线"}
+            </span>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-sm font-normal text-muted-foreground">知识点</CardTitle>
-            <LibraryBig aria-hidden="true" className="text-primary" />
-          </CardHeader>
-          <CardContent><p className="text-3xl font-semibold">{loading ? "…" : `${dashboard.knowledge_count} 个知识点`}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-sm font-normal text-muted-foreground">连续学习</CardTitle>
-            <Flame aria-hidden="true" className="text-primary" />
-          </CardHeader>
-          <CardContent><p className="text-3xl font-semibold">{loading ? "…" : `${dashboard.current_streak} 天`}</p></CardContent>
-        </Card>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card/70 px-4 py-3 text-sm">
-        {dashboard.offline ? <CloudOff aria-hidden="true" className="text-primary" /> : null}
-        <span>{dashboard.provider === "mock" ? "Mock AI" : dashboard.provider} · {dashboard.offline ? "离线可用" : "在线"}</span>
-        <span className="text-muted-foreground">今日已完成 {dashboard.reviewed_today} 次检测</span>
+        <div className="grid content-stretch gap-4 sm:grid-cols-3 lg:grid-cols-1">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="text-sm font-normal text-muted-foreground">知识点</CardTitle>
+              <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary"><LibraryBig aria-hidden="true" className="size-4" /></span>
+            </CardHeader>
+            <CardContent><p className="text-3xl font-semibold">{loading ? "—" : `${dashboard.knowledge_count} 个知识点`}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="text-sm font-normal text-muted-foreground">今日检测</CardTitle>
+              <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary"><CalendarCheck2 aria-hidden="true" className="size-4" /></span>
+            </CardHeader>
+            <CardContent><p className="text-3xl font-semibold">{loading ? "—" : `${dashboard.reviewed_today} 次`}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="text-sm font-normal text-muted-foreground">连续学习</CardTitle>
+              <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary"><Flame aria-hidden="true" className="size-4" /></span>
+            </CardHeader>
+            <CardContent><p className="text-3xl font-semibold">{loading ? "—" : `${dashboard.current_streak} 天`}</p></CardContent>
+          </Card>
+        </div>
       </div>
 
       {!loading && dashboard.knowledge_count === 0 ? (
         <Card className="border-dashed">
-          <CardHeader>
+          <CardHeader className="gap-2">
             <CardTitle>先体验一轮真实记忆闭环</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-start gap-3">
-            <p className="text-sm leading-6 text-muted-foreground">载入一个英语词义示例，系统会生成英译中、中译英和语境填空三种检测。</p>
+            <p className="text-sm leading-6 text-muted-foreground">加载一个英语词义示例，系统会生成英译中、中译英和语境填空三种检测。</p>
             <Button disabled={seeding} onClick={() => void loadDemo()}>{seeding ? "正在载入…" : "载入英语示例"}</Button>
           </CardContent>
         </Card>
