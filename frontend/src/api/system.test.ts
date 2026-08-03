@@ -35,6 +35,7 @@ describe("system API boundary", () => {
       name: "openai",
       mode: "remote",
       configured: true,
+      available: false,
       key_configured: true,
     })
     expect(JSON.stringify(status)).not.toContain("secret-value")

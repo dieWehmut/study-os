@@ -16,14 +16,19 @@ import {
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
+import { subjectName } from "@/lib/subjects"
+import { itemTypeLabel } from "@/lib/labels"
+import { useSubjectStore } from "@/store/useSubjectStore"
 
 const promptLabels: Record<string, string> = {
   en_to_zh: "看英文，说中文",
   zh_to_en: "看中文，说英文",
   context_cloze: "语境填空",
+  make_sentence: "造句（AI 批改）",
 }
 
 export function ReviewSession() {
+  const subject = useSubjectStore((state) => state.subject)
   const [queue, setQueue] = useState<DueReview[]>([])
   const [index, setIndex] = useState(0)
   const [answer, setAnswer] = useState("")
@@ -35,7 +40,7 @@ export function ReviewSession() {
 
   useEffect(() => {
     let active = true
-    getDueReviews()
+    getDueReviews(20, subject === "all" ? undefined : subject)
       .then(({ items }) => {
         if (active) setQueue(items)
       })
@@ -48,16 +53,19 @@ export function ReviewSession() {
     return () => {
       active = false
     }
-  }, [])
+  }, [subject])
 
   const current = queue[index]
+  const isChoicePrompt =
+    current?.prompt.prompt_type === "context_cloze" && (current.prompt.options?.length ?? 0) > 0
 
-  async function submitAnswer() {
-    if (!current || !answer.trim() || submitting) return
+  async function submitAnswer(payload?: string) {
+    const value = payload ?? answer.trim()
+    if (!current || !value || submitting) return
     setSubmitting(true)
     setError("")
     try {
-      setEvaluation(await answerReview(current.prompt.id, answer.trim(), undefined))
+      setEvaluation(await answerReview(current.prompt.id, value, undefined))
     } catch {
       setError("答案未能保存，请重试；当前输入不会丢失。")
     } finally {
@@ -114,14 +122,17 @@ export function ReviewSession() {
           <p className="text-sm font-medium">记忆检测</p>
           <p className="text-xs text-muted-foreground">{index + 1} / {queue.length}</p>
         </div>
-        <Badge variant="outline">{promptLabels[current.prompt.prompt_type] ?? current.prompt.prompt_type}</Badge>
+        <div className="flex items-center gap-2">
+          {subject !== "all" ? <Badge variant="secondary">{subjectName(subject)}</Badge> : null}
+          <Badge variant="outline">{promptLabels[current.prompt.prompt_type] ?? current.prompt.prompt_type}</Badge>
+        </div>
       </div>
       <Progress value={progress} aria-label="复习进度" />
 
-      <Card className="border-border/80 bg-card/90 shadow-[0_18px_70px_-48px_hsl(var(--primary)/0.65)]">
+      <Card className="border-border/80 bg-card/90">
         <CardHeader className="gap-4 border-b">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="secondary">{current.knowledge.item_type}</Badge>
+            <Badge variant="secondary">{itemTypeLabel(current.knowledge.item_type)}</Badge>
             {current.knowledge.level ? <span>{current.knowledge.level}</span> : null}
           </div>
           <div className="flex items-start justify-between gap-4">
@@ -140,34 +151,69 @@ export function ReviewSession() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4 pt-2">
-          <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="review-answer">
-            你的答案
-            <Textarea
-              id="review-answer"
-              value={answer}
-              disabled={Boolean(evaluation)}
-              onChange={(event) => setAnswer(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void submitAnswer()
-              }}
-              placeholder="写下你真正能说出的答案（Ctrl + Enter 提交）"
-              className="min-h-28 resize-y text-base"
-            />
-          </label>
+          {isChoicePrompt ? (
+            <fieldset className="grid gap-2" aria-label="选择答案">
+              <legend className="text-sm font-medium">选一个最合适的词</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {current.prompt.options?.map((option) => {
+                  const isCorrect = evaluation?.expected_answers.includes(option) ?? false
+                  return (
+                    <Button
+                      key={option}
+                      type="button"
+                      variant={isCorrect ? "default" : "outline"}
+                      size="lg"
+                      disabled={Boolean(evaluation) || submitting}
+                      onClick={() => void submitAnswer(option)}
+                      className="h-12 justify-start px-4 font-mono text-sm"
+                    >
+                      {option}
+                    </Button>
+                  )
+                })}
+              </div>
+            </fieldset>
+          ) : (
+            <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="review-answer">
+              你的答案
+              <Textarea
+                id="review-answer"
+                value={answer}
+                disabled={Boolean(evaluation)}
+                onChange={(event) => setAnswer(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void submitAnswer()
+                }}
+                placeholder="写下你真正能说出的答案（Ctrl + Enter 提交）"
+                className="min-h-28 resize-y text-base"
+              />
+            </label>
+          )}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          {audioSource === "browser" ? <p className="text-xs text-muted-foreground" role="status">Audio file unavailable; browser speech fallback used.</p> : null}
-          {audioSource === "unavailable" ? <p className="text-xs text-muted-foreground" role="status">No pronunciation audio is available.</p> : null}
+          {audioSource === "browser" ? <p className="text-xs text-muted-foreground" role="status">本地音频不可用，已改用浏览器朗读。</p> : null}
+          {audioSource === "unavailable" ? <p className="text-xs text-muted-foreground" role="status">没有可用的发音音频。</p> : null}
 
           {evaluation ? (
-            <div className="flex flex-col gap-4 rounded-xl border bg-muted/35 p-4" aria-live="polite">
+            <div
+              className={
+                evaluation.outcome === "correct"
+                  ? "flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/5 p-4"
+                  : evaluation.outcome === "partial"
+                    ? "flex flex-col gap-4 rounded-xl border border-accent/45 bg-accent/20 p-4"
+                    : "flex flex-col gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+              }
+              aria-live="polite"
+            >
               <div className="flex items-center gap-2">
                 <Badge variant={evaluation.outcome === "incorrect" ? "destructive" : "default"}>
                   {evaluation.outcome === "correct" ? "正确" : evaluation.outcome === "partial" ? "部分正确" : "需要重学"}
                 </Badge>
-                <span className="text-xs text-muted-foreground">系统他评 · {evaluation.rating === 3 ? "Good" : evaluation.rating === 2 ? "Hard" : "Again"}</span>
+                <span className="text-xs text-muted-foreground">系统他评 · {evaluation.rating === 3 ? "良好" : evaluation.rating === 2 ? "困难" : "重来"}</span>
               </div>
               <p className="text-sm leading-6">{evaluation.feedback}</p>
-              <p className="text-sm text-muted-foreground">参考答案：{evaluation.expected_answers.join(" / ")}</p>
+              {evaluation.expected_answers.length > 0 ? (
+                <p className="text-sm text-muted-foreground">参考答案：{evaluation.expected_answers.join(" / ")}</p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" aria-label="改判为重来" onClick={() => void correctRating(1)}>改判为重来</Button>
                 <Button variant="outline" size="sm" aria-label="改判为较难" onClick={() => void correctRating(2)}>改判为较难</Button>
@@ -183,7 +229,7 @@ export function ReviewSession() {
           </span>
           {evaluation ? (
             <Button onClick={nextPrompt}>下一题</Button>
-          ) : (
+          ) : isChoicePrompt ? null : (
             <Button disabled={!answer.trim() || submitting} onClick={() => void submitAnswer()}>
               {submitting ? <RotateCcw aria-hidden="true" className="animate-spin" /> : null}
               提交答案

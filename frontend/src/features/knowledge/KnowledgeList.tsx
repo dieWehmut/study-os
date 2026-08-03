@@ -3,6 +3,8 @@ import { BookOpenText } from "lucide-react"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { subjectName } from "@/lib/subjects"
+import { itemTypeLabel } from "@/lib/labels"
 
 interface KnowledgeListProps {
   items: KnowledgeItem[]
@@ -22,18 +24,20 @@ export function KnowledgeList({ items, loading = false, onSelect, selectedId }: 
           <button
             type="button"
             aria-pressed={item.id === selectedId}
+            aria-current={item.id === selectedId ? "true" : undefined}
             onClick={() => onSelect(item)}
             className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Card className={item.id === selectedId ? "ring-2 ring-primary/45" : "hover:bg-muted/35"} size="sm">
+            <Card className={item.id === selectedId ? "ring-2 ring-primary/50 shadow-sm" : "transition-colors hover:bg-muted/40"} size="sm">
               <CardHeader className="gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="truncate text-base">{item.term}</CardTitle>
                   <BookOpenText aria-hidden="true" className="size-4 shrink-0 text-primary" />
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge variant="secondary">{item.item_type}</Badge>
+                  <Badge variant="secondary">{itemTypeLabel(item.item_type)}</Badge>
                   {item.part_of_speech ? <Badge variant="outline">{item.part_of_speech}</Badge> : null}
+                  {item.subject ? <Badge variant="ghost">{subjectName(item.subject)}</Badge> : null}
                   {item.level ? <span className="text-xs text-muted-foreground">{item.level}</span> : null}
                 </div>
                 <CardDescription className="line-clamp-2">{item.concise_definition}</CardDescription>

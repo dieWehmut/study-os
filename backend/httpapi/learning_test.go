@@ -39,6 +39,7 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 				ID              string   `json:"id"`
 				Type            string   `json:"prompt_type"`
 				AcceptedAnswers []string `json:"accepted_answers"`
+				Options         []string `json:"options"`
 			} `json:"prompt"`
 			Knowledge struct {
 				ItemType          string `json:"item_type"`
@@ -53,7 +54,7 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 		} `json:"items"`
 	}
 	decodeJSON(t, dueResponse, &dueBody)
-	if len(dueBody.Items) != 3 || dueBody.Items[0].Knowledge.ItemType != "word_sense" {
+	if len(dueBody.Items) != 4 || dueBody.Items[0].Knowledge.ItemType != "word_sense" {
 		t.Fatalf("due items = %#v", dueBody.Items)
 	}
 	if len(dueBody.Items[0].Prompt.AcceptedAnswers) != 0 {
@@ -68,6 +69,20 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 		}
 		if item.Prompt.Type != "context_cloze" && item.Knowledge.Example != "" {
 			t.Fatalf("due response leaked example outside cloze prompt: %#v", item.Knowledge)
+		}
+		if item.Prompt.Type == "context_cloze" {
+			if len(item.Prompt.Options) != 4 {
+				t.Fatalf("cloze options = %#v, want 4 choices", item.Prompt.Options)
+			}
+			found := false
+			for _, option := range item.Prompt.Options {
+				if option == "abandon" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("cloze options missing the correct term: %#v", item.Prompt.Options)
+			}
 		}
 	}
 
@@ -138,7 +153,7 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 		Offline        bool   `json:"offline"`
 	}
 	decodeJSON(t, dashboardResponse, &dashboard)
-	if dashboard.KnowledgeCount != 1 || dashboard.PromptCount != 3 || dashboard.AttemptCount != 1 {
+	if dashboard.KnowledgeCount != 1 || dashboard.PromptCount != 4 || dashboard.AttemptCount != 1 {
 		t.Fatalf("dashboard = %#v", dashboard)
 	}
 	if dashboard.ReviewedToday != 1 || dashboard.CurrentStreak != 1 || dashboard.Provider != "mock" || !dashboard.Offline {

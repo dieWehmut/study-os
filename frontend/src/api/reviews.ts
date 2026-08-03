@@ -1,8 +1,10 @@
 import { apiRequest } from "./client"
 import type { DueReview, ReviewEvaluation } from "./types"
 
-export function getDueReviews(limit = 20): Promise<{ items: DueReview[] }> {
-  return apiRequest<{ items: DueReview[] }>(`/reviews/due?limit=${limit}`)
+export function getDueReviews(limit = 20, subject?: string): Promise<{ items: DueReview[] }> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (subject) params.set("subject", subject)
+  return apiRequest<{ items: DueReview[] }>(`/reviews/due?${params.toString()}`)
 }
 
 export function answerReview(

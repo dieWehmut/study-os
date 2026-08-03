@@ -13,15 +13,16 @@ type ImportMapping = Record<string, string>
 type Resolution = "merge" | "new_sense" | "reject"
 
 const targetFields = [
-  { key: "term", label: "term", required: true },
-  { key: "definition", label: "definition", required: true },
-  { key: "item_type", label: "item_type", required: false },
-  { key: "part_of_speech", label: "part_of_speech", required: false },
-  { key: "pronunciation", label: "pronunciation", required: false },
-  { key: "example", label: "example", required: false },
-  { key: "wiki", label: "wiki", required: false },
-  { key: "level", label: "level", required: false },
-  { key: "tags", label: "tags", required: false },
+  { key: "term", label: "单词", required: true },
+  { key: "definition", label: "释义", required: true },
+  { key: "item_type", label: "类型", required: false },
+  { key: "part_of_speech", label: "词性", required: false },
+  { key: "pronunciation", label: "发音", required: false },
+  { key: "example", label: "例句", required: false },
+  { key: "wiki", label: "百科", required: false },
+  { key: "level", label: "等级", required: false },
+  { key: "subject", label: "学科", required: false },
+  { key: "tags", label: "标签", required: false },
 ] as const
 
 const dispositionLabels: Record<string, string> = {
@@ -81,7 +82,7 @@ export function ImportWizard() {
   async function buildPreview() {
     if (!uploadResult || pending) return
     if (!mapping.term || !mapping.definition) {
-      setError("请选择 term 和 definition 的源列。")
+      setError("请选择「单词」和「释义」的源列。")
       return
     }
     setPending("preview")
@@ -176,7 +177,7 @@ export function ImportWizard() {
 
             {inspection.format === "sqlite" && inspection.tables.length > 0 ? (
               <label className="grid gap-2 text-sm font-medium" htmlFor="import-table">
-                SQLite 数据表
+                数据表
                 <select
                   id="import-table"
                   value={inspection.selected_table ?? ""}

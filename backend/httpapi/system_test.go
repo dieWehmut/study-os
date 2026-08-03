@@ -18,13 +18,15 @@ import (
 func TestSystemStatusRedactsProviderSecretAndReportsLocalState(t *testing.T) {
 	dataDir := t.TempDir()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "openai",
-		OpenAIAPIKey:  "test-secret-key",
-		OpenAIBaseURL: "https://example.test/v1",
-		OpenAIModel:   "test-model",
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "deepseek",
+		DeepSeek: config.DeepSeekConfig{
+			APIKey:  "test-secret-key",
+			BaseURL: "https://example.test/v1",
+			Model:   "test-model",
+		},
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)
@@ -63,7 +65,7 @@ func TestSystemStatusRedactsProviderSecretAndReportsLocalState(t *testing.T) {
 	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Provider.Name != "openai" || !body.Provider.Configured || body.Provider.Available || !body.Provider.KeyConfigured || body.Provider.Model != "test-model" {
+	if body.Provider.Name != "deepseek" || !body.Provider.Configured || !body.Provider.Available || !body.Provider.KeyConfigured || body.Provider.Model != "test-model" {
 		t.Fatalf("provider status = %#v", body.Provider)
 	}
 	if body.Data.Directory != dataDir || body.Data.DatabasePath != filepath.Join(dataDir, "study.db") {

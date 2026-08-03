@@ -20,6 +20,7 @@ type Candidate struct {
 	Example         string   `json:"example,omitempty"`
 	Wiki            string   `json:"wiki,omitempty"`
 	Level           string   `json:"level,omitempty"`
+	Subject         string   `json:"subject,omitempty"`
 	Tags            []string `json:"tags,omitempty"`
 	RawJSON         string   `json:"-"`
 	Fingerprint     string   `json:"fingerprint"`
@@ -43,6 +44,7 @@ func NormalizeCandidate(candidate Candidate) Candidate {
 	candidate.Example = normalizeText(candidate.Example)
 	candidate.Wiki = strings.TrimSpace(candidate.Wiki)
 	candidate.Level = normalizeToken(candidate.Level)
+	candidate.Subject = normalizeToken(candidate.Subject)
 	candidate.Tags = normalizeTags(candidate.Tags)
 
 	hash := sha256.New()

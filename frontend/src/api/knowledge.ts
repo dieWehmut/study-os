@@ -3,6 +3,8 @@ import type { KnowledgeItem } from "./types"
 
 export interface ListKnowledgeOptions {
   query?: string
+  group?: string
+  subject?: string
   limit?: number
   offset?: number
 }
@@ -12,9 +14,22 @@ export interface KnowledgeListResponse {
   count: number
 }
 
+export interface KnowledgeGroup {
+  id: string
+  name: string
+  kind?: string
+}
+
+export interface KnowledgeGroupListResponse {
+  items: KnowledgeGroup[]
+  count: number
+}
+
 export function listKnowledge(options: ListKnowledgeOptions = {}): Promise<KnowledgeListResponse> {
   const params = new URLSearchParams()
   if (options.query !== undefined) params.set("q", options.query)
+  if (options.group !== undefined) params.set("group", options.group)
+  if (options.subject !== undefined) params.set("subject", options.subject)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   if (options.offset !== undefined) params.set("offset", String(options.offset))
   const suffix = params.toString()
@@ -23,4 +38,8 @@ export function listKnowledge(options: ListKnowledgeOptions = {}): Promise<Knowl
 
 export function getKnowledge(id: string): Promise<KnowledgeItem> {
   return apiRequest<KnowledgeItem>(`/knowledge/${encodeURIComponent(id)}`)
+}
+
+export function listGroups(): Promise<KnowledgeGroupListResponse> {
+  return apiRequest<KnowledgeGroupListResponse>("/groups")
 }

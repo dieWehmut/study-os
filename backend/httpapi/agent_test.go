@@ -18,10 +18,10 @@ import (
 func TestProviderStatusAndMockGenerationStayOffline(t *testing.T) {
 	dataDir := t.TempDir()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)
@@ -59,16 +59,23 @@ func TestProviderStatusAndMockGenerationStayOffline(t *testing.T) {
 	}
 }
 
-func TestOpenAIProviderEndpointNeverLeaksKey(t *testing.T) {
+func TestDeepSeekProviderEndpointNeverLeaksKey(t *testing.T) {
 	dataDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		response.WriteHeader(http.StatusUnauthorized)
+		_, _ = response.Write([]byte(`{"error":{"message":"bad key"}}`))
+	}))
+	defer server.Close()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "openai",
-		OpenAIAPIKey:  "test-secret-key",
-		OpenAIBaseURL: "https://example.test/v1",
-		OpenAIModel:   "test-model",
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "deepseek",
+		DeepSeek: config.DeepSeekConfig{
+			APIKey:  "test-secret-key",
+			BaseURL: server.URL,
+			Model:   "deepseek-v4-flash",
+		},
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)
@@ -89,7 +96,7 @@ func TestOpenAIProviderEndpointNeverLeaksKey(t *testing.T) {
 	statusRequest := httptest.NewRequest(http.MethodGet, "http://127.0.0.1/api/agent/status", nil)
 	statusResponse := httptest.NewRecorder()
 	httpapi.NewRouter(application).ServeHTTP(statusResponse, statusRequest)
-	if !strings.Contains(statusResponse.Body.String(), `"configured":true`) || !strings.Contains(statusResponse.Body.String(), `"available":false`) {
-		t.Fatalf("OpenAI status must distinguish configured credentials from unavailable transport: %s", statusResponse.Body.String())
+	if !strings.Contains(statusResponse.Body.String(), `"configured":true`) || !strings.Contains(statusResponse.Body.String(), `"available":true`) {
+		t.Fatalf("DeepSeek status must report configured credentials as available: %s", statusResponse.Body.String())
 	}
 }

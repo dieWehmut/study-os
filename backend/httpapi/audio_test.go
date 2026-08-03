@@ -41,10 +41,10 @@ func TestAudioEndpointStreamsLocalFileAndSupportsRanges(t *testing.T) {
 		t.Fatalf("write local audio: %v", err)
 	}
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)
@@ -84,10 +84,10 @@ func TestAudioEndpointStreamsLocalFileAndSupportsRanges(t *testing.T) {
 func TestAudioEndpointRejectsEmptyAndUnsafeRequests(t *testing.T) {
 	dataDir := t.TempDir()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)
@@ -111,10 +111,10 @@ func TestAudioEndpointRejectsEmptyAndUnsafeRequests(t *testing.T) {
 func TestAudioEndpointReportsGeneratorUnavailableAsRetryable(t *testing.T) {
 	dataDir := t.TempDir()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)
@@ -142,10 +142,10 @@ func TestAudioEndpointReportsGeneratorUnavailableAsRetryable(t *testing.T) {
 func TestAudioGetNeverInvokesGenerator(t *testing.T) {
 	dataDir := t.TempDir()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)

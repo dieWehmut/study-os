@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -19,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
+	"study-os/backend/agent"
 	"study-os/backend/app"
 	"study-os/backend/backup"
 	"study-os/backend/db"
@@ -36,6 +40,14 @@ func NewRouter(application *app.App) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(loopbackHostOnly)
 	router.Use(trustedOriginOnly)
+	if application != nil && application.Launcher != nil {
+		router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				application.Launcher.Touch()
+				next.ServeHTTP(response, request)
+			})
+		})
+	}
 	router.Route("/api", func(api chi.Router) {
 		api.Get("/health", func(response http.ResponseWriter, request *http.Request) {
 			if application == nil || application.Store == nil {
@@ -57,6 +69,18 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/agent/status", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentStatus(response, request, application)
 		})
+		api.Get("/agent/vendors", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentVendors(response, request, application)
+		})
+		api.Patch("/agent/active", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentActive(response, request, application)
+		})
+		api.Patch("/agent/config", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentConfig(response, request, application)
+		})
+		api.Post("/agent/test", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentTest(response, request, application)
+		})
 		api.Post("/agent/generate", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentGenerate(response, request, application)
 		})
@@ -65,6 +89,18 @@ func NewRouter(application *app.App) http.Handler {
 		})
 		api.Post("/audio", func(response http.ResponseWriter, request *http.Request) {
 			handleAudioGenerate(response, request, application)
+		})
+		api.Get("/audio/timeline", func(response http.ResponseWriter, request *http.Request) {
+			handleAudioTimeline(response, request, application)
+		})
+		api.Get("/groups", func(response http.ResponseWriter, request *http.Request) {
+			handleGroups(response, request, application)
+		})
+		api.Post("/english/process", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishProcess(response, request, application)
+		})
+		api.Post("/english/wiki", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishWiki(response, request, application)
 		})
 		api.Post("/demo/seed", func(response http.ResponseWriter, request *http.Request) {
 			handleDemoSeed(response, request, application)
@@ -105,7 +141,23 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupList(response, request, application)
 		})
+		if application != nil && application.Launcher != nil {
+			api.Post("/launcher/close", func(response http.ResponseWriter, request *http.Request) {
+				handleLauncherClose(response, request, application)
+			})
+			api.Get("/update/status", func(response http.ResponseWriter, request *http.Request) {
+				handleUpdateStatus(response, request, application)
+			})
+			api.Post("/update/apply", func(response http.ResponseWriter, request *http.Request) {
+				handleUpdateApply(response, request, application)
+			})
+		}
 	})
+	if application != nil && application.Launcher != nil {
+		router.NotFound(func(response http.ResponseWriter, request *http.Request) {
+			application.Launcher.SPAHandler().ServeHTTP(response, request)
+		})
+	}
 	return router
 }
 
@@ -265,9 +317,17 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
 		return
 	}
-	items, err := application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
-		Query: request.URL.Query().Get("q"), Limit: parseLimit(request.URL.Query().Get("limit"), 100, 500), Offset: parseOffset(request.URL.Query().Get("offset")),
-	})
+	limit := parseLimit(request.URL.Query().Get("limit"), 100, 500)
+	offset := parseOffset(request.URL.Query().Get("offset"))
+	var items []models.KnowledgeItem
+	var err error
+	if groupID := strings.TrimSpace(request.URL.Query().Get("group")); groupID != "" {
+		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, limit, offset)
+	} else {
+		items, err = application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
+			Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"), Limit: limit, Offset: offset,
+		})
+	}
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -334,10 +394,11 @@ func isImportClientError(message string) bool {
 }
 
 type reviewPromptResponse struct {
-	ID              string `json:"id"`
-	KnowledgeItemID string `json:"knowledge_item_id"`
-	PromptType      string `json:"prompt_type"`
-	Question        string `json:"question"`
+	ID              string   `json:"id"`
+	KnowledgeItemID string   `json:"knowledge_item_id"`
+	PromptType      string   `json:"prompt_type"`
+	Question        string   `json:"question"`
+	Options         []string `json:"options,omitempty"`
 }
 
 // reviewKnowledgeResponse contains only metadata needed before answering.
@@ -383,7 +444,7 @@ func handleDemoSeed(response http.ResponseWriter, request *http.Request, applica
 		writeJSON(response, http.StatusOK, map[string]any{
 			"status":       "already_seeded",
 			"knowledge_id": knowledgeID,
-			"prompt_count": 3,
+			"prompt_count": 4,
 		})
 		return
 	}
@@ -404,6 +465,7 @@ func handleDemoSeed(response http.ResponseWriter, request *http.Request, applica
 	}
 	generated := memory.GeneratePrompts(memory.KnowledgeItem{
 		ID:                item.ID,
+		ItemType:          item.ItemType,
 		Term:              item.Term,
 		ConciseDefinition: item.ConciseDefinition,
 		Example:           item.Example,
@@ -448,7 +510,7 @@ func handleDemoSeed(response http.ResponseWriter, request *http.Request, applica
 			ID:          newRequestID("event-demo-seed"),
 			EventType:   "demo_seeded",
 			AggregateID: item.ID,
-			PayloadJSON: json.RawMessage(`{"prompt_count":3}`),
+			PayloadJSON: json.RawMessage(`{"prompt_count":4}`),
 			OccurredAt:  now,
 		})
 	})
@@ -469,7 +531,10 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 		return
 	}
 	limit := parseLimit(request.URL.Query().Get("limit"), 20, 100)
-	prompts, err := application.Store.DuePrompts(request.Context(), time.Now().UTC(), limit)
+	prompts, err := application.Store.DuePromptsWithOptions(request.Context(), time.Now().UTC(), db.DuePromptOptions{
+		Limit:   limit,
+		Subject: request.URL.Query().Get("subject"),
+	})
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -492,6 +557,7 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 				KnowledgeItemID: prompt.KnowledgeItemID,
 				PromptType:      prompt.PromptType,
 				Question:        prompt.Question,
+				Options:         clozeOptions(request.Context(), application.Store, prompt, item),
 			},
 			Knowledge: reviewKnowledgeResponse{
 				ID:            item.ID,
@@ -505,6 +571,68 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 		})
 	}
 	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+}
+
+var clozeFallbackPool = []string{
+	"resilient", "fluent", "serendipity", "diligent", "ambiguous",
+	"coherent", "subtle", "vivid", "reluctant", "sincere",
+}
+
+// clozeOptions builds four deterministic choices for cloze-style guessing:
+// the correct term plus three distractors from the knowledge base, padded
+// from a small fallback pool when the library is still nearly empty. Non-word
+// items keep the free-text cloze and receive no options.
+func clozeOptions(ctx context.Context, store *db.Store, prompt models.Prompt, item models.KnowledgeItem) []string {
+	if prompt.PromptType != string(memory.PromptContextCloze) || !wordLikeItem(item.ItemType) {
+		return nil
+	}
+	correct := item.Term
+	seen := map[string]bool{strings.ToLower(strings.TrimSpace(correct)): true}
+	options := []string{correct}
+	distractors, err := store.ListDistractorTerms(ctx, item.ID, 3)
+	if err != nil {
+		distractors = nil
+	}
+	for _, term := range distractors {
+		key := strings.ToLower(strings.TrimSpace(term))
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		options = append(options, term)
+		if len(options) == 4 {
+			break
+		}
+	}
+	for _, term := range clozeFallbackPool {
+		if len(options) == 4 {
+			break
+		}
+		key := strings.ToLower(strings.TrimSpace(term))
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		options = append(options, term)
+	}
+	if len(options) < 4 {
+		return options
+	}
+	sort.SliceStable(options, func(i, j int) bool {
+		left := sha256.Sum256([]byte(prompt.ID + "\x00" + options[i]))
+		right := sha256.Sum256([]byte(prompt.ID + "\x00" + options[j]))
+		return hex.EncodeToString(left[:]) < hex.EncodeToString(right[:])
+	})
+	return options
+}
+
+func wordLikeItem(itemType string) bool {
+	switch strings.ToLower(strings.TrimSpace(itemType)) {
+	case "word_sense", "phrase", "collocation":
+		return true
+	default:
+		return false
+	}
 }
 
 func handleAnswer(response http.ResponseWriter, request *http.Request, application *app.App) {
@@ -538,6 +666,9 @@ func handleAnswer(response http.ResponseWriter, request *http.Request, applicati
 		return
 	}
 	evaluation := memory.EvaluateAnswer(input.Answer, prompt.AcceptedAnswers)
+	if prompt.PromptType == string(memory.PromptMakeSentence) {
+		evaluation = evaluateFreeText(request.Context(), application, prompt, input.Answer)
+	}
 	now := time.Now().UTC()
 	after := memory.Schedule(before, now, evaluation.Rating)
 	priorCard, _ := json.Marshal(before)
@@ -663,6 +794,30 @@ func handleOverride(response http.ResponseWriter, request *http.Request, applica
 	})
 }
 
+func evaluateFreeText(ctx context.Context, application *app.App, prompt models.Prompt, answer string) memory.Evaluation {
+	provider, err := providerFor(application)
+	if err != nil {
+		return memory.EvaluateFreeTextAnswer(answer)
+	}
+	response, err := provider.Generate(ctx, agent.Request{
+		Kind: agent.KindEvaluateFreeText,
+		FreeText: &agent.FreeTextInput{
+			Question:        prompt.Question,
+			Answer:          answer,
+			PromptType:      prompt.PromptType,
+			AcceptedAnswers: prompt.AcceptedAnswers,
+		},
+	})
+	if err != nil || response.Feedback == nil {
+		return memory.EvaluateFreeTextAnswer(answer)
+	}
+	return memory.Evaluation{
+		Outcome:  memory.Outcome(response.Feedback.Outcome),
+		Rating:   memory.Rating(response.Feedback.Rating),
+		Feedback: response.Feedback.Message,
+	}
+}
+
 func handleDashboard(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
@@ -703,8 +858,8 @@ func handleDashboard(response http.ResponseWriter, request *http.Request, applic
 		"due_count":       dueCount,
 		"reviewed_today":  reviewedToday,
 		"current_streak":  currentStreak,
-		"provider":        application.Config.AIProvider,
-		"offline":         application.Config.AIProvider == "mock",
+		"provider":        application.Config.ActiveProvider,
+		"offline":         application.Config.ActiveProvider == "mock",
 	})
 }
 

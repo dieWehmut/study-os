@@ -10,7 +10,7 @@ async function answerCurrentPrompt(page: Page) {
   await page.getByRole("button", { name: "提交答案" }).click()
   await expect(page.getByText(/正确|部分正确|需要重学/).first()).toBeVisible()
   await page.getByRole("button", { name: "改判为掌握" }).click()
-  await expect(page.getByText(/系统他评 · Good/)).toBeVisible()
+  await expect(page.getByText(/系统他评 · 良好/)).toBeVisible()
   await page.getByRole("button", { name: "下一题" }).click()
 }
 
@@ -46,9 +46,9 @@ test("imports a fixture, reviews it, corrects a rating, and persists across relo
     buffer: Buffer.from(fixtureRows, "utf-8"),
   })
   await page.getByRole("button", { name: "上传文件" }).click()
-  await page.getByLabel("term 源列").selectOption("term")
-  await page.getByLabel("definition 源列").selectOption("definition")
-  await page.getByLabel("example 源列").selectOption("example")
+  await page.getByLabel("单词 源列").selectOption("term")
+  await page.getByLabel("释义 源列").selectOption("definition")
+  await page.getByLabel("例句 源列").selectOption("example")
   await page.getByRole("button", { name: "预览导入" }).click()
   await page.getByRole("button", { name: "提交导入" }).click()
   await expect(page.getByText(/已导入 2 条知识点/)).toBeVisible({ timeout: 15_000 })

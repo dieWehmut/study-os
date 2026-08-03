@@ -78,6 +78,18 @@ func TestClassifyDuplicate(t *testing.T) {
 	}
 }
 
+func TestNormalizeCandidateNormalizesSubject(t *testing.T) {
+	normalized := NormalizeCandidate(Candidate{
+		ItemType:   "word_sense",
+		Term:       "abandon",
+		Definition: "放弃",
+		Subject:    " English ",
+	})
+	if normalized.Subject != "english" {
+		t.Fatalf("subject = %q, want english", normalized.Subject)
+	}
+}
+
 func TestResolveDuplicatePrioritizesExactMatchOverEarlierReview(t *testing.T) {
 	existing := []Candidate{
 		{ItemType: "word_sense", Term: "bank", PartOfSpeech: "n", Definition: "financial institution"},

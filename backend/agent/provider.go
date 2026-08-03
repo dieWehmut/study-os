@@ -1,6 +1,6 @@
-// Package agent defines the provider boundary used by offline and future
-// network-backed learning agents. Providers receive typed requests and return
-// typed responses; queue workers can persist the request payload separately.
+// Package agent defines the provider boundary used by offline and network
+// backed learning agents. Providers receive typed requests and return typed
+// responses; queue workers can persist the request payload separately.
 package agent
 
 import (
@@ -19,23 +19,44 @@ type Provider interface {
 	Generate(context.Context, Request) (Response, error)
 }
 
-// Kind identifies the small set of provider operations needed by v0.1.
+// Kind identifies the small set of provider operations supported by the
+// application. Keep it closed: new capabilities get a new typed kind plus a
+// mock implementation so offline behavior stays deterministic.
 type Kind string
 
 const (
-	KindMemoryQuestion Kind = "memory_question"
-	KindFeedback       Kind = "feedback"
-	KindSummary        Kind = "summary"
+	KindMemoryQuestion      Kind = "memory_question"
+	KindFeedback            Kind = "feedback"
+	KindSummary             Kind = "summary"
+	KindWordWiki            Kind = "word_wiki"
+	KindMakeSentence        Kind = "make_sentence"
+	KindEvaluateFreeText    Kind = "evaluate_free_text"
+	KindExtractMemoryPoints Kind = "extract_memory_points"
+	KindCompressSenses      Kind = "compress_senses"
 )
+
+// Options carries per-request provider hints. Empty values mean the provider
+// defaults apply.
+type Options struct {
+	Model           string `json:"model,omitempty"`
+	Thinking        string `json:"thinking,omitempty"`
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
+}
 
 // Request is intentionally typed instead of accepting an arbitrary prompt.
 // This keeps persisted jobs inspectable and gives a future provider a stable
 // compatibility contract.
 type Request struct {
 	Kind      Kind            `json:"kind"`
+	Options   Options         `json:"options,omitempty"`
 	Knowledge *KnowledgeInput `json:"knowledge,omitempty"`
 	Feedback  *FeedbackInput  `json:"feedback,omitempty"`
 	Summary   *SummaryInput   `json:"summary,omitempty"`
+	WordWiki  *WordWikiInput  `json:"word_wiki,omitempty"`
+	Sentence  *SentenceInput  `json:"sentence,omitempty"`
+	FreeText  *FreeTextInput  `json:"free_text,omitempty"`
+	Extract   *ExtractInput   `json:"extract,omitempty"`
+	Compress  *CompressInput  `json:"compress,omitempty"`
 }
 
 type KnowledgeInput struct {
@@ -58,6 +79,50 @@ type SummaryInput struct {
 	MaxKeyPoints int    `json:"max_key_points,omitempty"`
 }
 
+type WordWikiInput struct {
+	ID           string   `json:"id,omitempty"`
+	Term         string   `json:"term"`
+	PartOfSpeech string   `json:"part_of_speech,omitempty"`
+	Definition   string   `json:"definition"`
+	Example      string   `json:"example,omitempty"`
+	Level        string   `json:"level,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+	SenseGroup   string   `json:"sense_group,omitempty"`
+}
+
+type SentenceInput struct {
+	Term       string `json:"term"`
+	Definition string `json:"definition,omitempty"`
+	Example    string `json:"example,omitempty"`
+	Level      string `json:"level,omitempty"`
+}
+
+type FreeTextInput struct {
+	Question        string   `json:"question"`
+	Answer          string   `json:"answer"`
+	PromptType      string   `json:"prompt_type,omitempty"`
+	AcceptedAnswers []string `json:"accepted_answers,omitempty"`
+	Criteria        string   `json:"criteria,omitempty"`
+}
+
+type ExtractInput struct {
+	Title     string `json:"title,omitempty"`
+	Subject   string `json:"subject,omitempty"`
+	Text      string `json:"text"`
+	MaxPoints int    `json:"max_points,omitempty"`
+}
+
+type CompressInput struct {
+	Term   string       `json:"term"`
+	Senses []SenseInput `json:"senses"`
+}
+
+type SenseInput struct {
+	Index      int      `json:"index"`
+	Definition string   `json:"definition"`
+	Tags       []string `json:"tags,omitempty"`
+}
+
 // Response contains exactly one operation-specific output for a successful
 // request. The pointers make malformed mixed responses detectable by callers.
 type Response struct {
@@ -65,6 +130,10 @@ type Response struct {
 	MemoryQuestion *MemoryQuestionOutput `json:"memory_question,omitempty"`
 	Feedback       *FeedbackOutput       `json:"feedback,omitempty"`
 	Summary        *SummaryOutput        `json:"summary,omitempty"`
+	WordWiki       *WordWikiOutput       `json:"word_wiki,omitempty"`
+	Sentence       *SentenceOutput       `json:"sentence,omitempty"`
+	Extract        *ExtractOutput        `json:"extract,omitempty"`
+	Compress       *CompressOutput       `json:"compress,omitempty"`
 }
 
 type MemoryQuestionOutput struct {
@@ -76,15 +145,52 @@ type MemoryQuestionOutput struct {
 }
 
 type FeedbackOutput struct {
-	Outcome Outcome `json:"outcome"`
-	Rating  Rating  `json:"rating"`
-	Message string  `json:"message"`
+	Outcome      Outcome `json:"outcome"`
+	Rating       Rating  `json:"rating"`
+	Message      string  `json:"message"`
+	SampleAnswer string  `json:"sample_answer,omitempty"`
 }
 
 type SummaryOutput struct {
 	Title     string   `json:"title,omitempty"`
 	KeyPoints []string `json:"key_points"`
 	Abstract  string   `json:"abstract,omitempty"`
+}
+
+type WordWikiOutput struct {
+	DetailedMarkdown  string   `json:"detailed_markdown"`
+	ConciseDefinition string   `json:"concise_definition,omitempty"`
+	MemoryTips        []string `json:"memory_tips,omitempty"`
+	Collocations      []string `json:"collocations,omitempty"`
+	WordFamily        []string `json:"word_family,omitempty"`
+}
+
+type SentenceOutput struct {
+	Sentence    string `json:"sentence"`
+	Translation string `json:"translation,omitempty"`
+	Blanked     string `json:"blanked,omitempty"`
+}
+
+type ExtractOutput struct {
+	Points []MemoryPointOutput `json:"points"`
+}
+
+type MemoryPointOutput struct {
+	Term       string   `json:"term"`
+	Definition string   `json:"definition,omitempty"`
+	ItemType   string   `json:"item_type"`
+	Level      string   `json:"level,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+}
+
+type CompressOutput struct {
+	Groups []SenseGroupOutput `json:"groups"`
+}
+
+type SenseGroupOutput struct {
+	Name             string `json:"name"`
+	SenseIndexes     []int  `json:"sense_indexes"`
+	MergedDefinition string `json:"merged_definition"`
 }
 
 // Validate checks the operation/payload pairing before a provider is called.
@@ -102,6 +208,26 @@ func (r Request) Validate() error {
 	case KindSummary:
 		if r.Summary == nil || strings.TrimSpace(r.Summary.Text) == "" {
 			return NewProviderError(ErrorPermanent, "summary requires text")
+		}
+	case KindWordWiki:
+		if r.WordWiki == nil || strings.TrimSpace(r.WordWiki.Term) == "" || strings.TrimSpace(r.WordWiki.Definition) == "" {
+			return NewProviderError(ErrorPermanent, "word wiki requires a term and definition")
+		}
+	case KindMakeSentence:
+		if r.Sentence == nil || strings.TrimSpace(r.Sentence.Term) == "" {
+			return NewProviderError(ErrorPermanent, "sentence generation requires a term")
+		}
+	case KindEvaluateFreeText:
+		if r.FreeText == nil || strings.TrimSpace(r.FreeText.Question) == "" {
+			return NewProviderError(ErrorPermanent, "free text evaluation requires a question")
+		}
+	case KindExtractMemoryPoints:
+		if r.Extract == nil || strings.TrimSpace(r.Extract.Text) == "" {
+			return NewProviderError(ErrorPermanent, "memory point extraction requires text")
+		}
+	case KindCompressSenses:
+		if r.Compress == nil || strings.TrimSpace(r.Compress.Term) == "" || len(r.Compress.Senses) == 0 {
+			return NewProviderError(ErrorPermanent, "sense compression requires a term and at least one sense")
 		}
 	default:
 		return NewProviderError(ErrorPermanent, "unsupported provider request kind")
@@ -136,7 +262,7 @@ const (
 )
 
 // ErrorClass is deliberately independent of HTTP status codes. Queue policy
-// can therefore be shared by a local provider and a future OpenAI adapter.
+// can therefore be shared by a local provider and a remote adapter.
 type ErrorClass string
 
 const (
@@ -260,62 +386,49 @@ func (p RetryPolicy) Next(err error, attempt int) (time.Duration, bool) {
 	return delay, true
 }
 
-// OpenAIConfig is kept separate from the application config so the adapter
-// can later be wired from environment-backed settings without exposing a key.
-type OpenAIConfig struct {
-	APIKey  string
-	BaseURL string
-	Model   string
+// DeepSeekConfig is the vendor-specific configuration for the DeepSeek
+// provider. Secrets are read from the process environment and never persisted.
+type DeepSeekConfig struct {
+	APIKey         string
+	BaseURL        string
+	Model          string
+	ReasoningModel string
 }
 
-func validateOpenAIConfig(cfg OpenAIConfig) error {
+// ProviderConfig selects the active provider from the configured vendor set.
+type ProviderConfig struct {
+	Active   string
+	DeepSeek DeepSeekConfig
+}
+
+// NewProvider builds the provider for the active vendor. Unknown or
+// unimplemented vendors return a classified configuration error.
+func NewProvider(cfg ProviderConfig) (Provider, error) {
+	switch strings.ToLower(strings.TrimSpace(cfg.Active)) {
+	case "", "mock":
+		return NewMockProvider(), nil
+	case "deepseek":
+		return NewDeepSeekProvider(cfg.DeepSeek)
+	default:
+		return nil, NewProviderError(ErrorConfigMissing, "configured AI provider is unsupported")
+	}
+}
+
+func validateDeepSeekConfig(cfg DeepSeekConfig) error {
 	if strings.TrimSpace(cfg.APIKey) == "" {
-		return NewProviderError(ErrorConfigMissing, "OpenAI provider API key is not configured")
+		return NewProviderError(ErrorConfigMissing, "DeepSeek API key is not configured")
 	}
 	if strings.TrimSpace(cfg.BaseURL) == "" {
-		return NewProviderError(ErrorConfigMissing, "OpenAI provider base URL is not configured")
+		return NewProviderError(ErrorConfigMissing, "DeepSeek base URL is not configured")
 	}
-	parsed, err := url.Parse(cfg.BaseURL)
+	parsed, err := url.Parse(strings.TrimSpace(cfg.BaseURL))
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "https" && parsed.Scheme != "http") {
-		return NewProviderError(ErrorPermanent, "OpenAI provider base URL is invalid")
+		return NewProviderError(ErrorPermanent, "DeepSeek base URL is invalid")
 	}
 	if strings.TrimSpace(cfg.Model) == "" {
-		return NewProviderError(ErrorConfigMissing, "OpenAI provider model is not configured")
+		return NewProviderError(ErrorConfigMissing, "DeepSeek model is not configured")
 	}
 	return nil
-}
-
-// OpenAIProvider is the intentionally offline adapter stub for v0.1. Future
-// work should add an injected HTTP transport here, translate request kinds to
-// provider-specific JSON, classify status codes, and decode into Response. No
-// network client is constructed by this package today.
-type OpenAIProvider struct {
-	baseURL string
-	model   string
-	apiKey  string
-}
-
-var _ Provider = (*OpenAIProvider)(nil)
-
-func NewOpenAIProvider(cfg OpenAIConfig) (*OpenAIProvider, error) {
-	if err := validateOpenAIConfig(cfg); err != nil {
-		return nil, err
-	}
-	return &OpenAIProvider{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), model: strings.TrimSpace(cfg.Model), apiKey: cfg.APIKey}, nil
-}
-
-func (p *OpenAIProvider) Name() string { return "openai" }
-
-func (p *OpenAIProvider) Generate(ctx context.Context, request Request) (Response, error) {
-	if err := ctxErr(ctx); err != nil {
-		return Response{}, err
-	}
-	if err := request.Validate(); err != nil {
-		return Response{}, err
-	}
-	// Keep the key private and make the missing transport explicit. An HTTP
-	// implementation can replace this method without changing callers.
-	return Response{}, NewProviderError(ErrorPermanent, "OpenAI provider transport is not enabled in offline v0.1")
 }
 
 func ctxErr(ctx context.Context) error {

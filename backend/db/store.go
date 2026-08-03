@@ -111,11 +111,11 @@ func createKnowledgeItem(ctx context.Context, database queryer, item models.Know
 		INSERT INTO knowledge_items(
 			id, source_id, item_type, term, part_of_speech, pronunciation,
 			concise_definition, detailed_markdown, example, level, tags_json,
-			fingerprint, created_at, updated_at
-		) VALUES (?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			subject, fingerprint, created_at, updated_at
+		) VALUES (?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		item.ID, item.SourceID, item.ItemType, item.Term, item.PartOfSpeech,
 		item.Pronunciation, item.ConciseDefinition, item.DetailedMarkdown,
-		item.Example, item.Level, tags, item.Fingerprint, formatTime(createdAt), formatTime(updatedAt))
+		item.Example, item.Level, tags, item.Subject, item.Fingerprint, formatTime(createdAt), formatTime(updatedAt))
 	if err != nil {
 		return fmt.Errorf("create knowledge item %q: %w", item.ID, err)
 	}
@@ -131,6 +131,38 @@ func (s *Store) GetKnowledgeItem(ctx context.Context, id string) (models.Knowled
 	return item, nil
 }
 
+func (s *Store) UpdateKnowledgeItem(ctx context.Context, item models.KnowledgeItem) error {
+	return updateKnowledgeItem(ctx, s.db, item)
+}
+
+func (s *TxStore) UpdateKnowledgeItem(ctx context.Context, item models.KnowledgeItem) error {
+	return updateKnowledgeItem(ctx, s.tx, item)
+}
+
+func updateKnowledgeItem(ctx context.Context, database queryer, item models.KnowledgeItem) error {
+	if strings.TrimSpace(item.ID) == "" {
+		return errors.New("knowledge item id is empty")
+	}
+	_, updatedAt := normalizedTimes(item.CreatedAt, item.UpdatedAt)
+	tags, err := marshalJSON(item.Tags, []string{})
+	if err != nil {
+		return fmt.Errorf("encode knowledge tags: %w", err)
+	}
+	result, err := database.ExecContext(ctx, `
+		UPDATE knowledge_items SET
+			item_type = ?, term = ?, part_of_speech = ?, pronunciation = ?,
+			concise_definition = ?, detailed_markdown = ?, example = ?,
+			level = ?, subject = ?, tags_json = ?, fingerprint = ?, updated_at = ?
+		WHERE id = ?`,
+		item.ItemType, item.Term, item.PartOfSpeech, item.Pronunciation,
+		item.ConciseDefinition, item.DetailedMarkdown, item.Example,
+		item.Level, item.Subject, tags, item.Fingerprint, formatTime(updatedAt), item.ID)
+	if err != nil {
+		return err
+	}
+	return requireChanged(result, "knowledge item")
+}
+
 func (s *Store) ListKnowledgeItems(ctx context.Context, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
 	limit := options.Limit
 	if limit <= 0 || limit > 500 {
@@ -142,10 +174,19 @@ func (s *Store) ListKnowledgeItems(ctx context.Context, options models.Knowledge
 	}
 	query := knowledgeSelect
 	arguments := make([]any, 0, 4)
+	subject := strings.ToLower(strings.TrimSpace(options.Subject))
+	where := make([]string, 0, 2)
 	if strings.TrimSpace(options.Query) != "" {
-		query += ` WHERE term LIKE ? ESCAPE '\' OR concise_definition LIKE ? ESCAPE '\'`
+		where = append(where, `(term LIKE ? ESCAPE '\' OR concise_definition LIKE ? ESCAPE '\')`)
 		pattern := "%" + escapeLike(strings.TrimSpace(options.Query)) + "%"
 		arguments = append(arguments, pattern, pattern)
+	}
+	if subject != "" {
+		where = append(where, `subject = ?`)
+		arguments = append(arguments, subject)
+	}
+	if len(where) > 0 {
+		query += ` WHERE ` + strings.Join(where, " AND ")
 	}
 	query += ` ORDER BY updated_at DESC, id ASC LIMIT ? OFFSET ?`
 	arguments = append(arguments, limit, offset)
@@ -238,13 +279,32 @@ func (s *Store) GetPrompt(ctx context.Context, id string) (models.Prompt, error)
 }
 
 func (s *Store) DuePrompts(ctx context.Context, before time.Time, limit int) ([]models.Prompt, error) {
+	return s.DuePromptsWithOptions(ctx, before, DuePromptOptions{Limit: limit})
+}
+
+type DuePromptOptions struct {
+	Limit   int
+	Subject string
+}
+
+func (s *Store) DuePromptsWithOptions(ctx context.Context, before time.Time, options DuePromptOptions) ([]models.Prompt, error) {
+	limit := options.Limit
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	rows, err := s.db.QueryContext(ctx, promptSelect+`
+	query := promptSelect + `
 		JOIN review_states AS rs ON rs.prompt_id = p.id
-		WHERE rs.due_at <= ?
-		ORDER BY rs.due_at ASC, p.id ASC LIMIT ?`, formatTime(before), limit)
+		WHERE rs.due_at <= ?`
+	arguments := []any{formatTime(before)}
+	if subject := strings.ToLower(strings.TrimSpace(options.Subject)); subject != "" {
+		query += ` AND EXISTS (
+			SELECT 1 FROM knowledge_items AS k WHERE k.id = p.knowledge_item_id AND k.subject = ?
+		)`
+		arguments = append(arguments, subject)
+	}
+	query += ` ORDER BY rs.due_at ASC, p.id ASC LIMIT ?`
+	arguments = append(arguments, limit)
+	rows, err := s.db.QueryContext(ctx, query, arguments...)
 	if err != nil {
 		return nil, fmt.Errorf("list due prompts: %w", err)
 	}
@@ -644,7 +704,7 @@ func (s *Store) seedFixtures(ctx context.Context) error {
 
 const knowledgeSelect = `SELECT id, COALESCE(source_id, ''), item_type, term,
 	part_of_speech, pronunciation, concise_definition, detailed_markdown, example,
-	level, tags_json, fingerprint, created_at, updated_at FROM knowledge_items`
+	level, subject, tags_json, fingerprint, created_at, updated_at FROM knowledge_items`
 
 const promptSelect = `SELECT p.id, p.knowledge_item_id, p.prompt_type, p.question,
 	p.accepted_answers_json, p.created_at, p.updated_at FROM prompts AS p`
@@ -658,8 +718,8 @@ func scanKnowledgeItem(row scanner) (models.KnowledgeItem, error) {
 	var tags, createdAt, updatedAt string
 	if err := row.Scan(&item.ID, &item.SourceID, &item.ItemType, &item.Term,
 		&item.PartOfSpeech, &item.Pronunciation, &item.ConciseDefinition,
-		&item.DetailedMarkdown, &item.Example, &item.Level, &tags, &item.Fingerprint,
-		&createdAt, &updatedAt); err != nil {
+		&item.DetailedMarkdown, &item.Example, &item.Level, &item.Subject, &tags,
+		&item.Fingerprint, &createdAt, &updatedAt); err != nil {
 		return models.KnowledgeItem{}, err
 	}
 	if err := json.Unmarshal([]byte(tags), &item.Tags); err != nil {

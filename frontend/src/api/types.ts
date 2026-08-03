@@ -8,6 +8,7 @@ export interface KnowledgeItem {
   detailed_markdown?: string
   example?: string
   level?: string
+  subject?: string
   tags?: string[]
 }
 
@@ -83,6 +84,7 @@ export interface ReviewPrompt {
   knowledge_item_id: string
   prompt_type: string
   question: string
+  options?: string[]
 }
 
 export interface ReviewKnowledge {

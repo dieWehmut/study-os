@@ -53,3 +53,21 @@ func answerVariants(value string) []string {
 	}
 	return nil
 }
+
+// EvaluateFreeTextAnswer is the deterministic offline fallback for sentence
+// building prompts. It cannot judge sentence quality, so any real attempt is
+// recorded as partial until an online AI evaluation can replace it.
+func EvaluateFreeTextAnswer(answer string) Evaluation {
+	if strings.TrimSpace(answer) == "" {
+		return Evaluation{
+			Outcome:  OutcomeIncorrect,
+			Rating:   RatingAgain,
+			Feedback: "还没有作答；先写出一句完整的英文句子。",
+		}
+	}
+	return Evaluation{
+		Outcome:  OutcomePartial,
+		Rating:   RatingHard,
+		Feedback: "离线模式无法逐句评判，已记录你的答案并标记为部分掌握；联网后可获得 AI 批改。",
+	}
+}

@@ -8,11 +8,27 @@ const mocks = vi.hoisted(() => ({
   listBackups: vi.fn(),
   updateSettings: vi.fn(),
   createBackup: vi.fn(),
+  getVendors: vi.fn(),
+  setActiveProvider: vi.fn(),
+  testProvider: vi.fn(),
+  saveVendorConfig: vi.fn(),
+  getUpdateStatus: vi.fn(),
+  applyUpdate: vi.fn(),
 }))
 vi.mock("@/api/system", () => mocks)
+vi.mock("@/api/agent", () => ({
+  getVendors: mocks.getVendors,
+  setActiveProvider: mocks.setActiveProvider,
+  testProvider: mocks.testProvider,
+  saveVendorConfig: mocks.saveVendorConfig,
+}))
+vi.mock("@/api/update", () => ({
+  getUpdateStatus: mocks.getUpdateStatus,
+  applyUpdate: mocks.applyUpdate,
+}))
 
 const status = {
-  provider: { name: "openai", mode: "remote", configured: true, key_configured: true, model: "gpt" },
+  provider: { name: "deepseek", mode: "remote", configured: true, key_configured: true, model: "deepseek-v4-flash" },
   data: { directory: "D:/StudyOS/data", database_path: "D:/StudyOS/data/study.db" },
   review: { daily_limit: 20 },
   backup: { directory: "D:/StudyOS/data/backups", count: 1, last_created_at: "2026-08-02T00:00:00Z" },
@@ -30,15 +46,51 @@ describe("SettingsPanel", () => {
     })
     mocks.updateSettings.mockResolvedValue({ daily_limit: 30 })
     mocks.createBackup.mockResolvedValue({ category: "daily", result: { path: "new.db" } })
+    mocks.getVendors.mockResolvedValue({
+      active_provider: "deepseek",
+      items: [
+        { id: "mock", display_name: "本地离线", implemented: true, active: false },
+        { id: "deepseek", display_name: "DeepSeek", implemented: true, key_configured: true, base_url: "https://api.deepseek.com/v1", models: ["deepseek-v4-flash", "deepseek-v4-pro"], active: true },
+        { id: "qwen", display_name: "通义千问（百炼）", implemented: false, active: false },
+      ],
+    })
+    mocks.setActiveProvider.mockResolvedValue({ active_provider: "deepseek" })
+    mocks.testProvider.mockResolvedValue({ ok: true, provider: "mock", latency_ms: 1 })
+    mocks.saveVendorConfig.mockResolvedValue({
+      provider: "deepseek",
+      key_configured: true,
+      base_url: "https://api.deepseek.com/v1",
+      model: "deepseek-v4-flash",
+      reasoning_model: "deepseek-v4-pro",
+    })
+    mocks.getUpdateStatus.mockResolvedValue({
+      current_version: "0.2.0-dev",
+      latest_version: "0.3.0",
+      update_available: true,
+      release_notes: "新增课程生成",
+    })
+    mocks.applyUpdate.mockResolvedValue({ status: "updating", version: "0.3.0" })
   })
 
   it("shows diagnostics and never renders a provider secret", async () => {
     render(<SettingsPanel />)
 
-    expect(await screen.findByText("OpenAI")).toBeInTheDocument()
+    expect(await screen.findByText("DeepSeek")).toBeInTheDocument()
+    expect(screen.getByText("通义千问（百炼）")).toBeInTheDocument()
     expect(screen.getByText("API key 已配置（仅显示状态）")).toBeInTheDocument()
     expect(screen.getByText("D:/StudyOS/data")).toBeInTheDocument()
     expect(screen.queryByText(/secret|api_key/i)).not.toBeInTheDocument()
+  })
+
+  it("switches the active vendor and tests connectivity", async () => {
+    render(<SettingsPanel />)
+
+    const setActive = await screen.findByRole("button", { name: "设为当前" })
+    fireEvent.click(setActive)
+    await waitFor(() => expect(mocks.setActiveProvider).toHaveBeenCalledWith("mock"))
+
+    fireEvent.click(screen.getAllByRole("button", { name: /测试连通性/ })[0])
+    await waitFor(() => expect(mocks.testProvider).toHaveBeenCalledWith("mock"))
   })
 
   it("saves a bounded daily limit and refreshes the displayed value", async () => {
@@ -68,5 +120,49 @@ describe("SettingsPanel", () => {
 
     expect((await screen.findByRole("alert")).textContent).toContain("无法读取系统设置：offline")
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument()
+  })
+
+  it("saves an API key and model through the vendor config form without echoing the key", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑配置" }))
+    const keyInput = screen.getByLabelText("API Key")
+    fireEvent.change(keyInput, { target: { value: "sk-live-secret" } })
+    fireEvent.click(screen.getByRole("combobox", { name: "推理模型" }))
+    const option = await screen.findByRole("option", { name: "deepseek-v4-pro" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
+
+    await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
+      provider: "deepseek",
+      api_key: "sk-live-secret",
+      reasoning_model: "deepseek-v4-pro",
+    }))
+    expect(await screen.findByText("AI 配置已保存")).toBeInTheDocument()
+    expect(screen.queryByDisplayValue("sk-live-secret")).not.toBeInTheDocument()
+  })
+
+  it("clears a stored API key", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑配置" }))
+    fireEvent.click(screen.getByRole("button", { name: "清除密钥" }))
+
+    await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
+      provider: "deepseek",
+      api_key: "",
+    }))
+  })
+
+  it("checks for updates and applies a new version", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "检查更新" }))
+    expect(await screen.findByText("发现新版本 0.3.0")).toBeInTheDocument()
+    expect(screen.getByText("新增课程生成")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "立即更新" }))
+    await waitFor(() => expect(mocks.applyUpdate).toHaveBeenCalledOnce())
   })
 })

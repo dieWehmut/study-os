@@ -264,6 +264,16 @@ func TestStoreUpgradesSchemaVersionOneWithOriginalName(t *testing.T) {
 			state TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
+		);
+		CREATE TABLE knowledge_items (
+			id TEXT PRIMARY KEY,
+			item_type TEXT NOT NULL,
+			term TEXT NOT NULL,
+			concise_definition TEXT NOT NULL,
+			tags_json TEXT NOT NULL DEFAULT '[]',
+			fingerprint TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
 		);`)
 	if err != nil {
 		_ = legacy.Close()
@@ -289,8 +299,8 @@ func TestStoreUpgradesSchemaVersionOneWithOriginalName(t *testing.T) {
 	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil {
 		t.Fatalf("count upgraded migrations: %v", err)
 	}
-	if migrationCount != 2 {
-		t.Fatalf("migration count = %d, want 2", migrationCount)
+	if migrationCount != 4 {
+		t.Fatalf("migration count = %d, want 4", migrationCount)
 	}
 }
 
@@ -303,7 +313,7 @@ func TestStoreRejectsUnsupportedFutureMigration(t *testing.T) {
 	}
 	if _, err := legacy.ExecContext(ctx, `
 		CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-		INSERT INTO schema_migrations(version, applied_at) VALUES (3, '2026-08-01T00:00:00Z');`); err != nil {
+		INSERT INTO schema_migrations(version, applied_at) VALUES (5, '2026-08-01T00:00:00Z');`); err != nil {
 		_ = legacy.Close()
 		t.Fatalf("create future migration marker: %v", err)
 	}
@@ -341,6 +351,43 @@ func TestFixturesAreSeededOnlyWhenExplicitlyRequested(t *testing.T) {
 	}
 	if len(items) == 0 {
 		t.Fatal("explicit fixture seed produced no knowledge items")
+	}
+}
+
+func TestUpdateKnowledgeItemPersistsWikiFields(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	now := time.Date(2026, 8, 3, 11, 0, 0, 0, time.UTC)
+	item := models.KnowledgeItem{
+		ID:                "knowledge-update",
+		ItemType:          "word_sense",
+		Term:              "abandon",
+		ConciseDefinition: "放弃",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := store.CreateKnowledgeItem(ctx, item); err != nil {
+		t.Fatalf("create knowledge item: %v", err)
+	}
+	item.DetailedMarkdown = "## abandon\n\n完整 wiki。"
+	item.Example = "They abandoned the plan."
+	item.UpdatedAt = now.Add(time.Hour)
+	if err := store.UpdateKnowledgeItem(ctx, item); err != nil {
+		t.Fatalf("update knowledge item: %v", err)
+	}
+	updated, err := store.GetKnowledgeItem(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get updated item: %v", err)
+	}
+	if updated.DetailedMarkdown != item.DetailedMarkdown || updated.Example != item.Example {
+		t.Fatalf("updated item = %#v", updated)
+	}
+	if !updated.UpdatedAt.Equal(item.UpdatedAt) {
+		t.Fatalf("updated time = %v, want %v", updated.UpdatedAt, item.UpdatedAt)
 	}
 }
 

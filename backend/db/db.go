@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 2
+const currentSchemaVersion = 4
 
 type openOptions struct {
 	seedFixtures bool
@@ -114,32 +114,119 @@ func migrate(ctx context.Context, database *sql.DB) error {
 			return fmt.Errorf("unsupported schema migration version %d", version)
 		}
 	}
-	if len(versions) == 0 {
+	latest := 0
+	if len(versions) > 0 {
+		latest = versions[len(versions)-1]
+	}
+	if latest == 0 {
 		if _, err := tx.ExecContext(ctx, schemaSQL); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", currentSchemaVersion, err)
 		}
 		if err := recordMigration(ctx, tx, currentSchemaVersion); err != nil {
 			return err
 		}
-	} else if containsVersion(versions, currentSchemaVersion) {
-		if !hasColumn(ctx, tx, "import_jobs", "original_name") {
-			return errors.New("schema version 2 is recorded but import_jobs.original_name is missing")
-		}
 	} else {
-		if len(versions) != 1 || versions[0] != 1 {
-			return fmt.Errorf("unsupported schema migration sequence %v", versions)
-		}
-		if !hasColumn(ctx, tx, "import_jobs", "original_name") {
-			if _, err := tx.ExecContext(ctx, `ALTER TABLE import_jobs ADD COLUMN original_name TEXT NOT NULL DEFAULT ''`); err != nil {
-				return fmt.Errorf("apply schema version %d: %w", currentSchemaVersion, err)
+		for version := latest + 1; version <= currentSchemaVersion; version++ {
+			if err := applyMigration(ctx, tx, version); err != nil {
+				return err
+			}
+			if err := recordMigration(ctx, tx, version); err != nil {
+				return err
 			}
 		}
-		if err := recordMigration(ctx, tx, currentSchemaVersion); err != nil {
-			return err
-		}
+	}
+	if err := verifySchema(ctx, tx, currentSchemaVersion); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit migration: %w", err)
+	}
+	return nil
+}
+
+func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
+	switch version {
+	case 2:
+		if !hasColumn(ctx, tx, "import_jobs", "original_name") {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE import_jobs ADD COLUMN original_name TEXT NOT NULL DEFAULT ''`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
+	case 3:
+		statements := []string{
+			`CREATE TABLE IF NOT EXISTS knowledge_groups (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL,
+				kind TEXT NOT NULL DEFAULT '',
+				parent_id TEXT REFERENCES knowledge_groups(id) ON DELETE SET NULL,
+				sort_order INTEGER NOT NULL DEFAULT 0,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`,
+			`CREATE INDEX IF NOT EXISTS knowledge_groups_parent_idx ON knowledge_groups(parent_id)`,
+			`CREATE TABLE IF NOT EXISTS knowledge_item_groups (
+				knowledge_item_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
+				group_id TEXT NOT NULL REFERENCES knowledge_groups(id) ON DELETE CASCADE,
+				PRIMARY KEY (knowledge_item_id, group_id)
+			)`,
+			`CREATE INDEX IF NOT EXISTS knowledge_item_groups_group_idx ON knowledge_item_groups(group_id)`,
+			`CREATE TABLE IF NOT EXISTS audio_assets (
+				id TEXT PRIMARY KEY,
+				knowledge_item_id TEXT REFERENCES knowledge_items(id) ON DELETE CASCADE,
+				source_type TEXT NOT NULL,
+				uri TEXT NOT NULL,
+				attribution TEXT NOT NULL DEFAULT '',
+				provider TEXT NOT NULL DEFAULT '',
+				voice TEXT NOT NULL DEFAULT '',
+				timeline_json TEXT NOT NULL DEFAULT '{}',
+				created_at TEXT NOT NULL
+			)`,
+		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
+		for _, column := range []struct{ name, definition string }{
+			{"provider", `ALTER TABLE audio_assets ADD COLUMN provider TEXT NOT NULL DEFAULT ''`},
+			{"voice", `ALTER TABLE audio_assets ADD COLUMN voice TEXT NOT NULL DEFAULT ''`},
+			{"timeline_json", `ALTER TABLE audio_assets ADD COLUMN timeline_json TEXT NOT NULL DEFAULT '{}'`},
+		} {
+			if !hasColumn(ctx, tx, "audio_assets", column.name) {
+				if _, err := tx.ExecContext(ctx, column.definition); err != nil {
+					return fmt.Errorf("apply schema version %d: %w", version, err)
+				}
+			}
+		}
+	case 4:
+		if !hasColumn(ctx, tx, "knowledge_items", "subject") {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE knowledge_items ADD COLUMN subject TEXT NOT NULL DEFAULT ''`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported migration version %d", version)
+	}
+	return nil
+}
+
+func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
+	switch version {
+	case 2:
+		if !hasColumn(ctx, tx, "import_jobs", "original_name") {
+			return errors.New("schema version 2 is recorded but import_jobs.original_name is missing")
+		}
+	case 3:
+		if !hasTable(ctx, tx, "knowledge_groups") || !hasTable(ctx, tx, "knowledge_item_groups") {
+			return errors.New("schema version 3 is recorded but group tables are missing")
+		}
+		if !hasColumn(ctx, tx, "audio_assets", "provider") {
+			return errors.New("schema version 3 is recorded but audio_assets.provider is missing")
+		}
+	case 4:
+		if !hasColumn(ctx, tx, "knowledge_items", "subject") {
+			return errors.New("schema version 4 is recorded but knowledge_items.subject is missing")
+		}
 	}
 	return nil
 }
@@ -196,4 +283,13 @@ func hasColumn(ctx context.Context, tx *sql.Tx, table, column string) bool {
 		}
 	}
 	return false
+}
+
+func hasTable(ctx context.Context, tx *sql.Tx, table string) bool {
+	var count int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&count); err != nil {
+		return false
+	}
+	return count > 0
 }

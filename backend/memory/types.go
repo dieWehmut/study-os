@@ -6,6 +6,7 @@ import (
 
 type KnowledgeItem struct {
 	ID                string
+	ItemType          string
 	Term              string
 	ConciseDefinition string
 	Example           string
@@ -19,6 +20,7 @@ const (
 	PromptEnglishToChinese PromptType = "en_to_zh"
 	PromptChineseToEnglish PromptType = "zh_to_en"
 	PromptContextCloze     PromptType = "context_cloze"
+	PromptMakeSentence     PromptType = "make_sentence"
 )
 
 type Prompt struct {
@@ -67,10 +69,27 @@ func GeneratePrompts(item KnowledgeItem) []Prompt {
 	if cloze == item.Example || cloze == "" {
 		cloze = "Choose the English expression for \"" + item.ConciseDefinition + "\": _____."
 	}
-	return []Prompt{
+	prompts := []Prompt{
 		{KnowledgeID: item.ID, Type: PromptEnglishToChinese, Question: item.Term, AcceptedAnswers: meanings},
 		{KnowledgeID: item.ID, Type: PromptChineseToEnglish, Question: item.ConciseDefinition, AcceptedAnswers: terms},
 		{KnowledgeID: item.ID, Type: PromptContextCloze, Question: cloze, AcceptedAnswers: terms},
+	}
+	if wantsSentencePrompt(item.ItemType) {
+		prompts = append(prompts, Prompt{
+			KnowledgeID: item.ID,
+			Type:        PromptMakeSentence,
+			Question:    "用 \"" + item.Term + "\" 造一个英文句子，并给出中文翻译。",
+		})
+	}
+	return prompts
+}
+
+func wantsSentencePrompt(itemType string) bool {
+	switch itemType {
+	case "", "word_sense", "phrase", "collocation", "word_family", "root_affix":
+		return true
+	default:
+		return false
 	}
 }
 

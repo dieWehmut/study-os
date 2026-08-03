@@ -64,11 +64,11 @@ describe("ImportWizard", () => {
     await waitFor(() => expect(mocks.uploadImport).toHaveBeenCalledWith(file))
 
     fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
-    expect(await screen.findByRole("alert")).toHaveTextContent("请选择 term 和 definition 的源列")
+    expect(await screen.findByRole("alert")).toHaveTextContent("请选择「单词」和「释义」的源列")
 
-    fireEvent.change(screen.getByLabelText("term 源列"), { target: { value: "word" } })
-    fireEvent.change(screen.getByLabelText("definition 源列"), { target: { value: "meaning" } })
-    fireEvent.change(screen.getByLabelText("wiki 源列"), { target: { value: "details" } })
+    fireEvent.change(screen.getByLabelText("单词 源列"), { target: { value: "word" } })
+    fireEvent.change(screen.getByLabelText("释义 源列"), { target: { value: "meaning" } })
+    fireEvent.change(screen.getByLabelText("百科 源列"), { target: { value: "details" } })
     fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
 
     expect(await screen.findByText("exact_duplicate")).toBeInTheDocument()
@@ -108,7 +108,7 @@ describe("ImportWizard", () => {
 
     fireEvent.change(input, { target: { files: [file] } })
     fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
-    fireEvent.change(await screen.findByLabelText("SQLite 数据表"), { target: { value: "words" } })
+    fireEvent.change(await screen.findByLabelText("数据表"), { target: { value: "words" } })
 
     await waitFor(() => expect(mocks.uploadImport).toHaveBeenLastCalledWith(file, "words"))
   })
@@ -131,8 +131,8 @@ describe("ImportWizard", () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(["word,meaning"], "words.csv")] } })
     fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
-    fireEvent.change(await screen.findByLabelText("term 源列"), { target: { value: "word" } })
-    fireEvent.change(screen.getByLabelText("definition 源列"), { target: { value: "meaning" } })
+    fireEvent.change(await screen.findByLabelText("单词 源列"), { target: { value: "word" } })
+    fireEvent.change(screen.getByLabelText("释义 源列"), { target: { value: "meaning" } })
     fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
 
     expect(await screen.findByText("term is required")).toBeInTheDocument()
@@ -144,8 +144,8 @@ describe("ImportWizard", () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(["word,meaning"], "words.csv")] } })
     fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
-    fireEvent.change(await screen.findByLabelText("term 源列"), { target: { value: "word" } })
-    fireEvent.change(screen.getByLabelText("definition 源列"), { target: { value: "meaning" } })
+    fireEvent.change(await screen.findByLabelText("单词 源列"), { target: { value: "word" } })
+    fireEvent.change(screen.getByLabelText("释义 源列"), { target: { value: "meaning" } })
     fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
 
     expect(await screen.findByRole("alert")).toHaveTextContent("映射无效")
@@ -161,8 +161,8 @@ describe("ImportWizard", () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(["word,meaning\nabandon,放弃\n"], "words.csv")] } })
     fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
-    fireEvent.change(await screen.findByLabelText("term 源列"), { target: { value: "word" } })
-    fireEvent.change(screen.getByLabelText("definition 源列"), { target: { value: "meaning" } })
+    fireEvent.change(await screen.findByLabelText("单词 源列"), { target: { value: "word" } })
+    fireEvent.change(screen.getByLabelText("释义 源列"), { target: { value: "meaning" } })
     fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
 
     const resolution = await screen.findByLabelText("第 2 行处理方式")
@@ -189,10 +189,10 @@ describe("ImportWizard", () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(["sqlite"], "words.sqlite")] } })
     fireEvent.click(screen.getByRole("button", { name: "上传文件" }))
-    fireEvent.change(await screen.findByLabelText("SQLite 数据表"), { target: { value: "words" } })
+    fireEvent.change(await screen.findByLabelText("数据表"), { target: { value: "words" } })
 
     expect(await screen.findByRole("alert")).toHaveTextContent("表读取失败")
-    expect(screen.getByLabelText("SQLite 数据表")).toHaveValue("")
+    expect(screen.getByLabelText("数据表")).toHaveValue("")
     expect(screen.getByText(/job-1/)).toBeInTheDocument()
     expect(mocks.uploadImport).toHaveBeenCalledTimes(2)
   })

@@ -120,8 +120,7 @@
     min-height: 100dvh;
     background-image:
       linear-gradient(hsl(var(--border) / 0.22) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--border) / 0.22) 1px, transparent 1px),
-      radial-gradient(circle at 78% -10%, hsl(var(--primary) / 0.08), transparent 30rem);
+      linear-gradient(90deg, hsl(var(--border) / 0.22) 1px, transparent 1px);
     background-position: -1px -1px;
     background-size: 32px 32px, 32px 32px, auto;
   }
@@ -136,6 +135,31 @@
 
   ::selection {
     background: hsl(var(--primary) / 0.2);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--muted) / 0.6);
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.6);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.45);
+    border-radius: 9999px;
+    border: 2px solid hsl(var(--background));
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.7);
   }
 }
 

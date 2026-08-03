@@ -67,7 +67,7 @@ func TestImportUploadPreviewCommitAndKnowledge(t *testing.T) {
 		} `json:"summary"`
 	}
 	decodeJSON(t, commit, &commitBody)
-	if commitBody.Summary.Inserted != 2 || commitBody.Summary.PromptsCreated != 6 {
+	if commitBody.Summary.Inserted != 2 || commitBody.Summary.PromptsCreated != 8 {
 		t.Fatalf("commit summary = %#v", commitBody.Summary)
 	}
 

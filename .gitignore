@@ -11,8 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+.env.local.bak
 *.db
+*.db-shm
+*.db-wal
+data/
 backend.exe
+*.exe~
 study-os.exe
 backend-e2e.exe
 frontend/.e2e-data/

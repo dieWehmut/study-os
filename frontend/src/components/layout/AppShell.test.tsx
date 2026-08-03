@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import App from "@/App"
+import { useSubjectStore } from "@/store/useSubjectStore"
 import { navigationForPath } from "./navigation"
 
 describe("application shell", () => {
@@ -10,6 +11,7 @@ describe("application shell", () => {
     localStorage.clear()
     document.documentElement.classList.remove("dark")
     document.documentElement.style.colorScheme = ""
+    useSubjectStore.setState({ subject: "all" })
 		vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }))
   })
 
@@ -59,6 +61,35 @@ describe("application shell", () => {
       "page",
     )
     expect(screen.getByRole("navigation", { name: "移动导航" })).toBeInTheDocument()
+  })
+
+  it("removes verbose nav descriptions and lets the sidebar stretch", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText("今天的学习入口")).not.toBeInTheDocument()
+    const handle = screen.getByRole("separator", { name: "调整侧栏宽度" })
+    fireEvent.keyDown(handle, { key: "ArrowRight" })
+    const sidebar = container.querySelector("aside")
+    expect(sidebar?.getAttribute("style")).toContain("272px")
+  })
+
+  it("puts 首页 first in the sidebar and switches subjects from the home page", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    const sidebarLinks = Array.from(document.querySelectorAll("aside nav a"))
+    expect(sidebarLinks[0]?.textContent?.trim()).toBe("首页")
+    const math = screen.getByRole("button", { name: "数学" })
+    fireEvent.click(math)
+    expect(math).toHaveAttribute("aria-pressed", "true")
+    expect(localStorage.getItem("study-os.subject")).toBe("math")
   })
 
   it("switches the page theme from the header and persists the choice", () => {
