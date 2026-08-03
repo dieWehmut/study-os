@@ -46,9 +46,18 @@ func New(ctx context.Context, options Options) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open application store: %w", err)
 	}
+	generator := audio.Generator(audio.NewSAPIProvider())
+	if cfg.DashScopeAPIKey != "" {
+		cloudGenerator, err := audio.NewDashScopeProvider(cfg.DashScopeAPIKey, cfg.DashScopeVoice)
+		if err != nil {
+			_ = store.Close()
+			return nil, fmt.Errorf("create cloud audio provider: %w", err)
+		}
+		generator = cloudGenerator
+	}
 	audioService, err := audio.NewService(filepath.Join(cfg.DataDir, "audio-cache"),
 		audio.WithLocalDir(filepath.Join(cfg.DataDir, "audio")),
-		audio.WithGenerator(audio.NewSAPIProvider()),
+		audio.WithGenerator(generator),
 	)
 	if err != nil {
 		_ = store.Close()
@@ -81,14 +90,14 @@ func (a *App) RecordBackup(ctx context.Context, result backup.Result) (models.Ba
 }
 
 func configNeedsDefaults(cfg config.Config) bool {
-	if cfg.ListenAddress == "" || cfg.DataDir == "" || cfg.DBPath == "" || cfg.AIProvider == "" {
+	if cfg.ListenAddress == "" || cfg.DataDir == "" || cfg.DBPath == "" || cfg.ActiveProvider == "" {
 		return true
 	}
-	// OpenAI settings are optional for the default mock provider. Do not make a
-	// fully specified mock application read an env file just to fill unused
-	// fields, but still allow an OpenAI app to inherit provider settings.
-	return cfg.AIProvider == "openai" &&
-		(cfg.OpenAIAPIKey == "" || cfg.OpenAIBaseURL == "" || cfg.OpenAIModel == "")
+	// DeepSeek settings are optional for the default mock provider. Do not make
+	// a fully specified mock application read an env file just to fill unused
+	// fields, but still allow a DeepSeek app to inherit provider settings.
+	return cfg.ActiveProvider == "deepseek" &&
+		(cfg.DeepSeek.APIKey == "" || cfg.DeepSeek.BaseURL == "" || cfg.DeepSeek.Model == "")
 }
 
 func mergeConfig(configured, loaded config.Config) config.Config {
@@ -101,17 +110,29 @@ func mergeConfig(configured, loaded config.Config) config.Config {
 	if configured.DBPath == "" {
 		configured.DBPath = loaded.DBPath
 	}
-	if configured.AIProvider == "" {
-		configured.AIProvider = loaded.AIProvider
+	if configured.ActiveProvider == "" {
+		configured.ActiveProvider = loaded.ActiveProvider
 	}
-	if configured.OpenAIAPIKey == "" {
-		configured.OpenAIAPIKey = loaded.OpenAIAPIKey
+	if configured.EnvFilePath == "" {
+		configured.EnvFilePath = loaded.EnvFilePath
 	}
-	if configured.OpenAIBaseURL == "" {
-		configured.OpenAIBaseURL = loaded.OpenAIBaseURL
+	if configured.DeepSeek.APIKey == "" {
+		configured.DeepSeek.APIKey = loaded.DeepSeek.APIKey
 	}
-	if configured.OpenAIModel == "" {
-		configured.OpenAIModel = loaded.OpenAIModel
+	if configured.DeepSeek.BaseURL == "" {
+		configured.DeepSeek.BaseURL = loaded.DeepSeek.BaseURL
+	}
+	if configured.DeepSeek.Model == "" {
+		configured.DeepSeek.Model = loaded.DeepSeek.Model
+	}
+	if configured.DeepSeek.ReasoningModel == "" {
+		configured.DeepSeek.ReasoningModel = loaded.DeepSeek.ReasoningModel
+	}
+	if configured.DashScopeAPIKey == "" {
+		configured.DashScopeAPIKey = loaded.DashScopeAPIKey
+	}
+	if configured.DashScopeVoice == "" {
+		configured.DashScopeVoice = loaded.DashScopeVoice
 	}
 	if !configured.SeedFixtures {
 		configured.SeedFixtures = loaded.SeedFixtures

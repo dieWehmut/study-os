@@ -385,7 +385,7 @@ func (s *Service) Commit(ctx context.Context, id string, resolutions map[string]
 			if err := tx.CreateKnowledgeItem(ctx, item); err != nil {
 				return err
 			}
-			generated := memory.GeneratePrompts(memory.KnowledgeItem{ID: item.ID, Term: item.Term, ConciseDefinition: item.ConciseDefinition, Example: item.Example, AcceptedMeanings: []string{item.ConciseDefinition}, AcceptedTerms: []string{item.Term}})
+			generated := memory.GeneratePrompts(memory.KnowledgeItem{ID: item.ID, ItemType: item.ItemType, Term: item.Term, ConciseDefinition: item.ConciseDefinition, Example: item.Example, AcceptedMeanings: []string{item.ConciseDefinition}, AcceptedTerms: []string{item.Term}})
 			for index, generatedPrompt := range generated {
 				promptID := fmt.Sprintf("%s-prompt-%d", item.ID, index+1)
 				if err := tx.CreatePrompt(ctx, models.Prompt{ID: promptID, KnowledgeItemID: item.ID, PromptType: string(generatedPrompt.Type), Question: generatedPrompt.Question, AcceptedAnswers: generatedPrompt.AcceptedAnswers, CreatedAt: now, UpdatedAt: now}); err != nil {

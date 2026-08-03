@@ -11,14 +11,36 @@ import (
 )
 
 type Config struct {
-	ListenAddress string
-	DataDir       string
-	DBPath        string
-	AIProvider    string
-	OpenAIAPIKey  string
-	OpenAIBaseURL string
-	OpenAIModel   string
-	SeedFixtures  bool
+	ListenAddress   string
+	DataDir         string
+	DBPath          string
+	ActiveProvider  string
+	EnvFilePath     string
+	DeepSeek        DeepSeekConfig
+	DashScopeAPIKey string
+	DashScopeVoice  string
+	SeedFixtures    bool
+}
+
+// DeepSeekConfig holds the DeepSeek vendor settings. Secrets stay in memory
+// only and are never persisted, returned by APIs, or logged.
+type DeepSeekConfig struct {
+	APIKey         string
+	BaseURL        string
+	Model          string
+	ReasoningModel string
+}
+
+// VendorStatus is the read-only vendor view exposed to settings UI. Key values
+// are never included; only whether a key is configured.
+type VendorStatus struct {
+	ID            string   `json:"id"`
+	DisplayName   string   `json:"display_name"`
+	Implemented   bool     `json:"implemented"`
+	KeyConfigured bool     `json:"key_configured"`
+	BaseURL       string   `json:"base_url,omitempty"`
+	Models        []string `json:"models,omitempty"`
+	Active        bool     `json:"active"`
 }
 
 func Load() (Config, error) {
@@ -30,7 +52,12 @@ func Load() (Config, error) {
 		if !os.IsNotExist(err) {
 			return Config{}, fmt.Errorf("stat env file %q: %w", path, err)
 		}
-		return FromLookup(os.LookupEnv)
+		cfg, err := FromLookup(os.LookupEnv)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.EnvFilePath = path
+		return cfg, nil
 	}
 	return LoadFromFile(path, os.LookupEnv)
 }
@@ -53,17 +80,27 @@ func LoadFromFile(path string, lookup func(string) (string, bool)) (Config, erro
 		value, ok := fileValues[key]
 		return value, ok
 	}
-	return fromLookup(merged)
+	cfg, err := fromLookup(merged)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.EnvFilePath = path
+	return cfg, nil
 }
 
 func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 	cfg := Config{
-		ListenAddress: valueOr(lookup, "STUDY_OS_LISTEN_ADDRESS", "127.0.0.1:8080"),
-		DataDir:       valueOr(lookup, "STUDY_OS_DATA_DIR", "data"),
-		AIProvider:    valueOr(lookup, "AI_PROVIDER", "mock"),
-		OpenAIAPIKey:  valueOr(lookup, "OPENAI_API_KEY", ""),
-		OpenAIBaseURL: valueOr(lookup, "OPENAI_BASE_URL", "https://api.openai.com/v1"),
-		OpenAIModel:   valueOr(lookup, "OPENAI_MODEL", ""),
+		ListenAddress:   valueOr(lookup, "STUDY_OS_LISTEN_ADDRESS", "127.0.0.1:8080"),
+		DataDir:         valueOr(lookup, "STUDY_OS_DATA_DIR", "data"),
+		ActiveProvider:  valueOr(lookup, "AI_ACTIVE_PROVIDER", "mock"),
+		DashScopeAPIKey: envValue(lookup, "DASHSCOPE_API_KEY"),
+		DashScopeVoice:  valueOr(lookup, "DASHSCOPE_TTS_VOICE", "longxiaochun"),
+		DeepSeek: DeepSeekConfig{
+			APIKey:         strings.TrimSpace(envValue(lookup, "DEEPSEEK_API_KEY")),
+			BaseURL:        valueOr(lookup, "DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
+			Model:          valueOr(lookup, "DEEPSEEK_MODEL", "deepseek-v4-flash"),
+			ReasoningModel: valueOr(lookup, "DEEPSEEK_REASONING_MODEL", "deepseek-v4-pro"),
+		},
 	}
 	cfg.DBPath = valueOr(lookup, "STUDY_OS_DB_PATH", filepath.Join(cfg.DataDir, "study.db"))
 
@@ -79,6 +116,55 @@ func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// Vendors returns the vendor registry view: the built-in offline mock, the
+// implemented DeepSeek vendor, and reserved placeholders for future vendors.
+func (c Config) Vendors() []VendorStatus {
+	active := strings.ToLower(strings.TrimSpace(c.ActiveProvider))
+	if active == "" {
+		active = "mock"
+	}
+	model := strings.TrimSpace(c.DeepSeek.Model)
+	if model == "" {
+		model = "deepseek-v4-flash"
+	}
+	reasoningModel := strings.TrimSpace(c.DeepSeek.ReasoningModel)
+	if reasoningModel == "" {
+		reasoningModel = "deepseek-v4-pro"
+	}
+	return []VendorStatus{
+		{
+			ID:          "mock",
+			DisplayName: "本地离线（Mock）",
+			Implemented: true,
+			Active:      active == "mock",
+		},
+		{
+			ID:            "deepseek",
+			DisplayName:   "DeepSeek",
+			Implemented:   true,
+			KeyConfigured: strings.TrimSpace(c.DeepSeek.APIKey) != "",
+			BaseURL:       strings.TrimRight(c.DeepSeek.BaseURL, "/"),
+			Models: []string{
+				model,
+				reasoningModel,
+			},
+			Active: active == "deepseek",
+		},
+		{ID: "qwen", DisplayName: "通义千问（百炼）"},
+		{ID: "glm", DisplayName: "智谱 GLM"},
+		{ID: "openai", DisplayName: "OpenAI"},
+		{ID: "volcengine", DisplayName: "火山豆包"},
+	}
+}
+
+func envValue(lookup func(string) (string, bool), key string) string {
+	value, ok := lookup(key)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 func parseEnvFile(path string) (map[string]string, error) {

@@ -35,3 +35,17 @@ func TestEvaluateAnswerAcceptsEnglishCaseAndPunctuation(t *testing.T) {
 		t.Fatalf("outcome = %q", got.Outcome)
 	}
 }
+
+func TestEvaluateFreeTextAnswerFallsBackOffline(t *testing.T) {
+	empty := EvaluateFreeTextAnswer("   ")
+	if empty.Outcome != OutcomeIncorrect || empty.Rating != RatingAgain {
+		t.Fatalf("empty answer evaluation = %#v", empty)
+	}
+	answered := EvaluateFreeTextAnswer("I abandon my old plan.")
+	if answered.Outcome != OutcomePartial || answered.Rating != RatingHard {
+		t.Fatalf("answered evaluation = %#v", answered)
+	}
+	if answered.Feedback == "" {
+		t.Fatal("offline fallback feedback is empty")
+	}
+}

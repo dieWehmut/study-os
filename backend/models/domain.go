@@ -37,6 +37,28 @@ type KnowledgeListOptions struct {
 	Offset int
 }
 
+type KnowledgeGroup struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Kind      string    `json:"kind,omitempty"`
+	ParentID  string    `json:"parent_id,omitempty"`
+	SortOrder int       `json:"sort_order,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type AudioAsset struct {
+	ID              string          `json:"id"`
+	KnowledgeItemID string          `json:"knowledge_item_id"`
+	SourceType      string          `json:"source_type"`
+	URI             string          `json:"uri"`
+	Attribution     string          `json:"attribution,omitempty"`
+	Provider        string          `json:"provider,omitempty"`
+	Voice           string          `json:"voice,omitempty"`
+	TimelineJSON    json.RawMessage `json:"timeline,omitempty"`
+	CreatedAt       time.Time       `json:"created_at"`
+}
+
 type Prompt struct {
 	ID              string    `json:"id"`
 	KnowledgeItemID string    `json:"knowledge_item_id"`

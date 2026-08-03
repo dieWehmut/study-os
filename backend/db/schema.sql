@@ -135,8 +135,29 @@ CREATE TABLE audio_assets (
     source_type TEXT NOT NULL,
     uri TEXT NOT NULL,
     attribution TEXT NOT NULL DEFAULT '',
+    provider TEXT NOT NULL DEFAULT '',
+    voice TEXT NOT NULL DEFAULT '',
+    timeline_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE knowledge_groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT '',
+    parent_id TEXT REFERENCES knowledge_groups(id) ON DELETE SET NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX knowledge_groups_parent_idx ON knowledge_groups(parent_id);
+
+CREATE TABLE knowledge_item_groups (
+    knowledge_item_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
+    group_id TEXT NOT NULL REFERENCES knowledge_groups(id) ON DELETE CASCADE,
+    PRIMARY KEY (knowledge_item_id, group_id)
+);
+CREATE INDEX knowledge_item_groups_group_idx ON knowledge_item_groups(group_id);
 
 CREATE TABLE backup_records (
     id TEXT PRIMARY KEY,

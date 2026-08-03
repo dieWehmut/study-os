@@ -10,32 +10,35 @@ import (
 
 func TestMergeConfigFillsAllProviderSettingsWithoutOverwritingExplicitValues(t *testing.T) {
 	configured := config.Config{
-		ListenAddress: "127.0.0.1:9000",
-		DataDir:       "configured-data",
-		DBPath:        "configured.db",
-		AIProvider:    "openai",
-		OpenAIModel:   "explicit-model",
+		ListenAddress:  "127.0.0.1:9000",
+		DataDir:        "configured-data",
+		DBPath:         "configured.db",
+		ActiveProvider: "deepseek",
+		DeepSeek:       config.DeepSeekConfig{Model: "explicit-model"},
 	}
 	loaded := config.Config{
-		ListenAddress: "127.0.0.1:8080",
-		DataDir:       "loaded-data",
-		DBPath:        "loaded.db",
-		AIProvider:    "mock",
-		OpenAIAPIKey:  "loaded-key",
-		OpenAIBaseURL: "https://loaded.example/v1",
-		OpenAIModel:   "loaded-model",
-		SeedFixtures:  true,
+		ListenAddress:  "127.0.0.1:8080",
+		DataDir:        "loaded-data",
+		DBPath:         "loaded.db",
+		ActiveProvider: "mock",
+		DeepSeek: config.DeepSeekConfig{
+			APIKey:         "loaded-key",
+			BaseURL:        "https://loaded.example/v1",
+			Model:          "loaded-model",
+			ReasoningModel: "loaded-reasoning-model",
+		},
+		SeedFixtures: true,
 	}
 
 	got := mergeConfig(configured, loaded)
-	if got.ListenAddress != configured.ListenAddress || got.DataDir != configured.DataDir || got.DBPath != configured.DBPath || got.AIProvider != configured.AIProvider {
+	if got.ListenAddress != configured.ListenAddress || got.DataDir != configured.DataDir || got.DBPath != configured.DBPath || got.ActiveProvider != configured.ActiveProvider {
 		t.Fatalf("core config was overwritten: %#v", got)
 	}
-	if got.OpenAIAPIKey != loaded.OpenAIAPIKey || got.OpenAIBaseURL != loaded.OpenAIBaseURL {
+	if got.DeepSeek.APIKey != loaded.DeepSeek.APIKey || got.DeepSeek.BaseURL != loaded.DeepSeek.BaseURL || got.DeepSeek.ReasoningModel != loaded.DeepSeek.ReasoningModel {
 		t.Fatalf("provider settings were not merged: %#v", got)
 	}
-	if got.OpenAIModel != configured.OpenAIModel {
-		t.Fatalf("explicit model was overwritten: %q", got.OpenAIModel)
+	if got.DeepSeek.Model != configured.DeepSeek.Model {
+		t.Fatalf("explicit model was overwritten: %q", got.DeepSeek.Model)
 	}
 	if !got.SeedFixtures {
 		t.Fatal("loaded fixture flag should be preserved when configured value is false")
@@ -44,18 +47,24 @@ func TestMergeConfigFillsAllProviderSettingsWithoutOverwritingExplicitValues(t *
 
 func TestMergeConfigLeavesConfiguredProviderSettingsUntouched(t *testing.T) {
 	configured := config.Config{
-		OpenAIAPIKey:  "configured-key",
-		OpenAIBaseURL: "https://configured.example/v1",
-		OpenAIModel:   "configured-model",
+		DeepSeek: config.DeepSeekConfig{
+			APIKey:         "configured-key",
+			BaseURL:        "https://configured.example/v1",
+			Model:          "configured-model",
+			ReasoningModel: "configured-reasoning",
+		},
 	}
 	loaded := config.Config{
-		OpenAIAPIKey:  "loaded-key",
-		OpenAIBaseURL: "https://loaded.example/v1",
-		OpenAIModel:   "loaded-model",
+		DeepSeek: config.DeepSeekConfig{
+			APIKey:         "loaded-key",
+			BaseURL:        "https://loaded.example/v1",
+			Model:          "loaded-model",
+			ReasoningModel: "loaded-reasoning",
+		},
 	}
 
 	got := mergeConfig(configured, loaded)
-	if got.OpenAIAPIKey != configured.OpenAIAPIKey || got.OpenAIBaseURL != configured.OpenAIBaseURL || got.OpenAIModel != configured.OpenAIModel {
+	if got.DeepSeek != configured.DeepSeek {
 		t.Fatalf("configured provider settings changed: %#v", got)
 	}
 }
@@ -118,10 +127,10 @@ func TestNewUsesDatabaseOverrideWithoutDataDirectory(t *testing.T) {
 
 func TestConfigNeedsDefaultsDoesNotLoadOptionalProviderFieldsForMock(t *testing.T) {
 	cfg := config.Config{
-		ListenAddress: "127.0.0.1:0",
-		DataDir:       t.TempDir(),
-		DBPath:        filepath.Join(t.TempDir(), "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:0",
+		DataDir:        t.TempDir(),
+		DBPath:         filepath.Join(t.TempDir(), "study.db"),
+		ActiveProvider: "mock",
 	}
 	if configNeedsDefaults(cfg) {
 		t.Fatal("mock config with complete core fields should not require env defaults")

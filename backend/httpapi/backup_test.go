@@ -17,10 +17,10 @@ import (
 func TestBackupAPICreatesAndListsVerifiedManualBackup(t *testing.T) {
 	dataDir := t.TempDir()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:0",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:0",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)
@@ -67,10 +67,10 @@ func TestBackupAPICreatesAndListsVerifiedManualBackup(t *testing.T) {
 func TestBackupAPIRejectsUnsupportedCategoryBeforeWriting(t *testing.T) {
 	dataDir := t.TempDir()
 	application, err := app.New(context.Background(), app.Options{Config: config.Config{
-		ListenAddress: "127.0.0.1:0",
-		DataDir:       dataDir,
-		DBPath:        filepath.Join(dataDir, "study.db"),
-		AIProvider:    "mock",
+		ListenAddress:  "127.0.0.1:0",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
 	}})
 	if err != nil {
 		t.Fatalf("construct application: %v", err)

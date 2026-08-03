@@ -89,7 +89,7 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 }
 
 func providerStatusFor(application *app.App) providerStatus {
-	name := strings.ToLower(strings.TrimSpace(application.Config.AIProvider))
+	name := strings.ToLower(strings.TrimSpace(application.Config.ActiveProvider))
 	if name == "" {
 		name = "mock"
 	}
@@ -99,15 +99,13 @@ func providerStatusFor(application *app.App) providerStatus {
 		status.Mode = "offline"
 		status.Configured = true
 		status.Available = true
-	case "openai":
+	case "deepseek":
 		status.Mode = "remote"
-		status.KeyConfigured = strings.TrimSpace(application.Config.OpenAIAPIKey) != ""
-		status.Model = strings.TrimSpace(application.Config.OpenAIModel)
+		status.KeyConfigured = strings.TrimSpace(application.Config.DeepSeek.APIKey) != ""
+		status.Model = strings.TrimSpace(application.Config.DeepSeek.Model)
 		_, providerErr := providerFor(application)
 		status.Configured = providerErr == nil
-		// v0.1 validates and redacts the configuration but intentionally does
-		// not enable the network transport yet.
-		status.Available = false
+		status.Available = status.Configured
 	default:
 		status.Mode = "unavailable"
 	}

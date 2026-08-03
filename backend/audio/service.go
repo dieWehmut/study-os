@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -37,6 +38,7 @@ type Request struct {
 	Locale    string `json:"locale,omitempty"`
 	Voice     string `json:"voice,omitempty"`
 	Format    string `json:"format,omitempty"`
+	Provider  string `json:"provider,omitempty"`
 	LocalPath string `json:"local_path,omitempty"`
 }
 
@@ -64,6 +66,22 @@ func (opened *Opened) Close() error {
 
 type Generator interface {
 	Generate(context.Context, Request, string) error
+}
+
+type Segment struct {
+	Start int64  `json:"start"`
+	End   int64  `json:"end"`
+	Text  string `json:"text"`
+}
+
+type Timeline struct {
+	Segments []Segment `json:"segments"`
+}
+
+// TimelineGenerator is an optional capability: generators that can produce
+// timing metadata (for example cloud TTS) return it alongside the audio file.
+type TimelineGenerator interface {
+	GenerateWithTimeline(context.Context, Request, string) (Timeline, error)
 }
 
 type Service struct {
@@ -121,6 +139,7 @@ func CacheKey(request Request) string {
 		normalized.Locale,
 		normalized.Voice,
 		normalized.Format,
+		normalized.Provider,
 	}, "\x00")
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])
@@ -186,7 +205,13 @@ func (service *Service) resolve(ctx context.Context, request Request, generate b
 	defer os.Remove(temporaryPath)
 
 	request.Format = format
-	if err := service.generator.Generate(ctx, request, temporaryPath); err != nil {
+	var timeline Timeline
+	if timelineGenerator, ok := service.generator.(TimelineGenerator); ok {
+		timeline, err = timelineGenerator.GenerateWithTimeline(ctx, request, temporaryPath)
+	} else {
+		err = service.generator.Generate(ctx, request, temporaryPath)
+	}
+	if err != nil {
 		return Asset{}, fmt.Errorf("generate pronunciation audio: %w", err)
 	}
 	if _, err := inspectSecureAsset(service.cacheDir, temporaryPath, key, SourceGenerated); err != nil {
@@ -197,7 +222,69 @@ func (service *Service) resolve(ctx context.Context, request Request, generate b
 			return Asset{}, fmt.Errorf("publish generated audio: %w", err)
 		}
 	}
+	if len(timeline.Segments) > 0 {
+		_ = writeTimelineSidecar(service.cacheDir, cachePath, timeline)
+	}
 	return inspectSecureAsset(service.cacheDir, cachePath, key, SourceGenerated)
+}
+
+// Timeline returns the persisted timing metadata for a generated asset, or an
+// empty timeline when no sidecar exists (for example local/SAPI audio).
+func (service *Service) Timeline(ctx context.Context, request Request) (Timeline, error) {
+	if err := ctx.Err(); err != nil {
+		return Timeline{}, err
+	}
+	if service == nil {
+		return Timeline{}, errors.New("audio service is nil")
+	}
+	request = normalizeRequest(request)
+	if request.Term == "" && request.LocalPath == "" {
+		return Timeline{}, fmt.Errorf("%w: empty term", ErrNotFound)
+	}
+	format, err := normalizedFormat(request.Format)
+	if err != nil {
+		return Timeline{}, err
+	}
+	sidecar := filepath.Join(service.cacheDir, CacheKey(request)+"."+format+".timeline.json")
+	content, err := os.ReadFile(sidecar)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return Timeline{}, nil
+		}
+		return Timeline{}, fmt.Errorf("read audio timeline: %w", err)
+	}
+	var timeline Timeline
+	if err := json.Unmarshal(content, &timeline); err != nil {
+		return Timeline{}, fmt.Errorf("decode audio timeline: %w", err)
+	}
+	return timeline, nil
+}
+
+func writeTimelineSidecar(root, cachePath string, timeline Timeline) error {
+	sidecar := cachePath + ".timeline.json"
+	content, err := json.Marshal(timeline)
+	if err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(root, ".timeline-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	if _, err := temporary.Write(content); err != nil {
+		_ = temporary.Close()
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	if err := os.Rename(temporaryPath, sidecar); err != nil {
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	return nil
 }
 
 func (service *Service) Open(ctx context.Context, request Request) (*Opened, error) {
@@ -359,6 +446,7 @@ func normalizeRequest(request Request) Request {
 	request.Locale = strings.ToLower(strings.TrimSpace(request.Locale))
 	request.Voice = strings.ToLower(strings.TrimSpace(request.Voice))
 	request.Format = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(request.Format)), ".")
+	request.Provider = strings.ToLower(strings.TrimSpace(request.Provider))
 	request.LocalPath = strings.TrimSpace(request.LocalPath)
 	return request
 }

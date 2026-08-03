@@ -131,6 +131,38 @@ func (s *Store) GetKnowledgeItem(ctx context.Context, id string) (models.Knowled
 	return item, nil
 }
 
+func (s *Store) UpdateKnowledgeItem(ctx context.Context, item models.KnowledgeItem) error {
+	return updateKnowledgeItem(ctx, s.db, item)
+}
+
+func (s *TxStore) UpdateKnowledgeItem(ctx context.Context, item models.KnowledgeItem) error {
+	return updateKnowledgeItem(ctx, s.tx, item)
+}
+
+func updateKnowledgeItem(ctx context.Context, database queryer, item models.KnowledgeItem) error {
+	if strings.TrimSpace(item.ID) == "" {
+		return errors.New("knowledge item id is empty")
+	}
+	_, updatedAt := normalizedTimes(item.CreatedAt, item.UpdatedAt)
+	tags, err := marshalJSON(item.Tags, []string{})
+	if err != nil {
+		return fmt.Errorf("encode knowledge tags: %w", err)
+	}
+	result, err := database.ExecContext(ctx, `
+		UPDATE knowledge_items SET
+			item_type = ?, term = ?, part_of_speech = ?, pronunciation = ?,
+			concise_definition = ?, detailed_markdown = ?, example = ?,
+			level = ?, tags_json = ?, fingerprint = ?, updated_at = ?
+		WHERE id = ?`,
+		item.ItemType, item.Term, item.PartOfSpeech, item.Pronunciation,
+		item.ConciseDefinition, item.DetailedMarkdown, item.Example,
+		item.Level, tags, item.Fingerprint, formatTime(updatedAt), item.ID)
+	if err != nil {
+		return err
+	}
+	return requireChanged(result, "knowledge item")
+}
+
 func (s *Store) ListKnowledgeItems(ctx context.Context, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
 	limit := options.Limit
 	if limit <= 0 || limit > 500 {

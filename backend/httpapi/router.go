@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
+	"study-os/backend/agent"
 	"study-os/backend/app"
 	"study-os/backend/backup"
 	"study-os/backend/db"
@@ -57,6 +58,15 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/agent/status", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentStatus(response, request, application)
 		})
+		api.Get("/agent/vendors", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentVendors(response, request, application)
+		})
+		api.Patch("/agent/active", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentActive(response, request, application)
+		})
+		api.Post("/agent/test", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentTest(response, request, application)
+		})
 		api.Post("/agent/generate", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentGenerate(response, request, application)
 		})
@@ -65,6 +75,18 @@ func NewRouter(application *app.App) http.Handler {
 		})
 		api.Post("/audio", func(response http.ResponseWriter, request *http.Request) {
 			handleAudioGenerate(response, request, application)
+		})
+		api.Get("/audio/timeline", func(response http.ResponseWriter, request *http.Request) {
+			handleAudioTimeline(response, request, application)
+		})
+		api.Get("/groups", func(response http.ResponseWriter, request *http.Request) {
+			handleGroups(response, request, application)
+		})
+		api.Post("/english/process", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishProcess(response, request, application)
+		})
+		api.Post("/english/wiki", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishWiki(response, request, application)
 		})
 		api.Post("/demo/seed", func(response http.ResponseWriter, request *http.Request) {
 			handleDemoSeed(response, request, application)
@@ -265,9 +287,17 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
 		return
 	}
-	items, err := application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
-		Query: request.URL.Query().Get("q"), Limit: parseLimit(request.URL.Query().Get("limit"), 100, 500), Offset: parseOffset(request.URL.Query().Get("offset")),
-	})
+	limit := parseLimit(request.URL.Query().Get("limit"), 100, 500)
+	offset := parseOffset(request.URL.Query().Get("offset"))
+	var items []models.KnowledgeItem
+	var err error
+	if groupID := strings.TrimSpace(request.URL.Query().Get("group")); groupID != "" {
+		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, limit, offset)
+	} else {
+		items, err = application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
+			Query: request.URL.Query().Get("q"), Limit: limit, Offset: offset,
+		})
+	}
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -383,7 +413,7 @@ func handleDemoSeed(response http.ResponseWriter, request *http.Request, applica
 		writeJSON(response, http.StatusOK, map[string]any{
 			"status":       "already_seeded",
 			"knowledge_id": knowledgeID,
-			"prompt_count": 3,
+			"prompt_count": 4,
 		})
 		return
 	}
@@ -404,6 +434,7 @@ func handleDemoSeed(response http.ResponseWriter, request *http.Request, applica
 	}
 	generated := memory.GeneratePrompts(memory.KnowledgeItem{
 		ID:                item.ID,
+		ItemType:          item.ItemType,
 		Term:              item.Term,
 		ConciseDefinition: item.ConciseDefinition,
 		Example:           item.Example,
@@ -448,7 +479,7 @@ func handleDemoSeed(response http.ResponseWriter, request *http.Request, applica
 			ID:          newRequestID("event-demo-seed"),
 			EventType:   "demo_seeded",
 			AggregateID: item.ID,
-			PayloadJSON: json.RawMessage(`{"prompt_count":3}`),
+			PayloadJSON: json.RawMessage(`{"prompt_count":4}`),
 			OccurredAt:  now,
 		})
 	})
@@ -538,6 +569,9 @@ func handleAnswer(response http.ResponseWriter, request *http.Request, applicati
 		return
 	}
 	evaluation := memory.EvaluateAnswer(input.Answer, prompt.AcceptedAnswers)
+	if prompt.PromptType == string(memory.PromptMakeSentence) {
+		evaluation = evaluateFreeText(request.Context(), application, prompt, input.Answer)
+	}
 	now := time.Now().UTC()
 	after := memory.Schedule(before, now, evaluation.Rating)
 	priorCard, _ := json.Marshal(before)
@@ -663,6 +697,30 @@ func handleOverride(response http.ResponseWriter, request *http.Request, applica
 	})
 }
 
+func evaluateFreeText(ctx context.Context, application *app.App, prompt models.Prompt, answer string) memory.Evaluation {
+	provider, err := providerFor(application)
+	if err != nil {
+		return memory.EvaluateFreeTextAnswer(answer)
+	}
+	response, err := provider.Generate(ctx, agent.Request{
+		Kind: agent.KindEvaluateFreeText,
+		FreeText: &agent.FreeTextInput{
+			Question:        prompt.Question,
+			Answer:          answer,
+			PromptType:      prompt.PromptType,
+			AcceptedAnswers: prompt.AcceptedAnswers,
+		},
+	})
+	if err != nil || response.Feedback == nil {
+		return memory.EvaluateFreeTextAnswer(answer)
+	}
+	return memory.Evaluation{
+		Outcome:  memory.Outcome(response.Feedback.Outcome),
+		Rating:   memory.Rating(response.Feedback.Rating),
+		Feedback: response.Feedback.Message,
+	}
+}
+
 func handleDashboard(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
@@ -703,8 +761,8 @@ func handleDashboard(response http.ResponseWriter, request *http.Request, applic
 		"due_count":       dueCount,
 		"reviewed_today":  reviewedToday,
 		"current_streak":  currentStreak,
-		"provider":        application.Config.AIProvider,
-		"offline":         application.Config.AIProvider == "mock",
+		"provider":        application.Config.ActiveProvider,
+		"offline":         application.Config.ActiveProvider == "mock",
 	})
 }
 

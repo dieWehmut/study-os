@@ -53,7 +53,7 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 		} `json:"items"`
 	}
 	decodeJSON(t, dueResponse, &dueBody)
-	if len(dueBody.Items) != 3 || dueBody.Items[0].Knowledge.ItemType != "word_sense" {
+	if len(dueBody.Items) != 4 || dueBody.Items[0].Knowledge.ItemType != "word_sense" {
 		t.Fatalf("due items = %#v", dueBody.Items)
 	}
 	if len(dueBody.Items[0].Prompt.AcceptedAnswers) != 0 {
@@ -138,7 +138,7 @@ func TestLearningLoopFromSeedToReviewAndOverride(t *testing.T) {
 		Offline        bool   `json:"offline"`
 	}
 	decodeJSON(t, dashboardResponse, &dashboard)
-	if dashboard.KnowledgeCount != 1 || dashboard.PromptCount != 3 || dashboard.AttemptCount != 1 {
+	if dashboard.KnowledgeCount != 1 || dashboard.PromptCount != 4 || dashboard.AttemptCount != 1 {
 		t.Fatalf("dashboard = %#v", dashboard)
 	}
 	if dashboard.ReviewedToday != 1 || dashboard.CurrentStreak != 1 || dashboard.Provider != "mock" || !dashboard.Offline {

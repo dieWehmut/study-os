@@ -23,8 +23,8 @@ func TestFromLookupUsesSafeDefaults(t *testing.T) {
 	if cfg.DBPath != filepath.Join("data", "study.db") {
 		t.Fatalf("database path = %q", cfg.DBPath)
 	}
-	if cfg.AIProvider != "mock" {
-		t.Fatalf("AI provider = %q", cfg.AIProvider)
+	if cfg.ActiveProvider != "mock" {
+		t.Fatalf("active provider = %q", cfg.ActiveProvider)
 	}
 	if cfg.SeedFixtures {
 		t.Fatal("fixtures must not be seeded by default")
@@ -33,11 +33,11 @@ func TestFromLookupUsesSafeDefaults(t *testing.T) {
 
 func TestLoadFromFileUsesProcessEnvironmentBeforeEnvFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".env.local")
-	contents := "AI_PROVIDER=openai\nOPENAI_API_KEY=from-file\nOPENAI_BASE_URL= https://example.test/v1 \nOPENAI_MODEL=small-model\n"
+	contents := "AI_ACTIVE_PROVIDER=deepseek\nDEEPSEEK_API_KEY=from-file\nDEEPSEEK_BASE_URL= https://deepseek.test/v1 \nDEEPSEEK_MODEL=small-model\n"
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}
-	values := map[string]string{"OPENAI_API_KEY": "from-process"}
+	values := map[string]string{"DEEPSEEK_API_KEY": "from-process"}
 	cfg, err := config.LoadFromFile(path, func(key string) (string, bool) {
 		value, ok := values[key]
 		return value, ok
@@ -45,14 +45,14 @@ func TestLoadFromFileUsesProcessEnvironmentBeforeEnvFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load env file: %v", err)
 	}
-	if cfg.AIProvider != "openai" {
-		t.Fatalf("provider = %q", cfg.AIProvider)
+	if cfg.ActiveProvider != "deepseek" {
+		t.Fatalf("active provider = %q", cfg.ActiveProvider)
 	}
-	if cfg.OpenAIAPIKey != "from-process" {
-		t.Fatalf("key priority = %q", cfg.OpenAIAPIKey)
+	if cfg.DeepSeek.APIKey != "from-process" {
+		t.Fatalf("key priority = %q", cfg.DeepSeek.APIKey)
 	}
-	if cfg.OpenAIBaseURL != "https://example.test/v1" || cfg.OpenAIModel != "small-model" {
-		t.Fatalf("openai settings = %#v", cfg)
+	if cfg.DeepSeek.BaseURL != "https://deepseek.test/v1" || cfg.DeepSeek.Model != "small-model" {
+		t.Fatalf("deepseek settings = %#v", cfg)
 	}
 }
 
@@ -72,7 +72,7 @@ func TestFromLookupUsesOverrides(t *testing.T) {
 		"STUDY_OS_DATA_DIR":       filepath.Join("var", "study-os"),
 		"STUDY_OS_DB_PATH":        filepath.Join("var", "database.sqlite"),
 		"STUDY_OS_SEED_FIXTURES":  "true",
-		"AI_PROVIDER":             "openai",
+		"AI_ACTIVE_PROVIDER":      "deepseek",
 	}
 
 	cfg, err := config.FromLookup(func(key string) (string, bool) {
@@ -92,8 +92,8 @@ func TestFromLookupUsesOverrides(t *testing.T) {
 	if cfg.DBPath != values["STUDY_OS_DB_PATH"] {
 		t.Fatalf("database path = %q", cfg.DBPath)
 	}
-	if cfg.AIProvider != "openai" {
-		t.Fatalf("AI provider = %q", cfg.AIProvider)
+	if cfg.ActiveProvider != "deepseek" {
+		t.Fatalf("active provider = %q", cfg.ActiveProvider)
 	}
 	if !cfg.SeedFixtures {
 		t.Fatal("fixtures should be enabled by explicit configuration")

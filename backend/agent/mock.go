@@ -31,6 +31,16 @@ func (p *MockProvider) Generate(ctx context.Context, request Request) (Response,
 		return p.feedback(*request.Feedback), nil
 	case KindSummary:
 		return p.summary(*request.Summary), nil
+	case KindWordWiki:
+		return p.wordWiki(*request.WordWiki), nil
+	case KindMakeSentence:
+		return p.makeSentence(*request.Sentence), nil
+	case KindEvaluateFreeText:
+		return p.evaluateFreeText(*request.FreeText), nil
+	case KindExtractMemoryPoints:
+		return p.extractMemoryPoints(*request.Extract), nil
+	case KindCompressSenses:
+		return p.compressSenses(*request.Compress), nil
 	default:
 		// Validate currently makes this unreachable; retaining a classified error
 		// protects callers if new kinds are added without an implementation.
@@ -115,6 +125,204 @@ func (p *MockProvider) summary(input SummaryInput) Response {
 		Kind:    KindSummary,
 		Summary: &SummaryOutput{Title: title, KeyPoints: points, Abstract: abstract},
 	}
+}
+
+func (p *MockProvider) wordWiki(input WordWikiInput) Response {
+	markdown := "## " + strings.TrimSpace(input.Term) + "\n\n"
+	markdown += "**释义**：" + strings.TrimSpace(input.Definition) + "\n"
+	if strings.TrimSpace(input.PartOfSpeech) != "" {
+		markdown += "**词性**：" + strings.TrimSpace(input.PartOfSpeech) + "\n"
+	}
+	if strings.TrimSpace(input.Example) != "" {
+		markdown += "**例句**：" + strings.TrimSpace(input.Example) + "\n"
+	}
+	markdown += "**记忆提示**：把「" + strings.TrimSpace(input.Term) + "」与「" + strings.TrimSpace(input.Definition) + "」绑定记忆。\n"
+	markdown += "**词族**：" + strings.TrimSpace(input.Term) + "（核心词）\n"
+	return Response{
+		Kind: KindWordWiki,
+		WordWiki: &WordWikiOutput{
+			DetailedMarkdown:  markdown,
+			ConciseDefinition: strings.TrimSpace(input.Definition),
+			MemoryTips:        []string{"把词义和语境例句一起记，比孤立记更牢。"},
+			Collocations:      []string{},
+			WordFamily:        []string{strings.TrimSpace(input.Term)},
+		},
+	}
+}
+
+func (p *MockProvider) makeSentence(input SentenceInput) Response {
+	term := strings.TrimSpace(input.Term)
+	definition := strings.TrimSpace(input.Definition)
+	if definition == "" {
+		definition = "something"
+	}
+	sentence := `"` + term + `" is a word I am learning, and it means ` + definition + "."
+	blanked := strings.Replace(sentence, term, "_____", 1)
+	return Response{
+		Kind: KindMakeSentence,
+		Sentence: &SentenceOutput{
+			Sentence:    sentence,
+			Translation: "我正在学习单词“" + term + "”，它表示" + definition + "。",
+			Blanked:     blanked,
+		},
+	}
+}
+
+func (p *MockProvider) evaluateFreeText(input FreeTextInput) Response {
+	answer := normalize(input.Answer)
+	if answer == "" {
+		return Response{
+			Kind: KindEvaluateFreeText,
+			Feedback: &FeedbackOutput{
+				Outcome: OutcomeIncorrect,
+				Rating:  RatingAgain,
+				Message: "还没有作答；先写出你的句子，再对照参考答案。",
+			},
+		}
+	}
+	accepted := cleanAnswers(input.AcceptedAnswers)
+	if len(accepted) > 0 {
+		for _, expected := range accepted {
+			if answer == normalize(expected) {
+				return Response{
+					Kind: KindEvaluateFreeText,
+					Feedback: &FeedbackOutput{
+						Outcome: OutcomeCorrect,
+						Rating:  RatingGood,
+						Message: "正确。这个句子可以进入下一轮复习。",
+					},
+				}
+			}
+		}
+		for _, expected := range accepted {
+			normalized := normalize(expected)
+			if normalized != "" && (strings.Contains(normalized, answer) || strings.Contains(answer, normalized)) {
+				return Response{
+					Kind: KindEvaluateFreeText,
+					Feedback: &FeedbackOutput{
+						Outcome: OutcomePartial,
+						Rating:  RatingHard,
+						Message: "接近参考答案，补充细节后再巩固一次。",
+					},
+				}
+			}
+		}
+	}
+	return Response{
+		Kind: KindEvaluateFreeText,
+		Feedback: &FeedbackOutput{
+			Outcome: OutcomePartial,
+			Rating:  RatingHard,
+			Message: "离线模式无法逐句评判，已记录你的答案并标记为部分掌握；联网后可用 AI 批改。",
+		},
+	}
+}
+
+func (p *MockProvider) extractMemoryPoints(input ExtractInput) Response {
+	text := strings.TrimSpace(input.Text)
+	maxPoints := input.MaxPoints
+	if maxPoints <= 0 {
+		maxPoints = 20
+	}
+	points := make([]MemoryPointOutput, 0, maxPoints)
+	if containsCJK(text) {
+		for _, part := range splitSentences(text) {
+			if len(points) >= maxPoints {
+				break
+			}
+			points = append(points, MemoryPointOutput{
+				Term:     part,
+				ItemType: "sentence",
+				Tags:     []string{"auto_extract", normalizeToken(input.Subject)},
+			})
+		}
+	} else {
+		seen := make(map[string]struct{})
+		for _, token := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+			return !unicode.IsLetter(r) && r != '\''
+		}) {
+			if len(points) >= maxPoints {
+				break
+			}
+			if len(token) < 4 {
+				continue
+			}
+			if _, exists := seen[token]; exists {
+				continue
+			}
+			seen[token] = struct{}{}
+			points = append(points, MemoryPointOutput{
+				Term:     token,
+				ItemType: "word_sense",
+				Tags:     []string{"auto_extract", normalizeToken(input.Subject)},
+			})
+		}
+	}
+	return Response{Kind: KindExtractMemoryPoints, Extract: &ExtractOutput{Points: points}}
+}
+
+func (p *MockProvider) compressSenses(input CompressInput) Response {
+	groups := make([]SenseGroupOutput, 0)
+	groupByPrefix := make(map[string]int)
+	for _, sense := range input.Senses {
+		definition := strings.TrimSpace(sense.Definition)
+		if definition == "" {
+			continue
+		}
+		prefix := runePrefix(definition, 4)
+		index, exists := groupByPrefix[prefix]
+		if !exists {
+			index = len(groups)
+			groupByPrefix[prefix] = index
+			groups = append(groups, SenseGroupOutput{
+				Name:             prefix,
+				MergedDefinition: definition,
+			})
+		}
+		groups[index].SenseIndexes = append(groups[index].SenseIndexes, sense.Index)
+	}
+	return Response{Kind: KindCompressSenses, Compress: &CompressOutput{Groups: groups}}
+}
+
+func containsCJK(value string) bool {
+	for _, r := range value {
+		if unicode.Is(unicode.Han, r) {
+			return true
+		}
+	}
+	return false
+}
+
+func splitSentences(value string) []string {
+	result := make([]string, 0)
+	start := 0
+	for index, r := range value {
+		switch r {
+		case '。', '！', '？', '；', '\n':
+			part := strings.TrimSpace(value[start:index])
+			if part != "" {
+				result = append(result, part)
+			}
+			start = index + len(string(r))
+		}
+	}
+	if tail := strings.TrimSpace(value[start:]); tail != "" {
+		result = append(result, tail)
+	}
+	return result
+}
+
+func runePrefix(value string, count int) string {
+	runes := []rune(value)
+	if len(runes) <= count {
+		return string(runes)
+	}
+	return string(runes[:count])
+}
+
+func normalizeToken(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	return strings.Join(strings.Fields(value), "_")
 }
 
 func cleanAnswers(values []string) []string {

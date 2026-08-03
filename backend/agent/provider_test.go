@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -169,31 +168,32 @@ func TestProviderErrorClassificationAndRetryPolicy(t *testing.T) {
 	}
 }
 
-func TestOpenAIProviderIsAnExplicitNonNetworkIntegrationPoint(t *testing.T) {
-	_, err := NewOpenAIProvider(OpenAIConfig{APIKey: ""})
-	if err == nil || ErrorClassOf(err) != ErrorConfigMissing {
-		t.Fatalf("missing key error = %v (class %q)", err, ErrorClassOf(err))
+func TestNewProviderFactorySelectsMockAndDeepSeek(t *testing.T) {
+	mock, err := NewProvider(ProviderConfig{Active: ""})
+	if err != nil {
+		t.Fatalf("default mock provider: %v", err)
 	}
-	if strings.Contains(err.Error(), "sk-") {
-		t.Fatalf("configuration error leaked a secret: %v", err)
+	if mock.Name() != "mock" {
+		t.Fatalf("mock provider name = %q", mock.Name())
 	}
 
-	provider, err := NewOpenAIProvider(OpenAIConfig{
-		APIKey:  "test-secret",
-		BaseURL: "https://api.example.test/v1",
-		Model:   "test-model",
+	deepseek, err := NewProvider(ProviderConfig{
+		Active: "deepseek",
+		DeepSeek: DeepSeekConfig{
+			APIKey:  "test-secret",
+			BaseURL: "https://api.deepseek.com/v1",
+			Model:   "deepseek-v4-flash",
+		},
 	})
 	if err != nil {
-		t.Fatalf("configured provider: %v", err)
+		t.Fatalf("deepseek provider: %v", err)
 	}
-	if provider.Name() != "openai" {
-		t.Fatalf("provider name = %q", provider.Name())
+	if deepseek.Name() != "deepseek" {
+		t.Fatalf("deepseek provider name = %q", deepseek.Name())
 	}
-	_, err = provider.Generate(context.Background(), Request{Kind: KindSummary, Summary: &SummaryInput{Text: "offline"}})
-	if err == nil || ErrorClassOf(err) != ErrorPermanent {
-		t.Fatalf("unimplemented provider error = %v (class %q)", err, ErrorClassOf(err))
-	}
-	if strings.Contains(err.Error(), "test-secret") {
-		t.Fatalf("provider error leaked the API key: %v", err)
+
+	_, err = NewProvider(ProviderConfig{Active: "unknown-vendor"})
+	if err == nil || ErrorClassOf(err) != ErrorConfigMissing {
+		t.Fatalf("unknown vendor error = %v (class %q)", err, ErrorClassOf(err))
 	}
 }
