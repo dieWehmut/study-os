@@ -39,7 +39,7 @@ export function Select({
         id={id}
         aria-label={ariaLabel}
         className={cn(
-          "inline-flex h-8 w-fit min-w-28 items-center justify-between gap-2 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 data-[popup-open]:border-ring data-[popup-open]:ring-3 data-[popup-open]:ring-ring/40",
+          "inline-flex h-8 w-fit min-w-28 items-center justify-between gap-2 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:border-ring data-[popup-open]:ring-2 data-[popup-open]:ring-ring",
           disabled && "pointer-events-none opacity-50",
           className,
         )}

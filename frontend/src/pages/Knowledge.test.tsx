@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Knowledge from "./Knowledge"
+import { useSubjectStore } from "@/store/useSubjectStore"
 
 const mocks = vi.hoisted(() => ({
   getKnowledge: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock("@/api/knowledge", () => mocks)
 describe("Knowledge page", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useSubjectStore.setState({ subject: "all" })
     mocks.listKnowledge.mockResolvedValue({
       count: 1,
       items: [
@@ -172,5 +174,15 @@ describe("Knowledge page", () => {
     fireEvent.pointerDown(option)
     fireEvent.click(option)
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith({ query: "", group: "g1", limit: 100, offset: 0 }))
+  })
+
+  it("filters by subject from the toolbar", async () => {
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "学科" }))
+    const option = await screen.findByRole("option", { name: "数学" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ subject: "math" })))
   })
 })

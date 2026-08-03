@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 3
+const currentSchemaVersion = 4
 
 type openOptions struct {
 	seedFixtures bool
@@ -198,6 +198,12 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				}
 			}
 		}
+	case 4:
+		if !hasColumn(ctx, tx, "knowledge_items", "subject") {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE knowledge_items ADD COLUMN subject TEXT NOT NULL DEFAULT ''`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -216,6 +222,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 		}
 		if !hasColumn(ctx, tx, "audio_assets", "provider") {
 			return errors.New("schema version 3 is recorded but audio_assets.provider is missing")
+		}
+	case 4:
+		if !hasColumn(ctx, tx, "knowledge_items", "subject") {
+			return errors.New("schema version 4 is recorded but knowledge_items.subject is missing")
 		}
 	}
 	return nil

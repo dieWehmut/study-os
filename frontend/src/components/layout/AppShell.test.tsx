@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import App from "@/App"
+import { useSubjectStore } from "@/store/useSubjectStore"
 import { navigationForPath } from "./navigation"
 
 describe("application shell", () => {
@@ -10,6 +11,7 @@ describe("application shell", () => {
     localStorage.clear()
     document.documentElement.classList.remove("dark")
     document.documentElement.style.colorScheme = ""
+    useSubjectStore.setState({ subject: "all" })
 		vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }))
   })
 
@@ -73,6 +75,19 @@ describe("application shell", () => {
     fireEvent.keyDown(handle, { key: "ArrowRight" })
     const sidebar = container.querySelector("aside")
     expect(sidebar?.getAttribute("style")).toContain("272px")
+  })
+
+  it("switches the active subject from the sidebar", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    const math = screen.getByRole("button", { name: "数学" })
+    fireEvent.click(math)
+    expect(math).toHaveAttribute("aria-pressed", "true")
+    expect(localStorage.getItem("study-os.subject")).toBe("math")
   })
 
   it("switches the page theme from the header and persists the choice", () => {

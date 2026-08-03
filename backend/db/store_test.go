@@ -264,6 +264,16 @@ func TestStoreUpgradesSchemaVersionOneWithOriginalName(t *testing.T) {
 			state TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
+		);
+		CREATE TABLE knowledge_items (
+			id TEXT PRIMARY KEY,
+			item_type TEXT NOT NULL,
+			term TEXT NOT NULL,
+			concise_definition TEXT NOT NULL,
+			tags_json TEXT NOT NULL DEFAULT '[]',
+			fingerprint TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
 		);`)
 	if err != nil {
 		_ = legacy.Close()
@@ -289,8 +299,8 @@ func TestStoreUpgradesSchemaVersionOneWithOriginalName(t *testing.T) {
 	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil {
 		t.Fatalf("count upgraded migrations: %v", err)
 	}
-	if migrationCount != 3 {
-		t.Fatalf("migration count = %d, want 3", migrationCount)
+	if migrationCount != 4 {
+		t.Fatalf("migration count = %d, want 4", migrationCount)
 	}
 }
 
@@ -303,7 +313,7 @@ func TestStoreRejectsUnsupportedFutureMigration(t *testing.T) {
 	}
 	if _, err := legacy.ExecContext(ctx, `
 		CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-		INSERT INTO schema_migrations(version, applied_at) VALUES (4, '2026-08-01T00:00:00Z');`); err != nil {
+		INSERT INTO schema_migrations(version, applied_at) VALUES (5, '2026-08-01T00:00:00Z');`); err != nil {
 		_ = legacy.Close()
 		t.Fatalf("create future migration marker: %v", err)
 	}

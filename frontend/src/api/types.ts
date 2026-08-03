@@ -8,6 +8,7 @@ export interface KnowledgeItem {
   detailed_markdown?: string
   example?: string
   level?: string
+  subject?: string
   tags?: string[]
 }
 

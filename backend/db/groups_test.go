@@ -159,6 +159,16 @@ func TestStoreUpgradesSchemaVersionTwoWithGroupsAndAudioColumns(t *testing.T) {
 			uri TEXT NOT NULL,
 			attribution TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
+		);
+		CREATE TABLE knowledge_items (
+			id TEXT PRIMARY KEY,
+			item_type TEXT NOT NULL,
+			term TEXT NOT NULL,
+			concise_definition TEXT NOT NULL,
+			tags_json TEXT NOT NULL DEFAULT '[]',
+			fingerprint TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
 		);`)
 	if err != nil {
 		_ = legacy.Close()
@@ -187,8 +197,8 @@ func TestStoreUpgradesSchemaVersionTwoWithGroupsAndAudioColumns(t *testing.T) {
 		versions = append(versions, version)
 	}
 	rows.Close()
-	if len(versions) != 2 || versions[0] != 2 || versions[1] != 3 {
-		t.Fatalf("migration versions = %#v, want [2 3]", versions)
+	if len(versions) != 3 || versions[0] != 2 || versions[1] != 3 || versions[2] != 4 {
+		t.Fatalf("migration versions = %#v, want [2 3 4]", versions)
 	}
 
 	var groupTables int
@@ -208,5 +218,14 @@ func TestStoreUpgradesSchemaVersionTwoWithGroupsAndAudioColumns(t *testing.T) {
 	}
 	if audioColumns != 3 {
 		t.Fatalf("audio columns = %d, want 3", audioColumns)
+	}
+	var subjectColumn int
+	if err := store.SQL().QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pragma_table_info('knowledge_items')
+		WHERE name = 'subject'`).Scan(&subjectColumn); err != nil {
+		t.Fatalf("inspect subject column: %v", err)
+	}
+	if subjectColumn != 1 {
+		t.Fatalf("subject column = %d, want 1", subjectColumn)
 	}
 }

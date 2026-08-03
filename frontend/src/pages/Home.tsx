@@ -4,7 +4,6 @@ import { Link } from "react-router-dom"
 
 import { getDashboard, seedDemo } from "@/api/dashboard"
 import type { DashboardData } from "@/api/types"
-import { Badge } from "@/components/ui/badge"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -71,7 +70,6 @@ export default function Home() {
     <section className="grid gap-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="grid gap-2">
-          <Badge variant="secondary" className="w-fit">今日计划</Badge>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">把新知识变成可记住的进度</h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">只检测值得记忆的内容；每次作答都会留下他评、反馈和下一次复习安排。</p>
         </div>
@@ -86,7 +84,6 @@ export default function Home() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="relative overflow-hidden lg:col-span-2">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-primary/8 to-transparent" />
           <CardHeader className="gap-3">
             <CardTitle className="text-sm font-normal text-muted-foreground">今天要巩固</CardTitle>
             <p className="font-heading text-5xl font-semibold tracking-tight sm:text-6xl">

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ReviewSession } from "./ReviewSession"
+import { useSubjectStore } from "@/store/useSubjectStore"
 
 const mocks = vi.hoisted(() => ({
   answerReview: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock("@/api/reviews", () => mocks)
 describe("ReviewSession", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useSubjectStore.setState({ subject: "all" })
     mocks.getDueReviews.mockResolvedValue({
       items: [
         {
@@ -132,5 +134,13 @@ describe("ReviewSession", () => {
     fireEvent.click(screen.getByRole("button", { name: "abandon" }))
     await waitFor(() => expect(mocks.answerReview).toHaveBeenCalledWith("p3", "abandon", undefined))
     expect(await screen.findByText("正确。")).toBeInTheDocument()
+  })
+
+  it("loads reviews for the active subject and shows its badge", async () => {
+    useSubjectStore.setState({ subject: "math" })
+    render(<ReviewSession />)
+
+    expect(await screen.findByText("数学")).toBeInTheDocument()
+    await waitFor(() => expect(mocks.getDueReviews).toHaveBeenCalledWith(20, "math"))
   })
 })

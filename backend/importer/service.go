@@ -39,6 +39,7 @@ type Mapping struct {
 	Example       string `json:"example,omitempty"`
 	Wiki          string `json:"wiki,omitempty"`
 	Level         string `json:"level,omitempty"`
+	Subject       string `json:"subject,omitempty"`
 	Tags          string `json:"tags,omitempty"`
 }
 
@@ -381,7 +382,7 @@ func (s *Service) Commit(ctx context.Context, id string, resolutions map[string]
 				}
 			}
 			itemID := "knowledge-" + row.ID
-			item := models.KnowledgeItem{ID: itemID, SourceID: sourceID, ItemType: candidate.ItemType, Term: candidate.Term, PartOfSpeech: candidate.PartOfSpeech, Pronunciation: candidate.Pronunciation, ConciseDefinition: candidate.Definition, DetailedMarkdown: candidate.Wiki, Example: candidate.Example, Level: candidate.Level, Tags: candidate.Tags, Fingerprint: candidate.Fingerprint, CreatedAt: now, UpdatedAt: now}
+			item := models.KnowledgeItem{ID: itemID, SourceID: sourceID, ItemType: candidate.ItemType, Term: candidate.Term, PartOfSpeech: candidate.PartOfSpeech, Pronunciation: candidate.Pronunciation, ConciseDefinition: candidate.Definition, DetailedMarkdown: candidate.Wiki, Example: candidate.Example, Level: candidate.Level, Subject: candidate.Subject, Tags: candidate.Tags, Fingerprint: candidate.Fingerprint, CreatedAt: now, UpdatedAt: now}
 			if err := tx.CreateKnowledgeItem(ctx, item); err != nil {
 				return err
 			}
@@ -602,7 +603,7 @@ func validateMapping(mapping Mapping, columns []string) error {
 	if strings.TrimSpace(mapping.Term) == "" || strings.TrimSpace(mapping.Definition) == "" {
 		return errors.New("term and definition mappings are required")
 	}
-	for field, column := range map[string]string{"term": mapping.Term, "definition": mapping.Definition, "item_type": mapping.ItemType, "part_of_speech": mapping.PartOfSpeech, "pronunciation": mapping.Pronunciation, "example": mapping.Example, "wiki": mapping.Wiki, "level": mapping.Level, "tags": mapping.Tags} {
+	for field, column := range map[string]string{"term": mapping.Term, "definition": mapping.Definition, "item_type": mapping.ItemType, "part_of_speech": mapping.PartOfSpeech, "pronunciation": mapping.Pronunciation, "example": mapping.Example, "wiki": mapping.Wiki, "level": mapping.Level, "subject": mapping.Subject, "tags": mapping.Tags} {
 		if strings.TrimSpace(column) != "" && !contains(columns, column) {
 			return fmt.Errorf("mapping %s references unknown column %q", field, column)
 		}
@@ -619,7 +620,7 @@ func mapCandidate(value map[string]any, mapping Mapping, raw json.RawMessage) (C
 	if itemType != "word_sense" && itemType != "phrase" && itemType != "collocation" {
 		return Candidate{}, fmt.Errorf("unsupported item_type %q", itemType)
 	}
-	candidate := Candidate{ItemType: itemType, Term: valueString(value[mapping.Term]), Definition: valueString(value[mapping.Definition]), PartOfSpeech: valueString(value[mapping.PartOfSpeech]), Pronunciation: valueString(value[mapping.Pronunciation]), Example: valueString(value[mapping.Example]), Wiki: valueString(value[mapping.Wiki]), Level: valueString(value[mapping.Level]), Tags: valueTags(value[mapping.Tags]), RawJSON: string(raw)}
+	candidate := Candidate{ItemType: itemType, Term: valueString(value[mapping.Term]), Definition: valueString(value[mapping.Definition]), PartOfSpeech: valueString(value[mapping.PartOfSpeech]), Pronunciation: valueString(value[mapping.Pronunciation]), Example: valueString(value[mapping.Example]), Wiki: valueString(value[mapping.Wiki]), Level: valueString(value[mapping.Level]), Subject: valueString(value[mapping.Subject]), Tags: valueTags(value[mapping.Tags]), RawJSON: string(raw)}
 	if strings.TrimSpace(candidate.Term) == "" || strings.TrimSpace(candidate.Definition) == "" {
 		return Candidate{}, errors.New("term and definition are required")
 	}
@@ -627,7 +628,7 @@ func mapCandidate(value map[string]any, mapping Mapping, raw json.RawMessage) (C
 }
 
 func candidateFromKnowledge(item models.KnowledgeItem) Candidate {
-	return Candidate{KnowledgeItemID: item.ID, ItemType: item.ItemType, Term: item.Term, PartOfSpeech: item.PartOfSpeech, Pronunciation: item.Pronunciation, Definition: item.ConciseDefinition, Example: item.Example, Wiki: item.DetailedMarkdown, Level: item.Level, Tags: item.Tags, Fingerprint: item.Fingerprint}
+	return Candidate{KnowledgeItemID: item.ID, ItemType: item.ItemType, Term: item.Term, PartOfSpeech: item.PartOfSpeech, Pronunciation: item.Pronunciation, Definition: item.ConciseDefinition, Example: item.Example, Wiki: item.DetailedMarkdown, Level: item.Level, Subject: item.Subject, Tags: item.Tags, Fingerprint: item.Fingerprint}
 }
 
 func valueString(value any) string {

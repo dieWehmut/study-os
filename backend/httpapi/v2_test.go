@@ -368,4 +368,80 @@ func TestAgentConfigEndpointSupportsDashScopeTTS(t *testing.T) {
 	}
 }
 
+func TestKnowledgeListFiltersBySubject(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+	for _, item := range []models.KnowledgeItem{
+		{ID: "k-en", ItemType: "word_sense", Term: "abandon", ConciseDefinition: "放弃", Subject: "english", CreatedAt: now, UpdatedAt: now},
+		{ID: "k-math", ItemType: "word_sense", Term: "derivative", ConciseDefinition: "导数", Subject: "math", CreatedAt: now, UpdatedAt: now},
+	} {
+		if err := application.Store.CreateKnowledgeItem(context.Background(), item); err != nil {
+			t.Fatalf("create item: %v", err)
+		}
+	}
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodGet, "/api/knowledge?subject=english&limit=10", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Items []struct {
+			ID      string `json:"id"`
+			Subject string `json:"subject"`
+		} `json:"items"`
+	}
+	decodeJSON(t, response, &body)
+	if len(body.Items) != 1 || body.Items[0].ID != "k-en" || body.Items[0].Subject != "english" {
+		t.Fatalf("filtered items = %#v", body.Items)
+	}
+}
+
+func TestDueReviewsFilterBySubject(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	ctx := context.Background()
+	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+	for index, item := range []models.KnowledgeItem{
+		{ID: "k-en", ItemType: "word_sense", Term: "abandon", ConciseDefinition: "放弃", Subject: "english", CreatedAt: now, UpdatedAt: now},
+		{ID: "k-math", ItemType: "word_sense", Term: "derivative", ConciseDefinition: "导数", Subject: "math", CreatedAt: now, UpdatedAt: now},
+	} {
+		if err := application.Store.CreateKnowledgeItem(ctx, item); err != nil {
+			t.Fatalf("create item: %v", err)
+		}
+		prompt := models.Prompt{
+			ID:              "prompt-" + item.ID,
+			KnowledgeItemID: item.ID,
+			PromptType:      "en_to_zh",
+			Question:        item.Term,
+			AcceptedAnswers: []string{item.ConciseDefinition},
+			CreatedAt:       now.Add(time.Duration(index) * time.Second),
+			UpdatedAt:       now.Add(time.Duration(index) * time.Second),
+		}
+		if err := application.Store.CreatePrompt(ctx, prompt); err != nil {
+			t.Fatalf("create prompt: %v", err)
+		}
+		if err := application.Store.UpsertReviewState(ctx, models.ReviewState{
+			PromptID:  prompt.ID,
+			CardJSON:  json.RawMessage(`{"due":"2026-08-03T12:00:00Z"}`),
+			DueAt:     now,
+			UpdatedAt: now,
+		}); err != nil {
+			t.Fatalf("upsert state: %v", err)
+		}
+	}
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodGet, "/api/reviews/due?subject=math&limit=10", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Items []struct {
+			Prompt struct {
+				ID string `json:"id"`
+			} `json:"prompt"`
+		} `json:"items"`
+	}
+	decodeJSON(t, response, &body)
+	if len(body.Items) != 1 || body.Items[0].Prompt.ID != "prompt-k-math" {
+		t.Fatalf("due items = %#v", body.Items)
+	}
+}
+
 var _ = httptest.NewRecorder

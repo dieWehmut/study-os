@@ -21,6 +21,7 @@ const targetFields = [
   { key: "example", label: "example", required: false },
   { key: "wiki", label: "wiki", required: false },
   { key: "level", label: "level", required: false },
+  { key: "subject", label: "学科", required: false },
   { key: "tags", label: "tags", required: false },
 ] as const
 

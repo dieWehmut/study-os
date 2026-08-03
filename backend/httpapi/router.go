@@ -301,7 +301,7 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, limit, offset)
 	} else {
 		items, err = application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
-			Query: request.URL.Query().Get("q"), Limit: limit, Offset: offset,
+			Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"), Limit: limit, Offset: offset,
 		})
 	}
 	if err != nil {
@@ -507,7 +507,10 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 		return
 	}
 	limit := parseLimit(request.URL.Query().Get("limit"), 20, 100)
-	prompts, err := application.Store.DuePrompts(request.Context(), time.Now().UTC(), limit)
+	prompts, err := application.Store.DuePromptsWithOptions(request.Context(), time.Now().UTC(), db.DuePromptOptions{
+		Limit:   limit,
+		Subject: request.URL.Query().Get("subject"),
+	})
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

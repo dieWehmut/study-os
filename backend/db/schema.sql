@@ -24,6 +24,7 @@ CREATE TABLE knowledge_items (
     detailed_markdown TEXT NOT NULL DEFAULT '',
     example TEXT NOT NULL DEFAULT '',
     level TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL DEFAULT '',
     tags_json TEXT NOT NULL DEFAULT '[]',
     fingerprint TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,

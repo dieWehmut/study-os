@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
+import { SUBJECTS } from "@/lib/subjects"
 import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
+import { useSubjectStore } from "@/store/useSubjectStore"
 
 export default function Knowledge() {
   const [query, setQuery] = useState("")
@@ -22,10 +24,19 @@ export default function Knowledge() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
+  const subject = useSubjectStore((state) => state.subject)
+  const setSubject = useSubjectStore((state) => state.setSubject)
 
   useEffect(() => {
     const controller = new AbortController()
-    void listKnowledge({ query, group: group || undefined, limit: 100, offset: 0 })
+    const options: Parameters<typeof listKnowledge>[0] = {
+      query,
+      group: group || undefined,
+      limit: 100,
+      offset: 0,
+    }
+    if (subject !== "all") options.subject = subject
+    void listKnowledge(options)
       .then((result) => {
         if (controller.signal.aborted) return
         setItems(result.items)
@@ -42,7 +53,7 @@ export default function Knowledge() {
         if (!controller.signal.aborted) setLoading(false)
     })
     return () => controller.abort()
-  }, [query, group, requestVersion])
+  }, [query, group, subject, requestVersion])
 
   useEffect(() => {
     let active = true
@@ -104,25 +115,42 @@ export default function Knowledge() {
         <CardHeader className="gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">搜索知识库</CardTitle>
-            <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-group">
-              知识分组
-              <Select
-                id="knowledge-group"
-                ariaLabel="知识分组"
-                value={group}
-                onValueChange={(value) => {
-                  setGroup(value)
-                  setLoading(true)
-                  setError("")
-                }}
-                placeholder="全部"
-                options={[
-                  { value: "", label: "全部" },
-                  ...groups.map((item) => ({ value: item.id, label: item.name })),
-                ]}
-                className="min-w-36"
-              />
-            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-subject">
+                学科
+                <Select
+                  id="knowledge-subject"
+                  ariaLabel="学科"
+                  value={subject}
+                  onValueChange={setSubject}
+                  placeholder="全部"
+                  options={[
+                    { value: "all", label: "全部" },
+                    ...SUBJECTS.map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                  className="min-w-28"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-group">
+                知识分组
+                <Select
+                  id="knowledge-group"
+                  ariaLabel="知识分组"
+                  value={group}
+                  onValueChange={(value) => {
+                    setGroup(value)
+                    setLoading(true)
+                    setError("")
+                  }}
+                  placeholder="全部"
+                  options={[
+                    { value: "", label: "全部" },
+                    ...groups.map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                  className="min-w-36"
+                />
+              </label>
+            </div>
           </div>
           <label className="relative block" htmlFor="knowledge-search">
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

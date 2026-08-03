@@ -168,7 +168,7 @@ export default function SettingsPanel() {
                       value={apiKeyDraft}
                       onChange={(event) => setApiKeyDraft(event.target.value)}
                       placeholder={vendor.key_configured ? "已配置，留空保持不变" : "输入 DeepSeek API Key"}
-                      className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -212,7 +212,7 @@ export default function SettingsPanel() {
                       value={baseURLDraft}
                       onChange={(event) => setBaseURLDraft(event.target.value)}
                       placeholder="https://api.deepseek.com/v1"
-                      className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -239,7 +239,7 @@ export default function SettingsPanel() {
                 value={ttsKeyDraft}
                 onChange={(event) => setTtsKeyDraft(event.target.value)}
                 placeholder="输入 DashScope API Key（留空保持不变）"
-                className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
             <label className="grid gap-1 text-xs font-medium" htmlFor="tts-voice">
@@ -251,7 +251,7 @@ export default function SettingsPanel() {
                 value={ttsVoiceDraft}
                 onChange={(event) => setTtsVoiceDraft(event.target.value)}
                 placeholder="longxiaochun"
-                className="h-8 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-8 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
             <div className="flex flex-wrap gap-2">

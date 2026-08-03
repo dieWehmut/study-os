@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
+import { subjectName } from "@/lib/subjects"
+import { useSubjectStore } from "@/store/useSubjectStore"
 
 const promptLabels: Record<string, string> = {
   en_to_zh: "看英文，说中文",
@@ -25,6 +27,7 @@ const promptLabels: Record<string, string> = {
 }
 
 export function ReviewSession() {
+  const subject = useSubjectStore((state) => state.subject)
   const [queue, setQueue] = useState<DueReview[]>([])
   const [index, setIndex] = useState(0)
   const [answer, setAnswer] = useState("")
@@ -36,7 +39,7 @@ export function ReviewSession() {
 
   useEffect(() => {
     let active = true
-    getDueReviews()
+    getDueReviews(20, subject === "all" ? undefined : subject)
       .then(({ items }) => {
         if (active) setQueue(items)
       })
@@ -49,7 +52,7 @@ export function ReviewSession() {
     return () => {
       active = false
     }
-  }, [])
+  }, [subject])
 
   const current = queue[index]
   const isChoicePrompt =
@@ -118,11 +121,14 @@ export function ReviewSession() {
           <p className="text-sm font-medium">记忆检测</p>
           <p className="text-xs text-muted-foreground">{index + 1} / {queue.length}</p>
         </div>
-        <Badge variant="outline">{promptLabels[current.prompt.prompt_type] ?? current.prompt.prompt_type}</Badge>
+        <div className="flex items-center gap-2">
+          {subject !== "all" ? <Badge variant="secondary">{subjectName(subject)}</Badge> : null}
+          <Badge variant="outline">{promptLabels[current.prompt.prompt_type] ?? current.prompt.prompt_type}</Badge>
+        </div>
       </div>
       <Progress value={progress} aria-label="复习进度" />
 
-      <Card className="border-border/80 bg-card/90 shadow-[0_18px_70px_-48px_hsl(var(--primary)/0.65)]">
+      <Card className="border-border/80 bg-card/90">
         <CardHeader className="gap-4 border-b">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="secondary">{current.knowledge.item_type}</Badge>

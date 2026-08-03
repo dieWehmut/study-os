@@ -25,6 +25,7 @@ type KnowledgeItem struct {
 	DetailedMarkdown  string    `json:"detailed_markdown,omitempty"`
 	Example           string    `json:"example,omitempty"`
 	Level             string    `json:"level,omitempty"`
+	Subject           string    `json:"subject,omitempty"`
 	Tags              []string  `json:"tags,omitempty"`
 	Fingerprint       string    `json:"fingerprint,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
@@ -32,9 +33,10 @@ type KnowledgeItem struct {
 }
 
 type KnowledgeListOptions struct {
-	Query  string
-	Limit  int
-	Offset int
+	Query   string
+	Subject string
+	Limit   int
+	Offset  int
 }
 
 type KnowledgeGroup struct {

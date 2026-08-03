@@ -4,6 +4,7 @@ import type { KnowledgeItem } from "./types"
 export interface ListKnowledgeOptions {
   query?: string
   group?: string
+  subject?: string
   limit?: number
   offset?: number
 }
@@ -28,6 +29,7 @@ export function listKnowledge(options: ListKnowledgeOptions = {}): Promise<Knowl
   const params = new URLSearchParams()
   if (options.query !== undefined) params.set("q", options.query)
   if (options.group !== undefined) params.set("group", options.group)
+  if (options.subject !== undefined) params.set("subject", options.subject)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   if (options.offset !== undefined) params.set("offset", String(options.offset))
   const suffix = params.toString()

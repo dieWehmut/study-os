@@ -7,7 +7,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="移动导航"
-      className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_-26px_hsl(var(--foreground)/0.45)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden"
     >
       <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
         {primaryNavigation.map(({ icon: Icon, label, path }) => (
