@@ -4,6 +4,7 @@ export interface ProviderStatus {
   name: string
   mode: string
   configured: boolean
+  available: boolean
   key_configured: boolean
   model?: string
 }
@@ -84,6 +85,7 @@ export function normalizeSystemStatus(value: unknown): SystemStatus {
     name: stringValue(provider.name, "mock"),
     mode: stringValue(provider.mode, "local"),
     configured: boolValue(provider.configured),
+    available: boolValue(provider.available),
     key_configured: boolValue(provider.key_configured),
   }
   const model = stringValue(provider.model)

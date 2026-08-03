@@ -8,11 +8,19 @@ const mocks = vi.hoisted(() => ({
   listBackups: vi.fn(),
   updateSettings: vi.fn(),
   createBackup: vi.fn(),
+  getVendors: vi.fn(),
+  setActiveProvider: vi.fn(),
+  testProvider: vi.fn(),
 }))
 vi.mock("@/api/system", () => mocks)
+vi.mock("@/api/agent", () => ({
+  getVendors: mocks.getVendors,
+  setActiveProvider: mocks.setActiveProvider,
+  testProvider: mocks.testProvider,
+}))
 
 const status = {
-  provider: { name: "openai", mode: "remote", configured: true, key_configured: true, model: "gpt" },
+  provider: { name: "deepseek", mode: "remote", configured: true, key_configured: true, model: "deepseek-v4-flash" },
   data: { directory: "D:/StudyOS/data", database_path: "D:/StudyOS/data/study.db" },
   review: { daily_limit: 20 },
   backup: { directory: "D:/StudyOS/data/backups", count: 1, last_created_at: "2026-08-02T00:00:00Z" },
@@ -30,15 +38,37 @@ describe("SettingsPanel", () => {
     })
     mocks.updateSettings.mockResolvedValue({ daily_limit: 30 })
     mocks.createBackup.mockResolvedValue({ category: "daily", result: { path: "new.db" } })
+    mocks.getVendors.mockResolvedValue({
+      active_provider: "deepseek",
+      items: [
+        { id: "mock", display_name: "本地离线（Mock）", implemented: true, active: false },
+        { id: "deepseek", display_name: "DeepSeek", implemented: true, key_configured: true, base_url: "https://api.deepseek.com/v1", models: ["deepseek-v4-flash", "deepseek-v4-pro"], active: true },
+        { id: "qwen", display_name: "通义千问（百炼）", implemented: false, active: false },
+      ],
+    })
+    mocks.setActiveProvider.mockResolvedValue({ active_provider: "deepseek" })
+    mocks.testProvider.mockResolvedValue({ ok: true, provider: "mock", latency_ms: 1 })
   })
 
   it("shows diagnostics and never renders a provider secret", async () => {
     render(<SettingsPanel />)
 
-    expect(await screen.findByText("OpenAI")).toBeInTheDocument()
+    expect(await screen.findByText("DeepSeek")).toBeInTheDocument()
+    expect(screen.getByText("通义千问（百炼）")).toBeInTheDocument()
     expect(screen.getByText("API key 已配置（仅显示状态）")).toBeInTheDocument()
     expect(screen.getByText("D:/StudyOS/data")).toBeInTheDocument()
     expect(screen.queryByText(/secret|api_key/i)).not.toBeInTheDocument()
+  })
+
+  it("switches the active vendor and tests connectivity", async () => {
+    render(<SettingsPanel />)
+
+    const setActive = await screen.findByRole("button", { name: "设为当前" })
+    fireEvent.click(setActive)
+    await waitFor(() => expect(mocks.setActiveProvider).toHaveBeenCalledWith("mock"))
+
+    fireEvent.click(screen.getAllByRole("button", { name: /测试连通性/ })[0])
+    await waitFor(() => expect(mocks.testProvider).toHaveBeenCalledWith("mock"))
   })
 
   it("saves a bounded daily limit and refreshes the displayed value", async () => {

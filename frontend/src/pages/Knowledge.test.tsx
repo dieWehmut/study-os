@@ -6,6 +6,7 @@ import Knowledge from "./Knowledge"
 const mocks = vi.hoisted(() => ({
   getKnowledge: vi.fn(),
   listKnowledge: vi.fn(),
+  listGroups: vi.fn(),
 }))
 
 vi.mock("@/api/knowledge", () => mocks)
@@ -35,6 +36,10 @@ describe("Knowledge page", () => {
       concise_definition: "放弃；抛弃",
       detailed_markdown: "## Usage\n\nTo leave something behind.",
       tags: ["core"],
+    })
+    mocks.listGroups.mockResolvedValue({
+      count: 1,
+      items: [{ id: "g1", name: "abandon 词族", kind: "word_family" }],
     })
   })
 
@@ -156,5 +161,13 @@ describe("Knowledge page", () => {
     expect(await screen.findByRole("heading", { name: "abandon" })).toBeInTheDocument()
     fireEvent.click(screen.getByRole("tab", { name: "详细 Wiki" }))
     expect(await screen.findByText(/还没有详细 Wiki/)).toBeInTheDocument()
+  })
+
+  it("filters by a knowledge group", async () => {
+    mocks.listKnowledge.mockResolvedValueOnce({ count: 0, items: [] })
+    render(<Knowledge />)
+
+    fireEvent.change(await screen.findByLabelText("知识分组"), { target: { value: "g1" } })
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith({ query: "", group: "g1", limit: 100, offset: 0 }))
   })
 })

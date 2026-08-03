@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { LibraryBig, RotateCcw, Search } from "lucide-react"
 
-import { getKnowledge, listKnowledge } from "@/api/knowledge"
+import { getKnowledge, listGroups, listKnowledge, type KnowledgeGroup } from "@/api/knowledge"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,8 @@ import { WikiPanel } from "@/features/knowledge/WikiPanel"
 
 export default function Knowledge() {
   const [query, setQuery] = useState("")
+  const [groups, setGroups] = useState<KnowledgeGroup[]>([])
+  const [group, setGroup] = useState("")
   const [items, setItems] = useState<KnowledgeItem[]>([])
   const [count, setCount] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -22,7 +24,7 @@ export default function Knowledge() {
 
   useEffect(() => {
     const controller = new AbortController()
-    void listKnowledge({ query, limit: 100, offset: 0 })
+    void listKnowledge({ query, group: group || undefined, limit: 100, offset: 0 })
       .then((result) => {
         if (controller.signal.aborted) return
         setItems(result.items)
@@ -39,7 +41,21 @@ export default function Knowledge() {
         if (!controller.signal.aborted) setLoading(false)
     })
     return () => controller.abort()
-  }, [query, requestVersion])
+  }, [query, group, requestVersion])
+
+  useEffect(() => {
+    let active = true
+    void listGroups()
+      .then((result) => {
+        if (active) setGroups(result.items)
+      })
+      .catch(() => {
+        // The group filter is optional; the plain list remains usable.
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const selectedSummary = items.find((item) => item.id === selectedId) ?? null
   const selected = selectedDetail?.id === selectedSummary?.id ? selectedDetail : selectedSummary
@@ -98,6 +114,25 @@ export default function Knowledge() {
               onChange={(event) => updateQuery(event.target.value)}
               className="pl-9"
             />
+          </label>
+          <label className="grid gap-1.5 text-sm font-medium" htmlFor="knowledge-group">
+            知识分组
+            <select
+              id="knowledge-group"
+              aria-label="知识分组"
+              value={group}
+              onChange={(event) => {
+                setGroup(event.target.value)
+                setLoading(true)
+                setError("")
+              }}
+              className="w-fit rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+            >
+              <option value="">全部</option>
+              {groups.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
           </label>
         </CardHeader>
         <CardContent>

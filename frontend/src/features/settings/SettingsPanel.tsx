@@ -14,10 +14,6 @@ import { Input } from "@/components/ui/input"
 import { MAX_DAILY_LIMIT, MIN_DAILY_LIMIT, normalizeDailyLimit } from "@/lib/settings"
 import { useSettingsStore } from "@/store/useSettingsStore"
 
-function providerLabel(provider: string): string {
-  return provider.toLowerCase() === "openai" ? "OpenAI" : provider || "Mock"
-}
-
 function formatDate(value?: string): string {
   if (!value) return "尚无备份"
   const date = new Date(value)
@@ -36,6 +32,9 @@ export default function SettingsPanel() {
     settings,
     status,
     backups,
+    vendors,
+    isTestingProvider,
+    providerTestNotice,
     isLoading,
     isSaving,
     isBackingUp,
@@ -44,6 +43,8 @@ export default function SettingsPanel() {
     load,
     saveDailyLimit,
     createDailyBackup,
+    switchProvider,
+    testProvider,
   } = useSettingsStore()
   const [dailyLimitDraft, setDailyLimitDraft] = useState<number | null>(null)
   const dailyLimit = dailyLimitDraft ?? settings.dailyLimit
@@ -60,7 +61,7 @@ export default function SettingsPanel() {
     return (
       <Card>
         <CardContent className="grid justify-items-start gap-3 py-8">
-          <p role="alert" className="text-sm text-destructive">无法读取系统设置{error ? `：${error}` : ""}</p>
+          <p role="alert" className="text-sm text-destructive">无法读取系统设置{error ? `（${error}）` : ""}</p>
           <Button variant="outline" onClick={() => void load()}><RefreshCw data-icon="inline-start" />重试</Button>
         </CardContent>
       </Card>
@@ -75,21 +76,41 @@ export default function SettingsPanel() {
             <div className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary"><Bot aria-hidden="true" /></div>
             <Badge variant={status.provider.configured ? "secondary" : "outline"}>{status.provider.configured ? "可用" : "未配置"}</Badge>
           </div>
-          <CardTitle>AI 提供商</CardTitle>
-          <CardDescription>只显示配置状态，密钥不会发送到设置界面。</CardDescription>
+          <CardTitle>AI 服务商</CardTitle>
+          <CardDescription>配置来自 .env.local；切换服务商只改写 AI_ACTIVE_PROVIDER，密钥值永不显示。</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
-          <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/45 px-3 py-2">
-            <span className="text-muted-foreground">提供商</span><strong>{providerLabel(status.provider.name)}</strong>
-          </div>
-          <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/45 px-3 py-2">
-            <span className="text-muted-foreground">运行模式</span><span>{status.provider.mode === "remote" ? "远程" : "本地 / 离线"}</span>
-          </div>
-          <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-            <ShieldCheck aria-hidden="true" className="size-4 text-primary" />
-            {status.provider.key_configured ? "API key 已配置（仅显示状态）" : "未配置 API key"}
-          </div>
-          {status.provider.model ? <p className="text-xs text-muted-foreground">模型：{status.provider.model}</p> : null}
+          {vendors.map((vendor) => (
+            <div key={vendor.id} className="grid gap-2 rounded-lg border border-border bg-muted/25 px-3 py-2">
+              <div className="flex items-center justify-between gap-3">
+                <strong className="text-sm">{vendor.display_name}</strong>
+                <Badge variant={vendor.active ? "default" : vendor.implemented ? "secondary" : "outline"}>
+                  {vendor.active ? "当前" : vendor.implemented ? "已接入" : "待接入"}
+                </Badge>
+              </div>
+              {vendor.implemented && vendor.id !== "mock" ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck aria-hidden="true" className="size-3.5 text-primary" />
+                  {vendor.key_configured ? "API key 已配置（仅显示状态）" : "未配置 API key"}
+                </div>
+              ) : null}
+              {vendor.base_url ? <code className="break-all text-xs text-muted-foreground">{vendor.base_url}</code> : null}
+              {vendor.models && vendor.models.length > 0 ? (
+                <p className="text-xs text-muted-foreground">模型：{vendor.models.join(" / ")}</p>
+              ) : null}
+              {vendor.implemented ? (
+                <div className="flex flex-wrap gap-2">
+                  {!vendor.active ? (
+                    <Button size="sm" variant="outline" onClick={() => void switchProvider(vendor.id)}>设为当前</Button>
+                  ) : null}
+                  <Button size="sm" variant="outline" disabled={isTestingProvider} onClick={() => void testProvider(vendor.id)}>
+                    测试连通性
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+          {providerTestNotice ? <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-primary">{providerTestNotice}</p> : null}
         </CardContent>
       </Card>
 

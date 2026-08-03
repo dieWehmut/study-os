@@ -61,6 +61,39 @@ describe("ReviewSession", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "改判为较难" }))
     await waitFor(() => expect(mocks.overrideAttempt).toHaveBeenCalledWith("a1", 2))
-    expect(await screen.findByText("已改判。")) .toBeInTheDocument()
+    expect(await screen.findByText("已改判。")).toBeInTheDocument()
+  })
+
+  it("renders sentence prompts and hides an empty reference answer", async () => {
+    mocks.getDueReviews.mockResolvedValueOnce({
+      items: [
+        {
+          due_at: "2026-08-01T10:00:00Z",
+          knowledge: { id: "k1", item_type: "word_sense" },
+          prompt: {
+            id: "p2",
+            knowledge_item_id: "k1",
+            prompt_type: "make_sentence",
+            question: "用 abandon 造一个英文句子，并给出中文翻译。",
+          },
+        },
+      ],
+    })
+    mocks.answerReview.mockResolvedValueOnce({
+      attempt_id: "a2",
+      outcome: "partial",
+      rating: 2,
+      feedback: "离线模式已记录你的答案。",
+      due_at: "2026-08-02T10:00:00Z",
+      expected_answers: [],
+    })
+    render(<ReviewSession />)
+
+    expect(await screen.findByText("造句（AI 批改）")).toBeInTheDocument()
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "I abandon my old plan." } })
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+
+    expect(await screen.findByText("离线模式已记录你的答案。")).toBeInTheDocument()
+    expect(screen.queryByText(/参考答案/)).not.toBeInTheDocument()
   })
 })

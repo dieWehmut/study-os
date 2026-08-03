@@ -21,6 +21,7 @@ const promptLabels: Record<string, string> = {
   en_to_zh: "看英文，说中文",
   zh_to_en: "看中文，说英文",
   context_cloze: "语境填空",
+  make_sentence: "造句（AI 批改）",
 }
 
 export function ReviewSession() {
@@ -167,7 +168,9 @@ export function ReviewSession() {
                 <span className="text-xs text-muted-foreground">系统他评 · {evaluation.rating === 3 ? "Good" : evaluation.rating === 2 ? "Hard" : "Again"}</span>
               </div>
               <p className="text-sm leading-6">{evaluation.feedback}</p>
-              <p className="text-sm text-muted-foreground">参考答案：{evaluation.expected_answers.join(" / ")}</p>
+              {evaluation.expected_answers.length > 0 ? (
+                <p className="text-sm text-muted-foreground">参考答案：{evaluation.expected_answers.join(" / ")}</p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" aria-label="改判为重来" onClick={() => void correctRating(1)}>改判为重来</Button>
                 <Button variant="outline" size="sm" aria-label="改判为较难" onClick={() => void correctRating(2)}>改判为较难</Button>
