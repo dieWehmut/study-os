@@ -64,6 +64,7 @@ func main() {
 	}
 
 	server := &http.Server{
+		Addr:              cfg.ListenAddress,
 		Handler:           httpapi.NewRouter(application),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
