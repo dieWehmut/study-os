@@ -29,6 +29,13 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function platformLabel(platform: string): string {
+  const [os, arch] = platform.split("/")
+  const osName = os === "windows" ? "Windows" : os === "darwin" ? "macOS" : os === "linux" ? "Linux" : os
+  const archName = arch === "amd64" ? "64 位" : arch === "arm64" ? "ARM64" : arch
+  return [osName, archName].filter(Boolean).join(" · ")
+}
+
 export default function SettingsPanel() {
   const {
     settings,
@@ -297,7 +304,7 @@ export default function SettingsPanel() {
         <CardContent className="grid gap-3 text-sm">
           <div className="grid gap-1 rounded-lg bg-muted/45 px-3 py-2"><span className="text-muted-foreground">数据目录</span><code className="break-all text-xs">{status.data.directory}</code></div>
           <div className="grid gap-1 rounded-lg bg-muted/45 px-3 py-2"><span className="text-muted-foreground">数据库</span><code className="break-all text-xs">{status.data.database_path}</code></div>
-          <p className="text-xs text-muted-foreground">Study OS {status.app.version} · {status.app.platform}</p>
+          <p className="text-xs text-muted-foreground">学习系统 {status.app.version} · {platformLabel(status.app.platform)}</p>
         </CardContent>
       </Card>
 

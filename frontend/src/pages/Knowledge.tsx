@@ -104,9 +104,9 @@ export default function Knowledge() {
     <section className="grid gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="grid gap-2">
-          <Badge variant="secondary" className="w-fit"><LibraryBig aria-hidden="true" />知识 Wiki</Badge>
+          <Badge variant="secondary" className="w-fit"><LibraryBig aria-hidden="true" />知识百科</Badge>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">整理每一个值得记忆的知识点</h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">词汇、短语与隐性结论会在这里形成简明卡片和详细 Wiki。</p>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">词汇、短语与隐性结论会在这里形成简明卡片和详细百科。</p>
         </div>
         <div className="text-sm text-muted-foreground" aria-live="polite">{loading ? "正在读取…" : `${count} 个知识点`}</div>
       </div>

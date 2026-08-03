@@ -17,6 +17,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { subjectName } from "@/lib/subjects"
+import { itemTypeLabel } from "@/lib/labels"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const promptLabels: Record<string, string> = {
@@ -131,7 +132,7 @@ export function ReviewSession() {
       <Card className="border-border/80 bg-card/90">
         <CardHeader className="gap-4 border-b">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="secondary">{current.knowledge.item_type}</Badge>
+            <Badge variant="secondary">{itemTypeLabel(current.knowledge.item_type)}</Badge>
             {current.knowledge.level ? <span>{current.knowledge.level}</span> : null}
           </div>
           <div className="flex items-start justify-between gap-4">
@@ -189,8 +190,8 @@ export function ReviewSession() {
             </label>
           )}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          {audioSource === "browser" ? <p className="text-xs text-muted-foreground" role="status">Audio file unavailable; browser speech fallback used.</p> : null}
-          {audioSource === "unavailable" ? <p className="text-xs text-muted-foreground" role="status">No pronunciation audio is available.</p> : null}
+          {audioSource === "browser" ? <p className="text-xs text-muted-foreground" role="status">本地音频不可用，已改用浏览器朗读。</p> : null}
+          {audioSource === "unavailable" ? <p className="text-xs text-muted-foreground" role="status">没有可用的发音音频。</p> : null}
 
           {evaluation ? (
             <div
@@ -207,7 +208,7 @@ export function ReviewSession() {
                 <Badge variant={evaluation.outcome === "incorrect" ? "destructive" : "default"}>
                   {evaluation.outcome === "correct" ? "正确" : evaluation.outcome === "partial" ? "部分正确" : "需要重学"}
                 </Badge>
-                <span className="text-xs text-muted-foreground">系统他评 · {evaluation.rating === 3 ? "Good" : evaluation.rating === 2 ? "Hard" : "Again"}</span>
+                <span className="text-xs text-muted-foreground">系统他评 · {evaluation.rating === 3 ? "良好" : evaluation.rating === 2 ? "困难" : "重来"}</span>
               </div>
               <p className="text-sm leading-6">{evaluation.feedback}</p>
               {evaluation.expected_answers.length > 0 ? (

@@ -7,6 +7,7 @@ import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { itemTypeLabel } from "@/lib/labels"
 
 interface WikiPanelProps {
   item: KnowledgeItem | null
@@ -18,7 +19,7 @@ export function WikiPanel({ item }: WikiPanelProps) {
       <Card className="grid min-h-64 place-items-center border-dashed">
         <CardContent className="grid justify-items-center gap-2 text-center text-sm text-muted-foreground">
           <BookOpenText aria-hidden="true" className="size-6 text-primary/50" />
-          <span>选择一个知识点查看 Wiki</span>
+          <span>选择一个知识点查看百科</span>
         </CardContent>
       </Card>
     )
@@ -28,7 +29,7 @@ export function WikiPanel({ item }: WikiPanelProps) {
     <Card key={item.id} className="min-w-0">
       <CardHeader className="gap-3 border-b">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{item.item_type}</Badge>
+          <Badge variant="secondary">{itemTypeLabel(item.item_type)}</Badge>
           {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
           {item.tags?.map((tag) => <Badge key={tag} variant="ghost">#{tag}</Badge>)}
         </div>
@@ -41,7 +42,7 @@ export function WikiPanel({ item }: WikiPanelProps) {
         <Tabs defaultValue="concise">
           <TabsList aria-label="Wiki视图">
             <TabsTrigger value="concise">简明</TabsTrigger>
-            <TabsTrigger value="detail">详细 Wiki</TabsTrigger>
+            <TabsTrigger value="detail">详细百科</TabsTrigger>
           </TabsList>
           <TabsContent value="concise" className="grid gap-5 pt-5">
             <section className="grid gap-2">
@@ -66,7 +67,7 @@ export function WikiPanel({ item }: WikiPanelProps) {
                   {item.detailed_markdown}
                 </ReactMarkdown>
               </div>
-            ) : <p className="text-sm text-muted-foreground">这个知识点还没有详细 Wiki。</p>}
+            ) : <p className="text-sm text-muted-foreground">这个知识点还没有详细百科。</p>}
           </TabsContent>
         </Tabs>
       </CardContent>

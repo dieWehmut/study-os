@@ -54,10 +54,10 @@ export function Sidebar({ width, onWidthChange }: SidebarProps) {
     >
       <div className="flex h-20 items-center gap-3 px-6">
         <div className="grid size-9 place-items-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm">
-          S
+          学
         </div>
         <div className="min-w-0">
-          <p className="font-heading text-sm font-semibold tracking-tight">Study OS</p>
+          <p className="font-heading text-sm font-semibold tracking-tight">学习系统</p>
         </div>
       </div>
 

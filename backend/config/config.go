@@ -136,7 +136,7 @@ func (c Config) Vendors() []VendorStatus {
 	return []VendorStatus{
 		{
 			ID:          "mock",
-			DisplayName: "本地离线（Mock）",
+			DisplayName: "本地离线",
 			Implemented: true,
 			Active:      active == "mock",
 		},

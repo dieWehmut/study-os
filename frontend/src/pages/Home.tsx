@@ -7,6 +7,7 @@ import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SUBJECTS } from "@/lib/subjects"
+import { providerLabel } from "@/lib/labels"
 import { cn } from "@/lib/utils"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
@@ -136,7 +137,7 @@ export default function Home() {
             </Link>
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
               {dashboard.offline ? <CloudOff aria-hidden="true" className="size-4 text-primary" /> : <Sparkles aria-hidden="true" className="size-4 text-primary" />}
-              {dashboard.provider === "mock" ? "Mock AI" : dashboard.provider} · {dashboard.offline ? "离线可用" : "在线"}
+              {providerLabel(dashboard.provider)} · {dashboard.offline ? "离线可用" : "在线"}
             </span>
           </CardContent>
         </Card>

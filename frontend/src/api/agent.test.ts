@@ -17,7 +17,7 @@ describe("agent vendor API", () => {
     mocks.apiRequest.mockResolvedValue({
       active_provider: "deepseek",
       items: [
-        { id: "mock", display_name: "本地离线（Mock）", implemented: true, active: false },
+        { id: "mock", display_name: "本地离线", implemented: true, active: false },
         { id: "deepseek", display_name: "DeepSeek", implemented: true, key_configured: true, active: true },
         { id: "qwen", display_name: "通义千问（百炼）", implemented: false, active: false },
       ],

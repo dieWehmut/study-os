@@ -50,7 +50,7 @@ describe("Knowledge page", () => {
 
     expect(await screen.findByRole("heading", { name: "abandon" })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "简明" })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("tab", { name: "详细 Wiki" }))
+    fireEvent.click(screen.getByRole("tab", { name: "详细百科" }))
 
     expect(await screen.findByText("To leave something behind.")).toBeInTheDocument()
   })
@@ -68,7 +68,7 @@ describe("Knowledge page", () => {
     })
     const { container } = render(<Knowledge />)
 
-    fireEvent.click(await screen.findByRole("tab", { name: "详细 Wiki" }))
+    fireEvent.click(await screen.findByRole("tab", { name: "详细百科" }))
     expect(container.querySelector("script")).toBeNull()
     expect(screen.getByText("bad")).toBeInTheDocument()
     expect(container.querySelector('a[href^="javascript:"]')).toBeNull()
@@ -141,7 +141,7 @@ describe("Knowledge page", () => {
     expect(screen.queryByText("STALE MARKDOWN")).not.toBeInTheDocument()
 
     resolveSecond({ id: "k2", item_type: "word_sense", term: "beta", concise_definition: "第二个", detailed_markdown: "FRESH MARKDOWN" })
-    fireEvent.click(await screen.findByRole("tab", { name: "详细 Wiki" }))
+    fireEvent.click(await screen.findByRole("tab", { name: "详细百科" }))
     expect(await screen.findByText("FRESH MARKDOWN")).toBeInTheDocument()
     expect(screen.queryByText("STALE MARKDOWN")).not.toBeInTheDocument()
   })
@@ -161,8 +161,8 @@ describe("Knowledge page", () => {
     render(<Knowledge />)
 
     expect(await screen.findByRole("heading", { name: "abandon" })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("tab", { name: "详细 Wiki" }))
-    expect(await screen.findByText(/还没有详细 Wiki/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("tab", { name: "详细百科" }))
+    expect(await screen.findByText(/还没有详细百科/)).toBeInTheDocument()
   })
 
   it("filters by a knowledge group", async () => {

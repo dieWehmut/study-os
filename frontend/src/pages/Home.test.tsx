@@ -40,7 +40,7 @@ describe("Today page", () => {
 
     expect(await screen.findByText("3 个待复习")) .toBeInTheDocument()
     expect(screen.getByText("1 个知识点")) .toBeInTheDocument()
-    expect(screen.getByText("Mock AI · 离线可用")) .toBeInTheDocument()
+    expect(screen.getByText("本地 · 离线可用")) .toBeInTheDocument()
 
     expect(screen.getByRole("link", { name: "开始复习" })).toHaveAttribute("href", "/memory")
   })
