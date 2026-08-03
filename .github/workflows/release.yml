@@ -144,14 +144,26 @@ jobs:
           if ($env:NOTES) {
             Set-Content -LiteralPath 'release-notes.md' -Value $env:NOTES -Encoding UTF8
           } else {
-            $changelog = Get-Content -LiteralPath 'CHANGELOG.md' -Raw
-            $pattern = "(?ms)^## v?$([regex]::Escape($version))\s*$.*?(?=^## |\z)"
-            $match = [regex]::Match($changelog, $pattern)
-            if ($match.Success) {
-              Set-Content -LiteralPath 'release-notes.md' -Value $match.Value.Trim() -Encoding UTF8
-            } else {
-              Set-Content -LiteralPath 'release-notes.md' -Value "## v$version" -Encoding UTF8
+            $lines = Get-Content -LiteralPath 'CHANGELOG.md'
+            $capture = $false
+            $body = @()
+            foreach ($line in $lines) {
+              if (-not $capture -and $line -match "^## v?$([regex]::Escape($version))\s*$") {
+                $capture = $true
+                $body += "## v$version"
+                continue
+              }
+              if ($capture -and $line -match '^## ') {
+                break
+              }
+              if ($capture) {
+                $body += $line
+              }
             }
+            if ($body.Count -eq 0) {
+              $body += "## v$version"
+            }
+            Set-Content -LiteralPath 'release-notes.md' -Value ($body -join "`n") -Encoding UTF8
           }
       - uses: softprops/action-gh-release@v2
         with:
