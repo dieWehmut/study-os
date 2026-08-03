@@ -64,8 +64,47 @@ jobs:
           path: build/bin/windows-${{ matrix.arch }}/StudyOS.exe
           if-no-files-found: error
 
+  build-pwa:
+    name: Build PWA launcher package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Build frontend
+        working-directory: frontend
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Build PWA server and package
+        shell: pwsh
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          $version = if ('${{ github.event.inputs.version }}') { '${{ github.event.inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
+          New-Item -ItemType Directory -Path "build/pwa/web" -Force | Out-Null
+          go build -ldflags "-X study-os/backend/version.Version=$version" -o build/pwa/study-os-server.exe ./backend
+          Copy-Item -Path "frontend/dist/*" -Destination "build/pwa/web" -Recurse -Force
+          ./scripts/package-pwa-release.ps1 -Version $version -SkipBuild | Out-Host
+      - uses: actions/upload-artifact@v4
+        with:
+          name: study-os-pwa-windows-x64
+          path: release
+          if-no-files-found: error
+
   publish:
-    needs: build-windows
+    needs: [build-windows, build-pwa]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,6 +120,11 @@ jobs:
             New-Item -ItemType Directory -Path $destination -Force | Out-Null
             Copy-Item -LiteralPath $source -Destination "$destination/StudyOS.exe"
           }
+      - name: Download PWA package
+        uses: actions/download-artifact@v4
+        with:
+          name: study-os-pwa-windows-x64
+          path: release
       - name: Package archives and manifest
         shell: pwsh
         run: |
