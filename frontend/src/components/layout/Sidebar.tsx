@@ -1,5 +1,4 @@
 import type { PointerEvent, KeyboardEvent } from "react"
-import { Atom, BookOpenText, FlaskConical, Languages, Map, Sigma } from "lucide-react"
 import { NavLink } from "react-router-dom"
 
 import {
@@ -7,19 +6,8 @@ import {
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
 } from "@/lib/sidebar"
-import { SUBJECTS } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
-import { useSubjectStore } from "@/store/useSubjectStore"
 import { primaryNavigation } from "./navigation"
-
-const subjectIcons: Record<string, typeof Languages> = {
-  chinese: BookOpenText,
-  math: Sigma,
-  english: Languages,
-  physics: Atom,
-  chemistry: FlaskConical,
-  geography: Map,
-}
 
 interface SidebarProps {
   width: number
@@ -27,9 +15,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({ width, onWidthChange }: SidebarProps) {
-  const subject = useSubjectStore((state) => state.subject)
-  const setSubject = useSubjectStore((state) => state.setSubject)
-
   function clampWidth(value: number): number {
     return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)))
   }
@@ -73,30 +58,6 @@ export function Sidebar({ width, onWidthChange }: SidebarProps) {
         </div>
         <div className="min-w-0">
           <p className="font-heading text-sm font-semibold tracking-tight">Study OS</p>
-        </div>
-      </div>
-
-      <div className="px-3 pt-1">
-        <p className="px-3 pb-1 text-[0.68rem] font-medium tracking-wider text-muted-foreground">学科</p>
-        <div className="grid gap-0.5">
-          {SUBJECTS.map(({ id, name }) => {
-            const Icon = subjectIcons[id]
-            return (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={subject === id}
-                onClick={() => setSubject(id)}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-                  subject === id && "bg-sidebar-accent font-medium text-sidebar-primary",
-                )}
-              >
-                <Icon aria-hidden="true" className="size-4 shrink-0" />
-                <span>{name}</span>
-              </button>
-            )
-          })}
         </div>
       </div>
 

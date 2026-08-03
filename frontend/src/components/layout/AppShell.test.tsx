@@ -77,13 +77,15 @@ describe("application shell", () => {
     expect(sidebar?.getAttribute("style")).toContain("272px")
   })
 
-  it("switches the active subject from the sidebar", () => {
+  it("puts 首页 first in the sidebar and switches subjects from the home page", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
       </MemoryRouter>,
     )
 
+    const sidebarLinks = Array.from(document.querySelectorAll("aside nav a"))
+    expect(sidebarLinks[0]?.textContent?.trim()).toBe("首页")
     const math = screen.getByRole("button", { name: "数学" })
     fireEvent.click(math)
     expect(math).toHaveAttribute("aria-pressed", "true")

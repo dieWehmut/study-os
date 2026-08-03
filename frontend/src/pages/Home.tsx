@@ -6,6 +6,9 @@ import { getDashboard, seedDemo } from "@/api/dashboard"
 import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { SUBJECTS } from "@/lib/subjects"
+import { cn } from "@/lib/utils"
+import { useSubjectStore } from "@/store/useSubjectStore"
 
 const emptyDashboard: DashboardData = {
   knowledge_count: 0,
@@ -19,6 +22,8 @@ const emptyDashboard: DashboardData = {
 }
 
 export default function Home() {
+  const subject = useSubjectStore((state) => state.subject)
+  const setSubject = useSubjectStore((state) => state.setSubject)
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard)
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
@@ -73,6 +78,38 @@ export default function Home() {
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">把新知识变成可记住的进度</h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">只检测值得记忆的内容；每次作答都会留下他评、反馈和下一次复习安排。</p>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2" aria-label="选择学科">
+        <button
+          type="button"
+          aria-pressed={subject === "all"}
+          onClick={() => setSubject("all")}
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            subject === "all"
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-card text-muted-foreground hover:bg-muted",
+          )}
+        >
+          全部
+        </button>
+        {SUBJECTS.map(({ id, name }) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={subject === id}
+            onClick={() => setSubject(id)}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              subject === id
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted",
+            )}
+          >
+            {name}
+          </button>
+        ))}
       </div>
 
       {error ? (
