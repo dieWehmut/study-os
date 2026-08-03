@@ -40,6 +40,14 @@ func NewRouter(application *app.App) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(loopbackHostOnly)
 	router.Use(trustedOriginOnly)
+	if application != nil && application.Launcher != nil {
+		router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				application.Launcher.Touch()
+				next.ServeHTTP(response, request)
+			})
+		})
+	}
 	router.Route("/api", func(api chi.Router) {
 		api.Get("/health", func(response http.ResponseWriter, request *http.Request) {
 			if application == nil || application.Store == nil {
@@ -133,7 +141,23 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupList(response, request, application)
 		})
+		if application != nil && application.Launcher != nil {
+			api.Post("/launcher/close", func(response http.ResponseWriter, request *http.Request) {
+				handleLauncherClose(response, request, application)
+			})
+			api.Get("/update/status", func(response http.ResponseWriter, request *http.Request) {
+				handleUpdateStatus(response, request, application)
+			})
+			api.Post("/update/apply", func(response http.ResponseWriter, request *http.Request) {
+				handleUpdateApply(response, request, application)
+			})
+		}
 	})
+	if application != nil && application.Launcher != nil {
+		router.NotFound(func(response http.ResponseWriter, request *http.Request) {
+			application.Launcher.SPAHandler().ServeHTTP(response, request)
+		})
+	}
 	return router
 }
 

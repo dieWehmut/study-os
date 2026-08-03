@@ -81,6 +81,22 @@ wails build -clean
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
+## PWA 启动器（一键安装 + 自动更新）
+
+也可以把学习系统装成“浏览器里的 PWA”：
+
+1. 打包发布包（需要 Go 与 pnpm）：
+   ```powershell
+   scripts\package-pwa-release.ps1 -Version 0.2.0
+   ```
+   生成 `release/study-os-pwa-windows-x64.zip`（含服务程序、网页与启动脚本）和校验文件。
+2. 用户侧一键安装（自动下载 GitHub 最新发布、校验、解压并生成桌面图标）：
+   ```powershell
+   scripts\install-pwa.ps1 -Folder D:\StudyOS
+   ```
+   之后双击桌面「学习系统」：自动启动本地后端并打开 PWA 界面；关闭浏览器窗口后后端会自动退出，不占资源。
+3. 自动更新：后端启动后定期检查 GitHub Releases，发现新版本时前端弹出更新说明与「立即更新」；设置页也有「检查更新」按钮。更新仓库可用 `STUDY_OS_UPDATE_REPO` 配置（默认 `dieWehmut/study-os`）。
+
 ## 文档
 
 - [架构](docs/architecture.md)

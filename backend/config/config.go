@@ -19,6 +19,9 @@ type Config struct {
 	DeepSeek        DeepSeekConfig
 	DashScopeAPIKey string
 	DashScopeVoice  string
+	Launcher        bool
+	StaticDir       string
+	UpdateRepo      string
 	SeedFixtures    bool
 }
 
@@ -93,6 +96,8 @@ func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 		ListenAddress:   valueOr(lookup, "STUDY_OS_LISTEN_ADDRESS", "127.0.0.1:8080"),
 		DataDir:         valueOr(lookup, "STUDY_OS_DATA_DIR", "data"),
 		ActiveProvider:  valueOr(lookup, "AI_ACTIVE_PROVIDER", "mock"),
+		StaticDir:       valueOr(lookup, "STUDY_OS_STATIC_DIR", "web"),
+		UpdateRepo:      valueOr(lookup, "STUDY_OS_UPDATE_REPO", "dieWehmut/study-os"),
 		DashScopeAPIKey: envValue(lookup, "DASHSCOPE_API_KEY"),
 		DashScopeVoice:  valueOr(lookup, "DASHSCOPE_TTS_VOICE", "longxiaochun"),
 		DeepSeek: DeepSeekConfig{
@@ -110,6 +115,13 @@ func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 			return Config{}, fmt.Errorf("parse STUDY_OS_SEED_FIXTURES: %w", err)
 		}
 		cfg.SeedFixtures = seedFixtures
+	}
+	if value, ok := lookup("STUDY_OS_LAUNCHER"); ok && strings.TrimSpace(value) != "" {
+		launcher, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err != nil {
+			return Config{}, fmt.Errorf("parse STUDY_OS_LAUNCHER: %w", err)
+		}
+		cfg.Launcher = launcher
 	}
 
 	if err := validateLoopbackAddress(cfg.ListenAddress); err != nil {

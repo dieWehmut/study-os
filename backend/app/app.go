@@ -11,7 +11,9 @@ import (
 	"study-os/backend/backup"
 	"study-os/backend/config"
 	"study-os/backend/db"
+	"study-os/backend/launcher"
 	"study-os/backend/models"
+	"study-os/backend/version"
 )
 
 type Options struct {
@@ -21,10 +23,11 @@ type Options struct {
 }
 
 type App struct {
-	Config  config.Config
-	Store   *db.Store
-	Backups *backup.Service
-	Audio   *audio.Service
+	Config   config.Config
+	Store    *db.Store
+	Backups  *backup.Service
+	Audio    *audio.Service
+	Launcher *launcher.Service
 }
 
 func New(ctx context.Context, options Options) (*App, error) {
@@ -63,11 +66,26 @@ func New(ctx context.Context, options Options) (*App, error) {
 		_ = store.Close()
 		return nil, fmt.Errorf("create audio service: %w", err)
 	}
+	var launcherService *launcher.Service
+	if cfg.Launcher || strings.TrimSpace(cfg.StaticDir) != "" {
+		staticDir, err := filepath.Abs(cfg.StaticDir)
+		if err != nil {
+			_ = store.Close()
+			return nil, fmt.Errorf("resolve static directory: %w", err)
+		}
+		launcherService = launcher.NewService(launcher.Options{
+			StaticDir: staticDir,
+			Repo:      cfg.UpdateRepo,
+			Version:   version.Version,
+			DataDir:   cfg.DataDir,
+		})
+	}
 	return &App{
-		Config:  cfg,
-		Store:   store,
-		Backups: backup.NewService(filepath.Join(cfg.DataDir, "backups")),
-		Audio:   audioService,
+		Config:   cfg,
+		Store:    store,
+		Backups:  backup.NewService(filepath.Join(cfg.DataDir, "backups")),
+		Audio:    audioService,
+		Launcher: launcherService,
 	}, nil
 }
 

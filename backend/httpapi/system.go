@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"study-os/backend/app"
+	"study-os/backend/version"
 )
 
 const defaultDailyLimit = 20
@@ -78,7 +79,7 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 			Count:     backupCount,
 		},
 		App: appStatus{
-			Version:  "0.2.0-dev",
+			Version:  version.Version,
 			Platform: runtime.GOOS + "/" + runtime.GOARCH,
 		},
 	}

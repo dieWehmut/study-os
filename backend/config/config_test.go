@@ -111,3 +111,34 @@ func TestFromLookupRejectsNonLoopbackListener(t *testing.T) {
 		t.Fatal("expected a non-loopback listener error")
 	}
 }
+
+func TestFromLookupParsesLauncherSettings(t *testing.T) {
+	values := map[string]string{
+		"STUDY_OS_LAUNCHER":    "true",
+		"STUDY_OS_STATIC_DIR":  "web-app",
+		"STUDY_OS_UPDATE_REPO": "me/study-os",
+	}
+	cfg, err := config.FromLookup(func(key string) (string, bool) {
+		value, ok := values[key]
+		return value, ok
+	})
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if !cfg.Launcher {
+		t.Fatal("launcher mode not enabled")
+	}
+	if cfg.StaticDir != "web-app" || cfg.UpdateRepo != "me/study-os" {
+		t.Fatalf("launcher settings = %#v", cfg)
+	}
+}
+
+func TestFromLookupAppliesLauncherDefaults(t *testing.T) {
+	cfg, err := config.FromLookup(func(string) (string, bool) { return "", false })
+	if err != nil {
+		t.Fatalf("load defaults: %v", err)
+	}
+	if cfg.Launcher || cfg.StaticDir != "web" || cfg.UpdateRepo != "dieWehmut/study-os" {
+		t.Fatalf("launcher defaults = %#v", cfg)
+	}
+}

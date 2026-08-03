@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   setActiveProvider: vi.fn(),
   testProvider: vi.fn(),
   saveVendorConfig: vi.fn(),
+  getUpdateStatus: vi.fn(),
+  applyUpdate: vi.fn(),
 }))
 vi.mock("@/api/system", () => mocks)
 vi.mock("@/api/agent", () => ({
@@ -19,6 +21,10 @@ vi.mock("@/api/agent", () => ({
   setActiveProvider: mocks.setActiveProvider,
   testProvider: mocks.testProvider,
   saveVendorConfig: mocks.saveVendorConfig,
+}))
+vi.mock("@/api/update", () => ({
+  getUpdateStatus: mocks.getUpdateStatus,
+  applyUpdate: mocks.applyUpdate,
 }))
 
 const status = {
@@ -57,6 +63,13 @@ describe("SettingsPanel", () => {
       model: "deepseek-v4-flash",
       reasoning_model: "deepseek-v4-pro",
     })
+    mocks.getUpdateStatus.mockResolvedValue({
+      current_version: "0.2.0-dev",
+      latest_version: "0.3.0",
+      update_available: true,
+      release_notes: "新增课程生成",
+    })
+    mocks.applyUpdate.mockResolvedValue({ status: "updating", version: "0.3.0" })
   })
 
   it("shows diagnostics and never renders a provider secret", async () => {
@@ -140,5 +153,16 @@ describe("SettingsPanel", () => {
       provider: "deepseek",
       api_key: "",
     }))
+  })
+
+  it("checks for updates and applies a new version", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "检查更新" }))
+    expect(await screen.findByText("发现新版本 0.3.0")).toBeInTheDocument()
+    expect(screen.getByText("新增课程生成")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "立即更新" }))
+    await waitFor(() => expect(mocks.applyUpdate).toHaveBeenCalledOnce())
   })
 })

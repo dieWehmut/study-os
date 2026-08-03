@@ -444,4 +444,54 @@ func TestDueReviewsFilterBySubject(t *testing.T) {
 	}
 }
 
+func TestLauncherServesSPAUpdateStatusAndClose(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<html>学习系统首页</html>"), 0o600); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+	application := testApplication(t, config.Config{
+		DataDir:    t.TempDir(),
+		Launcher:   true,
+		StaticDir:  staticDir,
+		UpdateRepo: "fake/study-os",
+	})
+	if application.Launcher == nil {
+		t.Fatal("launcher service missing")
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/repos/fake/study-os/releases/latest" {
+			_, _ = response.Write([]byte(`{"tag_name":"v0.3.0","body":"更新说明","assets":[{"name":"study-os-pwa-windows-x64.zip","browser_download_url":"/download"}]}`))
+			return
+		}
+		http.NotFound(response, request)
+	}))
+	defer server.Close()
+	application.Launcher.HTTPClient = server.Client()
+	application.Launcher.DownloadBase = server.URL
+	application.Launcher.APIBase = server.URL
+	router := httpapi.NewRouter(application)
+
+	status := requestJSON(t, router, http.MethodGet, "/api/update/status", nil)
+	if status.Code != http.StatusOK || !strings.Contains(status.Body.String(), `"update_available":true`) {
+		t.Fatalf("update status = %d, body = %s", status.Code, status.Body.String())
+	}
+	spa := requestJSON(t, router, http.MethodGet, "/knowledge", nil)
+	if spa.Code != http.StatusOK || !strings.Contains(spa.Body.String(), "学习系统首页") {
+		t.Fatalf("spa fallback = %d, body = %s", spa.Code, spa.Body.String())
+	}
+	closed := false
+	application.Launcher.OnShutdown = func() { closed = true }
+	closeResponse := requestJSON(t, router, http.MethodPost, "/api/launcher/close", nil)
+	if closeResponse.Code != http.StatusOK {
+		t.Fatalf("close = %d, body = %s", closeResponse.Code, closeResponse.Body.String())
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for !closed && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !closed {
+		t.Fatal("launcher close callback was not invoked")
+	}
+}
+
 var _ = httptest.NewRecorder

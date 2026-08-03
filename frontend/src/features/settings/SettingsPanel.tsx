@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
-import { Bot, Database, Download, HardDrive, RefreshCw, Save, ShieldCheck } from "lucide-react"
+import { Bot, Database, Download, HardDrive, RefreshCw, Save, ShieldCheck, UploadCloud } from "lucide-react"
 
 import type { VendorConfigInput } from "@/api/agent"
+import { applyUpdate, getUpdateStatus, type UpdateStatus } from "@/api/update"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -65,6 +66,10 @@ export default function SettingsPanel() {
   const [baseURLDraft, setBaseURLDraft] = useState("")
   const [ttsKeyDraft, setTtsKeyDraft] = useState("")
   const [ttsVoiceDraft, setTtsVoiceDraft] = useState("")
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [applyingUpdate, setApplyingUpdate] = useState(false)
+  const [updateError, setUpdateError] = useState("")
   const dailyLimit = dailyLimitDraft ?? settings.dailyLimit
 
   useEffect(() => {
@@ -103,6 +108,47 @@ export default function SettingsPanel() {
     if (ttsVoiceDraft.trim()) values.voice = ttsVoiceDraft.trim()
     await saveConfig("dashscope", values)
     setTtsKeyDraft("")
+  }
+
+  async function checkForUpdate() {
+    setCheckingUpdate(true)
+    setUpdateError("")
+    try {
+      setUpdateStatus(await getUpdateStatus())
+    } catch {
+      setUpdateError("检查更新失败，请确认网络可用。")
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
+
+  async function installUpdate() {
+    setApplyingUpdate(true)
+    setUpdateError("")
+    try {
+      await applyUpdate()
+      const started = Date.now()
+      const timer = window.setInterval(async () => {
+        if (Date.now() - started > 180_000) {
+          window.clearInterval(timer)
+          setApplyingUpdate(false)
+          setUpdateError("更新后服务未恢复，请稍后手动打开。")
+          return
+        }
+        try {
+          const response = await fetch("/api/health")
+          if (response.ok) {
+            window.clearInterval(timer)
+            window.location.reload()
+          }
+        } catch {
+          // 服务正在重启，继续等待。
+        }
+      }, 2000)
+    } catch {
+      setApplyingUpdate(false)
+      setUpdateError("更新失败，请检查网络后重试。")
+    }
   }
 
   return (
@@ -266,6 +312,47 @@ export default function SettingsPanel() {
             </div>
           </div>
           {providerTestNotice ? <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-primary">{providerTestNotice}</p> : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary"><UploadCloud aria-hidden="true" /></div>
+            <Button variant="outline" size="sm" disabled={checkingUpdate || applyingUpdate} onClick={() => void checkForUpdate()}>
+              <RefreshCw data-icon="inline-start" />{checkingUpdate ? "正在检查…" : "检查更新"}
+            </Button>
+          </div>
+          <CardTitle>更新</CardTitle>
+          <CardDescription>当前版本 {status.app.version}，自动检测 GitHub 最新发布。</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {updateError ? <p role="alert" className="text-sm text-destructive">{updateError}</p> : null}
+          {updateStatus ? (
+            updateStatus.update_available ? (
+              <div className="grid gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+                <p className="text-sm font-medium">发现新版本 {updateStatus.latest_version}</p>
+                {updateStatus.release_notes ? (
+                  <div className="max-h-32 overflow-auto text-xs leading-5 whitespace-pre-wrap text-muted-foreground">
+                    {updateStatus.release_notes}
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" disabled={applyingUpdate} onClick={() => void installUpdate()}>
+                    {applyingUpdate ? "正在后台更新…" : "立即更新"}
+                  </Button>
+                  {updateStatus.release_url ? (
+                    <a className="text-xs text-primary underline underline-offset-3" href={updateStatus.release_url} target="_blank" rel="noreferrer">查看发布说明</a>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-border bg-muted/35 px-3 py-2.5 text-sm text-muted-foreground">
+                已是最新版本{updateStatus.latest_version ? `（${updateStatus.latest_version}）` : ""}。
+                {updateStatus.error ? ` ${updateStatus.error}` : ""}
+              </p>
+            )
+          ) : null}
         </CardContent>
       </Card>
 
