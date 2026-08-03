@@ -148,7 +148,8 @@ jobs:
             $capture = $false
             $body = @()
             foreach ($line in $lines) {
-              if (-not $capture -and $line -match "^## v?$([regex]::Escape($version))\s*$") {
+              $startsWithVersion = $line.StartsWith("## v$version") -or $line.StartsWith("## $version")
+              if (-not $capture -and $startsWithVersion) {
                 $capture = $true
                 $body += "## v$version"
                 continue
