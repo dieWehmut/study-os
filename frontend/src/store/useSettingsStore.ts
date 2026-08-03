@@ -10,9 +10,11 @@ import {
 } from "@/api/system"
 import {
   getVendors,
+  saveVendorConfig,
   setActiveProvider,
   testProvider,
   type ProviderTestResult,
+  type VendorConfigInput,
   type VendorInfo,
 } from "@/api/agent"
 import {
@@ -30,6 +32,7 @@ interface SettingsStore {
   activeProvider: string
   isTestingProvider: boolean
   providerTestNotice: string | null
+  isSavingConfig: boolean
   isLoading: boolean
   isSaving: boolean
   isBackingUp: boolean
@@ -40,6 +43,7 @@ interface SettingsStore {
   createDailyBackup: () => Promise<void>
   switchProvider: (provider: string) => Promise<void>
   testProvider: (provider: string) => Promise<void>
+  saveConfig: (provider: string, values: VendorConfigInput) => Promise<void>
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -54,6 +58,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   activeProvider: "mock",
   isTestingProvider: false,
   providerTestNotice: null,
+  isSavingConfig: false,
   isLoading: false,
   isSaving: false,
   isBackingUp: false,
@@ -138,6 +143,36 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       }
     } catch (error) {
       set({ isTestingProvider: false, providerTestNotice: `连通失败：${errorMessage(error, "服务不可用")}` })
+    }
+  },
+
+  async saveConfig(provider, values) {
+    set({ isSavingConfig: true, error: null, notice: null, providerTestNotice: null })
+    try {
+      const result = await saveVendorConfig({ ...values, provider })
+      const vendorResponse = await getVendors()
+      const status = get().status
+      const nextStatus = status
+        ? {
+            ...status,
+            provider: {
+              ...status.provider,
+              key_configured: result.key_configured,
+              configured: true,
+              available: true,
+              ...(result.model ? { model: result.model } : {}),
+            },
+          }
+        : status
+      set({
+        isSavingConfig: false,
+        vendors: vendorResponse.items,
+        activeProvider: vendorResponse.active_provider,
+        status: nextStatus,
+        notice: "AI 配置已保存",
+      })
+    } catch (error) {
+      set({ isSavingConfig: false, error: `配置保存失败：${errorMessage(error, "无法写入 .env.local")}` })
     }
   },
 }))

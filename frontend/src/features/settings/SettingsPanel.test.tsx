@@ -11,12 +11,14 @@ const mocks = vi.hoisted(() => ({
   getVendors: vi.fn(),
   setActiveProvider: vi.fn(),
   testProvider: vi.fn(),
+  saveVendorConfig: vi.fn(),
 }))
 vi.mock("@/api/system", () => mocks)
 vi.mock("@/api/agent", () => ({
   getVendors: mocks.getVendors,
   setActiveProvider: mocks.setActiveProvider,
   testProvider: mocks.testProvider,
+  saveVendorConfig: mocks.saveVendorConfig,
 }))
 
 const status = {
@@ -48,6 +50,13 @@ describe("SettingsPanel", () => {
     })
     mocks.setActiveProvider.mockResolvedValue({ active_provider: "deepseek" })
     mocks.testProvider.mockResolvedValue({ ok: true, provider: "mock", latency_ms: 1 })
+    mocks.saveVendorConfig.mockResolvedValue({
+      provider: "deepseek",
+      key_configured: true,
+      base_url: "https://api.deepseek.com/v1",
+      model: "deepseek-v4-flash",
+      reasoning_model: "deepseek-v4-pro",
+    })
   })
 
   it("shows diagnostics and never renders a provider secret", async () => {
@@ -98,5 +107,35 @@ describe("SettingsPanel", () => {
 
     expect((await screen.findByRole("alert")).textContent).toContain("无法读取系统设置：offline")
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument()
+  })
+
+  it("saves an API key and model through the vendor config form without echoing the key", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑配置" }))
+    const keyInput = screen.getByLabelText("API Key")
+    fireEvent.change(keyInput, { target: { value: "sk-live-secret" } })
+    fireEvent.change(screen.getByLabelText("推理模型"), { target: { value: "deepseek-v4-pro" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
+
+    await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
+      provider: "deepseek",
+      api_key: "sk-live-secret",
+      reasoning_model: "deepseek-v4-pro",
+    }))
+    expect(await screen.findByText("AI 配置已保存")).toBeInTheDocument()
+    expect(screen.queryByDisplayValue("sk-live-secret")).not.toBeInTheDocument()
+  })
+
+  it("clears a stored API key", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑配置" }))
+    fireEvent.click(screen.getByRole("button", { name: "清除密钥" }))
+
+    await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
+      provider: "deepseek",
+      api_key: "",
+    }))
   })
 })

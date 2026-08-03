@@ -64,6 +64,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Patch("/agent/active", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentActive(response, request, application)
 		})
+		api.Patch("/agent/config", func(response http.ResponseWriter, request *http.Request) {
+			handleAgentConfig(response, request, application)
+		})
 		api.Post("/agent/test", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentTest(response, request, application)
 		})

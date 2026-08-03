@@ -51,8 +51,9 @@ DASHSCOPE_API_KEY=
 DASHSCOPE_TTS_VOICE=longxiaochun
 ```
 
-设置页的「AI 服务商」卡片会显示每个厂商的配置状态，并可切换
-`AI_ACTIVE_PROVIDER`（只改写该行，带备份）。密钥值在任何界面都不显示。
+设置页的「AI 服务商」卡片会显示每个厂商的配置状态，可切换
+`AI_ACTIVE_PROVIDER`、填写/清除 API Key、选择模型并保存到 `.env.local`
+（带备份）。密钥是只写不回显的：界面只显示“已配置/未配置”，绝不显示密钥值。
 
 ## 验证命令
 

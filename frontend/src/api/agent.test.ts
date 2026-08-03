@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { getVendors, setActiveProvider, testProvider } from "./agent"
+import { getVendors, saveVendorConfig, setActiveProvider, testProvider } from "./agent"
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -46,5 +46,30 @@ describe("agent vendor API", () => {
       body: JSON.stringify({ provider: "mock" }),
     })
     expect(result.ok).toBe(true)
+  })
+
+  it("saves vendor config without ever returning the key value", async () => {
+    mocks.apiRequest.mockResolvedValue({
+      provider: "deepseek",
+      key_configured: true,
+      base_url: "https://api.deepseek.com/v1",
+      model: "deepseek-v4-flash",
+      reasoning_model: "deepseek-v4-pro",
+    })
+    const result = await saveVendorConfig({
+      provider: "deepseek",
+      api_key: "sk-live-secret",
+      model: "deepseek-v4-flash",
+    })
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/agent/config", {
+      method: "PATCH",
+      body: JSON.stringify({
+        provider: "deepseek",
+        api_key: "sk-live-secret",
+        model: "deepseek-v4-flash",
+      }),
+    })
+    expect(result.key_configured).toBe(true)
+    expect(JSON.stringify(result)).not.toContain("sk-live-secret")
   })
 })

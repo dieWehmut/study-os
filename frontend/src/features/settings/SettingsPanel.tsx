@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Bot, Database, Download, HardDrive, RefreshCw, Save, ShieldCheck } from "lucide-react"
 
+import type { VendorConfigInput } from "@/api/agent"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,6 +36,7 @@ export default function SettingsPanel() {
     vendors,
     isTestingProvider,
     providerTestNotice,
+    isSavingConfig,
     isLoading,
     isSaving,
     isBackingUp,
@@ -45,8 +47,16 @@ export default function SettingsPanel() {
     createDailyBackup,
     switchProvider,
     testProvider,
+    saveConfig,
   } = useSettingsStore()
   const [dailyLimitDraft, setDailyLimitDraft] = useState<number | null>(null)
+  const [openConfig, setOpenConfig] = useState<string | null>(null)
+  const [apiKeyDraft, setApiKeyDraft] = useState("")
+  const [modelDraft, setModelDraft] = useState("")
+  const [reasoningModelDraft, setReasoningModelDraft] = useState("")
+  const [baseURLDraft, setBaseURLDraft] = useState("")
+  const [ttsKeyDraft, setTtsKeyDraft] = useState("")
+  const [ttsVoiceDraft, setTtsVoiceDraft] = useState("")
   const dailyLimit = dailyLimitDraft ?? settings.dailyLimit
 
   useEffect(() => {
@@ -66,6 +76,25 @@ export default function SettingsPanel() {
         </CardContent>
       </Card>
     )
+  }
+
+  async function saveDeepSeekConfig() {
+    const values: VendorConfigInput = { provider: "deepseek" }
+    if (apiKeyDraft.trim()) values.api_key = apiKeyDraft.trim()
+    if (baseURLDraft.trim()) values.base_url = baseURLDraft.trim()
+    if (modelDraft) values.model = modelDraft
+    if (reasoningModelDraft) values.reasoning_model = reasoningModelDraft
+    await saveConfig("deepseek", values)
+    setApiKeyDraft("")
+    setOpenConfig(null)
+  }
+
+  async function saveTTSConfig() {
+    const values: VendorConfigInput = { provider: "dashscope" }
+    if (ttsKeyDraft.trim()) values.api_key = ttsKeyDraft.trim()
+    if (ttsVoiceDraft.trim()) values.voice = ttsVoiceDraft.trim()
+    await saveConfig("dashscope", values)
+    setTtsKeyDraft("")
   }
 
   return (
@@ -103,6 +132,11 @@ export default function SettingsPanel() {
                       <Button size="xs" variant="outline" disabled={isTestingProvider} onClick={() => void testProvider(vendor.id)}>
                         测试连通性
                       </Button>
+                      {vendor.id === "deepseek" ? (
+                        <Button size="xs" variant="ghost" onClick={() => setOpenConfig(openConfig === "deepseek" ? null : "deepseek")}>
+                          编辑配置
+                        </Button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -122,8 +156,105 @@ export default function SettingsPanel() {
                   ))}
                 </div>
               ) : null}
+              {vendor.id === "deepseek" && openConfig === "deepseek" ? (
+                <div className="grid gap-2.5 rounded-lg border border-border bg-background/70 p-2.5">
+                  <label className="grid gap-1 text-xs font-medium" htmlFor="ds-api-key">
+                    API Key
+                    <input
+                      id="ds-api-key"
+                      type="password"
+                      aria-label="API Key"
+                      value={apiKeyDraft}
+                      onChange={(event) => setApiKeyDraft(event.target.value)}
+                      placeholder={vendor.key_configured ? "已配置，留空保持不变" : "输入 DeepSeek API Key"}
+                      className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="grid gap-1 text-xs font-medium" htmlFor="ds-model">
+                      模型
+                      <select
+                        id="ds-model"
+                        aria-label="模型"
+                        value={modelDraft}
+                        onChange={(event) => setModelDraft(event.target.value)}
+                        className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <option value="">默认（deepseek-v4-flash）</option>
+                        <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+                        <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-medium" htmlFor="ds-reasoning-model">
+                      推理模型
+                      <select
+                        id="ds-reasoning-model"
+                        aria-label="推理模型"
+                        value={reasoningModelDraft}
+                        onChange={(event) => setReasoningModelDraft(event.target.value)}
+                        className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <option value="">默认（deepseek-v4-pro）</option>
+                        <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                        <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className="grid gap-1 text-xs font-medium" htmlFor="ds-base-url">
+                    接口地址
+                    <input
+                      id="ds-base-url"
+                      type="text"
+                      aria-label="接口地址"
+                      value={baseURLDraft}
+                      onChange={(event) => setBaseURLDraft(event.target.value)}
+                      placeholder="https://api.deepseek.com/v1"
+                      className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="xs" disabled={isSavingConfig} onClick={() => void saveDeepSeekConfig()}>保存配置</Button>
+                    <Button size="xs" variant="outline" disabled={isSavingConfig} onClick={() => void saveConfig("deepseek", { provider: "deepseek", api_key: "" })}>
+                      清除密钥
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ))}
+          <div className="grid gap-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-muted-foreground/50" />
+              <strong className="text-sm">云端发音（CosyVoice）</strong>
+            </div>
+            <label className="grid gap-1 text-xs font-medium" htmlFor="tts-api-key">
+              TTS API Key
+              <input
+                id="tts-api-key"
+                type="password"
+                aria-label="TTS API Key"
+                value={ttsKeyDraft}
+                onChange={(event) => setTtsKeyDraft(event.target.value)}
+                placeholder="输入 DashScope API Key（留空保持不变）"
+                className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-medium" htmlFor="tts-voice">
+              发音人
+              <input
+                id="tts-voice"
+                type="text"
+                aria-label="发音人"
+                value={ttsVoiceDraft}
+                onChange={(event) => setTtsVoiceDraft(event.target.value)}
+                placeholder="longxiaochun"
+                className="h-8 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button size="xs" disabled={isSavingConfig} onClick={() => void saveTTSConfig()}>保存发音配置</Button>
+            </div>
+          </div>
           {providerTestNotice ? <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-primary">{providerTestNotice}</p> : null}
         </CardContent>
       </Card>

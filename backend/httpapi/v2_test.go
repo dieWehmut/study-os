@@ -230,4 +230,142 @@ func TestGenerateWordWikiThroughAgentEndpoint(t *testing.T) {
 	}
 }
 
+func TestAgentConfigEndpointWritesKeyAndNeverEchoesIt(t *testing.T) {
+	envPath := filepath.Join(t.TempDir(), ".env.local")
+	if err := os.WriteFile(envPath, []byte("AI_ACTIVE_PROVIDER=mock\nDEEPSEEK_MODEL=old-model\n"), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	application := testApplication(t, config.Config{
+		DataDir:        t.TempDir(),
+		ActiveProvider: "mock",
+		EnvFilePath:    envPath,
+	})
+	router := httpapi.NewRouter(application)
+
+	response := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{
+		"provider":        "deepseek",
+		"api_key":         "sk-live-secret",
+		"model":           "deepseek-v4-flash",
+		"reasoning_model": "deepseek-v4-pro",
+		"base_url":        "https://api.deepseek.com/v1",
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "sk-live-secret") {
+		t.Fatalf("config endpoint echoed the API key: %s", response.Body.String())
+	}
+	var saved struct {
+		Provider       string `json:"provider"`
+		KeyConfigured  bool   `json:"key_configured"`
+		Model          string `json:"model"`
+		ReasoningModel string `json:"reasoning_model"`
+		BaseURL        string `json:"base_url"`
+	}
+	decodeJSON(t, response, &saved)
+	if saved.Provider != "deepseek" || !saved.KeyConfigured || saved.Model != "deepseek-v4-flash" || saved.ReasoningModel != "deepseek-v4-pro" {
+		t.Fatalf("saved config = %#v", saved)
+	}
+
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	if !strings.Contains(string(content), "DEEPSEEK_API_KEY=sk-live-secret") || !strings.Contains(string(content), "DEEPSEEK_MODEL=deepseek-v4-flash") {
+		t.Fatalf("env file content = %s", string(content))
+	}
+	if application.Config.DeepSeek.APIKey != "sk-live-secret" || application.Config.DeepSeek.Model != "deepseek-v4-flash" {
+		t.Fatalf("in-memory config not updated: %#v", application.Config.DeepSeek)
+	}
+	vendors := requestJSON(t, router, http.MethodGet, "/api/agent/vendors", nil)
+	if !strings.Contains(vendors.Body.String(), `"key_configured":true`) {
+		t.Fatalf("vendors did not reflect saved key: %s", vendors.Body.String())
+	}
+}
+
+func TestAgentConfigEndpointClearsKey(t *testing.T) {
+	envPath := filepath.Join(t.TempDir(), ".env.local")
+	if err := os.WriteFile(envPath, []byte("AI_ACTIVE_PROVIDER=deepseek\nDEEPSEEK_API_KEY=sk-old\nDEEPSEEK_MODEL=flash\n"), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	application := testApplication(t, config.Config{
+		DataDir:        t.TempDir(),
+		ActiveProvider: "deepseek",
+		DeepSeek: config.DeepSeekConfig{
+			APIKey:  "sk-old",
+			BaseURL: "https://api.deepseek.com/v1",
+			Model:   "deepseek-v4-flash",
+		},
+		EnvFilePath: envPath,
+	})
+	router := httpapi.NewRouter(application)
+
+	response := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{
+		"provider": "deepseek",
+		"api_key":  "",
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	if strings.Contains(string(content), "DEEPSEEK_API_KEY") {
+		t.Fatalf("cleared key still present:\n%s", string(content))
+	}
+	if application.Config.DeepSeek.APIKey != "" {
+		t.Fatalf("in-memory key not cleared: %q", application.Config.DeepSeek.APIKey)
+	}
+}
+
+func TestAgentConfigEndpointValidatesProviderAndFields(t *testing.T) {
+	envPath := filepath.Join(t.TempDir(), ".env.local")
+	if err := os.WriteFile(envPath, []byte(""), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	application := testApplication(t, config.Config{DataDir: t.TempDir(), EnvFilePath: envPath})
+	router := httpapi.NewRouter(application)
+
+	unknown := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{"provider": "qwen", "api_key": "x"})
+	if unknown.Code != http.StatusBadRequest {
+		t.Fatalf("unknown provider status = %d, body = %s", unknown.Code, unknown.Body.String())
+	}
+	hacked := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{"provider": "deepseek", "hacked_field": "x"})
+	if hacked.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field status = %d, body = %s", hacked.Code, hacked.Body.String())
+	}
+}
+
+func TestAgentConfigEndpointSupportsDashScopeTTS(t *testing.T) {
+	envPath := filepath.Join(t.TempDir(), ".env.local")
+	if err := os.WriteFile(envPath, []byte(""), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	application := testApplication(t, config.Config{DataDir: t.TempDir(), EnvFilePath: envPath})
+	router := httpapi.NewRouter(application)
+
+	response := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{
+		"provider": "dashscope",
+		"api_key":  "dashscope-secret",
+		"voice":    "longhua",
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "dashscope-secret") {
+		t.Fatalf("config endpoint echoed the DashScope key: %s", response.Body.String())
+	}
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	if !strings.Contains(string(content), "DASHSCOPE_API_KEY=dashscope-secret") || !strings.Contains(string(content), "DASHSCOPE_TTS_VOICE=longhua") {
+		t.Fatalf("env file content = %s", string(content))
+	}
+	if application.Config.DashScopeAPIKey != "dashscope-secret" || application.Config.DashScopeVoice != "longhua" {
+		t.Fatalf("in-memory dashscope config not updated: %#v", application.Config)
+	}
+}
+
 var _ = httptest.NewRecorder

@@ -88,6 +88,104 @@ func handleAgentActive(response http.ResponseWriter, request *http.Request, appl
 	writeJSON(response, http.StatusOK, map[string]any{"active_provider": application.Config.ActiveProvider})
 }
 
+func handleAgentConfig(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	if strings.TrimSpace(application.Config.EnvFilePath) == "" {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "env file path is unavailable in this runtime"})
+		return
+	}
+	var input struct {
+		Provider       string  `json:"provider"`
+		APIKey         *string `json:"api_key"`
+		BaseURL        *string `json:"base_url"`
+		Model          *string `json:"model"`
+		ReasoningModel *string `json:"reasoning_model"`
+		Voice          *string `json:"voice"`
+	}
+	request.Body = http.MaxBytesReader(response, request.Body, maxImportJSONBytes)
+	if err := decodeRequest(request, &input); err != nil {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	provider := strings.ToLower(strings.TrimSpace(input.Provider))
+	if provider == "" {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "provider is required"})
+		return
+	}
+
+	updates := make(map[string]string)
+	switch provider {
+	case "deepseek":
+		if input.APIKey != nil {
+			updates["DEEPSEEK_API_KEY"] = strings.TrimSpace(*input.APIKey)
+		}
+		if input.BaseURL != nil {
+			updates["DEEPSEEK_BASE_URL"] = strings.TrimSpace(*input.BaseURL)
+		}
+		if input.Model != nil {
+			updates["DEEPSEEK_MODEL"] = strings.TrimSpace(*input.Model)
+		}
+		if input.ReasoningModel != nil {
+			updates["DEEPSEEK_REASONING_MODEL"] = strings.TrimSpace(*input.ReasoningModel)
+		}
+	case "dashscope":
+		if input.APIKey != nil {
+			updates["DASHSCOPE_API_KEY"] = strings.TrimSpace(*input.APIKey)
+		}
+		if input.Voice != nil {
+			updates["DASHSCOPE_TTS_VOICE"] = strings.TrimSpace(*input.Voice)
+		}
+	default:
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "unsupported provider for config updates"})
+		return
+	}
+	if len(updates) == 0 {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "no config fields provided"})
+		return
+	}
+	if err := config.UpdateEnvFile(application.Config.EnvFilePath, updates); err != nil {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// Apply the same values to the in-memory config so the change takes effect
+	// without a restart. The API key itself is never echoed back.
+	if value, ok := updates["DEEPSEEK_API_KEY"]; ok {
+		application.Config.DeepSeek.APIKey = value
+	}
+	if value, ok := updates["DEEPSEEK_BASE_URL"]; ok {
+		application.Config.DeepSeek.BaseURL = value
+	}
+	if value, ok := updates["DEEPSEEK_MODEL"]; ok {
+		application.Config.DeepSeek.Model = value
+	}
+	if value, ok := updates["DEEPSEEK_REASONING_MODEL"]; ok {
+		application.Config.DeepSeek.ReasoningModel = value
+	}
+	if value, ok := updates["DASHSCOPE_API_KEY"]; ok {
+		application.Config.DashScopeAPIKey = value
+	}
+	if value, ok := updates["DASHSCOPE_TTS_VOICE"]; ok {
+		application.Config.DashScopeVoice = value
+	}
+
+	payload := map[string]any{"provider": provider}
+	switch provider {
+	case "deepseek":
+		payload["key_configured"] = application.Config.DeepSeek.APIKey != ""
+		payload["base_url"] = application.Config.DeepSeek.BaseURL
+		payload["model"] = application.Config.DeepSeek.Model
+		payload["reasoning_model"] = application.Config.DeepSeek.ReasoningModel
+	case "dashscope":
+		payload["key_configured"] = application.Config.DashScopeAPIKey != ""
+		payload["voice"] = application.Config.DashScopeVoice
+	}
+	writeJSON(response, http.StatusOK, payload)
+}
+
 func handleAgentTest(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
