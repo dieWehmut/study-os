@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 *.db
+*.db-shm
+*.db-wal
+data/
 backend.exe
 study-os.exe
 backend-e2e.exe
