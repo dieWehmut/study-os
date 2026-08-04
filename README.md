@@ -4,6 +4,16 @@ Study OS 是一个本地优先、可定制、Agent-native 的自学 Web 应用�
 v0.2 在英语记忆闭环（导入 → 去重 → 记忆 → 他评 → FSRS）之上补上了真实 AI
 接入、厂商化配置、词库清洗管线、云端发音与新的记忆题型。
 
+## 一键安装（PWA 版）
+
+在 PowerShell 中运行下面这一行，即可自动下载最新发布、校验并安装，同时在桌面生成「学习系统」图标：
+
+```powershell
+irm https://raw.githubusercontent.com/dieWehmut/study-os/main/scripts/install-pwa.ps1 | iex
+```
+
+之后双击桌面图标：自动启动后端并打开学习界面；关闭窗口即释放资源，更新也会在应用内自动完成。
+
 ## v0.2 已包含
 
 - 响应式 React 界面：桌面侧栏 / 移动底部导航，亮色 / 暗色主题切换

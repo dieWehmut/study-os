@@ -67,7 +67,7 @@ func New(ctx context.Context, options Options) (*App, error) {
 		return nil, fmt.Errorf("create audio service: %w", err)
 	}
 	var launcherService *launcher.Service
-	if cfg.Launcher || strings.TrimSpace(cfg.StaticDir) != "" {
+	if cfg.Launcher {
 		staticDir, err := filepath.Abs(cfg.StaticDir)
 		if err != nil {
 			_ = store.Close()

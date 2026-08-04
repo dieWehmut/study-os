@@ -75,10 +75,7 @@ export default function Home() {
   return (
     <section className="grid gap-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="grid gap-2">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">把新知识变成可记住的进度</h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">只检测值得记忆的内容；每次作答都会留下他评、反馈和下一次复习安排。</p>
-        </div>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">只检测值得记忆的内容；每次作答都会留下他评、反馈和下一次复习安排。</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2" aria-label="选择学科">

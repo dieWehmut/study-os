@@ -52,15 +52,6 @@ export function Sidebar({ width, onWidthChange }: SidebarProps) {
       style={{ width: `${width}px` }}
       className="relative hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:fixed md:inset-y-0 md:flex md:flex-col"
     >
-      <div className="flex h-20 items-center gap-3 px-6">
-        <div className="grid size-9 place-items-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm">
-          学
-        </div>
-        <div className="min-w-0">
-          <p className="font-heading text-sm font-semibold tracking-tight">学习系统</p>
-        </div>
-      </div>
-
       <nav aria-label="主导航" className="flex flex-1 flex-col gap-1 px-3 py-3">
         {primaryNavigation.map(({ icon: Icon, label, path }) => (
           <NavLink
