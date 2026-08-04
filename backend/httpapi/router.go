@@ -153,6 +153,15 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/dump", func(response http.ResponseWriter, request *http.Request) {
 			handleDump(response, request, application)
 		})
+		api.Post("/integrate", func(response http.ResponseWriter, request *http.Request) {
+			handleIntegrateCreate(response, request, application)
+		})
+		api.Get("/integrate", func(response http.ResponseWriter, request *http.Request) {
+			handleIntegrateList(response, request, application)
+		})
+		api.Get("/integrate/{noteID}", func(response http.ResponseWriter, request *http.Request) {
+			handleIntegrateGet(response, request, application)
+		})
 		api.Post("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupCreate(response, request, application)
 		})

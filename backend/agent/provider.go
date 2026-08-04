@@ -35,6 +35,7 @@ const (
 	KindCompressSenses      Kind = "compress_senses"
 	KindChat                Kind = "chat"
 	KindCompare             Kind = "compare"
+	KindIntegrate           Kind = "integrate"
 )
 
 // Options carries per-request provider hints. Empty values mean the provider
@@ -61,6 +62,7 @@ type Request struct {
 	Compress  *CompressInput  `json:"compress,omitempty"`
 	Chat      *ChatInput      `json:"chat,omitempty"`
 	Compare   *CompareInput   `json:"compare,omitempty"`
+	Integrate *IntegrateInput `json:"integrate,omitempty"`
 }
 
 type KnowledgeInput struct {
@@ -144,6 +146,13 @@ type CompareInput struct {
 	TermB   string `json:"term_b"`
 }
 
+type IntegrateInput struct {
+	Subject  string `json:"subject"`
+	Title    string `json:"title,omitempty"`
+	Text     string `json:"text"`
+	MaxCards int    `json:"max_cards,omitempty"`
+}
+
 // Response contains exactly one operation-specific output for a successful
 // request. The pointers make malformed mixed responses detectable by callers.
 type Response struct {
@@ -157,6 +166,7 @@ type Response struct {
 	Compress       *CompressOutput       `json:"compress,omitempty"`
 	Chat           *ChatOutput           `json:"chat,omitempty"`
 	Compare        *CompareOutput        `json:"compare,omitempty"`
+	Integrate      *IntegrateOutput      `json:"integrate,omitempty"`
 }
 
 type MemoryQuestionOutput struct {
@@ -228,6 +238,31 @@ type CompareOutput struct {
 	MemoryTip      string   `json:"memory_tip,omitempty"`
 }
 
+type MindNodeOutput struct {
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	ParentID string `json:"parent_id,omitempty"`
+	NodeType string `json:"node_type,omitempty"`
+}
+
+type MindMapOutput struct {
+	Title string           `json:"title"`
+	Nodes []MindNodeOutput `json:"nodes"`
+}
+
+type CardOutput struct {
+	ID       string   `json:"id"`
+	CardType string   `json:"card_type"`
+	Title    string   `json:"title"`
+	Body     string   `json:"body"`
+	Tags     []string `json:"tags,omitempty"`
+}
+
+type IntegrateOutput struct {
+	Map   MindMapOutput `json:"mindmap"`
+	Cards []CardOutput  `json:"cards"`
+}
+
 // Validate checks the operation/payload pairing before a provider is called.
 // Invalid user data is permanent: retrying it cannot make it valid.
 func (r Request) Validate() error {
@@ -271,6 +306,10 @@ func (r Request) Validate() error {
 	case KindCompare:
 		if r.Compare == nil || strings.TrimSpace(r.Compare.TermA) == "" || strings.TrimSpace(r.Compare.TermB) == "" {
 			return NewProviderError(ErrorPermanent, "compare requires two terms")
+		}
+	case KindIntegrate:
+		if r.Integrate == nil || strings.TrimSpace(r.Integrate.Text) == "" {
+			return NewProviderError(ErrorPermanent, "integrate requires text")
 		}
 	default:
 		return NewProviderError(ErrorPermanent, "unsupported provider request kind")

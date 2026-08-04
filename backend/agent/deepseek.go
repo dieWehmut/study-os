@@ -270,6 +270,12 @@ func decodeDeepSeekOutput(kind Kind, content string) (Response, error) {
 			return Response{}, fmt.Errorf("model returned an invalid comparison")
 		}
 		return Response{Kind: kind, Compare: &output}, nil
+	case KindIntegrate:
+		var output IntegrateOutput
+		if err := json.Unmarshal([]byte(content), &output); err != nil || strings.TrimSpace(output.Map.Title) == "" || len(output.Map.Nodes) == 0 {
+			return Response{}, fmt.Errorf("model returned an invalid integration")
+		}
+		return Response{Kind: kind, Integrate: &output}, nil
 	default:
 		return Response{}, NewProviderError(ErrorPermanent, "unsupported provider request kind")
 	}
@@ -298,6 +304,9 @@ func deepSeekSystemPrompt(kind Kind) string {
 		return base + " 你是学科答疑助手，回答要准确、简洁、分点，适合自学。输出字段：answer（完整回答，可含 Markdown 列表）。"
 	case KindCompare:
 		return base + " 输出字段：summary（一句话总对比）、same_points（相同点数组）、diff_points（不同点数组，逐条说明）、confusion_point（最易混点）、memory_tip（记忆口诀/提示）。"
+	case KindIntegrate:
+		return base + " 你负责把资料整理成「导图 + 卡片」。输出字段：mindmap（{title, nodes:[{id,label,parent_id,node_type}]}）、cards（数组，每项 {id,card_type,title,body,tags}）。" +
+			"质量规则：每个节点 label 不超过 20 字；一张卡片只讲一个主题，body 用 2-4 个短句；层级不超过 3 层；node_type 取值 root/branch/leaf/conclusion/trap（二级结论用 conclusion，易错信号用 trap）。"
 	default:
 		return base
 	}
@@ -343,6 +352,9 @@ func deepSeekUserPrompt(request Request) string {
 	case KindCompare:
 		input := request.Compare
 		return fmt.Sprintf("subject=%q\nterm_a=%q\nterm_b=%q", input.Subject, input.TermA, input.TermB)
+	case KindIntegrate:
+		input := request.Integrate
+		return fmt.Sprintf("subject=%q\ntitle=%q\nmax_cards=%d\ntext=%q", input.Subject, input.Title, input.MaxCards, input.Text)
 	default:
 		return "unknown request"
 	}

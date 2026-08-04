@@ -664,4 +664,53 @@ func TestDashboardIncludesSubjectDueCountsAndRecentItems(t *testing.T) {
 	}
 }
 
+func TestIntegrateEndpointCreatesListsAndGetsNotes(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	created := requestJSON(t, router, http.MethodPost, "/api/integrate", map[string]any{
+		"subject": "physics",
+		"title":   "运动学",
+		"text":    "速度描述快慢。加速度描述变化快慢。",
+	})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, body = %s", created.Code, created.Body.String())
+	}
+	var note models.IntegratedNote
+	decodeJSON(t, created, &note)
+	if note.Title != "运动学" || !strings.Contains(string(note.MindmapJSON), `"root"`) || !strings.Contains(string(note.CardsJSON), `"concept"`) {
+		t.Fatalf("note = %#v", note)
+	}
+
+	list := requestJSON(t, router, http.MethodGet, "/api/integrate?subject=physics&limit=10", nil)
+	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "note-") {
+		t.Fatalf("list = %d, body = %s", list.Code, list.Body.String())
+	}
+	get := requestJSON(t, router, http.MethodGet, "/api/integrate/"+note.ID, nil)
+	if get.Code != http.StatusOK || !strings.Contains(get.Body.String(), "运动学") {
+		t.Fatalf("get = %d, body = %s", get.Code, get.Body.String())
+	}
+}
+
+func TestIntegrateEndpointAcceptsKnowledgeItemSource(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	ctx := context.Background()
+	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+	if err := application.Store.CreateKnowledgeItem(ctx, models.KnowledgeItem{
+		ID: "k-int", ItemType: "concept", Term: "加速度", ConciseDefinition: "速度变化快慢",
+		Subject: "physics", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create item: %v", err)
+	}
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodPost, "/api/integrate", map[string]any{
+		"knowledge_id": "k-int",
+	})
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"source_id":"k-int"`) {
+		t.Fatalf("body = %s", response.Body.String())
+	}
+}
+
 var _ = httptest.NewRecorder

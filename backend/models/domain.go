@@ -73,6 +73,17 @@ type ChatMessage struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type IntegratedNote struct {
+	ID          string          `json:"id"`
+	Subject     string          `json:"subject,omitempty"`
+	Title       string          `json:"title"`
+	SourceType  string          `json:"source_type,omitempty"`
+	SourceID    string          `json:"source_id,omitempty"`
+	MindmapJSON json.RawMessage `json:"mindmap"`
+	CardsJSON   json.RawMessage `json:"cards"`
+	CreatedAt   time.Time       `json:"created_at"`
+}
+
 type Prompt struct {
 	ID              string    `json:"id"`
 	KnowledgeItemID string    `json:"knowledge_item_id"`

@@ -180,3 +180,15 @@ CREATE TABLE chat_messages (
     created_at TEXT NOT NULL
 );
 CREATE INDEX chat_messages_subject_idx ON chat_messages(subject, created_at DESC);
+
+CREATE TABLE integrated_notes (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT '',
+    source_id TEXT NOT NULL DEFAULT '',
+    mindmap_json TEXT NOT NULL DEFAULT '{}',
+    cards_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX integrated_notes_subject_idx ON integrated_notes(subject, created_at DESC);

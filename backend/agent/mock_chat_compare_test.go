@@ -50,3 +50,31 @@ func TestValidateRequiresChatAndCompareInputs(t *testing.T) {
 		}
 	}
 }
+
+func TestMockIntegrateBuildsMindmapAndCards(t *testing.T) {
+	provider := agent.NewMockProvider()
+	output, err := provider.Generate(context.Background(), agent.Request{
+		Kind: agent.KindIntegrate,
+		Integrate: &agent.IntegrateInput{
+			Subject:  "physics",
+			Title:    "运动学",
+			Text:     "速度描述运动的快慢。加速度描述速度变化的快慢。匀变速运动中，加速度恒定。",
+			MaxCards: 3,
+		},
+	})
+	if err != nil {
+		t.Fatalf("integrate: %v", err)
+	}
+	if output.Integrate == nil {
+		t.Fatalf("integrate output = %#v", output)
+	}
+	if output.Integrate.Map.Title != "运动学" || len(output.Integrate.Map.Nodes) < 4 {
+		t.Fatalf("mindmap = %#v", output.Integrate.Map)
+	}
+	if output.Integrate.Map.Nodes[0].NodeType != "root" || output.Integrate.Map.Nodes[1].ParentID != "n0" {
+		t.Fatalf("nodes = %#v", output.Integrate.Map.Nodes)
+	}
+	if len(output.Integrate.Cards) == 0 || output.Integrate.Cards[0].CardType != "concept" {
+		t.Fatalf("cards = %#v", output.Integrate.Cards)
+	}
+}

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"unicode"
 )
@@ -45,6 +46,8 @@ func (p *MockProvider) Generate(ctx context.Context, request Request) (Response,
 		return p.chat(*request.Chat), nil
 	case KindCompare:
 		return p.compare(*request.Compare), nil
+	case KindIntegrate:
+		return p.integrate(*request.Integrate), nil
 	default:
 		// Validate currently makes this unreachable; retaining a classified error
 		// protects callers if new kinds are added without an implementation.
@@ -347,6 +350,73 @@ func (p *MockProvider) compare(input CompareInput) Response {
 			MemoryTip:      "先抓一个关键差异，再对比复习，别两个一起硬背。",
 		},
 	}
+}
+
+func (p *MockProvider) integrate(input IntegrateInput) Response {
+	title := strings.TrimSpace(input.Title)
+	if title == "" {
+		title = strings.TrimSpace(input.Subject) + " 整合笔记"
+	}
+	maxCards := input.MaxCards
+	if maxCards <= 0 {
+		maxCards = 8
+	}
+	sentences := splitSentences(strings.TrimSpace(input.Text))
+	if len(sentences) > 6 {
+		sentences = sentences[:6]
+	}
+	nodes := []MindNodeOutput{{ID: "n0", Label: truncateRunes(title, 20), NodeType: "root"}}
+	cards := make([]CardOutput, 0, len(sentences))
+	for index, sentence := range sentences {
+		nodeID := fmt.Sprintf("n%d", index+1)
+		label := truncateRunes(sentence, 20)
+		nodes = append(nodes, MindNodeOutput{ID: nodeID, Label: label, ParentID: "n0", NodeType: "branch"})
+		cards = append(cards, CardOutput{
+			ID:       "c" + nodeID,
+			CardType: "concept",
+			Title:    label,
+			Body:     sentence,
+			Tags:     []string{normalizeToken(input.Subject)},
+		})
+		if index < 2 {
+			parts := strings.FieldsFunc(sentence, func(r rune) bool {
+				return r == '，' || r == ',' || r == '；' || r == ';'
+			})
+			subIndex := 1
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+				subID := fmt.Sprintf("n%d-%d", index+1, subIndex)
+				nodes = append(nodes, MindNodeOutput{
+					ID: subID, Label: truncateRunes(part, 20), ParentID: nodeID, NodeType: "leaf",
+				})
+				subIndex++
+				if subIndex > 2 {
+					break
+				}
+			}
+		}
+		if len(cards) >= maxCards {
+			break
+		}
+	}
+	return Response{
+		Kind: KindIntegrate,
+		Integrate: &IntegrateOutput{
+			Map:   MindMapOutput{Title: title, Nodes: nodes},
+			Cards: cards,
+		},
+	}
+}
+
+func truncateRunes(value string, limit int) string {
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit]) + "…"
 }
 
 func containsCJK(value string) bool {
