@@ -258,6 +258,18 @@ func decodeDeepSeekOutput(kind Kind, content string) (Response, error) {
 			return Response{}, fmt.Errorf("model returned invalid sense groups")
 		}
 		return Response{Kind: kind, Compress: &output}, nil
+	case KindChat:
+		var output ChatOutput
+		if err := json.Unmarshal([]byte(content), &output); err != nil || strings.TrimSpace(output.Answer) == "" {
+			return Response{}, fmt.Errorf("model returned an invalid chat answer")
+		}
+		return Response{Kind: kind, Chat: &output}, nil
+	case KindCompare:
+		var output CompareOutput
+		if err := json.Unmarshal([]byte(content), &output); err != nil || strings.TrimSpace(output.Summary) == "" {
+			return Response{}, fmt.Errorf("model returned an invalid comparison")
+		}
+		return Response{Kind: kind, Compare: &output}, nil
 	default:
 		return Response{}, NewProviderError(ErrorPermanent, "unsupported provider request kind")
 	}
@@ -282,6 +294,10 @@ func deepSeekSystemPrompt(kind Kind) string {
 		return base + " 输出字段：points（数组，每项含 term、definition、item_type、level、tags）。只抽取值得记忆的内容，不要逻辑推理题。"
 	case KindCompressSenses:
 		return base + " 输出字段：groups（数组，每项含 name、sense_indexes（对应输入序号）、merged_definition）。把同核义项合并成更少的分组。"
+	case KindChat:
+		return base + " 你是学科答疑助手，回答要准确、简洁、分点，适合自学。输出字段：answer（完整回答，可含 Markdown 列表）。"
+	case KindCompare:
+		return base + " 输出字段：summary（一句话总对比）、same_points（相同点数组）、diff_points（不同点数组，逐条说明）、confusion_point（最易混点）、memory_tip（记忆口诀/提示）。"
 	default:
 		return base
 	}
@@ -317,6 +333,16 @@ func deepSeekUserPrompt(request Request) string {
 		input := request.Compress
 		encoded, _ := json.Marshal(input.Senses)
 		return fmt.Sprintf("term=%q\nsenses=%s", input.Term, string(encoded))
+	case KindChat:
+		input := request.Chat
+		history := ""
+		for _, turn := range input.History {
+			history += turn.Role + ": " + turn.Content + "\n"
+		}
+		return fmt.Sprintf("subject=%q\nhistory:\n%s\nuser_question=%q", input.Subject, history, input.Prompt)
+	case KindCompare:
+		input := request.Compare
+		return fmt.Sprintf("subject=%q\nterm_a=%q\nterm_b=%q", input.Subject, input.TermA, input.TermB)
 	default:
 		return "unknown request"
 	}

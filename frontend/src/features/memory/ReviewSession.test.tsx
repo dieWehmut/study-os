@@ -141,6 +141,12 @@ describe("ReviewSession", () => {
     render(<ReviewSession />)
 
     expect(await screen.findByText("数学")).toBeInTheDocument()
-    await waitFor(() => expect(mocks.getDueReviews).toHaveBeenCalledWith(20, "math"))
+    await waitFor(() => expect(mocks.getDueReviews).toHaveBeenCalledWith(20, "math", undefined))
+  })
+
+  it("passes recovery mode to the due queue", async () => {
+    render(<ReviewSession recovery />)
+
+    await waitFor(() => expect(mocks.getDueReviews).toHaveBeenCalledWith(20, undefined, "recovery"))
   })
 })

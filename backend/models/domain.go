@@ -35,6 +35,7 @@ type KnowledgeItem struct {
 type KnowledgeListOptions struct {
 	Query   string
 	Subject string
+	Tag     string
 	Limit   int
 	Offset  int
 }
@@ -59,6 +60,17 @@ type AudioAsset struct {
 	Voice           string          `json:"voice,omitempty"`
 	TimelineJSON    json.RawMessage `json:"timeline,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
+}
+
+type ChatMessage struct {
+	ID           string    `json:"id"`
+	SessionID    string    `json:"session_id,omitempty"`
+	Subject      string    `json:"subject,omitempty"`
+	Role         string    `json:"role"`
+	Content      string    `json:"content"`
+	Status       string    `json:"status,omitempty"`
+	ErrorSummary string    `json:"error_summary,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type Prompt struct {

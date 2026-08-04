@@ -83,3 +83,37 @@ func TestGeneratePromptsTreatsDefinitionAlternativesAsSeparateAnswers(t *testing
 		t.Fatalf("accepted answers = %#v, want separate definition alternatives", answers)
 	}
 }
+
+func TestGeneratePromptsUsesChineseTemplates(t *testing.T) {
+	prompts := GeneratePrompts(KnowledgeItem{
+		ID:                "k-cn",
+		ItemType:          "classic_text",
+		Subject:           "chinese",
+		Term:              "论语十二章",
+		ConciseDefinition: "学而时习之，不亦说乎。",
+	})
+	types := make(map[PromptType]bool)
+	for _, prompt := range prompts {
+		types[prompt.Type] = true
+	}
+	if !types[PromptVerseFill] || !types[PromptDefinitionRecall] || !types[PromptDefinitionTerm] {
+		t.Fatalf("chinese prompt types = %#v", types)
+	}
+}
+
+func TestGeneratePromptsUsesStemTemplates(t *testing.T) {
+	prompts := GeneratePrompts(KnowledgeItem{
+		ID:                "k-math",
+		ItemType:          "formula",
+		Subject:           "math",
+		Term:              "二次函数顶点式",
+		ConciseDefinition: "顶点坐标为 (h,k) 的解析式",
+	})
+	types := make(map[PromptType]bool)
+	for _, prompt := range prompts {
+		types[prompt.Type] = true
+	}
+	if !types[PromptFormulaRecall] || !types[PromptDefinitionRecall] || !types[PromptDefinitionTerm] {
+		t.Fatalf("stem prompt types = %#v", types)
+	}
+}

@@ -33,6 +33,8 @@ const (
 	KindEvaluateFreeText    Kind = "evaluate_free_text"
 	KindExtractMemoryPoints Kind = "extract_memory_points"
 	KindCompressSenses      Kind = "compress_senses"
+	KindChat                Kind = "chat"
+	KindCompare             Kind = "compare"
 )
 
 // Options carries per-request provider hints. Empty values mean the provider
@@ -57,6 +59,8 @@ type Request struct {
 	FreeText  *FreeTextInput  `json:"free_text,omitempty"`
 	Extract   *ExtractInput   `json:"extract,omitempty"`
 	Compress  *CompressInput  `json:"compress,omitempty"`
+	Chat      *ChatInput      `json:"chat,omitempty"`
+	Compare   *CompareInput   `json:"compare,omitempty"`
 }
 
 type KnowledgeInput struct {
@@ -123,6 +127,23 @@ type SenseInput struct {
 	Tags       []string `json:"tags,omitempty"`
 }
 
+type ChatTurn struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type ChatInput struct {
+	Subject string     `json:"subject"`
+	Prompt  string     `json:"prompt"`
+	History []ChatTurn `json:"history,omitempty"`
+}
+
+type CompareInput struct {
+	Subject string `json:"subject"`
+	TermA   string `json:"term_a"`
+	TermB   string `json:"term_b"`
+}
+
 // Response contains exactly one operation-specific output for a successful
 // request. The pointers make malformed mixed responses detectable by callers.
 type Response struct {
@@ -134,6 +155,8 @@ type Response struct {
 	Sentence       *SentenceOutput       `json:"sentence,omitempty"`
 	Extract        *ExtractOutput        `json:"extract,omitempty"`
 	Compress       *CompressOutput       `json:"compress,omitempty"`
+	Chat           *ChatOutput           `json:"chat,omitempty"`
+	Compare        *CompareOutput        `json:"compare,omitempty"`
 }
 
 type MemoryQuestionOutput struct {
@@ -193,6 +216,18 @@ type SenseGroupOutput struct {
 	MergedDefinition string `json:"merged_definition"`
 }
 
+type ChatOutput struct {
+	Answer string `json:"answer"`
+}
+
+type CompareOutput struct {
+	Summary        string   `json:"summary"`
+	SamePoints     []string `json:"same_points,omitempty"`
+	DiffPoints     []string `json:"diff_points,omitempty"`
+	ConfusionPoint string   `json:"confusion_point,omitempty"`
+	MemoryTip      string   `json:"memory_tip,omitempty"`
+}
+
 // Validate checks the operation/payload pairing before a provider is called.
 // Invalid user data is permanent: retrying it cannot make it valid.
 func (r Request) Validate() error {
@@ -228,6 +263,14 @@ func (r Request) Validate() error {
 	case KindCompressSenses:
 		if r.Compress == nil || strings.TrimSpace(r.Compress.Term) == "" || len(r.Compress.Senses) == 0 {
 			return NewProviderError(ErrorPermanent, "sense compression requires a term and at least one sense")
+		}
+	case KindChat:
+		if r.Chat == nil || strings.TrimSpace(r.Chat.Prompt) == "" {
+			return NewProviderError(ErrorPermanent, "chat requires a prompt")
+		}
+	case KindCompare:
+		if r.Compare == nil || strings.TrimSpace(r.Compare.TermA) == "" || strings.TrimSpace(r.Compare.TermB) == "" {
+			return NewProviderError(ErrorPermanent, "compare requires two terms")
 		}
 	default:
 		return NewProviderError(ErrorPermanent, "unsupported provider request kind")

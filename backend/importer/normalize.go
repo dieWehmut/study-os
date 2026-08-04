@@ -75,6 +75,17 @@ func normalizeToken(value string) string {
 	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(value)), "_"))
 }
 
+func supportedItemType(itemType string) bool {
+	switch itemType {
+	case "word_sense", "phrase", "collocation", "word_family", "root_affix",
+		"formula", "theorem", "classic_text", "idiom", "cultural_knowledge",
+		"chemical_equation", "experiment_conclusion", "concept", "sentence", "brain_dump":
+		return true
+	default:
+		return false
+	}
+}
+
 func normalizeTerm(value string) string {
 	value = normalizeText(value)
 	value = strings.Trim(value, " \t\r\n.,!?;:()[]{}\"'")

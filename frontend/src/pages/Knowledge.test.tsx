@@ -8,9 +8,11 @@ const mocks = vi.hoisted(() => ({
   getKnowledge: vi.fn(),
   listKnowledge: vi.fn(),
   listGroups: vi.fn(),
+  compareKnowledge: vi.fn(),
 }))
 
 vi.mock("@/api/knowledge", () => mocks)
+vi.mock("@/api/chat", () => ({ compareKnowledge: mocks.compareKnowledge }))
 
 describe("Knowledge page", () => {
   beforeEach(() => {
@@ -42,6 +44,13 @@ describe("Knowledge page", () => {
     mocks.listGroups.mockResolvedValue({
       count: 1,
       items: [{ id: "g1", name: "abandon 词族", kind: "word_family" }],
+    })
+    mocks.compareKnowledge.mockResolvedValue({
+      summary: "速度与加速度的对比",
+      same_points: ["都是运动学概念"],
+      diff_points: ["速度描述快慢", "加速度描述变化快慢"],
+      confusion_point: "方向",
+      memory_tip: "抓差异",
     })
   })
 
@@ -184,5 +193,39 @@ describe("Knowledge page", () => {
     fireEvent.pointerDown(option)
     fireEvent.click(option)
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ subject: "math" })))
+  })
+
+  it("filters by special attribute tags", async () => {
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "属性" }))
+    const option = await screen.findByRole("option", { name: "二级结论" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ tag: "二级结论" })))
+  })
+
+  it("compares two knowledge points", async () => {
+    mocks.listKnowledge.mockResolvedValueOnce({
+      count: 2,
+      items: [
+        { id: "k1", item_type: "word_sense", term: "abandon", concise_definition: "放弃" },
+        { id: "k2", item_type: "word_sense", term: "resilient", concise_definition: "有韧性的" },
+      ],
+    })
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "对比对象 A" }))
+    const optionA = await screen.findByRole("option", { name: "abandon" })
+    fireEvent.pointerDown(optionA)
+    fireEvent.click(optionA)
+    fireEvent.click(screen.getByRole("combobox", { name: "对比对象 B" }))
+    const optionB = await screen.findByRole("option", { name: "resilient" })
+    fireEvent.pointerDown(optionB)
+    fireEvent.click(optionB)
+    fireEvent.click(screen.getByRole("button", { name: "对比" }))
+
+    expect(await screen.findByText("速度与加速度的对比")).toBeInTheDocument()
+    expect(mocks.compareKnowledge).toHaveBeenCalled()
   })
 })

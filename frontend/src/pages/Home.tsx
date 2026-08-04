@@ -3,6 +3,7 @@ import { ArrowRight, CalendarCheck2, CloudOff, Flame, LibraryBig, Sparkles } fro
 import { Link } from "react-router-dom"
 
 import { getDashboard, seedDemo } from "@/api/dashboard"
+import { dumpThought } from "@/api/chat"
 import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +30,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState("")
+  const [dumpText, setDumpText] = useState("")
+  const [dumping, setDumping] = useState(false)
+  const [dumpNotice, setDumpNotice] = useState("")
 
   async function refreshDashboard() {
     setLoading(true)
@@ -72,6 +76,22 @@ export default function Home() {
     }
   }
 
+  async function saveDump() {
+    const text = dumpText.trim()
+    if (!text || dumping) return
+    setDumping(true)
+    setDumpNotice("")
+    try {
+      await dumpThought(text)
+      setDumpText("")
+      setDumpNotice("已暂存到知识库，稍后可以整理。")
+    } catch {
+      setDumpNotice("暂存失败，请重试。")
+    } finally {
+      setDumping(false)
+    }
+  }
+
   return (
     <section className="grid gap-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -109,6 +129,28 @@ export default function Home() {
           </button>
         ))}
       </div>
+
+      <Card>
+        <CardHeader className="gap-1.5">
+          <CardTitle>先把念头扔进来</CardTitle>
+          <p className="text-sm text-muted-foreground">不用分类、不用写完整，半句话也可以，先存下再说。</p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <textarea
+            aria-label="脑暴收集箱"
+            value={dumpText}
+            onChange={(event) => setDumpText(event.target.value)}
+            placeholder="例如：等下查一下动能定理的适用条件…"
+            className="min-h-20 resize-y rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div className="flex items-center gap-3">
+            <Button disabled={!dumpText.trim() || dumping} onClick={() => void saveDump()}>
+              {dumping ? "暂存中…" : "暂存"}
+            </Button>
+            {dumpNotice ? <p aria-live="polite" className="text-sm text-muted-foreground">{dumpNotice}</p> : null}
+          </div>
+        </CardContent>
+      </Card>
 
       {error ? (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/35 bg-destructive/5 px-4 py-3 text-sm text-destructive">

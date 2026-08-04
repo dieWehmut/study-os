@@ -1,19 +1,51 @@
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-import { BookOpenText } from "lucide-react"
+import { useState } from "react"
+import { BookOpenText, ChevronLeft, ChevronRight } from "lucide-react"
 
+import { updateKnowledgeTag } from "@/api/chat"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { itemTypeLabel } from "@/lib/labels"
+import { subjectName } from "@/lib/subjects"
 
 interface WikiPanelProps {
   item: KnowledgeItem | null
+  onUpdated?: (item: KnowledgeItem) => void
 }
 
-export function WikiPanel({ item }: WikiPanelProps) {
+const attributeTags = ["二级结论", "解题策略", "易错信号"]
+
+function chunkMarkdown(markdown: string): string[] {
+  const chunks = markdown.split(/(?=^#{1,6} )/m).map((chunk) => chunk.trim()).filter(Boolean)
+  return chunks.length > 0 ? chunks : [markdown]
+}
+
+export function WikiPanel({ item, onUpdated }: WikiPanelProps) {
+  const [tagOverride, setTagOverride] = useState<string[] | null>(null)
+  const [chunkIndex, setChunkIndex] = useState(0)
+  const [tagPending, setTagPending] = useState("")
+  const current: KnowledgeItem | null = item ? { ...item, tags: tagOverride ?? item.tags } : null
+
+  const chunks = current?.detailed_markdown ? chunkMarkdown(current.detailed_markdown) : []
+
+  async function toggleTag(tag: string) {
+    if (!current || tagPending) return
+    const has = current.tags?.includes(tag) ?? false
+    setTagPending(tag)
+    try {
+      const updated = await updateKnowledgeTag(current.id, tag, has)
+      setTagOverride(updated.tags ?? null)
+      onUpdated?.(updated)
+    } finally {
+      setTagPending("")
+    }
+  }
+
   if (!item) {
     return (
       <Card className="grid min-h-64 place-items-center border-dashed">
@@ -30,8 +62,25 @@ export function WikiPanel({ item }: WikiPanelProps) {
       <CardHeader className="gap-3 border-b">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{itemTypeLabel(item.item_type)}</Badge>
+          {item.subject ? <Badge variant="outline">{subjectName(item.subject)}</Badge> : null}
           {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
-          {item.tags?.map((tag) => <Badge key={tag} variant="ghost">#{tag}</Badge>)}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {attributeTags.map((tag) => {
+            const active = current?.tags?.includes(tag) ?? false
+            return (
+              <Button
+                key={tag}
+                type="button"
+                size="xs"
+                variant={active ? "default" : "outline"}
+                disabled={Boolean(tagPending)}
+                onClick={() => void toggleTag(tag)}
+              >
+                {active ? `✓ ${tag}` : tag}
+              </Button>
+            )
+          })}
         </div>
         <h2 className="font-heading text-3xl font-semibold tracking-tight">{item.term}</h2>
         {item.part_of_speech || item.pronunciation ? (
@@ -57,15 +106,28 @@ export function WikiPanel({ item }: WikiPanelProps) {
             ) : null}
           </TabsContent>
           <TabsContent value="detail" className="pt-5">
-            {item.detailed_markdown ? (
-              <div className="grid gap-3 leading-7 [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:font-heading [&_h1]:text-2xl [&_h2]:font-heading [&_h2]:text-xl [&_h3]:font-heading [&_h3]:text-lg [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3">
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                  urlTransform={(url) => (/^(https?:|mailto:)/i.test(url) ? url : "")}
-                >
-                  {item.detailed_markdown}
-                </ReactMarkdown>
+            {chunks.length > 0 ? (
+              <div className="grid gap-3">
+                {chunks.length > 1 ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <Button size="xs" variant="outline" disabled={chunkIndex === 0} onClick={() => setChunkIndex((value) => Math.max(0, value - 1))}>
+                      <ChevronLeft data-icon="inline-start" />上一块
+                    </Button>
+                    <span className="text-xs text-muted-foreground">第 {chunkIndex + 1} / {chunks.length} 块</span>
+                    <Button size="xs" variant="outline" disabled={chunkIndex >= chunks.length - 1} onClick={() => setChunkIndex((value) => Math.min(chunks.length - 1, value + 1))}>
+                      下一块<ChevronRight data-icon="inline-end" />
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="rounded-lg border border-border bg-card p-3 leading-7 [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:font-heading [&_h1]:text-2xl [&_h2]:font-heading [&_h2]:text-xl [&_h3]:font-heading [&_h3]:text-lg [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                    urlTransform={(url) => (/^(https?:|mailto:)/i.test(url) ? url : "")}
+                  >
+                    {chunks[chunkIndex]}
+                  </ReactMarkdown>
+                </div>
               </div>
             ) : <p className="text-sm text-muted-foreground">这个知识点还没有详细百科。</p>}
           </TabsContent>

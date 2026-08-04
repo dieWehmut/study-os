@@ -41,6 +41,10 @@ func (p *MockProvider) Generate(ctx context.Context, request Request) (Response,
 		return p.extractMemoryPoints(*request.Extract), nil
 	case KindCompressSenses:
 		return p.compressSenses(*request.Compress), nil
+	case KindChat:
+		return p.chat(*request.Chat), nil
+	case KindCompare:
+		return p.compare(*request.Compare), nil
 	default:
 		// Validate currently makes this unreachable; retaining a classified error
 		// protects callers if new kinds are added without an implementation.
@@ -282,6 +286,67 @@ func (p *MockProvider) compressSenses(input CompressInput) Response {
 		groups[index].SenseIndexes = append(groups[index].SenseIndexes, sense.Index)
 	}
 	return Response{Kind: KindCompressSenses, Compress: &CompressOutput{Groups: groups}}
+}
+
+func (p *MockProvider) chat(input ChatInput) Response {
+	subject := strings.TrimSpace(input.Subject)
+	if subject == "" {
+		subject = "综合"
+	}
+	subject = subjectChineseName(subject)
+	return Response{
+		Kind: KindChat,
+		Chat: &ChatOutput{
+			Answer: "（离线模式）已收到你在「" + subject + "」下的问题：" + strings.TrimSpace(input.Prompt) +
+				"\n\n联网配置 AI 服务商后，我会结合学科知识给出详细解答。",
+		},
+	}
+}
+
+func subjectChineseName(subject string) string {
+	switch strings.ToLower(strings.TrimSpace(subject)) {
+	case "chinese":
+		return "语文"
+	case "math":
+		return "数学"
+	case "english":
+		return "英语"
+	case "physics":
+		return "物理"
+	case "chemistry":
+		return "化学"
+	case "geography":
+		return "地理"
+	case "all":
+		return "综合"
+	default:
+		return subject
+	}
+}
+
+func (p *MockProvider) compare(input CompareInput) Response {
+	subject := strings.TrimSpace(input.Subject)
+	if subject == "" {
+		subject = "综合"
+	}
+	termA := strings.TrimSpace(input.TermA)
+	termB := strings.TrimSpace(input.TermB)
+	return Response{
+		Kind: KindCompare,
+		Compare: &CompareOutput{
+			Summary: "「" + termA + "」与「" + termB + "」的对比（离线模式生成；联网后可获得更详细辨析）。",
+			SamePoints: []string{
+				"都属于「" + subject + "」需要掌握的知识点",
+				"考试中常以辨析/选择形式出现",
+			},
+			DiffPoints: []string{
+				termA + "：" + termA + "的核心含义",
+				termB + "：" + termB + "的核心含义",
+			},
+			ConfusionPoint: "注意区分两者的适用条件与易混表述。",
+			MemoryTip:      "先抓一个关键差异，再对比复习，别两个一起硬背。",
+		},
+	}
 }
 
 func containsCJK(value string) bool {

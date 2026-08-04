@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 4
+const currentSchemaVersion = 5
 
 type openOptions struct {
 	seedFixtures bool
@@ -204,6 +204,24 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				return fmt.Errorf("apply schema version %d: %w", version, err)
 			}
 		}
+	case 5:
+		if _, err := tx.ExecContext(ctx, `
+			CREATE TABLE IF NOT EXISTS chat_messages (
+				id TEXT PRIMARY KEY,
+				session_id TEXT NOT NULL DEFAULT '',
+				subject TEXT NOT NULL DEFAULT '',
+				role TEXT NOT NULL,
+				content TEXT NOT NULL,
+				status TEXT NOT NULL DEFAULT 'pending',
+				error_summary TEXT NOT NULL DEFAULT '',
+				created_at TEXT NOT NULL
+			)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			CREATE INDEX IF NOT EXISTS chat_messages_subject_idx ON chat_messages(subject, created_at DESC)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -226,6 +244,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 	case 4:
 		if !hasColumn(ctx, tx, "knowledge_items", "subject") {
 			return errors.New("schema version 4 is recorded but knowledge_items.subject is missing")
+		}
+	case 5:
+		if !hasTable(ctx, tx, "chat_messages") {
+			return errors.New("schema version 5 is recorded but chat_messages is missing")
 		}
 	}
 	return nil

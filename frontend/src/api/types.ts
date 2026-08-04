@@ -121,3 +121,22 @@ export interface ReviewEvaluation {
   due_at: string
   expected_answers: string[]
 }
+
+export interface ChatMessage {
+  id: string
+  session_id?: string
+  subject?: string
+  role: string
+  content: string
+  status?: string
+  error_summary?: string
+  created_at: string
+}
+
+export interface CompareOutput {
+  summary: string
+  same_points?: string[]
+  diff_points?: string[]
+  confusion_point?: string
+  memory_tip?: string
+}

@@ -7,6 +7,7 @@ import (
 type KnowledgeItem struct {
 	ID                string
 	ItemType          string
+	Subject           string
 	Term              string
 	ConciseDefinition string
 	Example           string
@@ -21,6 +22,10 @@ const (
 	PromptChineseToEnglish PromptType = "zh_to_en"
 	PromptContextCloze     PromptType = "context_cloze"
 	PromptMakeSentence     PromptType = "make_sentence"
+	PromptDefinitionRecall PromptType = "definition_recall"
+	PromptDefinitionTerm   PromptType = "definition_term"
+	PromptFormulaRecall    PromptType = "formula_recall"
+	PromptVerseFill        PromptType = "verse_fill"
 )
 
 type Prompt struct {
@@ -54,6 +59,20 @@ type Evaluation struct {
 }
 
 func GeneratePrompts(item KnowledgeItem) []Prompt {
+	switch strings.ToLower(strings.TrimSpace(item.Subject)) {
+	case "english":
+		return englishPrompts(item)
+	case "chinese":
+		return chinesePrompts(item)
+	default:
+		if isEnglishWordItem(item.ItemType) {
+			return englishPrompts(item)
+		}
+		return stemPrompts(item)
+	}
+}
+
+func englishPrompts(item KnowledgeItem) []Prompt {
 	meanings := splitAlternatives(item.AcceptedMeanings)
 	if len(meanings) == 0 && item.ConciseDefinition != "" {
 		meanings = splitAlternatives([]string{item.ConciseDefinition})
@@ -82,6 +101,75 @@ func GeneratePrompts(item KnowledgeItem) []Prompt {
 		})
 	}
 	return prompts
+}
+
+func chinesePrompts(item KnowledgeItem) []Prompt {
+	meanings := splitAlternatives(item.AcceptedMeanings)
+	if len(meanings) == 0 && item.ConciseDefinition != "" {
+		meanings = splitAlternatives([]string{item.ConciseDefinition})
+	}
+	terms := splitAlternatives(item.AcceptedTerms)
+	if len(terms) == 0 && item.Term != "" {
+		terms = []string{item.Term}
+	}
+	return []Prompt{
+		{
+			KnowledgeID: item.ID,
+			Type:        PromptVerseFill,
+			Question:    "根据提示完成背诵：「" + item.Term + "」——请写出完整内容（上句接下句或默写全文）。",
+		},
+		{
+			KnowledgeID:     item.ID,
+			Type:            PromptDefinitionRecall,
+			Question:        "「" + item.Term + "」指什么？请用自己的话准确复述。",
+			AcceptedAnswers: meanings,
+		},
+		{
+			KnowledgeID:     item.ID,
+			Type:            PromptDefinitionTerm,
+			Question:        "看到以下内容，写出对应的篇目/词条：" + item.ConciseDefinition,
+			AcceptedAnswers: terms,
+		},
+	}
+}
+
+func stemPrompts(item KnowledgeItem) []Prompt {
+	meanings := splitAlternatives(item.AcceptedMeanings)
+	if len(meanings) == 0 && item.ConciseDefinition != "" {
+		meanings = splitAlternatives([]string{item.ConciseDefinition})
+	}
+	terms := splitAlternatives(item.AcceptedTerms)
+	if len(terms) == 0 && item.Term != "" {
+		terms = []string{item.Term}
+	}
+	return []Prompt{
+		{
+			KnowledgeID: item.ID,
+			Type:        PromptFormulaRecall,
+			Question:    "默写/复述：「" + item.Term + "」，并说出适用条件或易错点。",
+		},
+		{
+			KnowledgeID:     item.ID,
+			Type:            PromptDefinitionRecall,
+			Question:        "「" + item.Term + "」的含义/结论是什么？",
+			AcceptedAnswers: meanings,
+		},
+		{
+			KnowledgeID:     item.ID,
+			Type:            PromptDefinitionTerm,
+			Question:        "看到以下描述，写出对应的结论/符号/术语：" + item.ConciseDefinition,
+			AcceptedAnswers: terms,
+		},
+	}
+}
+
+func isEnglishWordItem(itemType string) bool {
+	switch itemType {
+	case "", "word_sense", "phrase", "collocation", "word_family", "root_affix":
+		return true
+	default:
+		return false
+	}
 }
 
 func wantsSentencePrompt(itemType string) bool {

@@ -25,9 +25,17 @@ const promptLabels: Record<string, string> = {
   zh_to_en: "看中文，说英文",
   context_cloze: "语境填空",
   make_sentence: "造句（AI 批改）",
+  definition_recall: "看词说定义",
+  definition_term: "看定义说词",
+  formula_recall: "默写公式",
+  verse_fill: "上下句背诵",
 }
 
-export function ReviewSession() {
+interface ReviewSessionProps {
+  recovery?: boolean
+}
+
+export function ReviewSession({ recovery = false }: ReviewSessionProps) {
   const subject = useSubjectStore((state) => state.subject)
   const [queue, setQueue] = useState<DueReview[]>([])
   const [index, setIndex] = useState(0)
@@ -40,7 +48,7 @@ export function ReviewSession() {
 
   useEffect(() => {
     let active = true
-    getDueReviews(20, subject === "all" ? undefined : subject)
+    getDueReviews(20, subject === "all" ? undefined : subject, recovery ? "recovery" : undefined)
       .then(({ items }) => {
         if (active) setQueue(items)
       })
@@ -53,7 +61,7 @@ export function ReviewSession() {
     return () => {
       active = false
     }
-  }, [subject])
+  }, [subject, recovery])
 
   const current = queue[index]
   const isChoicePrompt =

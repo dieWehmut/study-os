@@ -7,6 +7,7 @@ import Home from "@/pages/Home"
 import Import from "@/pages/Import"
 import Knowledge from "@/pages/Knowledge"
 import Memory from "@/pages/Memory"
+import Chat from "@/pages/Chat"
 import Practice from "@/pages/Practice"
 import Settings from "@/pages/Settings"
 
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/knowledge" element={<Knowledge />} />
         <Route path="/import" element={<Import />} />
         <Route path="/memory" element={<Memory />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/practice" element={<Practice />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

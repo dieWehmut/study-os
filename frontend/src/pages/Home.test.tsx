@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -7,9 +7,11 @@ import Home from "./Home"
 const mocks = vi.hoisted(() => ({
   getDashboard: vi.fn(),
   seedDemo: vi.fn(),
+  dumpThought: vi.fn(),
 }))
 
 vi.mock("@/api/dashboard", () => mocks)
+vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
 
 describe("Today page", () => {
   beforeEach(() => {
@@ -29,6 +31,7 @@ describe("Today page", () => {
       knowledge_id: "demo-knowledge-abandon",
       prompt_count: 3,
     })
+    mocks.dumpThought.mockResolvedValue({ id: "dump-1", term: "念头" })
   })
 
   it("shows live progress and links to the focused memory session", async () => {
@@ -115,5 +118,18 @@ describe("Today page", () => {
       expect(screen.getByRole("button", { name })).toBeInTheDocument()
     }
     expect(screen.getByRole("button", { name: "全部" })).toBeInTheDocument()
+  })
+
+  it("dumps a thought without requiring classification", async () => {
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(screen.getByLabelText("脑暴收集箱"), { target: { value: "半句话的念头" } })
+    fireEvent.click(screen.getByRole("button", { name: "暂存" }))
+    await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledWith("半句话的念头"))
+    expect(await screen.findByText("已暂存到知识库，稍后可以整理。")).toBeInTheDocument()
   })
 })

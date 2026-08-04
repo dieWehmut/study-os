@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { LibraryBig, RotateCcw, Search } from "lucide-react"
+import { GitCompareArrows, LibraryBig, RotateCcw, Search } from "lucide-react"
 
+import { compareKnowledge } from "@/api/chat"
 import { getKnowledge, listGroups, listKnowledge, type KnowledgeGroup } from "@/api/knowledge"
-import type { KnowledgeItem } from "@/api/types"
+import type { CompareOutput, KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +25,11 @@ export default function Knowledge() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
+  const [tag, setTag] = useState("")
+  const [compareA, setCompareA] = useState("")
+  const [compareB, setCompareB] = useState("")
+  const [compareResult, setCompareResult] = useState<CompareOutput | null>(null)
+  const [comparing, setComparing] = useState(false)
   const subject = useSubjectStore((state) => state.subject)
   const setSubject = useSubjectStore((state) => state.setSubject)
 
@@ -36,6 +42,7 @@ export default function Knowledge() {
       offset: 0,
     }
     if (subject !== "all") options.subject = subject
+    if (tag) options.tag = tag
     void listKnowledge(options)
       .then((result) => {
         if (controller.signal.aborted) return
@@ -53,7 +60,7 @@ export default function Knowledge() {
         if (!controller.signal.aborted) setLoading(false)
     })
     return () => controller.abort()
-  }, [query, group, subject, requestVersion])
+  }, [query, group, subject, tag, requestVersion])
 
   useEffect(() => {
     let active = true
@@ -98,6 +105,19 @@ export default function Knowledge() {
     setLoading(true)
     setError("")
     setQuery(value)
+  }
+
+  async function runCompare() {
+    if (!compareA || !compareB || compareA === compareB || comparing) return
+    setComparing(true)
+    try {
+      setCompareResult(await compareKnowledge(subject === "all" ? "" : subject, compareA, compareB))
+    } catch {
+      setCompareResult(null)
+      setError("对比生成失败，请确认 AI 服务已配置。")
+    } finally {
+      setComparing(false)
+    }
   }
 
   return (
@@ -150,6 +170,27 @@ export default function Knowledge() {
                   className="min-w-36"
                 />
               </label>
+              <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-tag">
+                属性
+                <Select
+                  id="knowledge-tag"
+                  ariaLabel="属性"
+                  value={tag}
+                  onValueChange={(value) => {
+                    setTag(value)
+                    setLoading(true)
+                    setError("")
+                  }}
+                  placeholder="全部"
+                  options={[
+                    { value: "", label: "全部" },
+                    { value: "二级结论", label: "二级结论" },
+                    { value: "解题策略", label: "解题策略" },
+                    { value: "易错信号", label: "易错信号" },
+                  ]}
+                  className="min-w-32"
+                />
+              </label>
             </div>
           </div>
           <label className="relative block" htmlFor="knowledge-search">
@@ -167,6 +208,52 @@ export default function Knowledge() {
           </label>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 grid gap-3 rounded-xl border border-border bg-muted/25 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <GitCompareArrows aria-hidden="true" className="size-4 text-primary" />
+              对比两个知识点
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Select
+                ariaLabel="对比对象 A"
+                value={compareA}
+                onValueChange={setCompareA}
+                placeholder="选择 A"
+                options={items.map((item) => ({ value: item.term, label: item.term }))}
+                className="min-w-40"
+              />
+              <Select
+                ariaLabel="对比对象 B"
+                value={compareB}
+                onValueChange={setCompareB}
+                placeholder="选择 B"
+                options={items.map((item) => ({ value: item.term, label: item.term }))}
+                className="min-w-40"
+              />
+              <Button size="sm" disabled={!compareA || !compareB || compareA === compareB || comparing} onClick={() => void runCompare()}>
+                {comparing ? "生成中…" : "对比"}
+              </Button>
+            </div>
+            {compareResult ? (
+              <div className="grid gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm leading-6">
+                <p className="font-medium">{compareResult.summary}</p>
+                {compareResult.same_points?.length ? (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">相同点</p>
+                    <ul className="ml-4 list-disc">{compareResult.same_points.map((point) => <li key={point}>{point}</li>)}</ul>
+                  </div>
+                ) : null}
+                {compareResult.diff_points?.length ? (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">不同点</p>
+                    <ul className="ml-4 list-disc">{compareResult.diff_points.map((point) => <li key={point}>{point}</li>)}</ul>
+                  </div>
+                ) : null}
+                {compareResult.confusion_point ? <p>易混点：{compareResult.confusion_point}</p> : null}
+                {compareResult.memory_tip ? <p className="text-primary">记忆提示：{compareResult.memory_tip}</p> : null}
+              </div>
+            ) : null}
+          </div>
           {error ? (
             <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/35 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               <span>{error}</span>
@@ -175,7 +262,14 @@ export default function Knowledge() {
           ) : (
             <div className="grid gap-4 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
               <KnowledgeList items={items} selectedId={selectedId ?? undefined} loading={loading} onSelect={(item) => setSelectedId(item.id)} />
-              <WikiPanel item={selected} />
+              <WikiPanel
+                key={selected?.id ?? "none"}
+                item={selected}
+                onUpdated={(updated) => {
+                  setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)))
+                  setSelectedDetail(updated)
+                }}
+              />
             </div>
           )}
         </CardContent>

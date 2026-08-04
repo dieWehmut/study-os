@@ -494,4 +494,122 @@ func TestLauncherServesSPAUpdateStatusAndClose(t *testing.T) {
 	}
 }
 
+func TestChatAsyncFlowAnswersInBackground(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	sent := requestJSON(t, router, http.MethodPost, "/api/chat", map[string]any{
+		"subject": "math",
+		"message": "导数是什么？",
+	})
+	if sent.Code != http.StatusAccepted {
+		t.Fatalf("send status = %d, body = %s", sent.Code, sent.Body.String())
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		messages := requestJSON(t, router, http.MethodGet, "/api/chat/messages?subject=math&limit=10", nil)
+		var body struct {
+			Items []models.ChatMessage `json:"items"`
+		}
+		decodeJSON(t, messages, &body)
+		if len(body.Items) == 2 && body.Items[1].Status == "done" && body.Items[1].Content != "" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("chat answer did not complete: %#v", body.Items)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func TestCompareEndpointProducesStructuredOutput(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodPost, "/api/compare", map[string]any{
+		"subject": "physics",
+		"term_a":  "速度",
+		"term_b":  "加速度",
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), "summary") || !strings.Contains(response.Body.String(), "速度") {
+		t.Fatalf("compare body = %s", response.Body.String())
+	}
+}
+
+func TestDumpEndpointStoresBrainDump(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+	response := requestJSON(t, router, http.MethodPost, "/api/dump", map[string]any{
+		"text": "等下记得查一下动能定理的适用条件",
+	})
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	items := requestJSON(t, router, http.MethodGet, "/api/knowledge?tag=brain_dump&limit=10", nil)
+	if items.Code != http.StatusOK || !strings.Contains(items.Body.String(), "brain_dump") {
+		t.Fatalf("knowledge = %d, body = %s", items.Code, items.Body.String())
+	}
+}
+
+func TestKnowledgeTagEndpointAddsAndFilters(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	ctx := context.Background()
+	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+	if err := application.Store.CreateKnowledgeItem(ctx, models.KnowledgeItem{
+		ID: "k-tag", ItemType: "theorem", Term: "动能定理", ConciseDefinition: "合外力做功等于动能变化",
+		Subject: "physics", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create item: %v", err)
+	}
+	router := httpapi.NewRouter(application)
+	added := requestJSON(t, router, http.MethodPost, "/api/knowledge/k-tag/tag", map[string]any{"tag": "二级结论"})
+	if added.Code != http.StatusOK || !strings.Contains(added.Body.String(), "二级结论") {
+		t.Fatalf("tag add = %d, body = %s", added.Code, added.Body.String())
+	}
+	filtered := requestJSON(t, router, http.MethodGet, "/api/knowledge?tag=二级结论&limit=10", nil)
+	if filtered.Code != http.StatusOK || !strings.Contains(filtered.Body.String(), "k-tag") {
+		t.Fatalf("tag filter = %d, body = %s", filtered.Code, filtered.Body.String())
+	}
+}
+
+func TestDueReviewsRecoveryModeFiltersEasyPrompts(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	ctx := context.Background()
+	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+	if err := application.Store.CreateKnowledgeItem(ctx, models.KnowledgeItem{
+		ID: "k-r", ItemType: "word_sense", Term: "abandon", ConciseDefinition: "放弃", Subject: "english", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create item: %v", err)
+	}
+	for index, prompt := range []models.Prompt{
+		{ID: "p-en", KnowledgeItemID: "k-r", PromptType: "en_to_zh", Question: "abandon", CreatedAt: now, UpdatedAt: now},
+		{ID: "p-sentence", KnowledgeItemID: "k-r", PromptType: "make_sentence", Question: "用 abandon 造句", CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
+	} {
+		if err := application.Store.CreatePrompt(ctx, prompt); err != nil {
+			t.Fatalf("create prompt: %v", err)
+		}
+		if err := application.Store.UpsertReviewState(ctx, models.ReviewState{
+			PromptID: prompt.ID, CardJSON: json.RawMessage(`{"due":"x"}`), DueAt: now.Add(time.Duration(index) * time.Second), UpdatedAt: now,
+		}); err != nil {
+			t.Fatalf("upsert state: %v", err)
+		}
+	}
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodGet, "/api/reviews/due?mode=recovery&limit=10", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d", response.Code)
+	}
+	var body struct {
+		Items []struct {
+			Prompt struct {
+				ID string `json:"id"`
+			} `json:"prompt"`
+		} `json:"items"`
+	}
+	decodeJSON(t, response, &body)
+	if len(body.Items) != 1 || body.Items[0].Prompt.ID != "p-en" {
+		t.Fatalf("recovery items = %#v", body.Items)
+	}
+}
+
 var _ = httptest.NewRecorder

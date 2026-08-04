@@ -135,6 +135,21 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/knowledge/{knowledgeID}", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeGet(response, request, application)
 		})
+		api.Post("/knowledge/{knowledgeID}/tag", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeTag(response, request, application)
+		})
+		api.Post("/chat", func(response http.ResponseWriter, request *http.Request) {
+			handleChatSend(response, request, application)
+		})
+		api.Get("/chat/messages", func(response http.ResponseWriter, request *http.Request) {
+			handleChatMessages(response, request, application)
+		})
+		api.Post("/compare", func(response http.ResponseWriter, request *http.Request) {
+			handleCompare(response, request, application)
+		})
+		api.Post("/dump", func(response http.ResponseWriter, request *http.Request) {
+			handleDump(response, request, application)
+		})
 		api.Post("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupCreate(response, request, application)
 		})
@@ -325,7 +340,8 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, limit, offset)
 	} else {
 		items, err = application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
-			Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"), Limit: limit, Offset: offset,
+			Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"),
+			Tag: request.URL.Query().Get("tag"), Limit: limit, Offset: offset,
 		})
 	}
 	if err != nil {
@@ -534,6 +550,7 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 	prompts, err := application.Store.DuePromptsWithOptions(request.Context(), time.Now().UTC(), db.DuePromptOptions{
 		Limit:   limit,
 		Subject: request.URL.Query().Get("subject"),
+		Mode:    request.URL.Query().Get("mode"),
 	})
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -666,7 +683,7 @@ func handleAnswer(response http.ResponseWriter, request *http.Request, applicati
 		return
 	}
 	evaluation := memory.EvaluateAnswer(input.Answer, prompt.AcceptedAnswers)
-	if prompt.PromptType == string(memory.PromptMakeSentence) {
+	if len(prompt.AcceptedAnswers) == 0 {
 		evaluation = evaluateFreeText(request.Context(), application, prompt, input.Answer)
 	}
 	now := time.Now().UTC()

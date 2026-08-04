@@ -168,3 +168,15 @@ CREATE TABLE backup_records (
     size_bytes INTEGER NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE chat_messages (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    error_summary TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX chat_messages_subject_idx ON chat_messages(subject, created_at DESC);

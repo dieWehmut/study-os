@@ -617,7 +617,7 @@ func mapCandidate(value map[string]any, mapping Mapping, raw json.RawMessage) (C
 		itemType = "word_sense"
 	}
 	itemType = normalizeToken(itemType)
-	if itemType != "word_sense" && itemType != "phrase" && itemType != "collocation" {
+	if !supportedItemType(itemType) {
 		return Candidate{}, fmt.Errorf("unsupported item_type %q", itemType)
 	}
 	candidate := Candidate{ItemType: itemType, Term: valueString(value[mapping.Term]), Definition: valueString(value[mapping.Definition]), PartOfSpeech: valueString(value[mapping.PartOfSpeech]), Pronunciation: valueString(value[mapping.Pronunciation]), Example: valueString(value[mapping.Example]), Wiki: valueString(value[mapping.Wiki]), Level: valueString(value[mapping.Level]), Subject: valueString(value[mapping.Subject]), Tags: valueTags(value[mapping.Tags]), RawJSON: string(raw)}

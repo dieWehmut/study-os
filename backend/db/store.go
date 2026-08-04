@@ -173,9 +173,10 @@ func (s *Store) ListKnowledgeItems(ctx context.Context, options models.Knowledge
 		offset = 0
 	}
 	query := knowledgeSelect
-	arguments := make([]any, 0, 4)
+	arguments := make([]any, 0, 6)
 	subject := strings.ToLower(strings.TrimSpace(options.Subject))
-	where := make([]string, 0, 2)
+	tag := strings.TrimSpace(options.Tag)
+	where := make([]string, 0, 3)
 	if strings.TrimSpace(options.Query) != "" {
 		where = append(where, `(term LIKE ? ESCAPE '\' OR concise_definition LIKE ? ESCAPE '\')`)
 		pattern := "%" + escapeLike(strings.TrimSpace(options.Query)) + "%"
@@ -184,6 +185,10 @@ func (s *Store) ListKnowledgeItems(ctx context.Context, options models.Knowledge
 	if subject != "" {
 		where = append(where, `subject = ?`)
 		arguments = append(arguments, subject)
+	}
+	if tag != "" {
+		where = append(where, `tags_json LIKE ? ESCAPE '\'`)
+		arguments = append(arguments, `%"`+escapeLike(tag)+`"%`)
 	}
 	if len(where) > 0 {
 		query += ` WHERE ` + strings.Join(where, " AND ")
@@ -285,6 +290,7 @@ func (s *Store) DuePrompts(ctx context.Context, before time.Time, limit int) ([]
 type DuePromptOptions struct {
 	Limit   int
 	Subject string
+	Mode    string
 }
 
 func (s *Store) DuePromptsWithOptions(ctx context.Context, before time.Time, options DuePromptOptions) ([]models.Prompt, error) {
@@ -301,6 +307,9 @@ func (s *Store) DuePromptsWithOptions(ctx context.Context, before time.Time, opt
 			SELECT 1 FROM knowledge_items AS k WHERE k.id = p.knowledge_item_id AND k.subject = ?
 		)`
 		arguments = append(arguments, subject)
+	}
+	if strings.EqualFold(strings.TrimSpace(options.Mode), "recovery") {
+		query += ` AND p.prompt_type IN ('en_to_zh', 'context_cloze')`
 	}
 	query += ` ORDER BY rs.due_at ASC, p.id ASC LIMIT ?`
 	arguments = append(arguments, limit)
