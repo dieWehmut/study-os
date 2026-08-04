@@ -84,6 +84,27 @@ type IntegratedNote struct {
 	CreatedAt   time.Time       `json:"created_at"`
 }
 
+type ChatAttachment struct {
+	ID         string    `json:"id"`
+	SessionID  string    `json:"session_id,omitempty"`
+	Subject    string    `json:"subject,omitempty"`
+	MessageID  string    `json:"message_id,omitempty"`
+	Name       string    `json:"name"`
+	StoredPath string    `json:"-"`
+	SizeBytes  int64     `json:"size_bytes"`
+	Kind       string    `json:"kind,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type ChatConversation struct {
+	SessionID    string    `json:"session_id"`
+	Subject      string    `json:"subject,omitempty"`
+	MessageCount int       `json:"message_count"`
+	LastAt       time.Time `json:"last_at"`
+	Title        string    `json:"title"`
+	Preview      string    `json:"preview,omitempty"`
+}
+
 type Prompt struct {
 	ID              string    `json:"id"`
 	KnowledgeItemID string    `json:"knowledge_item_id"`

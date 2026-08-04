@@ -149,3 +149,12 @@ export interface CompareOutput {
   confusion_point?: string
   memory_tip?: string
 }
+
+export interface ChatConversation {
+  session_id: string
+  subject?: string
+  message_count: number
+  last_at: string
+  title: string
+  preview?: string
+}

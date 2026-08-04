@@ -192,3 +192,16 @@ CREATE TABLE integrated_notes (
     created_at TEXT NOT NULL
 );
 CREATE INDEX integrated_notes_subject_idx ON integrated_notes(subject, created_at DESC);
+
+CREATE TABLE chat_attachments (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL DEFAULT '',
+    message_id TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    stored_path TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    kind TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX chat_attachments_session_idx ON chat_attachments(session_id, created_at DESC);

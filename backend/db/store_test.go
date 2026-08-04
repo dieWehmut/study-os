@@ -299,8 +299,8 @@ func TestStoreUpgradesSchemaVersionOneWithOriginalName(t *testing.T) {
 	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil {
 		t.Fatalf("count upgraded migrations: %v", err)
 	}
-	if migrationCount != 6 {
-		t.Fatalf("migration count = %d, want 6", migrationCount)
+	if migrationCount != 7 {
+		t.Fatalf("migration count = %d, want 7", migrationCount)
 	}
 }
 
@@ -313,7 +313,7 @@ func TestStoreRejectsUnsupportedFutureMigration(t *testing.T) {
 	}
 	if _, err := legacy.ExecContext(ctx, `
 		CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-		INSERT INTO schema_migrations(version, applied_at) VALUES (7, '2026-08-01T00:00:00Z');`); err != nil {
+		INSERT INTO schema_migrations(version, applied_at) VALUES (8, '2026-08-01T00:00:00Z');`); err != nil {
 		_ = legacy.Close()
 		t.Fatalf("create future migration marker: %v", err)
 	}

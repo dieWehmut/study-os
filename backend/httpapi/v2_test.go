@@ -1,8 +1,10 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -711,6 +713,100 @@ func TestIntegrateEndpointAcceptsKnowledgeItemSource(t *testing.T) {
 	if !strings.Contains(response.Body.String(), `"source_id":"k-int"`) {
 		t.Fatalf("body = %s", response.Body.String())
 	}
+}
+
+func TestChatAttachmentsAndConversations(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	upload := attachmentMultipartRequest(t, router, "hello attachment file", "notes.txt")
+	if upload.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d, body = %s", upload.Code, upload.Body.String())
+	}
+	var uploaded struct {
+		ID   string `json:"id"`
+		Kind string `json:"kind"`
+	}
+	decodeJSON(t, upload, &uploaded)
+	if uploaded.ID == "" || uploaded.Kind != "text" {
+		t.Fatalf("uploaded = %#v", uploaded)
+	}
+
+	sent := requestJSON(t, router, http.MethodPost, "/api/chat", map[string]any{
+		"subject":        "math",
+		"message":        "帮我看看这个文件",
+		"attachment_ids": []string{uploaded.ID},
+	})
+	if sent.Code != http.StatusAccepted {
+		t.Fatalf("send status = %d, body = %s", sent.Code, sent.Body.String())
+	}
+	var sentBody struct {
+		SessionID string `json:"session_id"`
+	}
+	decodeJSON(t, sent, &sentBody)
+	if sentBody.SessionID == "" {
+		t.Fatal("session_id missing")
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		messages := requestJSON(t, router, http.MethodGet,
+			"/api/chat/messages?subject=math&session_id="+sentBody.SessionID+"&limit=10", nil)
+		var body struct {
+			Items []models.ChatMessage `json:"items"`
+		}
+		decodeJSON(t, messages, &body)
+		if len(body.Items) == 2 && body.Items[1].Status == "done" {
+			var userMessage string
+			for _, item := range body.Items {
+				if item.Role == "user" {
+					userMessage = item.Content
+				}
+			}
+			if !strings.Contains(userMessage, "hello attachment file") {
+				t.Fatalf("attachment text missing from user message: %q", userMessage)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("chat did not complete: %#v", body.Items)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	conversations := requestJSON(t, router, http.MethodGet, "/api/chat/conversations?subject=math&limit=10", nil)
+	if conversations.Code != http.StatusOK || !strings.Contains(conversations.Body.String(), sentBody.SessionID) {
+		t.Fatalf("conversations = %d, body = %s", conversations.Code, conversations.Body.String())
+	}
+	if !strings.Contains(conversations.Body.String(), "帮我看看这个文件") {
+		t.Fatalf("conversation title missing: %s", conversations.Body.String())
+	}
+
+	download := requestJSON(t, router, http.MethodGet, "/api/chat/attachments/"+uploaded.ID, nil)
+	if download.Code != http.StatusOK || !strings.Contains(download.Body.String(), "hello attachment file") {
+		t.Fatalf("attachment download = %d, body = %s", download.Code, download.Body.String())
+	}
+}
+
+func attachmentMultipartRequest(t *testing.T, handler http.Handler, content, filename string) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	if _, err := part.Write([]byte(content)); err != nil {
+		t.Fatalf("write multipart file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/api/chat/attachments", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	return response
 }
 
 var _ = httptest.NewRecorder

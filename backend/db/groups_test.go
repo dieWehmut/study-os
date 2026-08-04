@@ -197,8 +197,8 @@ func TestStoreUpgradesSchemaVersionTwoWithGroupsAndAudioColumns(t *testing.T) {
 		versions = append(versions, version)
 	}
 	rows.Close()
-	if len(versions) != 5 || versions[0] != 2 || versions[1] != 3 || versions[2] != 4 || versions[3] != 5 || versions[4] != 6 {
-		t.Fatalf("migration versions = %#v, want [2 3 4 5 6]", versions)
+	if len(versions) != 6 || versions[0] != 2 || versions[1] != 3 || versions[2] != 4 || versions[3] != 5 || versions[4] != 6 || versions[5] != 7 {
+		t.Fatalf("migration versions = %#v, want [2 3 4 5 6 7]", versions)
 	}
 
 	var groupTables int

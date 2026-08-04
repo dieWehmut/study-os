@@ -147,6 +147,15 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/chat/messages", func(response http.ResponseWriter, request *http.Request) {
 			handleChatMessages(response, request, application)
 		})
+		api.Get("/chat/conversations", func(response http.ResponseWriter, request *http.Request) {
+			handleChatConversations(response, request, application)
+		})
+		api.Post("/chat/attachments", func(response http.ResponseWriter, request *http.Request) {
+			handleChatAttachmentUpload(response, request, application)
+		})
+		api.Get("/chat/attachments/{attachmentID}", func(response http.ResponseWriter, request *http.Request) {
+			handleChatAttachmentGet(response, request, application)
+		})
 		api.Post("/compare", func(response http.ResponseWriter, request *http.Request) {
 			handleCompare(response, request, application)
 		})

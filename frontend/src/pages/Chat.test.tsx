@@ -7,11 +7,15 @@ import { useSubjectStore } from "@/store/useSubjectStore"
 const mocks = vi.hoisted(() => ({
   sendChatMessage: vi.fn(),
   listChatMessages: vi.fn(),
+  listChatConversations: vi.fn(),
+  uploadChatAttachment: vi.fn(),
 }))
 
 vi.mock("@/api/chat", () => ({
   sendChatMessage: mocks.sendChatMessage,
   listChatMessages: mocks.listChatMessages,
+  listChatConversations: mocks.listChatConversations,
+  uploadChatAttachment: mocks.uploadChatAttachment,
 }))
 
 describe("Chat page", () => {
@@ -19,7 +23,9 @@ describe("Chat page", () => {
     vi.clearAllMocks()
     useSubjectStore.setState({ subject: "all" })
     mocks.listChatMessages.mockResolvedValue({ items: [], count: 0 })
-    mocks.sendChatMessage.mockResolvedValue({ message_id: "ai-1", status: "pending" })
+    mocks.listChatConversations.mockResolvedValue({ items: [], count: 0 })
+    mocks.sendChatMessage.mockResolvedValue({ session_id: "s1", message_id: "ai-1", status: "pending" })
+    mocks.uploadChatAttachment.mockResolvedValue({ id: "att-1", name: "notes.txt", size_bytes: 5, kind: "text" })
   })
 
   it("sends a message and shows the async pending state", async () => {
@@ -29,7 +35,7 @@ describe("Chat page", () => {
     fireEvent.change(input, { target: { value: "导数是什么？" } })
     fireEvent.click(screen.getByRole("button", { name: "发送" }))
 
-    await waitFor(() => expect(mocks.sendChatMessage).toHaveBeenCalledWith("all", "导数是什么？"))
+    await waitFor(() => expect(mocks.sendChatMessage).toHaveBeenCalledWith("all", "导数是什么？", undefined, undefined))
     expect(await screen.findByText("AI 正在思考…")).toBeInTheDocument()
 
     mocks.listChatMessages.mockResolvedValueOnce({
@@ -48,5 +54,43 @@ describe("Chat page", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "导数和单调性有什么关系？" }))
     expect(screen.getByLabelText("发给 AI 的消息")).toHaveValue("导数和单调性有什么关系？")
+  })
+
+  it("lists conversations and opens one to view history", async () => {
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [
+        {
+          session_id: "s1",
+          subject: "math",
+          message_count: 2,
+          last_at: "2026-08-04T00:00:00Z",
+          title: "导数",
+          preview: "导数是变化率。",
+        },
+      ],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是啥？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    await waitFor(() => expect(mocks.listChatMessages).toHaveBeenCalledWith("", "s1", 50))
+    expect((await screen.findAllByText("导数是变化率。")).length).toBeGreaterThan(0)
+  })
+
+  it("uploads an attachment and shows it before sending", async () => {
+    render(<Chat />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" })
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() => expect(mocks.uploadChatAttachment).toHaveBeenCalled())
+    expect(await screen.findByText("notes.txt")).toBeInTheDocument()
   })
 })

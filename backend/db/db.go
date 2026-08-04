@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 6
+const currentSchemaVersion = 7
 
 type openOptions struct {
 	seedFixtures bool
@@ -240,6 +240,25 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 			CREATE INDEX IF NOT EXISTS integrated_notes_subject_idx ON integrated_notes(subject, created_at DESC)`); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", version, err)
 		}
+	case 7:
+		if _, err := tx.ExecContext(ctx, `
+			CREATE TABLE IF NOT EXISTS chat_attachments (
+				id TEXT PRIMARY KEY,
+				session_id TEXT NOT NULL DEFAULT '',
+				subject TEXT NOT NULL DEFAULT '',
+				message_id TEXT NOT NULL DEFAULT '',
+				name TEXT NOT NULL,
+				stored_path TEXT NOT NULL,
+				size_bytes INTEGER NOT NULL DEFAULT 0,
+				kind TEXT NOT NULL DEFAULT '',
+				created_at TEXT NOT NULL
+			)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			CREATE INDEX IF NOT EXISTS chat_attachments_session_idx ON chat_attachments(session_id, created_at DESC)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -270,6 +289,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 	case 6:
 		if !hasTable(ctx, tx, "integrated_notes") {
 			return errors.New("schema version 6 is recorded but integrated_notes is missing")
+		}
+	case 7:
+		if !hasTable(ctx, tx, "chat_attachments") {
+			return errors.New("schema version 7 is recorded but chat_attachments is missing")
 		}
 	}
 	return nil

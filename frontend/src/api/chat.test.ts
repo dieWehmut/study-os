@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { compareKnowledge, dumpThought, listChatMessages, sendChatMessage, updateKnowledgeTag } from "./chat"
+import {
+  compareKnowledge,
+  dumpThought,
+  listChatConversations,
+  listChatMessages,
+  sendChatMessage,
+  updateKnowledgeTag,
+  uploadChatAttachment,
+} from "./chat"
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -14,19 +22,33 @@ describe("chat API", () => {
   })
 
   it("sends a chat message asynchronously", async () => {
-    mocks.apiRequest.mockResolvedValue({ message_id: "ai-1", status: "pending" })
-    const result = await sendChatMessage("math", "导数是什么？")
+    mocks.apiRequest.mockResolvedValue({ session_id: "s1", message_id: "ai-1", status: "pending" })
+    const result = await sendChatMessage("math", "导数是什么？", "s1", ["att-1"])
     expect(mocks.apiRequest).toHaveBeenCalledWith("/chat", {
       method: "POST",
-      body: JSON.stringify({ subject: "math", message: "导数是什么？" }),
+      body: JSON.stringify({ subject: "math", message: "导数是什么？", session_id: "s1", attachment_ids: ["att-1"] }),
     })
     expect(result.status).toBe("pending")
   })
 
   it("lists chat messages with subject filter", async () => {
     mocks.apiRequest.mockResolvedValue({ items: [], count: 0 })
-    await listChatMessages("english", 10)
-    expect(mocks.apiRequest).toHaveBeenCalledWith("/chat/messages?limit=10&subject=english")
+    await listChatMessages("english", "s1", 10)
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/chat/messages?limit=10&subject=english&session_id=s1")
+  })
+
+  it("lists conversations and uploads attachments", async () => {
+    mocks.apiRequest.mockResolvedValueOnce({ items: [], count: 0 })
+    await listChatConversations("math", 20)
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/chat/conversations?limit=20&subject=math")
+
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" })
+    mocks.apiRequest.mockResolvedValueOnce({ id: "att-1", name: "notes.txt", size_bytes: 5, kind: "text" })
+    await uploadChatAttachment(file)
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/chat/attachments", {
+      method: "POST",
+      body: expect.any(FormData),
+    })
   })
 
   it("compares knowledge points", async () => {
