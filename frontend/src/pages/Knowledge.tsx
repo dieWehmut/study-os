@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
-import { SUBJECTS } from "@/lib/subjects"
+import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -136,21 +136,7 @@ export default function Knowledge() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">搜索知识库</CardTitle>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-subject">
-                学科
-                <Select
-                  id="knowledge-subject"
-                  ariaLabel="学科"
-                  value={subject}
-                  onValueChange={setSubject}
-                  placeholder="全部"
-                  options={[
-                    { value: "all", label: "全部" },
-                    ...SUBJECTS.map((item) => ({ value: item.id, label: item.name })),
-                  ]}
-                  className="min-w-28"
-                />
-              </label>
+              <SubjectChips subject={subject} onSelect={setSubject} />
               <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-group">
                 知识分组
                 <Select

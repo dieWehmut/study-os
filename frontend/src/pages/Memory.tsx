@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ReviewSession } from "@/features/memory/ReviewSession"
+import { SubjectChips } from "@/features/subjects/SubjectChips"
+import { useSubjectStore } from "@/store/useSubjectStore"
 
 const emptyDashboard: DashboardData = {
   knowledge_count: 0,
@@ -20,6 +22,8 @@ const emptyDashboard: DashboardData = {
 }
 
 export default function Memory() {
+  const subject = useSubjectStore((state) => state.subject)
+  const setSubject = useSubjectStore((state) => state.setSubject)
   const [recovery, setRecovery] = useState(false)
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard)
 
@@ -59,6 +63,7 @@ export default function Memory() {
       {recovery ? (
         <Badge variant="secondary" className="w-fit">脑雾时只推送低阻力任务（看词回忆 / 四选一猜词）</Badge>
       ) : null}
+      <SubjectChips subject={subject} onSelect={setSubject} />
       <div className="grid gap-3 sm:grid-cols-3">
         {[
           { label: "待复习", value: dashboard.due_count },

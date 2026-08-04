@@ -3,11 +3,10 @@ import { SendHorizonal, Sparkles } from "lucide-react"
 
 import { listChatMessages, sendChatMessage } from "@/api/chat"
 import type { ChatMessage } from "@/api/types"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { subjectName } from "@/lib/subjects"
-import { SubjectBadge } from "@/features/subjects/SubjectBadge"
+import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const suggestions: Record<string, string[]> = {
@@ -22,6 +21,7 @@ const suggestions: Record<string, string[]> = {
 
 export default function Chat() {
   const subject = useSubjectStore((state) => state.subject)
+  const setSubject = useSubjectStore((state) => state.setSubject)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState("")
   const [loading, setLoading] = useState(true)
@@ -107,8 +107,8 @@ export default function Chat() {
           </div>
           <p className="text-sm text-muted-foreground">问题提交后立即返回，AI 在后台回答，完成后自动出现，不打断学习。</p>
         </div>
-        {subject === "all" ? <Badge variant="secondary">综合</Badge> : <SubjectBadge subject={subject} />}
       </div>
+      <SubjectChips subject={subject} onSelect={setSubject} />
 
       <Card className="min-h-96">
         <CardContent className="flex flex-col gap-3 p-4">

@@ -92,18 +92,14 @@ describe("application shell", () => {
     expect(localStorage.getItem("study-os.subject")).toBe("math")
   })
 
-  it("switches subjects from the global header on every page", () => {
+  it("switches subjects from the in-page subject chips", () => {
     render(
       <MemoryRouter initialEntries={["/chat"]}>
         <App />
       </MemoryRouter>,
     )
 
-    const combobox = screen.getByRole("combobox", { name: "切换学科" })
-    fireEvent.click(combobox)
-    const option = screen.getByRole("option", { name: "英语" })
-    fireEvent.pointerDown(option)
-    fireEvent.click(option)
+    fireEvent.click(screen.getByRole("button", { name: "英语" }))
     expect(useSubjectStore.getState().subject).toBe("english")
   })
 

@@ -188,10 +188,7 @@ describe("Knowledge page", () => {
   it("filters by subject from the toolbar", async () => {
     render(<Knowledge />)
 
-    fireEvent.click(await screen.findByRole("combobox", { name: "学科" }))
-    const option = await screen.findByRole("option", { name: "数学" })
-    fireEvent.pointerDown(option)
-    fireEvent.click(option)
+    fireEvent.click(await screen.findByRole("button", { name: "数学" }))
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ subject: "math" })))
   })
 
