@@ -92,6 +92,21 @@ describe("application shell", () => {
     expect(localStorage.getItem("study-os.subject")).toBe("math")
   })
 
+  it("switches subjects from the global header on every page", () => {
+    render(
+      <MemoryRouter initialEntries={["/chat"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    const combobox = screen.getByRole("combobox", { name: "切换学科" })
+    fireEvent.click(combobox)
+    const option = screen.getByRole("option", { name: "英语" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+    expect(useSubjectStore.getState().subject).toBe("english")
+  })
+
   it("switches the page theme from the header and persists the choice", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
