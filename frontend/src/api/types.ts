@@ -111,6 +111,15 @@ export interface DashboardData {
   current_streak: number
   provider: string
   offline: boolean
+  subjects_due?: Record<string, number>
+  recent_items?: RecentKnowledgeItem[]
+}
+
+export interface RecentKnowledgeItem {
+  id: string
+  term: string
+  item_type: string
+  subject?: string
 }
 
 export interface ReviewEvaluation {

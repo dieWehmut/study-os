@@ -10,6 +10,16 @@ import { subjectName } from "@/lib/subjects"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
+const suggestions: Record<string, string[]> = {
+  all: ["今天该复习什么？", "帮我总结最近学的知识点"],
+  chinese: ["文言文实词怎么记？", "古诗文默写怎么快速过一遍？"],
+  math: ["二级结论有哪些常见题型？", "导数和单调性有什么关系？"],
+  english: ["abandon 和 give up 有什么区别？", "帮我造几个背单词的句子"],
+  physics: ["速度与加速度怎么区分？", "动能定理的适用条件是什么？"],
+  chemistry: ["怎么快速配平方程式？", "氧化还原反应怎么判断？"],
+  geography: ["气候类型怎么记？", "区位因素有哪些分类？"],
+}
+
 export default function Chat() {
   const subject = useSubjectStore((state) => state.subject)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -107,9 +117,24 @@ export default function Chat() {
             {loading ? (
               <p className="py-16 text-center text-sm text-muted-foreground">正在读取对话…</p>
             ) : messages.length === 0 ? (
-              <p className="rounded-xl border border-dashed px-4 py-16 text-center text-sm text-muted-foreground">
-                还没有对话。把想不通的问题直接扔进来，AI 会在后台回答。
-              </p>
+              <div className="grid gap-4 py-8">
+                <p className="rounded-xl border border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
+                  还没有对话。把想不通的问题直接扔进来，AI 会在后台回答。
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">试试：</span>
+                  {(suggestions[subject] ?? suggestions.all).map((question) => (
+                    <button
+                      key={question}
+                      type="button"
+                      onClick={() => setDraft(question)}
+                      className="rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : (
               messages.map((message) => (
                 <div key={message.id} className={message.role === "user" ? "flex max-w-[85%] flex-col items-end gap-1 self-end" : "flex max-w-[85%] flex-col items-start gap-1 self-start"}>

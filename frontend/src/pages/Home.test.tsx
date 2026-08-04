@@ -25,6 +25,8 @@ describe("Today page", () => {
       current_streak: 3,
       provider: "mock",
       offline: true,
+      subjects_due: { english: 2 },
+      recent_items: [{ id: "k1", term: "abandon", item_type: "word_sense", subject: "english" }],
     })
     mocks.seedDemo.mockResolvedValue({
       status: "seeded",
@@ -131,5 +133,17 @@ describe("Today page", () => {
     fireEvent.click(screen.getByRole("button", { name: "暂存" }))
     await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledWith("半句话的念头"))
     expect(await screen.findByText("已暂存到知识库，稍后可以整理。")).toBeInTheDocument()
+  })
+
+  it("shows subject due counts, recent items, and quick links", async () => {
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText("2 待复习")).toBeInTheDocument()
+    expect(screen.getByText("abandon")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /答疑/ })).toBeInTheDocument()
   })
 })

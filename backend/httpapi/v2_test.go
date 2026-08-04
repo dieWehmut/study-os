@@ -612,4 +612,56 @@ func TestDueReviewsRecoveryModeFiltersEasyPrompts(t *testing.T) {
 	}
 }
 
+func TestUpdateStatusWorksInNormalMode(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodGet, "/api/update/status", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"update_available":false`) {
+		t.Fatalf("body = %s", response.Body.String())
+	}
+}
+
+func TestDashboardIncludesSubjectDueCountsAndRecentItems(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	ctx := context.Background()
+	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+	if err := application.Store.CreateKnowledgeItem(ctx, models.KnowledgeItem{
+		ID: "k-dash", ItemType: "word_sense", Term: "abandon", ConciseDefinition: "放弃",
+		Subject: "english", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create item: %v", err)
+	}
+	prompt := models.Prompt{
+		ID: "p-dash", KnowledgeItemID: "k-dash", PromptType: "en_to_zh",
+		Question: "abandon", AcceptedAnswers: []string{"放弃"}, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := application.Store.CreatePrompt(ctx, prompt); err != nil {
+		t.Fatalf("create prompt: %v", err)
+	}
+	if err := application.Store.UpsertReviewState(ctx, models.ReviewState{
+		PromptID: prompt.ID, CardJSON: json.RawMessage(`{"due":"x"}`), DueAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("upsert state: %v", err)
+	}
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodGet, "/api/dashboard", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var body struct {
+		SubjectsDue map[string]int `json:"subjects_due"`
+		RecentItems []struct {
+			ID string `json:"id"`
+		} `json:"recent_items"`
+	}
+	decodeJSON(t, response, &body)
+	if body.SubjectsDue["english"] != 1 {
+		t.Fatalf("subjects_due = %#v", body.SubjectsDue)
+	}
+	if len(body.RecentItems) != 1 || body.RecentItems[0].ID != "k-dash" {
+		t.Fatalf("recent_items = %#v", body.RecentItems)
+	}
+}
+
 var _ = httptest.NewRecorder

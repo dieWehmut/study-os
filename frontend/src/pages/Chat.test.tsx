@@ -41,4 +41,12 @@ describe("Chat page", () => {
     })
     expect(await screen.findByText("导数是变化率。", {}, { timeout: 4000 })).toBeInTheDocument()
   })
+
+  it("fills the input from a suggestion chip", async () => {
+    useSubjectStore.setState({ subject: "math" })
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "导数和单调性有什么关系？" }))
+    expect(screen.getByLabelText("发给 AI 的消息")).toHaveValue("导数和单调性有什么关系？")
+  })
 })

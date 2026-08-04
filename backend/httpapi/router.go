@@ -81,6 +81,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/agent/test", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentTest(response, request, application)
 		})
+		api.Get("/update/status", func(response http.ResponseWriter, request *http.Request) {
+			handleUpdateStatus(response, request, application)
+		})
 		api.Post("/agent/generate", func(response http.ResponseWriter, request *http.Request) {
 			handleAgentGenerate(response, request, application)
 		})
@@ -159,9 +162,6 @@ func NewRouter(application *app.App) http.Handler {
 		if application != nil && application.Launcher != nil {
 			api.Post("/launcher/close", func(response http.ResponseWriter, request *http.Request) {
 				handleLauncherClose(response, request, application)
-			})
-			api.Get("/update/status", func(response http.ResponseWriter, request *http.Request) {
-				handleUpdateStatus(response, request, application)
 			})
 			api.Post("/update/apply", func(response http.ResponseWriter, request *http.Request) {
 				handleUpdateApply(response, request, application)
@@ -868,6 +868,34 @@ func handleDashboard(response http.ResponseWriter, request *http.Request, applic
 	if reviewedToday > 0 {
 		currentStreak = 1
 	}
+	subjectsDue := map[string]int{}
+	subjectRows, err := database.QueryContext(ctx, `
+		SELECT COALESCE(k.subject, ''), COUNT(*)
+		FROM prompts AS p
+		JOIN review_states AS rs ON rs.prompt_id = p.id
+		JOIN knowledge_items AS k ON k.id = p.knowledge_item_id
+		WHERE rs.due_at <= ?
+		GROUP BY k.subject`, formatHTTPTime(time.Now().UTC()))
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	for subjectRows.Next() {
+		var subject string
+		var count int
+		if err := subjectRows.Scan(&subject, &count); err != nil {
+			_ = subjectRows.Close()
+			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		subjectsDue[subject] = count
+	}
+	_ = subjectRows.Close()
+	recentItems, err := application.Store.ListKnowledgeItems(ctx, models.KnowledgeListOptions{Limit: 5, Offset: 0})
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
 	writeJSON(response, http.StatusOK, map[string]any{
 		"knowledge_count": knowledgeCount,
 		"prompt_count":    promptCount,
@@ -877,6 +905,8 @@ func handleDashboard(response http.ResponseWriter, request *http.Request, applic
 		"current_streak":  currentStreak,
 		"provider":        application.Config.ActiveProvider,
 		"offline":         application.Config.ActiveProvider == "mock",
+		"subjects_due":    subjectsDue,
+		"recent_items":    recentItems,
 	})
 }
 

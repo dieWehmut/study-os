@@ -15,9 +15,10 @@ const subjectIcons: Record<string, typeof Languages> = {
 interface SubjectPickerProps {
   subject: string
   onSelect: (subject: string) => void
+  dueCounts?: Record<string, number>
 }
 
-export function SubjectPicker({ subject, onSelect }: SubjectPickerProps) {
+export function SubjectPicker({ subject, onSelect, dueCounts }: SubjectPickerProps) {
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="选择学科">
       {SUBJECTS.map(({ id }) => {
@@ -46,7 +47,14 @@ export function SubjectPicker({ subject, onSelect }: SubjectPickerProps) {
             </span>
             <span className="min-w-0">
               <span className="block text-sm font-medium" style={active ? { color: meta.color } : undefined}>{meta.name}</span>
-              <span className="block truncate text-xs text-muted-foreground">{meta.tagline}</span>
+              <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                {meta.tagline}
+                {dueCounts?.[id] ? (
+                  <span className="rounded-full px-1.5 text-[0.68rem] font-medium" style={{ color: meta.color, backgroundColor: `${meta.color}18` }}>
+                    {dueCounts[id]} 待复习
+                  </span>
+                ) : null}
+              </span>
             </span>
           </button>
         )

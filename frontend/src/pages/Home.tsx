@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowRight, CalendarCheck2, CloudOff, Flame, LibraryBig, Sparkles } from "lucide-react"
+import { ArrowRight, BrainCircuit, CalendarCheck2, CloudOff, Flame, LibraryBig, MessagesSquare, Sparkles } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { getDashboard, seedDemo } from "@/api/dashboard"
@@ -7,8 +7,9 @@ import { dumpThought } from "@/api/chat"
 import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { providerLabel } from "@/lib/labels"
+import { itemTypeLabel, providerLabel } from "@/lib/labels"
 import { cn } from "@/lib/utils"
+import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { SubjectPicker } from "@/features/subjects/SubjectPicker"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
@@ -21,6 +22,8 @@ const emptyDashboard: DashboardData = {
   current_streak: 0,
   provider: "mock",
   offline: true,
+  subjects_due: {},
+  recent_items: [],
 }
 
 export default function Home() {
@@ -119,7 +122,7 @@ export default function Home() {
           <p className="text-sm text-muted-foreground">不同学科有各自的记忆题型与整理方式，选一个开始。</p>
         </CardHeader>
         <CardContent>
-          <SubjectPicker subject={subject} onSelect={setSubject} />
+          <SubjectPicker subject={subject} onSelect={setSubject} dueCounts={dashboard.subjects_due} />
         </CardContent>
       </Card>
 
@@ -198,6 +201,57 @@ export default function Home() {
           </Card>
         </div>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { to: "/knowledge", label: "知识库", description: "浏览与整理知识点", icon: LibraryBig },
+          { to: "/memory", label: "记忆", description: "按计划完成复习", icon: BrainCircuit },
+          { to: "/chat", label: "答疑", description: "随时问 AI，异步回答", icon: MessagesSquare },
+        ].map(({ to, label, description, icon: Icon }) => (
+          <Link
+            key={to}
+            to={to}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-auto flex-col items-start gap-1.5 p-4",
+            )}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <Icon aria-hidden="true" className="size-4 text-primary" />
+              {label}
+            </span>
+            <span className="text-xs font-normal text-muted-foreground">{description}</span>
+          </Link>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader className="gap-1.5">
+          <CardTitle>最近加入</CardTitle>
+          <p className="text-sm text-muted-foreground">最新整理的知识点与念头</p>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          {!dashboard.recent_items || dashboard.recent_items.length === 0 ? (
+            <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+              还没有知识点。先去导入资料，或在上方暂存一个念头。
+            </p>
+          ) : (
+            dashboard.recent_items.map((item) => (
+              <Link
+                key={item.id}
+                to="/knowledge"
+                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2 transition-colors hover:bg-muted/50"
+              >
+                <span className="truncate text-sm font-medium">{item.term}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {item.subject ? <SubjectBadge subject={item.subject} /> : null}
+                  <span className="text-xs text-muted-foreground">{itemTypeLabel(item.item_type)}</span>
+                </span>
+              </Link>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {!loading && dashboard.knowledge_count === 0 ? (
         <Card className="border-dashed">
