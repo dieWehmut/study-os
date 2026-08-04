@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { itemTypeLabel } from "@/lib/labels"
-import { subjectName } from "@/lib/subjects"
+import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 
 interface WikiPanelProps {
   item: KnowledgeItem | null
@@ -62,7 +62,7 @@ export function WikiPanel({ item, onUpdated }: WikiPanelProps) {
       <CardHeader className="gap-3 border-b">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{itemTypeLabel(item.item_type)}</Badge>
-          {item.subject ? <Badge variant="outline">{subjectName(item.subject)}</Badge> : null}
+          {item.subject ? <SubjectBadge subject={item.subject} /> : null}
           {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">

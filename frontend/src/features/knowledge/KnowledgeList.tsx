@@ -3,8 +3,8 @@ import { BookOpenText } from "lucide-react"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { subjectName } from "@/lib/subjects"
 import { itemTypeLabel } from "@/lib/labels"
+import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 
 interface KnowledgeListProps {
   items: KnowledgeItem[]
@@ -37,7 +37,7 @@ export function KnowledgeList({ items, loading = false, onSelect, selectedId }: 
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge variant="secondary">{itemTypeLabel(item.item_type)}</Badge>
                   {item.part_of_speech ? <Badge variant="outline">{item.part_of_speech}</Badge> : null}
-                  {item.subject ? <Badge variant="ghost">{subjectName(item.subject)}</Badge> : null}
+                  {item.subject ? <SubjectBadge subject={item.subject} /> : null}
                   {item.level ? <span className="text-xs text-muted-foreground">{item.level}</span> : null}
                 </div>
                 <CardDescription className="line-clamp-2">{item.concise_definition}</CardDescription>

@@ -7,9 +7,9 @@ import { dumpThought } from "@/api/chat"
 import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { SUBJECTS } from "@/lib/subjects"
 import { providerLabel } from "@/lib/labels"
 import { cn } from "@/lib/utils"
+import { SubjectPicker } from "@/features/subjects/SubjectPicker"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const emptyDashboard: DashboardData = {
@@ -98,37 +98,30 @@ export default function Home() {
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">只检测值得记忆的内容；每次作答都会留下他评、反馈和下一次复习安排。</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2" aria-label="选择学科">
-        <button
-          type="button"
-          aria-pressed={subject === "all"}
-          onClick={() => setSubject("all")}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            subject === "all"
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-card text-muted-foreground hover:bg-muted",
-          )}
-        >
-          全部
-        </button>
-        {SUBJECTS.map(({ id, name }) => (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={subject === id}
-            onClick={() => setSubject(id)}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              subject === id
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-muted",
-            )}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
+      <Card>
+        <CardHeader className="gap-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>选择学科</CardTitle>
+            <button
+              type="button"
+              aria-pressed={subject === "all"}
+              onClick={() => setSubject("all")}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                subject === "all"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted",
+              )}
+            >
+              全部
+            </button>
+          </div>
+          <p className="text-sm text-muted-foreground">不同学科有各自的记忆题型与整理方式，选一个开始。</p>
+        </CardHeader>
+        <CardContent>
+          <SubjectPicker subject={subject} onSelect={setSubject} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="gap-1.5">

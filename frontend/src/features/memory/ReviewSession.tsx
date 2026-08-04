@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
-import { subjectName } from "@/lib/subjects"
 import { itemTypeLabel } from "@/lib/labels"
+import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const promptLabels: Record<string, string> = {
@@ -131,7 +131,7 @@ export function ReviewSession({ recovery = false }: ReviewSessionProps) {
           <p className="text-xs text-muted-foreground">{index + 1} / {queue.length}</p>
         </div>
         <div className="flex items-center gap-2">
-          {subject !== "all" ? <Badge variant="secondary">{subjectName(subject)}</Badge> : null}
+          {subject !== "all" ? <SubjectBadge subject={subject} /> : null}
           <Badge variant="outline">{promptLabels[current.prompt.prompt_type] ?? current.prompt.prompt_type}</Badge>
         </div>
       </div>

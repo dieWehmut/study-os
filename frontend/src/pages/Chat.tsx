@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { subjectName } from "@/lib/subjects"
+import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 export default function Chat() {
@@ -96,7 +97,7 @@ export default function Chat() {
           </div>
           <p className="text-sm text-muted-foreground">问题提交后立即返回，AI 在后台回答，完成后自动出现，不打断学习。</p>
         </div>
-        <Badge variant="secondary">{subject === "all" ? "综合" : subjectName(subject)}</Badge>
+        {subject === "all" ? <Badge variant="secondary">综合</Badge> : <SubjectBadge subject={subject} />}
       </div>
 
       <Card className="min-h-96">
@@ -111,16 +112,22 @@ export default function Chat() {
               </p>
             ) : (
               messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={message.role === "user" ? "self-end max-w-[85%] rounded-2xl rounded-br-sm bg-primary/10 px-4 py-2.5 text-sm leading-6" : "self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-border bg-muted/30 px-4 py-2.5 text-sm leading-6"}
-                >
-                  {message.status === "pending" ? (
-                    <p className="text-muted-foreground">AI 正在思考…</p>
-                  ) : (
-                    <p className="whitespace-pre-wrap">{message.content || "（无内容）"}</p>
-                  )}
-                  {message.status === "failed" ? <p className="mt-1 text-xs text-destructive">{message.error_summary || "回答失败"}</p> : null}
+                <div key={message.id} className={message.role === "user" ? "flex max-w-[85%] flex-col items-end gap-1 self-end" : "flex max-w-[85%] flex-col items-start gap-1 self-start"}>
+                  <span className="text-[0.68rem] text-muted-foreground">{message.role === "user" ? "你" : "AI"}</span>
+                  <div
+                    className={
+                      message.role === "user"
+                        ? "rounded-2xl rounded-br-sm bg-primary/10 px-4 py-2.5 text-sm leading-6"
+                        : "rounded-2xl rounded-bl-sm border border-border bg-muted/30 px-4 py-2.5 text-sm leading-6"
+                    }
+                  >
+                    {message.status === "pending" ? (
+                      <p className="text-muted-foreground">AI 正在思考…</p>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{message.content || "（无内容）"}</p>
+                    )}
+                    {message.status === "failed" ? <p className="mt-1 text-xs text-destructive">{message.error_summary || "回答失败"}</p> : null}
+                  </div>
                 </div>
               ))
             )}
