@@ -1,7 +1,6 @@
 import { Moon, Sun } from "lucide-react"
 import { useState } from "react"
 
-import { Button } from "@/components/ui/button"
 import { initializeTheme, saveTheme, type Theme } from "@/lib/theme"
 
 export function ThemeToggle() {
@@ -14,20 +13,18 @@ export function ThemeToggle() {
   }
 
   return (
-    <Button
+    <button
       type="button"
-      variant="outline"
-      size="icon"
-      className="transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 hover:border-primary/40 hover:bg-primary/10 hover:text-primary hover:shadow-sm active:translate-y-0 active:scale-95"
       aria-label={`切换到${nextTheme === "dark" ? "暗色" : "亮色"}模式`}
       title={`切换到${nextTheme === "dark" ? "暗色" : "亮色"}模式`}
       onClick={toggleTheme}
+      className="inline-grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-background text-foreground shadow-sm transition-all duration-180 hover:-translate-y-0.5 hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {theme === "dark" ? (
-        <Sun aria-hidden="true" className="transition-transform duration-200 group-hover/button:rotate-12 group-hover/button:scale-110" />
+        <Sun aria-hidden="true" className="size-[18px]" />
       ) : (
-        <Moon aria-hidden="true" className="transition-transform duration-200 group-hover/button:rotate-12 group-hover/button:scale-110" />
+        <Moon aria-hidden="true" className="size-[18px]" />
       )}
-    </Button>
+    </button>
   )
 }
