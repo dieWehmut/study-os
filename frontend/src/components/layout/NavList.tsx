@@ -10,7 +10,7 @@ interface NavListProps {
 
 export function NavList({ onNavigate, label }: NavListProps) {
   return (
-    <nav aria-label={label} className="flex flex-1 flex-col gap-1 px-3 py-3">
+    <nav aria-label={label} className="mt-2.5 flex flex-1 flex-col gap-1 px-3">
       {primaryNavigation.map(({ icon: Icon, label: itemLabel, path }) => (
         <NavLink
           key={path}
@@ -19,8 +19,8 @@ export function NavList({ onNavigate, label }: NavListProps) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              "group flex min-h-[42px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-              isActive && "bg-sidebar-accent text-sidebar-primary shadow-sm",
+              "inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold leading-snug text-muted-foreground transition-colors duration-150 hover:bg-primary/10 hover:text-primary focus-visible:bg-primary/10 focus-visible:text-primary focus-visible:outline-none",
+              isActive && "bg-primary/10 text-primary",
             )
           }
         >

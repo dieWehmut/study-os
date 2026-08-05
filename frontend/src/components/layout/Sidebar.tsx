@@ -52,18 +52,6 @@ export function Sidebar({ width, onWidthChange }: SidebarProps) {
     >
       <NavList label="主导航" />
 
-      <div className="px-6 pb-6">
-        <div className="rounded-xl border border-sidebar-border bg-background/65 p-3">
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-            本地优先
-          </div>
-          <p className="mt-1 text-[0.68rem] leading-4 text-muted-foreground">
-            学习记录保存在本机，离线仍可继续。
-          </p>
-        </div>
-      </div>
-
       <div
         role="separator"
         aria-orientation="vertical"
