@@ -18,7 +18,7 @@ export function ThemeToggle() {
       aria-label={`切换到${nextTheme === "dark" ? "暗色" : "亮色"}模式`}
       title={`切换到${nextTheme === "dark" ? "暗色" : "亮色"}模式`}
       onClick={toggleTheme}
-      className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-foreground transition-all hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:border md:border-border md:bg-background md:shadow-sm md:hover:-translate-y-0.5 md:hover:border-primary/50"
+      className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {theme === "dark" ? (
         <Sun aria-hidden="true" className="size-[18px]" />
