@@ -49,7 +49,7 @@ describe("application shell", () => {
     expect(navigationForPath("/knowledge/item-1").path).toBe("/knowledge")
   })
 
-  it("marks the current route and exposes mobile navigation labels", () => {
+  it("marks the current route and shows navigation in desktop sidebar and mobile drawer", () => {
     render(
       <MemoryRouter initialEntries={["/memory"]}>
         <App />
@@ -60,7 +60,28 @@ describe("application shell", () => {
       "aria-current",
       "page",
     )
-    expect(screen.getByRole("navigation", { name: "移动导航" })).toBeInTheDocument()
+    expect(screen.getByRole("navigation", { name: "主导航" })).toBeInTheDocument()
+  })
+
+  it("opens the mobile drawer from the header and closes it after navigating", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // Closed drawer sets aria-hidden, so query the DOM rather than the a11y tree.
+    const drawer = document.querySelector(
+      'aside[aria-hidden] nav[aria-label="移动端主导航"]',
+    )?.parentElement as HTMLElement
+    expect(drawer).toHaveAttribute("aria-hidden", "true")
+
+    fireEvent.click(screen.getByRole("button", { name: "打开导航菜单" }))
+    expect(drawer).toHaveAttribute("aria-hidden", "false")
+
+    const drawerLink = drawer.querySelector('a[href="/memory"]') as HTMLElement
+    fireEvent.click(drawerLink)
+    expect(drawer).toHaveAttribute("aria-hidden", "true")
   })
 
   it("removes verbose nav descriptions and lets the sidebar stretch", () => {
