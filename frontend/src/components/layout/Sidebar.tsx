@@ -1,13 +1,11 @@
 import type { PointerEvent, KeyboardEvent } from "react"
-import { NavLink } from "react-router-dom"
 
 import {
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
 } from "@/lib/sidebar"
-import { cn } from "@/lib/utils"
-import { primaryNavigation } from "./navigation"
+import { NavList } from "./NavList"
 
 interface SidebarProps {
   width: number
@@ -52,24 +50,7 @@ export function Sidebar({ width, onWidthChange }: SidebarProps) {
       style={{ width: `${width}px` }}
       className="relative hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:fixed md:inset-y-0 md:flex md:flex-col"
     >
-      <nav aria-label="主导航" className="flex flex-1 flex-col gap-1 px-3 py-3">
-        {primaryNavigation.map(({ icon: Icon, label, path }) => (
-          <NavLink
-            key={path}
-            to={path}
-            end={path === "/"}
-            className={({ isActive }) =>
-              cn(
-                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-                isActive && "bg-sidebar-accent font-medium text-sidebar-primary shadow-sm",
-              )
-            }
-          >
-            <Icon aria-hidden="true" className="size-4 shrink-0" />
-            <span className="truncate">{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      <NavList label="主导航" />
 
       <div className="px-6 pb-6">
         <div className="rounded-xl border border-sidebar-border bg-background/65 p-3">
