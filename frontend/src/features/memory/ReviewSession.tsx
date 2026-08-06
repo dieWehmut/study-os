@@ -111,12 +111,14 @@ export function ReviewSession({ recovery = false }: ReviewSessionProps) {
 
   if (!current) {
     return (
-      <Card className="mx-auto max-w-2xl">
-        <CardHeader>
-          <CheckCircle2 aria-hidden="true" className="text-primary" />
-          <CardTitle>今天的到期内容已经完成</CardTitle>
-          <CardDescription>新导入或新学的知识会自动进入这里。</CardDescription>
-        </CardHeader>
+      <Card className="mx-auto w-full max-w-2xl">
+        <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+          <CheckCircle2 aria-hidden="true" className="size-12 text-primary" />
+          <div>
+            <h2 className="font-heading text-lg font-semibold">今天的到期内容已经完成</h2>
+            <p className="mt-1 text-sm text-muted-foreground">新导入或新学的知识会自动进入这里。</p>
+          </div>
+        </CardContent>
       </Card>
     )
   }
