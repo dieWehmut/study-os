@@ -12,7 +12,21 @@ v0.2 在英语记忆闭环（导入 → 去重 → 记忆 → 他评 → FSRS）
 irm https://raw.githubusercontent.com/dieWehmut/study-os/main/scripts/install-pwa.ps1 | iex
 ```
 
-之后双击桌面图标：自动启动后端并打开学习界面；关闭窗口即释放资源，更新也会在应用内自动完成。
+之后双击桌面图标：自动启动后端并打开学习界面；关掉页面后后端空闲 10 分钟自动退出，更新在应用内完成。
+端口被占用时会自动向后顺延，图标打开的始终是后端实际监听的地址，不会停在 8080。
+
+安装包在落地之前会先过完这几道检查，任何一道不过就中止，安装目录不会被动过：
+
+- 只接受 https 的安装包与校验文件地址，并强制 TLS 1.2
+- 下载到临时目录后先比对 `.sha256`，再检查压缩包内有没有越界路径，才解压
+- 覆盖安装前把 `data/` 打包备份到 `<安装目录>\backups\pre-install\`（带校验值，保留最近 5 份）
+- 只结束安装目录里正在运行的旧后端，开发用的 `go run ./backend` 不受影响
+
+想装到别的目录、或者不要桌面图标，就把脚本存下来再带参数运行：
+
+```powershell
+scripts\install-pwa.ps1 -Folder D:\StudyOS -SkipShortcut
+```
 
 ## v0.2 已包含
 
@@ -31,7 +45,9 @@ irm https://raw.githubusercontent.com/dieWehmut/study-os/main/scripts/install-pw
 - 云端 TTS（DashScope CosyVoice，带时间轴），未配置时回退 Windows SAPI
 - 英语词库清洗管线：按等级/标签过滤、词形还原分组、批量生成 Wiki
 - Wails v2 桌面壳：单实例、关窗即退、每日自动备份、可验证更新
-- 安装 / 发布流水线：PowerShell 安装与更新、x64/ARM64、SHA-256 校验、失败回滚
+- 安装 / 发布流水线：PowerShell 安装与更新、x64/ARM64、SHA-256 校验、失败回滚，
+  桌面版与一键 PWA 两条安装路径各有 Pester 覆盖（越界压缩包、非 https 地址、
+  覆盖安装前备份学习数据）
 
 ## 快速开始（浏览器开发）
 
@@ -93,10 +109,12 @@ pnpm --dir frontend build
 wails build -clean
 ```
 
-安装 / 更新一键脚本：
+安装 / 更新一键脚本（两套安装路径都有 Pester 覆盖）：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
+Invoke-Pester -Script scripts\tests\install.Tests.ps1        # 桌面版安装器
+Invoke-Pester -Script scripts\tests\install-pwa.Tests.ps1    # 一键 PWA 安装器
 ```
 
 ## PWA 启动器（一键安装 + 自动更新）
@@ -108,11 +126,11 @@ powershell -ExecutionPolicy Bypass -File install.ps1
    scripts\package-pwa-release.ps1 -Version 0.2.0
    ```
    生成 `release/study-os-pwa-windows-x64.zip`（含服务程序、网页与启动脚本）和校验文件。
-2. 用户侧一键安装（自动下载 GitHub 最新发布、校验、解压并生成桌面图标）：
+2. 用户侧一键安装见上面的「一键安装（PWA 版）」；本地调试安装器时可直接指定目录：
    ```powershell
    scripts\install-pwa.ps1 -Folder D:\StudyOS
    ```
-   之后双击桌面「学习系统」：自动启动本地后端并打开 PWA 界面；关闭浏览器窗口后后端会自动退出，不占资源。
+   之后双击桌面「学习系统」：自动启动本地后端并打开 PWA 界面；关掉页面后后端空闲 10 分钟自动退出，不常驻占用资源。
 3. 自动更新：后端启动后定期检查 GitHub Releases，发现新版本时前端弹出更新说明与「立即更新」；设置页也有「检查更新」按钮。更新仓库可用 `STUDY_OS_UPDATE_REPO` 配置（默认 `dieWehmut/study-os`）。
 
 ## v0.2 明确不含
