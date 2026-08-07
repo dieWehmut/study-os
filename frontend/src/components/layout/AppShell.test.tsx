@@ -98,6 +98,32 @@ describe("application shell", () => {
     expect(sidebar?.getAttribute("style")).toContain("272px")
   })
 
+  it("centers the nav buttons as one group in both the sidebar and the drawer", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // jsdom computes no layout, so pin the two classes that produce the
+    // centering instead: the nav has to stretch and center its own children,
+    // and nothing may push it down from the top. A leading margin is what used
+    // to leave the group sitting high in the rail on tall screens.
+    // The closed drawer is aria-hidden, so reach it through the DOM.
+    const navs = document.querySelectorAll("aside nav")
+    expect(navs).toHaveLength(2)
+    for (const nav of navs) {
+      expect(nav.className).toContain("flex-1")
+      expect(nav.className).toContain("justify-center")
+      expect(nav.className).not.toMatch(/(^|\s)mt-/)
+    }
+
+    // The resize handle is a sibling of the nav, but absolute positioning keeps
+    // it out of flow so it never eats into the space the nav centers within.
+    const handle = screen.getByRole("separator", { name: "调整侧栏宽度" })
+    expect(handle.className).toContain("absolute")
+  })
+
   it("puts 首页 first in the sidebar and switches subjects from the home page", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
