@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { defaultExclude, defineConfig } from "vitest/config"
 
-import { backendServer } from "./vite-plugin-backend"
+import { backendServer } from "./vite-plugin-backend.ts"
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), backendServer()],

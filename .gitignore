@@ -26,6 +26,7 @@ backend-e2e.exe
 frontend/.e2e-data/
 frontend/test-results/
 frontend/playwright-report/
+.playwright-mcp/
 *.tsbuildinfo
 /build/
 frontend/wailsjs/
