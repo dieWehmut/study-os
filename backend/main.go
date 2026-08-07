@@ -16,6 +16,7 @@ import (
 	"study-os/backend/app"
 	"study-os/backend/config"
 	"study-os/backend/httpapi"
+	"study-os/backend/launcher"
 )
 
 func main() {
@@ -29,13 +30,19 @@ func main() {
 
 	var listener net.Listener
 	if cfg.Launcher {
-		listener, err = net.Listen("tcp", cfg.ListenAddress)
+		if live, address := launcher.LiveInstance(cfg.DataDir); live {
+			fmt.Println("学习系统已在运行：http://" + address)
+			return
+		}
+		listener, err = launcher.Listen(cfg.ListenAddress, launcher.DefaultPortSpan)
 		if err != nil {
-			if launcherAlreadyRunning(cfg) {
-				return
-			}
 			log.Fatalf("listen %s: %v", cfg.ListenAddress, err)
 		}
+		cfg.ListenAddress = listener.Addr().String()
+		if err := launcher.WriteAddress(cfg.DataDir, cfg.ListenAddress); err != nil {
+			log.Fatalf("record launcher address: %v", err)
+		}
+		defer launcher.RemoveAddress(cfg.DataDir)
 	}
 
 	serverCtx, cancelServer := context.WithCancel(ctx)
@@ -92,18 +99,4 @@ func main() {
 	if err := server.Shutdown(shutdownContext); err != nil {
 		log.Printf("shutdown HTTP server: %v", err)
 	}
-}
-
-func launcherAlreadyRunning(cfg config.Config) bool {
-	client := &http.Client{Timeout: 2 * time.Second}
-	response, err := client.Get("http://" + cfg.ListenAddress + "/api/health")
-	if err != nil {
-		return false
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return false
-	}
-	fmt.Println("学习系统已在运行")
-	return true
 }
