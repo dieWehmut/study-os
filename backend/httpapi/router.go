@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -882,33 +883,75 @@ func handleDashboard(response http.ResponseWriter, request *http.Request, applic
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
 		return
 	}
-	var knowledgeCount, promptCount, attemptCount, dueCount, reviewedToday int
 	database := application.Store.SQL()
 	ctx := request.Context()
-	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM knowledge_items`).Scan(&knowledgeCount); err != nil {
+	subject := strings.TrimSpace(request.URL.Query().Get("subject"))
+	now := time.Now().UTC()
+	dayStart := now.Truncate(24 * time.Hour)
+
+	// When a subject is selected the counts must be scoped to it, otherwise the
+	// UI shows global totals next to per-subject content.
+	scopedCount := func(globalSQL, subjectSQL string, args ...any) (int, error) {
+		query, queryArgs := globalSQL, args
+		if subject != "" {
+			query = subjectSQL
+			queryArgs = append(append([]any{}, args...), subject)
+		}
+		var count int
+		err := database.QueryRowContext(ctx, query, queryArgs...).Scan(&count)
+		return count, err
+	}
+
+	knowledgeCount, err := scopedCount(
+		`SELECT COUNT(*) FROM knowledge_items`,
+		`SELECT COUNT(*) FROM knowledge_items WHERE subject = ?`)
+	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM attempts`).Scan(&attemptCount); err != nil {
+	attemptCount, err := scopedCount(
+		`SELECT COUNT(*) FROM attempts`,
+		`SELECT COUNT(*) FROM attempts AS a
+			JOIN prompts AS p ON p.id = a.prompt_id
+			JOIN knowledge_items AS k ON k.id = p.knowledge_item_id
+			WHERE k.subject = ?`)
+	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM prompts`).Scan(&promptCount); err != nil {
+	promptCount, err := scopedCount(
+		`SELECT COUNT(*) FROM prompts`,
+		`SELECT COUNT(*) FROM prompts AS p
+			JOIN knowledge_items AS k ON k.id = p.knowledge_item_id
+			WHERE k.subject = ?`)
+	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM review_states WHERE due_at <= ?`, formatHTTPTime(time.Now().UTC())).Scan(&dueCount); err != nil {
+	dueCount, err := scopedCount(
+		`SELECT COUNT(*) FROM review_states WHERE due_at <= ?`,
+		`SELECT COUNT(*) FROM review_states AS rs
+			JOIN prompts AS p ON p.id = rs.prompt_id
+			JOIN knowledge_items AS k ON k.id = p.knowledge_item_id
+			WHERE rs.due_at <= ? AND k.subject = ?`, formatHTTPTime(now))
+	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	dayStart := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM attempts WHERE created_at >= ?`, formatHTTPTime(dayStart)).Scan(&reviewedToday); err != nil {
+	reviewedToday, err := scopedCount(
+		`SELECT COUNT(*) FROM attempts WHERE created_at >= ?`,
+		`SELECT COUNT(*) FROM attempts AS a
+			JOIN prompts AS p ON p.id = a.prompt_id
+			JOIN knowledge_items AS k ON k.id = p.knowledge_item_id
+			WHERE a.created_at >= ? AND k.subject = ?`, formatHTTPTime(dayStart))
+	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	currentStreak := 0
-	if reviewedToday > 0 {
-		currentStreak = 1
+	currentStreak, err := currentReviewStreak(ctx, database, subject, now)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
 	}
 	subjectsDue := map[string]int{}
 	subjectRows, err := database.QueryContext(ctx, `
@@ -923,17 +966,17 @@ func handleDashboard(response http.ResponseWriter, request *http.Request, applic
 		return
 	}
 	for subjectRows.Next() {
-		var subject string
+		var rowSubject string
 		var count int
-		if err := subjectRows.Scan(&subject, &count); err != nil {
+		if err := subjectRows.Scan(&rowSubject, &count); err != nil {
 			_ = subjectRows.Close()
 			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		subjectsDue[subject] = count
+		subjectsDue[rowSubject] = count
 	}
 	_ = subjectRows.Close()
-	recentItems, err := application.Store.ListKnowledgeItems(ctx, models.KnowledgeListOptions{Limit: 5, Offset: 0})
+	recentItems, err := application.Store.ListKnowledgeItems(ctx, models.KnowledgeListOptions{Subject: subject, Limit: 5, Offset: 0})
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -950,6 +993,51 @@ func handleDashboard(response http.ResponseWriter, request *http.Request, applic
 		"subjects_due":    subjectsDue,
 		"recent_items":    recentItems,
 	})
+}
+
+// currentReviewStreak counts back day by day from today over the days that have
+// at least one attempt. A day with no attempt ends the streak, except for today
+// itself: the streak is still intact until the day is over, so an untouched
+// today falls through to yesterday instead of resetting the count to zero.
+func currentReviewStreak(ctx context.Context, database *sql.DB, subject string, now time.Time) (int, error) {
+	query := `SELECT DISTINCT substr(created_at, 1, 10) FROM attempts`
+	args := []any{}
+	if subject != "" {
+		query = `SELECT DISTINCT substr(a.created_at, 1, 10)
+			FROM attempts AS a
+			JOIN prompts AS p ON p.id = a.prompt_id
+			JOIN knowledge_items AS k ON k.id = p.knowledge_item_id
+			WHERE k.subject = ?`
+		args = append(args, subject)
+	}
+	rows, err := database.QueryContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	activeDays := map[string]bool{}
+	for rows.Next() {
+		var day string
+		if err := rows.Scan(&day); err != nil {
+			return 0, err
+		}
+		activeDays[day] = true
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	cursor := now.UTC()
+	if !activeDays[cursor.Format("2006-01-02")] {
+		cursor = cursor.AddDate(0, 0, -1)
+	}
+	streak := 0
+	for activeDays[cursor.Format("2006-01-02")] {
+		streak++
+		cursor = cursor.AddDate(0, 0, -1)
+	}
+	return streak, nil
 }
 
 func demoSeedExists(ctx context.Context, store *db.Store, knowledgeID string) bool {
