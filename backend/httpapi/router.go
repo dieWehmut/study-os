@@ -455,6 +455,7 @@ type reviewItemResponse struct {
 type answerRequest struct {
 	Answer      string `json:"answer"`
 	Familiarity *int   `json:"familiarity"`
+	SelfRating  *int   `json:"self_rating"`
 }
 
 type answerResponse struct {
@@ -464,6 +465,20 @@ type answerResponse struct {
 	Feedback        string    `json:"feedback"`
 	DueAt           time.Time `json:"due_at"`
 	ExpectedAnswers []string  `json:"expected_answers"`
+}
+
+// evaluationFromSelfRating converts a learner's 1-3 self-report into the same
+// Evaluation shape that EvaluateAnswer produces, so the scheduler and the
+// attempt history stay on one code path.
+func evaluationFromSelfRating(rating int) memory.Evaluation {
+	switch rating {
+	case 1:
+		return memory.Evaluation{Outcome: memory.OutcomeIncorrect, Rating: memory.RatingAgain, Feedback: "需要重学"}
+	case 2:
+		return memory.Evaluation{Outcome: memory.OutcomePartial, Rating: memory.RatingHard, Feedback: "模糊记忆"}
+	default:
+		return memory.Evaluation{Outcome: memory.OutcomeCorrect, Rating: memory.RatingGood, Feedback: "认识"}
+	}
 }
 
 func handleDemoSeed(response http.ResponseWriter, request *http.Request, application *app.App) {
