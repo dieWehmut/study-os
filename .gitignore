@@ -29,6 +29,7 @@ frontend/playwright-report/
 .playwright-mcp/
 *.tsbuildinfo
 /build/
+prompt
 frontend/wailsjs/
 frontend/package.json.md5
 # Editor directories and files
