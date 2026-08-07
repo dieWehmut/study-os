@@ -26,10 +26,12 @@ export default function Memory() {
   const setSubject = useSubjectStore((state) => state.setSubject)
   const [recovery, setRecovery] = useState(false)
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard)
+  // Bumped after each answered card so the counters below follow the queue.
+  const [refreshToken, setRefreshToken] = useState(0)
 
   useEffect(() => {
     let active = true
-    getDashboard()
+    getDashboard(subject === "all" ? undefined : subject)
       .then((value) => {
         if (active) setDashboard(value)
       })
@@ -39,7 +41,7 @@ export default function Memory() {
     return () => {
       active = false
     }
-  }, [])
+  }, [subject, refreshToken])
 
   return (
     <section className="grid gap-4">
@@ -78,7 +80,7 @@ export default function Memory() {
           </Card>
         ))}
       </div>
-      <ReviewSession recovery={recovery} />
+      <ReviewSession recovery={recovery} onProgress={() => setRefreshToken((value) => value + 1)} />
     </section>
   )
 }

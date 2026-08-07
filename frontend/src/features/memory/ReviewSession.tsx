@@ -41,9 +41,11 @@ const recognitionPromptTypes = new Set(["en_to_zh"])
 
 interface ReviewSessionProps {
   recovery?: boolean
+  /** Fires after each answered card so the page can refresh its counters. */
+  onProgress?: () => void
 }
 
-export function ReviewSession({ recovery = false }: ReviewSessionProps) {
+export function ReviewSession({ recovery = false, onProgress }: ReviewSessionProps) {
   const subject = useSubjectStore((state) => state.subject)
   const [queue, setQueue] = useState<DueReview[]>([])
   const [libraryCount, setLibraryCount] = useState<number | null>(null)
@@ -91,6 +93,7 @@ export function ReviewSession({ recovery = false }: ReviewSessionProps) {
     setIndex((value) => value + 1)
     setError("")
     setAudioSource(null)
+    onProgress?.()
   }
 
   async function speakTerm() {

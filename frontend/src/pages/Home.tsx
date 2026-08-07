@@ -37,11 +37,13 @@ export default function Home() {
   const [dumping, setDumping] = useState(false)
   const [dumpNotice, setDumpNotice] = useState("")
 
+  const subjectFilter = subject === "all" ? undefined : subject
+
   async function refreshDashboard() {
     setLoading(true)
     setError("")
     try {
-      setDashboard(await getDashboard())
+      setDashboard(await getDashboard(subjectFilter))
     } catch {
       setError("无法读取学习进度，请确认本地后端正在运行。")
     } finally {
@@ -51,7 +53,7 @@ export default function Home() {
 
   useEffect(() => {
     let active = true
-    getDashboard()
+    getDashboard(subject === "all" ? undefined : subject)
       .then((value) => {
         if (active) setDashboard(value)
       })
@@ -64,7 +66,7 @@ export default function Home() {
     return () => {
       active = false
     }
-  }, [])
+  }, [subject])
 
   async function loadDemo() {
     setSeeding(true)
