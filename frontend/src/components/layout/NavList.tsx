@@ -10,7 +10,7 @@ interface NavListProps {
 
 export function NavList({ onNavigate, label }: NavListProps) {
   return (
-    <nav aria-label={label} className="mt-2.5 flex flex-1 flex-col gap-1 px-3">
+    <nav aria-label={label} className="flex flex-1 flex-col justify-center gap-1 px-3">
       {primaryNavigation.map(({ icon: Icon, label: itemLabel, path }) => (
         <NavLink
           key={path}
