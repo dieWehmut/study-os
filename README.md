@@ -25,9 +25,9 @@ irm https://raw.githubusercontent.com/dieWehmut/study-os/main/scripts/install-pw
 - 记忆题型：看英说中、看中说英、语境填空、造句（AI 他评，离线降级为部分掌握）
 - 确定性他评（incorrect / partial / correct）+ 正负反馈 + 一键改判
 - FSRS 调度（Again / Hard / Good），跨重启持久保存
-- 厂商化 AI 配置：`.env.local` 按厂商分组（DeepSeek 已接入，其余占位），
-  设置页展示各厂商卡片、可切换活跃服务商、测试连通性；密钥永不回显
-- DeepSeek 生成：词 Wiki、造句、自由文本批改、记忆点抽取、义项压缩
+- 多厂商 AI 配置：DeepSeek / Claude / OpenAI / 通义千问 / 智谱 GLM / 火山豆包
+  全部可用，设置页展示各厂商卡片、可切换活跃服务商、测试连通性；密钥永不回显
+- AI 生成：词 Wiki、造句、自由文本批改、记忆点抽取、义项压缩
 - 云端 TTS（DashScope CosyVoice，带时间轴），未配置时回退 Windows SAPI
 - 英语词库清洗管线：按等级/标签过滤、词形还原分组、批量生成 Wiki
 - Wails v2 桌面壳：单实例、关窗即退、每日自动备份、可验证更新
@@ -51,17 +51,25 @@ pnpm --dir frontend dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 ## AI 配置
 
-复制 `.env.sample` 为 `.env.local`，按厂商填写：
+复制 `.env.sample` 为 `.env.local`，按厂商填写。`AI_ACTIVE_PROVIDER` 可选
+`mock`（本地离线）、`deepseek`、`claude`、`openai`、`qwen`、`glm`、`volcengine`；
+每个厂商的 `*_BASE_URL` / `*_MODEL` / `*_REASONING_MODEL` 留空即用内置默认值，
+所以最少只要填一个密钥：
 
 ```dotenv
-AI_ACTIVE_PROVIDER=mock
+AI_ACTIVE_PROVIDER=deepseek
 DEEPSEEK_API_KEY=
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
-DEEPSEEK_MODEL=deepseek-v4-flash
-DEEPSEEK_REASONING_MODEL=deepseek-v4-pro
-DASHSCOPE_API_KEY=
+ANTHROPIC_API_KEY=       # Claude 沿用官方惯例的密钥名
+OPENAI_API_KEY=
+QWEN_API_KEY=
+GLM_API_KEY=
+VOLCENGINE_API_KEY=
+DASHSCOPE_API_KEY=       # 云端 TTS，与对话服务商相互独立
 DASHSCOPE_TTS_VOICE=longxiaochun
 ```
+
+DeepSeek / OpenAI / 通义千问 / GLM / 火山豆包走 OpenAI ChatCompletions 兼容协议，
+Claude 走 Anthropic Messages 协议；两条链路都在后端实现，前端无需区分。
 
 设置页的「AI 服务商」卡片会显示每个厂商的配置状态，可切换
 `AI_ACTIVE_PROVIDER`、填写/清除 API Key、选择模型并保存到 `.env.local`
