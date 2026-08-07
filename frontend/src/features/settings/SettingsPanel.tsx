@@ -91,13 +91,24 @@ export default function SettingsPanel() {
     )
   }
 
-  async function saveDeepSeekConfig() {
-    const values: VendorConfigInput = { provider: "deepseek" }
+  // One set of drafts backs every vendor's editor, so they are cleared whenever
+  // the open vendor changes. Without this, a model id belonging to the previous
+  // vendor would be submitted to the next one.
+  function toggleVendorConfig(vendorID: string) {
+    setOpenConfig(openConfig === vendorID ? null : vendorID)
+    setApiKeyDraft("")
+    setModelDraft("")
+    setReasoningModelDraft("")
+    setBaseURLDraft("")
+  }
+
+  async function saveVendorSettings(vendorID: string) {
+    const values: VendorConfigInput = { provider: vendorID }
     if (apiKeyDraft.trim()) values.api_key = apiKeyDraft.trim()
     if (baseURLDraft.trim()) values.base_url = baseURLDraft.trim()
     if (modelDraft) values.model = modelDraft
     if (reasoningModelDraft) values.reasoning_model = reasoningModelDraft
-    await saveConfig("deepseek", values)
+    await saveConfig(vendorID, values)
     setApiKeyDraft("")
     setOpenConfig(null)
   }
@@ -204,7 +215,14 @@ export default function SettingsPanel() {
           <CardDescription>配置来自 .env.local；切换服务商只改写 AI_ACTIVE_PROVIDER，密钥值永不显示。</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {vendors.map((vendor) => (
+          {vendors.map((vendor) => {
+            // The backend already reports each vendor's [chat, reasoning] models,
+            // so the option list is derived rather than hardcoded per vendor.
+            const models = vendor.models ?? []
+            const modelOptions = models.map((model) => ({ value: model, label: model }))
+            const defaultModel = models[0] ?? ""
+            const defaultReasoningModel = models[1] ?? defaultModel
+            return (
             <div key={vendor.id} className={vendor.active ? "grid gap-2 rounded-xl border border-primary/30 bg-primary/4 px-3 py-2.5" : "grid gap-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5"}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
@@ -222,16 +240,16 @@ export default function SettingsPanel() {
                   {vendor.implemented ? (
                     <div className="flex flex-wrap gap-1.5">
                       {!vendor.active ? (
-                        <Button size="xs" variant="outline" onClick={() => void switchProvider(vendor.id)}>设为当前</Button>
+                        <Button size="xs" variant="outline" aria-label={`将 ${vendor.display_name} 设为当前`} onClick={() => void switchProvider(vendor.id)}>设为当前</Button>
                       ) : null}
-                      <Button size="xs" variant="outline" disabled={isTestingProvider} onClick={() => void testProvider(vendor.id)}>
+                      <Button size="xs" variant="outline" aria-label={`测试 ${vendor.display_name} 连通性`} disabled={isTestingProvider} onClick={() => void testProvider(vendor.id)}>
                         测试连通性
                       </Button>
-                      {vendor.id === "deepseek" ? (
-                        <Button size="xs" variant="ghost" onClick={() => setOpenConfig(openConfig === "deepseek" ? null : "deepseek")}>
+                      {vendor.id === "mock" ? null : (
+                        <Button size="xs" variant="ghost" aria-label={`编辑 ${vendor.display_name} 配置`} onClick={() => toggleVendorConfig(vendor.id)}>
                           编辑配置
                         </Button>
-                      ) : null}
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -251,74 +269,71 @@ export default function SettingsPanel() {
                   ))}
                 </div>
               ) : null}
-              {vendor.id === "deepseek" && openConfig === "deepseek" ? (
+              {openConfig === vendor.id ? (
                 <div className="grid gap-2.5 rounded-lg border border-border bg-background/70 p-2.5">
-                  <label className="grid gap-1 text-xs font-medium" htmlFor="ds-api-key">
+                  <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-api-key`}>
                     API Key
                     <input
-                      id="ds-api-key"
+                      id={`${vendor.id}-api-key`}
                       type="password"
                       aria-label="API Key"
                       value={apiKeyDraft}
                       onChange={(event) => setApiKeyDraft(event.target.value)}
-                      placeholder={vendor.key_configured ? "已配置，留空保持不变" : "输入 DeepSeek API Key"}
+                      placeholder={vendor.key_configured ? "已配置，留空保持不变" : `输入 ${vendor.display_name} API Key`}
                       className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="grid gap-1 text-xs font-medium" htmlFor="ds-model">
-                      模型
-                      <Select
-                        id="ds-model"
-                        ariaLabel="模型"
-                        value={modelDraft}
-                        onValueChange={setModelDraft}
-                        placeholder="默认（deepseek-v4-flash）"
-                        options={[
-                          { value: "deepseek-v4-flash", label: "deepseek-v4-flash" },
-                          { value: "deepseek-v4-pro", label: "deepseek-v4-pro" },
-                        ]}
-                        className="w-full min-w-0"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-medium" htmlFor="ds-reasoning-model">
-                      推理模型
-                      <Select
-                        id="ds-reasoning-model"
-                        ariaLabel="推理模型"
-                        value={reasoningModelDraft}
-                        onValueChange={setReasoningModelDraft}
-                        placeholder="默认（deepseek-v4-pro）"
-                        options={[
-                          { value: "deepseek-v4-pro", label: "deepseek-v4-pro" },
-                          { value: "deepseek-v4-flash", label: "deepseek-v4-flash" },
-                        ]}
-                        className="w-full min-w-0"
-                      />
-                    </label>
-                  </div>
-                  <label className="grid gap-1 text-xs font-medium" htmlFor="ds-base-url">
+                  {modelOptions.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-model`}>
+                        模型
+                        <Select
+                          id={`${vendor.id}-model`}
+                          ariaLabel="模型"
+                          value={modelDraft}
+                          onValueChange={setModelDraft}
+                          placeholder={`默认（${defaultModel}）`}
+                          options={modelOptions}
+                          className="w-full min-w-0"
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-reasoning-model`}>
+                        推理模型
+                        <Select
+                          id={`${vendor.id}-reasoning-model`}
+                          ariaLabel="推理模型"
+                          value={reasoningModelDraft}
+                          onValueChange={setReasoningModelDraft}
+                          placeholder={`默认（${defaultReasoningModel}）`}
+                          options={modelOptions}
+                          className="w-full min-w-0"
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                  <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-base-url`}>
                     接口地址
                     <input
-                      id="ds-base-url"
+                      id={`${vendor.id}-base-url`}
                       type="text"
                       aria-label="接口地址"
                       value={baseURLDraft}
                       onChange={(event) => setBaseURLDraft(event.target.value)}
-                      placeholder="https://api.deepseek.com/v1"
+                      placeholder={vendor.base_url ?? "https://"}
                       className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="xs" disabled={isSavingConfig} onClick={() => void saveDeepSeekConfig()}>保存配置</Button>
-                    <Button size="xs" variant="outline" disabled={isSavingConfig} onClick={() => void saveConfig("deepseek", { provider: "deepseek", api_key: "" })}>
+                    <Button size="xs" disabled={isSavingConfig} onClick={() => void saveVendorSettings(vendor.id)}>保存配置</Button>
+                    <Button size="xs" variant="outline" disabled={isSavingConfig} onClick={() => void saveConfig(vendor.id, { provider: vendor.id, api_key: "" })}>
                       清除密钥
                     </Button>
                   </div>
                 </div>
               ) : null}
             </div>
-          ))}
+            )
+          })}
           <div className="grid gap-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5">
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-muted-foreground/50" />
