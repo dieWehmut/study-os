@@ -699,6 +699,10 @@ func handleAnswer(response http.ResponseWriter, request *http.Request, applicati
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "familiarity must be between 1 and 5"})
 		return
 	}
+	if input.SelfRating != nil && (*input.SelfRating < 1 || *input.SelfRating > 3) {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "self_rating must be between 1 and 3"})
+		return
+	}
 	promptID := chi.URLParam(request, "promptID")
 	prompt, err := application.Store.GetPrompt(request.Context(), promptID)
 	if err != nil {
@@ -715,9 +719,14 @@ func handleAnswer(response http.ResponseWriter, request *http.Request, applicati
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "invalid review card"})
 		return
 	}
-	evaluation := memory.EvaluateAnswer(input.Answer, prompt.AcceptedAnswers)
-	if len(prompt.AcceptedAnswers) == 0 {
-		evaluation = evaluateFreeText(request.Context(), application, prompt, input.Answer)
+	var evaluation memory.Evaluation
+	if input.SelfRating != nil {
+		evaluation = evaluationFromSelfRating(*input.SelfRating)
+	} else {
+		evaluation = memory.EvaluateAnswer(input.Answer, prompt.AcceptedAnswers)
+		if len(prompt.AcceptedAnswers) == 0 {
+			evaluation = evaluateFreeText(request.Context(), application, prompt, input.Answer)
+		}
 	}
 	now := time.Now().UTC()
 	after := memory.Schedule(before, now, evaluation.Rating)
