@@ -28,3 +28,13 @@ export function overrideAttempt(
     body: JSON.stringify({ rating }),
   })
 }
+
+export function submitSelfRating(
+  promptId: string,
+  rating: 1 | 2 | 3,
+): Promise<ReviewEvaluation> {
+  return apiRequest<ReviewEvaluation>(`/reviews/${promptId}/answer`, {
+    method: "POST",
+    body: JSON.stringify({ self_rating: rating }),
+  })
+}
