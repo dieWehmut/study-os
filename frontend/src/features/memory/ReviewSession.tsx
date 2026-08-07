@@ -150,7 +150,7 @@ export function ReviewSession({ recovery = false }: ReviewSessionProps) {
   const isRecognition = recognitionPromptTypes.has(current.prompt.prompt_type)
 
   return (
-    <section className="mx-auto flex max-w-4xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-5">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium">记忆检测</p>
