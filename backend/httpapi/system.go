@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"study-os/backend/app"
+	"study-os/backend/config"
 	"study-os/backend/version"
 )
 
@@ -95,20 +96,22 @@ func providerStatusFor(application *app.App) providerStatus {
 		name = "mock"
 	}
 	status := providerStatus{Name: name}
-	switch name {
-	case "mock":
+	spec, ok := config.LookupVendor(name)
+	switch {
+	case !ok:
+		status.Mode = "unavailable"
+	case !spec.NeedsKey():
 		status.Mode = "offline"
 		status.Configured = true
 		status.Available = true
-	case "deepseek":
+	default:
+		resolved := application.Config.Vendor(spec.ID)
 		status.Mode = "remote"
-		status.KeyConfigured = strings.TrimSpace(application.Config.DeepSeek.APIKey) != ""
-		status.Model = strings.TrimSpace(application.Config.DeepSeek.Model)
+		status.KeyConfigured = strings.TrimSpace(resolved.APIKey) != ""
+		status.Model = strings.TrimSpace(resolved.Model)
 		_, providerErr := providerFor(application)
 		status.Configured = providerErr == nil
 		status.Available = status.Configured
-	default:
-		status.Mode = "unavailable"
 	}
 	return status
 }

@@ -10,15 +10,23 @@ import (
 const activeProviderKey = "AI_ACTIVE_PROVIDER"
 
 // allowedEnvKeys limits which settings the application is allowed to rewrite.
-// Secrets are written locally but never returned by any API.
-var allowedEnvKeys = map[string]bool{
-	activeProviderKey:          true,
-	"DEEPSEEK_API_KEY":         true,
-	"DEEPSEEK_BASE_URL":        true,
-	"DEEPSEEK_MODEL":           true,
-	"DEEPSEEK_REASONING_MODEL": true,
-	"DASHSCOPE_API_KEY":        true,
-	"DASHSCOPE_TTS_VOICE":      true,
+// Vendor keys are derived from the registry so a new vendor is writable the
+// moment it is registered, with no second list to update. Secrets are written
+// locally but never returned by any API.
+var allowedEnvKeys = buildAllowedEnvKeys()
+
+func buildAllowedEnvKeys() map[string]bool {
+	keys := map[string]bool{
+		activeProviderKey:     true,
+		"DASHSCOPE_API_KEY":   true,
+		"DASHSCOPE_TTS_VOICE": true,
+	}
+	for _, spec := range vendorSpecs {
+		for _, key := range spec.EnvKeys() {
+			keys[key] = true
+		}
+	}
+	return keys
 }
 
 // SetActiveProvider rewrites only the AI_ACTIVE_PROVIDER line of the local
@@ -127,12 +135,8 @@ func UpdateEnvFile(path string, values map[string]string) error {
 }
 
 func knownImplementedProvider(provider string) bool {
-	switch provider {
-	case "mock", "deepseek":
-		return true
-	default:
-		return false
-	}
+	_, ok := LookupVendor(provider)
+	return ok
 }
 
 func stripExport(line string) string {

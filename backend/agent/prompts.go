@@ -1,202 +1,16 @@
 package agent
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strconv"
 	"strings"
-	"time"
 )
 
-// DeepSeekProvider calls the DeepSeek Chat Completions endpoint through an
-// OpenAI-compatible HTTP transport. Model names follow the current DeepSeek
-// API: deepseek-v4-flash and deepseek-v4-pro (legacy aliases are deprecated).
-type DeepSeekProvider struct {
-	apiKey         string
-	baseURL        string
-	model          string
-	reasoningModel string
-	httpClient     *http.Client
-}
+// The prompt text and output decoding below are Study OS domain logic, not
+// vendor logic: every provider sends the same instructions and parses the same
+// JSON envelope. Keeping them here stops each new vendor from re-deriving them.
 
-type DeepSeekOption func(*DeepSeekProvider)
-
-// WithHTTPClient injects a custom HTTP client (used by tests and future
-// proxy setups). The default is http.DefaultClient.
-func WithHTTPClient(client *http.Client) DeepSeekOption {
-	return func(provider *DeepSeekProvider) {
-		if client != nil {
-			provider.httpClient = client
-		}
-	}
-}
-
-var _ Provider = (*DeepSeekProvider)(nil)
-
-func NewDeepSeekProvider(cfg DeepSeekConfig, options ...DeepSeekOption) (*DeepSeekProvider, error) {
-	if err := validateDeepSeekConfig(cfg); err != nil {
-		return nil, err
-	}
-	provider := &DeepSeekProvider{
-		apiKey:         strings.TrimSpace(cfg.APIKey),
-		baseURL:        strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
-		model:          strings.TrimSpace(cfg.Model),
-		reasoningModel: strings.TrimSpace(cfg.ReasoningModel),
-		httpClient:     http.DefaultClient,
-	}
-	if provider.reasoningModel == "" {
-		provider.reasoningModel = provider.model
-	}
-	for _, option := range options {
-		if option != nil {
-			option(provider)
-		}
-	}
-	return provider, nil
-}
-
-func (p *DeepSeekProvider) Name() string {
-	return "deepseek"
-}
-
-func (p *DeepSeekProvider) Generate(ctx context.Context, request Request) (Response, error) {
-	if err := ctxErr(ctx); err != nil {
-		return Response{}, err
-	}
-	if err := request.Validate(); err != nil {
-		return Response{}, err
-	}
-
-	thinking, effort, err := normalizedOptions(request.Options)
-	if err != nil {
-		return Response{}, err
-	}
-	model := p.model
-	if strings.TrimSpace(request.Options.Model) != "" {
-		model = strings.TrimSpace(request.Options.Model)
-	}
-	body := map[string]any{
-		"model": model,
-		"messages": []map[string]string{
-			{"role": "system", "content": deepSeekSystemPrompt(request.Kind)},
-			{"role": "user", "content": deepSeekUserPrompt(request)},
-		},
-		"response_format": map[string]string{"type": "json_object"},
-		"thinking":        map[string]string{"type": thinking},
-		"stream":          false,
-	}
-	if thinking == "disabled" {
-		body["temperature"] = 0.2
-	} else if effort != "" {
-		body["reasoning_effort"] = effort
-	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return Response{}, NewProviderError(ErrorPermanent, "encode DeepSeek request failed")
-	}
-
-	endpoint := p.baseURL + "/chat/completions"
-	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-	if err != nil {
-		return Response{}, NewProviderError(ErrorPermanent, "build DeepSeek request failed")
-	}
-	httpRequest.Header.Set("Authorization", "Bearer "+p.apiKey)
-	httpRequest.Header.Set("Content-Type", "application/json")
-
-	response, err := p.httpClient.Do(httpRequest)
-	if err != nil {
-		return Response{}, &ProviderError{
-			Class:   ErrorTemporary,
-			Message: "DeepSeek request failed",
-			Cause:   err,
-		}
-	}
-	defer response.Body.Close()
-	responseBody, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if err != nil {
-		return Response{}, NewProviderError(ErrorTemporary, "read DeepSeek response failed")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return Response{}, classifyDeepSeekHTTP(response.StatusCode, response.Header.Get("Retry-After"), responseBody)
-	}
-
-	var envelope struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(responseBody, &envelope); err != nil {
-		return Response{}, NewProviderError(ErrorPermanent, "decode DeepSeek response failed")
-	}
-	content := ""
-	if len(envelope.Choices) > 0 {
-		content = strings.TrimSpace(envelope.Choices[0].Message.Content)
-	}
-	if content == "" {
-		return Response{}, NewProviderError(ErrorPermanent, "DeepSeek returned an empty completion")
-	}
-	output, err := decodeDeepSeekOutput(request.Kind, content)
-	if err != nil {
-		return Response{}, NewProviderError(ErrorPermanent, err.Error())
-	}
-	return output, nil
-}
-
-func normalizedOptions(options Options) (string, string, error) {
-	thinking := "disabled"
-	switch strings.ToLower(strings.TrimSpace(options.Thinking)) {
-	case "":
-	case "enabled":
-		thinking = "enabled"
-	case "disabled":
-		thinking = "disabled"
-	default:
-		return "", "", NewProviderError(ErrorPermanent, "thinking must be enabled or disabled")
-	}
-	effort := strings.ToLower(strings.TrimSpace(options.ReasoningEffort))
-	switch effort {
-	case "", "low", "high", "max":
-	default:
-		return "", "", NewProviderError(ErrorPermanent, "reasoning_effort must be low, high, or max")
-	}
-	return thinking, effort, nil
-}
-
-func classifyDeepSeekHTTP(status int, retryAfter string, body []byte) error {
-	message := deepSeekErrorMessage(body)
-	switch {
-	case status == http.StatusTooManyRequests:
-		var delay time.Duration
-		if seconds, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && seconds > 0 {
-			delay = time.Duration(seconds) * time.Second
-		}
-		if message == "" {
-			message = "DeepSeek rate limit exceeded"
-		}
-		return NewRateLimitError(message, delay)
-	case status == http.StatusBadRequest || status == http.StatusUnauthorized ||
-		status == http.StatusForbidden || status == http.StatusNotFound:
-		if message == "" {
-			message = "DeepSeek rejected the request"
-		}
-		return NewProviderError(ErrorPermanent, message)
-	case status >= 500:
-		if message == "" {
-			message = "DeepSeek upstream unavailable"
-		}
-		return NewProviderError(ErrorTemporary, message)
-	default:
-		return NewProviderError(ErrorTemporary, "DeepSeek request failed")
-	}
-}
-
-func deepSeekErrorMessage(body []byte) string {
+func providerErrorMessage(body []byte) string {
 	var payload struct {
 		Error struct {
 			Message string `json:"message"`
@@ -208,7 +22,7 @@ func deepSeekErrorMessage(body []byte) string {
 	return strings.TrimSpace(payload.Error.Message)
 }
 
-func decodeDeepSeekOutput(kind Kind, content string) (Response, error) {
+func decodeProviderOutput(kind Kind, content string) (Response, error) {
 	switch kind {
 	case KindMemoryQuestion:
 		var output MemoryQuestionOutput
@@ -281,7 +95,7 @@ func decodeDeepSeekOutput(kind Kind, content string) (Response, error) {
 	}
 }
 
-func deepSeekSystemPrompt(kind Kind) string {
+func systemPromptFor(kind Kind) string {
 	base := "你是高中自学系统 Study OS 的生成助手。只输出一个 JSON 对象，不要 Markdown 代码块、不要注释、不要任何额外文字。"
 	switch kind {
 	case KindMemoryQuestion:
@@ -312,7 +126,7 @@ func deepSeekSystemPrompt(kind Kind) string {
 	}
 }
 
-func deepSeekUserPrompt(request Request) string {
+func userPromptFor(request Request) string {
 	switch request.Kind {
 	case KindMemoryQuestion:
 		input := request.Knowledge

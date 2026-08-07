@@ -16,22 +16,15 @@ type Config struct {
 	DBPath          string
 	ActiveProvider  string
 	EnvFilePath     string
-	DeepSeek        DeepSeekConfig
+	// AI holds per-vendor settings keyed by vendor id. Use Vendor(id) to read
+	// it so registry defaults are applied.
+	AI              map[string]VendorConfig
 	DashScopeAPIKey string
 	DashScopeVoice  string
 	Launcher        bool
 	StaticDir       string
 	UpdateRepo      string
 	SeedFixtures    bool
-}
-
-// DeepSeekConfig holds the DeepSeek vendor settings. Secrets stay in memory
-// only and are never persisted, returned by APIs, or logged.
-type DeepSeekConfig struct {
-	APIKey         string
-	BaseURL        string
-	Model          string
-	ReasoningModel string
 }
 
 // VendorStatus is the read-only vendor view exposed to settings UI. Key values
@@ -100,12 +93,7 @@ func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 		UpdateRepo:      valueOr(lookup, "STUDY_OS_UPDATE_REPO", "dieWehmut/study-os"),
 		DashScopeAPIKey: envValue(lookup, "DASHSCOPE_API_KEY"),
 		DashScopeVoice:  valueOr(lookup, "DASHSCOPE_TTS_VOICE", "longxiaochun"),
-		DeepSeek: DeepSeekConfig{
-			APIKey:         strings.TrimSpace(envValue(lookup, "DEEPSEEK_API_KEY")),
-			BaseURL:        valueOr(lookup, "DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
-			Model:          valueOr(lookup, "DEEPSEEK_MODEL", "deepseek-v4-flash"),
-			ReasoningModel: valueOr(lookup, "DEEPSEEK_REASONING_MODEL", "deepseek-v4-pro"),
-		},
+		AI:              loadVendors(lookup),
 	}
 	cfg.DBPath = valueOr(lookup, "STUDY_OS_DB_PATH", filepath.Join(cfg.DataDir, "study.db"))
 
@@ -130,45 +118,24 @@ func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 	return cfg, nil
 }
 
-// Vendors returns the vendor registry view: the built-in offline mock, the
-// implemented DeepSeek vendor, and reserved placeholders for future vendors.
-func (c Config) Vendors() []VendorStatus {
-	active := strings.ToLower(strings.TrimSpace(c.ActiveProvider))
-	if active == "" {
-		active = "mock"
+// loadVendors resolves every registered vendor from the environment. Keys are
+// derived from each spec's EnvPrefix so the loader cannot fall out of sync with
+// the env allow-list.
+func loadVendors(lookup func(string) (string, bool)) map[string]VendorConfig {
+	vendors := make(map[string]VendorConfig, len(vendorSpecs))
+	for _, spec := range vendorSpecs {
+		keys := spec.EnvKeys()
+		if keys == nil {
+			continue
+		}
+		vendors[spec.ID] = VendorConfig{
+			APIKey:         envValue(lookup, keys["api_key"]),
+			BaseURL:        valueOr(lookup, keys["base_url"], spec.BaseURL),
+			Model:          valueOr(lookup, keys["model"], spec.Model),
+			ReasoningModel: valueOr(lookup, keys["reasoning_model"], spec.ReasoningModel),
+		}
 	}
-	model := strings.TrimSpace(c.DeepSeek.Model)
-	if model == "" {
-		model = "deepseek-v4-flash"
-	}
-	reasoningModel := strings.TrimSpace(c.DeepSeek.ReasoningModel)
-	if reasoningModel == "" {
-		reasoningModel = "deepseek-v4-pro"
-	}
-	return []VendorStatus{
-		{
-			ID:          "mock",
-			DisplayName: "本地离线",
-			Implemented: true,
-			Active:      active == "mock",
-		},
-		{
-			ID:            "deepseek",
-			DisplayName:   "DeepSeek",
-			Implemented:   true,
-			KeyConfigured: strings.TrimSpace(c.DeepSeek.APIKey) != "",
-			BaseURL:       strings.TrimRight(c.DeepSeek.BaseURL, "/"),
-			Models: []string{
-				model,
-				reasoningModel,
-			},
-			Active: active == "deepseek",
-		},
-		{ID: "qwen", DisplayName: "通义千问（百炼）"},
-		{ID: "glm", DisplayName: "智谱 GLM"},
-		{ID: "openai", DisplayName: "OpenAI"},
-		{ID: "volcengine", DisplayName: "火山豆包"},
-	}
+	return vendors
 }
 
 func envValue(lookup func(string) (string, bool), key string) string {

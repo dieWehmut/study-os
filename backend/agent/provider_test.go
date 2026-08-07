@@ -168,7 +168,10 @@ func TestProviderErrorClassificationAndRetryPolicy(t *testing.T) {
 	}
 }
 
-func TestNewProviderFactorySelectsMockAndDeepSeek(t *testing.T) {
+// The factory dispatches on wire protocol rather than vendor name, so a new
+// OpenAI-compatible vendor must work without any change to this package. These
+// cases pin that: the vendor name is carried through to Name() untouched.
+func TestNewProviderFactoryDispatchesOnStyle(t *testing.T) {
 	mock, err := NewProvider(ProviderConfig{Active: ""})
 	if err != nil {
 		t.Fatalf("default mock provider: %v", err)
@@ -177,23 +180,45 @@ func TestNewProviderFactorySelectsMockAndDeepSeek(t *testing.T) {
 		t.Fatalf("mock provider name = %q", mock.Name())
 	}
 
-	deepseek, err := NewProvider(ProviderConfig{
-		Active: "deepseek",
-		DeepSeek: DeepSeekConfig{
-			APIKey:  "test-secret",
-			BaseURL: "https://api.deepseek.com/v1",
-			Model:   "deepseek-v4-flash",
+	tests := []struct {
+		name   string
+		active string
+		style  string
+		vendor VendorConfig
+	}{
+		{
+			name:   "openai style",
+			active: "deepseek",
+			style:  StyleOpenAI,
+			vendor: VendorConfig{APIKey: "test-secret", BaseURL: "https://api.deepseek.com/v1", Model: "deepseek-v4-flash"},
 		},
-	})
-	if err != nil {
-		t.Fatalf("deepseek provider: %v", err)
+		{
+			name:   "unregistered openai compatible vendor",
+			active: "some-new-vendor",
+			style:  StyleOpenAI,
+			vendor: VendorConfig{APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "some-model"},
+		},
+		{
+			name:   "anthropic style",
+			active: "claude",
+			style:  StyleAnthropic,
+			vendor: VendorConfig{APIKey: "test-secret", BaseURL: "https://api.anthropic.com/v1", Model: "claude-sonnet-4-6"},
+		},
 	}
-	if deepseek.Name() != "deepseek" {
-		t.Fatalf("deepseek provider name = %q", deepseek.Name())
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider, err := NewProvider(ProviderConfig{Active: test.active, Style: test.style, Vendor: test.vendor})
+			if err != nil {
+				t.Fatalf("provider: %v", err)
+			}
+			if provider.Name() != test.active {
+				t.Fatalf("provider name = %q, want %q", provider.Name(), test.active)
+			}
+		})
 	}
 
 	_, err = NewProvider(ProviderConfig{Active: "unknown-vendor"})
 	if err == nil || ErrorClassOf(err) != ErrorConfigMissing {
-		t.Fatalf("unknown vendor error = %v (class %q)", err, ErrorClassOf(err))
+		t.Fatalf("unknown style error = %v (class %q)", err, ErrorClassOf(err))
 	}
 }

@@ -12,20 +12,20 @@ import (
 	"study-os/backend/agent"
 )
 
-func TestNewDeepSeekProviderValidatesConfiguration(t *testing.T) {
+func TestNewOpenAIProviderValidatesConfiguration(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  agent.DeepSeekConfig
+		config  agent.VendorConfig
 		wantErr agent.ErrorClass
 	}{
-		{name: "missing key", config: agent.DeepSeekConfig{BaseURL: "https://api.deepseek.com/v1", Model: "deepseek-v4-flash"}, wantErr: agent.ErrorConfigMissing},
-		{name: "missing base url", config: agent.DeepSeekConfig{APIKey: "sk-test", Model: "deepseek-v4-flash"}, wantErr: agent.ErrorConfigMissing},
-		{name: "bad base url", config: agent.DeepSeekConfig{APIKey: "sk-test", BaseURL: "://bad", Model: "deepseek-v4-flash"}, wantErr: agent.ErrorPermanent},
-		{name: "missing model", config: agent.DeepSeekConfig{APIKey: "sk-test", BaseURL: "https://api.deepseek.com/v1"}, wantErr: agent.ErrorConfigMissing},
+		{name: "missing key", config: agent.VendorConfig{BaseURL: "https://api.deepseek.com/v1", Model: "deepseek-v4-flash"}, wantErr: agent.ErrorConfigMissing},
+		{name: "missing base url", config: agent.VendorConfig{APIKey: "sk-test", Model: "deepseek-v4-flash"}, wantErr: agent.ErrorConfigMissing},
+		{name: "bad base url", config: agent.VendorConfig{APIKey: "sk-test", BaseURL: "://bad", Model: "deepseek-v4-flash"}, wantErr: agent.ErrorPermanent},
+		{name: "missing model", config: agent.VendorConfig{APIKey: "sk-test", BaseURL: "https://api.deepseek.com/v1"}, wantErr: agent.ErrorConfigMissing},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := agent.NewDeepSeekProvider(test.config)
+			_, err := agent.NewOpenAIProvider("deepseek", test.config)
 			if err == nil {
 				t.Fatal("expected a configuration error")
 			}
@@ -39,7 +39,7 @@ func TestNewDeepSeekProviderValidatesConfiguration(t *testing.T) {
 	}
 }
 
-func TestDeepSeekProviderCallsChatCompletionsAndDecodes(t *testing.T) {
+func TestOpenAIProviderCallsChatCompletionsAndDecodes(t *testing.T) {
 	var captured map[string]any
 	var authorization string
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
@@ -59,7 +59,7 @@ func TestDeepSeekProviderCallsChatCompletionsAndDecodes(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := agent.NewDeepSeekProvider(agent.DeepSeekConfig{
+	provider, err := agent.NewOpenAIProvider("deepseek", agent.VendorConfig{
 		APIKey:  "sk-test",
 		BaseURL: server.URL + "/v1",
 		Model:   "deepseek-v4-flash",
@@ -105,7 +105,7 @@ func TestDeepSeekProviderCallsChatCompletionsAndDecodes(t *testing.T) {
 	}
 }
 
-func TestDeepSeekProviderUsesOptionsAndReasoningModel(t *testing.T) {
+func TestOpenAIProviderUsesOptionsAndReasoningModel(t *testing.T) {
 	var captured map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		_ = json.NewDecoder(request.Body).Decode(&captured)
@@ -113,7 +113,7 @@ func TestDeepSeekProviderUsesOptionsAndReasoningModel(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := agent.NewDeepSeekProvider(agent.DeepSeekConfig{
+	provider, err := agent.NewOpenAIProvider("deepseek", agent.VendorConfig{
 		APIKey:         "sk-test",
 		BaseURL:        server.URL,
 		Model:          "deepseek-v4-flash",
@@ -149,7 +149,51 @@ func TestDeepSeekProviderUsesOptionsAndReasoningModel(t *testing.T) {
 	}
 }
 
-func TestDeepSeekProviderClassifiesErrors(t *testing.T) {
+// `thinking` and `reasoning_effort` are DeepSeek extensions. A strict
+// OpenAI-compatible endpoint answers 400 for unknown body parameters, so every
+// other vendor must receive the portable body even when the caller asks for
+// thinking. Without this guard the shared provider silently breaks Qwen, GLM,
+// OpenAI and Volcengine on every request.
+func TestOpenAIProviderOmitsDeepSeekExtensionsForOtherVendors(t *testing.T) {
+	for _, vendor := range []string{"openai", "qwen", "glm", "volcengine"} {
+		t.Run(vendor, func(t *testing.T) {
+			var captured map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				_ = json.NewDecoder(request.Body).Decode(&captured)
+				_, _ = response.Write([]byte(`{"choices":[{"message":{"content":"{\"sentence\":\"X\",\"blanked\":\"Y\"}"}}]}`))
+			}))
+			defer server.Close()
+
+			provider, err := agent.NewOpenAIProvider(vendor, agent.VendorConfig{
+				APIKey:  "sk-test",
+				BaseURL: server.URL,
+				Model:   "some-model",
+			}, agent.WithHTTPClient(server.Client()))
+			if err != nil {
+				t.Fatalf("create provider: %v", err)
+			}
+			_, err = provider.Generate(context.Background(), agent.Request{
+				Kind: agent.KindMakeSentence,
+				Options: agent.Options{
+					Thinking:        "enabled",
+					ReasoningEffort: "max",
+				},
+				Sentence: &agent.SentenceInput{Term: "abandon"},
+			})
+			if err != nil {
+				t.Fatalf("generate: %v", err)
+			}
+			if _, exists := captured["thinking"]; exists {
+				t.Fatalf("%s must not receive the deepseek thinking parameter", vendor)
+			}
+			if _, exists := captured["reasoning_effort"]; exists {
+				t.Fatalf("%s must not receive the deepseek reasoning_effort parameter", vendor)
+			}
+		})
+	}
+}
+
+func TestOpenAIProviderClassifiesErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		status     int
@@ -171,7 +215,7 @@ func TestDeepSeekProviderClassifiesErrors(t *testing.T) {
 				_, _ = response.Write([]byte(`{"error":{"message":"upstream says no"}}`))
 			}))
 			defer server.Close()
-			provider, err := agent.NewDeepSeekProvider(agent.DeepSeekConfig{
+			provider, err := agent.NewOpenAIProvider("deepseek", agent.VendorConfig{
 				APIKey:  "sk-test",
 				BaseURL: server.URL,
 				Model:   "deepseek-v4-flash",
@@ -193,12 +237,12 @@ func TestDeepSeekProviderClassifiesErrors(t *testing.T) {
 	}
 }
 
-func TestDeepSeekProviderRejectsMalformedModelJSON(t *testing.T) {
+func TestOpenAIProviderRejectsMalformedModelJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		_, _ = response.Write([]byte(`{"choices":[{"message":{"content":"not json at all"}}]}`))
 	}))
 	defer server.Close()
-	provider, err := agent.NewDeepSeekProvider(agent.DeepSeekConfig{
+	provider, err := agent.NewOpenAIProvider("deepseek", agent.VendorConfig{
 		APIKey:  "sk-test",
 		BaseURL: server.URL,
 		Model:   "deepseek-v4-flash",

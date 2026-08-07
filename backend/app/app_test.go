@@ -14,18 +14,23 @@ func TestMergeConfigFillsAllProviderSettingsWithoutOverwritingExplicitValues(t *
 		DataDir:        "configured-data",
 		DBPath:         "configured.db",
 		ActiveProvider: "deepseek",
-		DeepSeek:       config.DeepSeekConfig{Model: "explicit-model"},
+		AI: map[string]config.VendorConfig{
+			"deepseek": {Model: "explicit-model"},
+		},
 	}
 	loaded := config.Config{
 		ListenAddress:  "127.0.0.1:8080",
 		DataDir:        "loaded-data",
 		DBPath:         "loaded.db",
 		ActiveProvider: "mock",
-		DeepSeek: config.DeepSeekConfig{
-			APIKey:         "loaded-key",
-			BaseURL:        "https://loaded.example/v1",
-			Model:          "loaded-model",
-			ReasoningModel: "loaded-reasoning-model",
+		AI: map[string]config.VendorConfig{
+			"deepseek": {
+				APIKey:         "loaded-key",
+				BaseURL:        "https://loaded.example/v1",
+				Model:          "loaded-model",
+				ReasoningModel: "loaded-reasoning-model",
+			},
+			"claude": {APIKey: "loaded-claude-key"},
 		},
 		SeedFixtures: true,
 	}
@@ -34,11 +39,18 @@ func TestMergeConfigFillsAllProviderSettingsWithoutOverwritingExplicitValues(t *
 	if got.ListenAddress != configured.ListenAddress || got.DataDir != configured.DataDir || got.DBPath != configured.DBPath || got.ActiveProvider != configured.ActiveProvider {
 		t.Fatalf("core config was overwritten: %#v", got)
 	}
-	if got.DeepSeek.APIKey != loaded.DeepSeek.APIKey || got.DeepSeek.BaseURL != loaded.DeepSeek.BaseURL || got.DeepSeek.ReasoningModel != loaded.DeepSeek.ReasoningModel {
-		t.Fatalf("provider settings were not merged: %#v", got)
+	deepseek := got.AI["deepseek"]
+	want := loaded.AI["deepseek"]
+	if deepseek.APIKey != want.APIKey || deepseek.BaseURL != want.BaseURL || deepseek.ReasoningModel != want.ReasoningModel {
+		t.Fatalf("provider settings were not merged: %#v", deepseek)
 	}
-	if got.DeepSeek.Model != configured.DeepSeek.Model {
-		t.Fatalf("explicit model was overwritten: %q", got.DeepSeek.Model)
+	if deepseek.Model != "explicit-model" {
+		t.Fatalf("explicit model was overwritten: %q", deepseek.Model)
+	}
+	// A vendor the application never mentioned must survive the merge, otherwise
+	// switching providers at runtime would find an empty credential.
+	if got.AI["claude"].APIKey != "loaded-claude-key" {
+		t.Fatalf("unmentioned vendor was dropped: %#v", got.AI)
 	}
 	if !got.SeedFixtures {
 		t.Fatal("loaded fixture flag should be preserved when configured value is false")
@@ -47,25 +59,29 @@ func TestMergeConfigFillsAllProviderSettingsWithoutOverwritingExplicitValues(t *
 
 func TestMergeConfigLeavesConfiguredProviderSettingsUntouched(t *testing.T) {
 	configured := config.Config{
-		DeepSeek: config.DeepSeekConfig{
-			APIKey:         "configured-key",
-			BaseURL:        "https://configured.example/v1",
-			Model:          "configured-model",
-			ReasoningModel: "configured-reasoning",
+		AI: map[string]config.VendorConfig{
+			"deepseek": {
+				APIKey:         "configured-key",
+				BaseURL:        "https://configured.example/v1",
+				Model:          "configured-model",
+				ReasoningModel: "configured-reasoning",
+			},
 		},
 	}
 	loaded := config.Config{
-		DeepSeek: config.DeepSeekConfig{
-			APIKey:         "loaded-key",
-			BaseURL:        "https://loaded.example/v1",
-			Model:          "loaded-model",
-			ReasoningModel: "loaded-reasoning",
+		AI: map[string]config.VendorConfig{
+			"deepseek": {
+				APIKey:         "loaded-key",
+				BaseURL:        "https://loaded.example/v1",
+				Model:          "loaded-model",
+				ReasoningModel: "loaded-reasoning",
+			},
 		},
 	}
 
 	got := mergeConfig(configured, loaded)
-	if got.DeepSeek != configured.DeepSeek {
-		t.Fatalf("configured provider settings changed: %#v", got)
+	if got.AI["deepseek"] != configured.AI["deepseek"] {
+		t.Fatalf("configured provider settings changed: %#v", got.AI)
 	}
 }
 

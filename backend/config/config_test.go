@@ -48,11 +48,12 @@ func TestLoadFromFileUsesProcessEnvironmentBeforeEnvFile(t *testing.T) {
 	if cfg.ActiveProvider != "deepseek" {
 		t.Fatalf("active provider = %q", cfg.ActiveProvider)
 	}
-	if cfg.DeepSeek.APIKey != "from-process" {
-		t.Fatalf("key priority = %q", cfg.DeepSeek.APIKey)
+	vendor := cfg.Vendor("deepseek")
+	if vendor.APIKey != "from-process" {
+		t.Fatalf("key priority = %q", vendor.APIKey)
 	}
-	if cfg.DeepSeek.BaseURL != "https://deepseek.test/v1" || cfg.DeepSeek.Model != "small-model" {
-		t.Fatalf("deepseek settings = %#v", cfg)
+	if vendor.BaseURL != "https://deepseek.test/v1" || vendor.Model != "small-model" {
+		t.Fatalf("deepseek settings = %#v", vendor)
 	}
 }
 

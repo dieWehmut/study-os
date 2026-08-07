@@ -47,10 +47,13 @@ func TestVendorListEndpointNeverLeaksKey(t *testing.T) {
 	application := testApplication(t, config.Config{
 		DataDir:        dataDir,
 		ActiveProvider: "deepseek",
-		DeepSeek: config.DeepSeekConfig{
-			APIKey:  "sk-test-secret",
-			BaseURL: "https://api.deepseek.com/v1",
-			Model:   "deepseek-v4-flash",
+		AI: map[string]config.VendorConfig{
+			"deepseek": {
+				APIKey:  "sk-test-secret",
+				BaseURL: "https://api.deepseek.com/v1",
+				Model:   "deepseek-v4-flash",
+			},
+			"claude": {APIKey: "sk-ant-test-secret"},
 		},
 	})
 	response := requestJSON(t, httpapi.NewRouter(application), http.MethodGet, "/api/agent/vendors", nil)
@@ -58,14 +61,26 @@ func TestVendorListEndpointNeverLeaksKey(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
 	body := response.Body.String()
-	if strings.Contains(body, "sk-test-secret") {
-		t.Fatalf("vendor list leaked the API key: %s", body)
+	for _, secret := range []string{"sk-test-secret", "sk-ant-test-secret"} {
+		if strings.Contains(body, secret) {
+			t.Fatalf("vendor list leaked the API key: %s", body)
+		}
 	}
 	if !strings.Contains(body, `"id":"deepseek"`) || !strings.Contains(body, `"implemented":true`) || !strings.Contains(body, `"key_configured":true`) || !strings.Contains(body, `"active":true`) {
 		t.Fatalf("deepseek vendor status missing: %s", body)
 	}
-	if !strings.Contains(body, `"id":"qwen","display_name":"通义千问（百炼）","implemented":false`) {
-		t.Fatalf("placeholder vendor must appear unimplemented: %s", body)
+	// Every registered vendor must reach the settings UI, and the ones without a
+	// key must still describe themselves so they can be configured there.
+	for _, spec := range config.VendorSpecs() {
+		if !strings.Contains(body, `"id":"`+spec.ID+`"`) {
+			t.Fatalf("vendor %q missing from the list: %s", spec.ID, body)
+		}
+	}
+	if !strings.Contains(body, `"id":"claude"`) || !strings.Contains(body, `"claude-sonnet-4-6"`) {
+		t.Fatalf("claude vendor status missing: %s", body)
+	}
+	if strings.Contains(body, `"implemented":false`) {
+		t.Fatalf("no vendor should be unimplemented: %s", body)
 	}
 }
 
@@ -276,8 +291,8 @@ func TestAgentConfigEndpointWritesKeyAndNeverEchoesIt(t *testing.T) {
 	if !strings.Contains(string(content), "DEEPSEEK_API_KEY=sk-live-secret") || !strings.Contains(string(content), "DEEPSEEK_MODEL=deepseek-v4-flash") {
 		t.Fatalf("env file content = %s", string(content))
 	}
-	if application.Config.DeepSeek.APIKey != "sk-live-secret" || application.Config.DeepSeek.Model != "deepseek-v4-flash" {
-		t.Fatalf("in-memory config not updated: %#v", application.Config.DeepSeek)
+	if stored := application.Config.Vendor("deepseek"); stored.APIKey != "sk-live-secret" || stored.Model != "deepseek-v4-flash" {
+		t.Fatalf("in-memory config not updated: %#v", stored)
 	}
 	vendors := requestJSON(t, router, http.MethodGet, "/api/agent/vendors", nil)
 	if !strings.Contains(vendors.Body.String(), `"key_configured":true`) {
@@ -293,10 +308,12 @@ func TestAgentConfigEndpointClearsKey(t *testing.T) {
 	application := testApplication(t, config.Config{
 		DataDir:        t.TempDir(),
 		ActiveProvider: "deepseek",
-		DeepSeek: config.DeepSeekConfig{
-			APIKey:  "sk-old",
-			BaseURL: "https://api.deepseek.com/v1",
-			Model:   "deepseek-v4-flash",
+		AI: map[string]config.VendorConfig{
+			"deepseek": {
+				APIKey:  "sk-old",
+				BaseURL: "https://api.deepseek.com/v1",
+				Model:   "deepseek-v4-flash",
+			},
 		},
 		EnvFilePath: envPath,
 	})
@@ -316,8 +333,8 @@ func TestAgentConfigEndpointClearsKey(t *testing.T) {
 	if strings.Contains(string(content), "DEEPSEEK_API_KEY") {
 		t.Fatalf("cleared key still present:\n%s", string(content))
 	}
-	if application.Config.DeepSeek.APIKey != "" {
-		t.Fatalf("in-memory key not cleared: %q", application.Config.DeepSeek.APIKey)
+	if cleared := application.Config.Vendor("deepseek"); cleared.APIKey != "" {
+		t.Fatalf("in-memory key not cleared: %q", cleared.APIKey)
 	}
 }
 
@@ -329,13 +346,62 @@ func TestAgentConfigEndpointValidatesProviderAndFields(t *testing.T) {
 	application := testApplication(t, config.Config{DataDir: t.TempDir(), EnvFilePath: envPath})
 	router := httpapi.NewRouter(application)
 
-	unknown := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{"provider": "qwen", "api_key": "x"})
+	unknown := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{"provider": "not-a-vendor", "api_key": "x"})
 	if unknown.Code != http.StatusBadRequest {
 		t.Fatalf("unknown provider status = %d, body = %s", unknown.Code, unknown.Body.String())
+	}
+	// mock has no credentials to store, so it is the one registered vendor that
+	// must still be refused here.
+	offline := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{"provider": "mock", "api_key": "x"})
+	if offline.Code != http.StatusBadRequest {
+		t.Fatalf("mock provider status = %d, body = %s", offline.Code, offline.Body.String())
 	}
 	hacked := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{"provider": "deepseek", "hacked_field": "x"})
 	if hacked.Code != http.StatusBadRequest {
 		t.Fatalf("unknown field status = %d, body = %s", hacked.Code, hacked.Body.String())
+	}
+	empty := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{"provider": "deepseek"})
+	if empty.Code != http.StatusBadRequest {
+		t.Fatalf("empty update status = %d, body = %s", empty.Code, empty.Body.String())
+	}
+}
+
+// Every key-bearing vendor must accept a credential write, otherwise it would be
+// listed in the settings UI but impossible to configure there.
+func TestAgentConfigEndpointAcceptsEveryKeyBearingVendor(t *testing.T) {
+	for _, spec := range config.VendorSpecs() {
+		if !spec.NeedsKey() {
+			continue
+		}
+		t.Run(spec.ID, func(t *testing.T) {
+			envPath := filepath.Join(t.TempDir(), ".env.local")
+			if err := os.WriteFile(envPath, []byte(""), 0o600); err != nil {
+				t.Fatalf("write env file: %v", err)
+			}
+			application := testApplication(t, config.Config{DataDir: t.TempDir(), EnvFilePath: envPath})
+			router := httpapi.NewRouter(application)
+
+			response := requestJSON(t, router, http.MethodPatch, "/api/agent/config", map[string]any{
+				"provider": spec.ID,
+				"api_key":  "sk-" + spec.ID,
+			})
+			if response.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+			}
+			if strings.Contains(response.Body.String(), "sk-"+spec.ID) {
+				t.Fatalf("config response leaked the key: %s", response.Body.String())
+			}
+			content, err := os.ReadFile(envPath)
+			if err != nil {
+				t.Fatalf("read env file: %v", err)
+			}
+			if !strings.Contains(string(content), spec.EnvKeys()["api_key"]+"=sk-"+spec.ID) {
+				t.Fatalf("env file missing the vendor key:\n%s", string(content))
+			}
+			if stored := application.Config.Vendor(spec.ID); stored.APIKey != "sk-"+spec.ID {
+				t.Fatalf("in-memory config not updated: %#v", stored)
+			}
+		})
 	}
 }
 

@@ -27,21 +27,25 @@ func TestFromLookupParsesVendorSettings(t *testing.T) {
 	if cfg.ActiveProvider != "deepseek" {
 		t.Fatalf("active provider = %q", cfg.ActiveProvider)
 	}
-	if cfg.DeepSeek.APIKey != "sk-test" {
-		t.Fatalf("api key = %q", cfg.DeepSeek.APIKey)
+	vendor := cfg.Vendor("deepseek")
+	if vendor.APIKey != "sk-test" {
+		t.Fatalf("api key = %q", vendor.APIKey)
 	}
-	if cfg.DeepSeek.BaseURL != "https://deepseek.example/v1" {
-		t.Fatalf("base url = %q", cfg.DeepSeek.BaseURL)
+	if vendor.BaseURL != "https://deepseek.example/v1" {
+		t.Fatalf("base url = %q", vendor.BaseURL)
 	}
-	if cfg.DeepSeek.Model != "deepseek-v4-flash" {
-		t.Fatalf("model = %q", cfg.DeepSeek.Model)
+	if vendor.Model != "deepseek-v4-flash" {
+		t.Fatalf("model = %q", vendor.Model)
 	}
-	if cfg.DeepSeek.ReasoningModel != "deepseek-v4-pro" {
-		t.Fatalf("reasoning model = %q", cfg.DeepSeek.ReasoningModel)
+	if vendor.ReasoningModel != "deepseek-v4-pro" {
+		t.Fatalf("reasoning model = %q", vendor.ReasoningModel)
 	}
 }
 
-func TestFromLookupAppliesDeepSeekDefaults(t *testing.T) {
+// Every registered vendor must resolve to a usable base URL and model without
+// any environment at all, otherwise picking it in the settings UI would produce
+// a provider that fails on first use.
+func TestFromLookupAppliesDefaultsForEveryVendor(t *testing.T) {
 	cfg, err := config.FromLookup(func(string) (string, bool) { return "", false })
 	if err != nil {
 		t.Fatalf("load defaults: %v", err)
@@ -49,14 +53,40 @@ func TestFromLookupAppliesDeepSeekDefaults(t *testing.T) {
 	if cfg.ActiveProvider != "mock" {
 		t.Fatalf("active provider = %q", cfg.ActiveProvider)
 	}
-	if cfg.DeepSeek.BaseURL != "https://api.deepseek.com/v1" {
-		t.Fatalf("default base url = %q", cfg.DeepSeek.BaseURL)
+	for _, spec := range config.VendorSpecs() {
+		if !spec.NeedsKey() {
+			continue
+		}
+		vendor := cfg.Vendor(spec.ID)
+		if vendor.APIKey != "" {
+			t.Fatalf("vendor %q invented an api key: %q", spec.ID, vendor.APIKey)
+		}
+		if vendor.BaseURL == "" || vendor.Model == "" || vendor.ReasoningModel == "" {
+			t.Fatalf("vendor %q has incomplete defaults: %#v", spec.ID, vendor)
+		}
+		if !strings.HasPrefix(vendor.BaseURL, "https://") {
+			t.Fatalf("vendor %q base url must be https: %q", spec.ID, vendor.BaseURL)
+		}
 	}
-	if cfg.DeepSeek.Model != "deepseek-v4-flash" {
-		t.Fatalf("default model = %q", cfg.DeepSeek.Model)
+	if got := cfg.Vendor("deepseek"); got.BaseURL != "https://api.deepseek.com/v1" || got.Model != "deepseek-v4-flash" {
+		t.Fatalf("deepseek defaults = %#v", got)
 	}
-	if cfg.DeepSeek.ReasoningModel != "deepseek-v4-pro" {
-		t.Fatalf("default reasoning model = %q", cfg.DeepSeek.ReasoningModel)
+	if got := cfg.Vendor("claude"); got.Model != "claude-sonnet-4-6" || got.ReasoningModel != "claude-opus-4-6" {
+		t.Fatalf("claude defaults = %#v", got)
+	}
+}
+
+// Each vendor's env keys must be unique to it. A duplicated EnvPrefix would
+// make two vendors silently share one API key.
+func TestVendorEnvKeysAreUnique(t *testing.T) {
+	owner := make(map[string]string)
+	for _, spec := range config.VendorSpecs() {
+		for _, key := range spec.EnvKeys() {
+			if previous, taken := owner[key]; taken {
+				t.Fatalf("env key %q claimed by both %q and %q", key, previous, spec.ID)
+			}
+			owner[key] = spec.ID
+		}
 	}
 }
 
@@ -75,21 +105,26 @@ func TestLoadFromFileGivesProcessEnvironmentPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load env file: %v", err)
 	}
-	if cfg.DeepSeek.APIKey != "from-process" {
-		t.Fatalf("key priority = %q", cfg.DeepSeek.APIKey)
+	vendor := cfg.Vendor("deepseek")
+	if vendor.APIKey != "from-process" {
+		t.Fatalf("key priority = %q", vendor.APIKey)
 	}
-	if cfg.DeepSeek.Model != "from-file-model" {
-		t.Fatalf("model = %q", cfg.DeepSeek.Model)
+	if vendor.Model != "from-file-model" {
+		t.Fatalf("model = %q", vendor.Model)
 	}
 	if cfg.EnvFilePath != path {
 		t.Fatalf("env file path = %q", cfg.EnvFilePath)
 	}
 }
 
-func TestVendorsListsImplementedAndPlaceholders(t *testing.T) {
+// Every registered vendor is now backed by a real wire protocol, so the list the
+// settings UI renders must report all of them as usable and must never mark two
+// vendors active at once.
+func TestVendorsListsEveryRegisteredVendor(t *testing.T) {
 	values := map[string]string{
 		"AI_ACTIVE_PROVIDER": "deepseek",
 		"DEEPSEEK_API_KEY":   "sk-test",
+		"ANTHROPIC_API_KEY":  "sk-ant-test",
 	}
 	cfg, err := config.FromLookup(func(key string) (string, bool) {
 		value, ok := values[key]
@@ -99,12 +134,19 @@ func TestVendorsListsImplementedAndPlaceholders(t *testing.T) {
 		t.Fatalf("load config: %v", err)
 	}
 	vendors := cfg.Vendors()
-	if len(vendors) < 6 {
-		t.Fatalf("vendor count = %d, want at least 6", len(vendors))
+	if len(vendors) != len(config.VendorSpecs()) {
+		t.Fatalf("vendor count = %d, want %d", len(vendors), len(config.VendorSpecs()))
 	}
 	byID := make(map[string]config.VendorStatus, len(vendors))
+	active := 0
 	for _, vendor := range vendors {
 		byID[vendor.ID] = vendor
+		if vendor.Active {
+			active++
+		}
+	}
+	if active != 1 {
+		t.Fatalf("active vendor count = %d, want exactly 1", active)
 	}
 	mock := byID["mock"]
 	if !mock.Implemented || mock.Active {
@@ -120,9 +162,28 @@ func TestVendorsListsImplementedAndPlaceholders(t *testing.T) {
 	if len(deepseek.Models) != 2 || deepseek.Models[0] != "deepseek-v4-flash" || deepseek.Models[1] != "deepseek-v4-pro" {
 		t.Fatalf("deepseek models = %#v", deepseek.Models)
 	}
-	for _, placeholder := range []string{"qwen", "glm", "openai", "volcengine"} {
-		if byID[placeholder].Implemented {
-			t.Fatalf("vendor %q must not be implemented yet", placeholder)
+	claude := byID["claude"]
+	if !claude.Implemented || !claude.KeyConfigured || claude.Active {
+		t.Fatalf("claude vendor = %#v", claude)
+	}
+	if len(claude.Models) != 2 || claude.Models[0] != "claude-sonnet-4-6" || claude.Models[1] != "claude-opus-4-6" {
+		t.Fatalf("claude models = %#v", claude.Models)
+	}
+	for _, spec := range config.VendorSpecs() {
+		vendor, listed := byID[spec.ID]
+		if !listed {
+			t.Fatalf("vendor %q is registered but missing from the list", spec.ID)
+		}
+		if !vendor.Implemented {
+			t.Fatalf("vendor %q must be selectable", spec.ID)
+		}
+		if spec.NeedsKey() && (vendor.BaseURL == "" || len(vendor.Models) != 2) {
+			t.Fatalf("vendor %q is not fully described: %#v", spec.ID, vendor)
+		}
+	}
+	for _, unconfigured := range []string{"openai", "qwen", "glm", "volcengine"} {
+		if byID[unconfigured].KeyConfigured {
+			t.Fatalf("vendor %q reported a key that was never set", unconfigured)
 		}
 	}
 }

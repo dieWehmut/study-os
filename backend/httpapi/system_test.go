@@ -22,10 +22,12 @@ func TestSystemStatusRedactsProviderSecretAndReportsLocalState(t *testing.T) {
 		DataDir:        dataDir,
 		DBPath:         filepath.Join(dataDir, "study.db"),
 		ActiveProvider: "deepseek",
-		DeepSeek: config.DeepSeekConfig{
-			APIKey:  "test-secret-key",
-			BaseURL: "https://example.test/v1",
-			Model:   "test-model",
+		AI: map[string]config.VendorConfig{
+			"deepseek": {
+				APIKey:  "test-secret-key",
+				BaseURL: "https://example.test/v1",
+				Model:   "test-model",
+			},
 		},
 	}})
 	if err != nil {

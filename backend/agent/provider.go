@@ -6,6 +6,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -468,47 +469,97 @@ func (p RetryPolicy) Next(err error, attempt int) (time.Duration, bool) {
 	return delay, true
 }
 
-// DeepSeekConfig is the vendor-specific configuration for the DeepSeek
-// provider. Secrets are read from the process environment and never persisted.
-type DeepSeekConfig struct {
+// VendorConfig is the per-vendor configuration for a network backed provider.
+// Secrets are read from the process environment and never persisted.
+type VendorConfig struct {
 	APIKey         string
 	BaseURL        string
 	Model          string
 	ReasoningModel string
 }
 
-// ProviderConfig selects the active provider from the configured vendor set.
+// Wire protocol names. Every hosted vendor Study OS supports speaks one of
+// these, so adding a vendor is a config change rather than a new provider.
+const (
+	StyleMock      = "mock"
+	StyleOpenAI    = "openai"
+	StyleAnthropic = "anthropic"
+)
+
+// ProviderConfig selects the active vendor and carries its resolved settings.
+// Style picks the wire protocol, which is what lets a new OpenAI-compatible
+// vendor work without touching this package.
 type ProviderConfig struct {
-	Active   string
-	DeepSeek DeepSeekConfig
+	Active string
+	Style  string
+	Vendor VendorConfig
 }
 
-// NewProvider builds the provider for the active vendor. Unknown or
-// unimplemented vendors return a classified configuration error.
+// NewProvider builds the provider for the active vendor. Unknown vendors and
+// unrecognised wire protocols return a classified configuration error.
 func NewProvider(cfg ProviderConfig) (Provider, error) {
-	switch strings.ToLower(strings.TrimSpace(cfg.Active)) {
-	case "", "mock":
+	name := strings.ToLower(strings.TrimSpace(cfg.Active))
+	if name == "" || name == StyleMock {
 		return NewMockProvider(), nil
-	case "deepseek":
-		return NewDeepSeekProvider(cfg.DeepSeek)
+	}
+	switch strings.ToLower(strings.TrimSpace(cfg.Style)) {
+	case StyleMock:
+		return NewMockProvider(), nil
+	case StyleOpenAI:
+		return NewOpenAIProvider(name, cfg.Vendor)
+	case StyleAnthropic:
+		return NewAnthropicProvider(name, cfg.Vendor)
 	default:
 		return nil, NewProviderError(ErrorConfigMissing, "configured AI provider is unsupported")
 	}
 }
 
-func validateDeepSeekConfig(cfg DeepSeekConfig) error {
+// ProviderOption tweaks a network backed provider at construction time.
+// Options are shared across wire protocols, so they carry settings rather than
+// mutating a concrete provider type.
+type ProviderOption func(*providerOptions)
+
+type providerOptions struct {
+	httpClient *http.Client
+}
+
+// WithHTTPClient injects a custom HTTP client (used by tests and future proxy
+// setups). The default is http.DefaultClient.
+func WithHTTPClient(client *http.Client) ProviderOption {
+	return func(options *providerOptions) {
+		if client != nil {
+			options.httpClient = client
+		}
+	}
+}
+
+func resolveProviderOptions(options ...ProviderOption) providerOptions {
+	resolved := providerOptions{httpClient: http.DefaultClient}
+	for _, option := range options {
+		if option != nil {
+			option(&resolved)
+		}
+	}
+	return resolved
+}
+
+func validateVendorConfig(vendor string, cfg VendorConfig) error {
+	label := strings.TrimSpace(vendor)
+	if label == "" {
+		label = "provider"
+	}
 	if strings.TrimSpace(cfg.APIKey) == "" {
-		return NewProviderError(ErrorConfigMissing, "DeepSeek API key is not configured")
+		return NewProviderError(ErrorConfigMissing, label+" API key is not configured")
 	}
 	if strings.TrimSpace(cfg.BaseURL) == "" {
-		return NewProviderError(ErrorConfigMissing, "DeepSeek base URL is not configured")
+		return NewProviderError(ErrorConfigMissing, label+" base URL is not configured")
 	}
 	parsed, err := url.Parse(strings.TrimSpace(cfg.BaseURL))
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "https" && parsed.Scheme != "http") {
-		return NewProviderError(ErrorPermanent, "DeepSeek base URL is invalid")
+		return NewProviderError(ErrorPermanent, label+" base URL is invalid")
 	}
 	if strings.TrimSpace(cfg.Model) == "" {
-		return NewProviderError(ErrorConfigMissing, "DeepSeek model is not configured")
+		return NewProviderError(ErrorConfigMissing, label+" model is not configured")
 	}
 	return nil
 }

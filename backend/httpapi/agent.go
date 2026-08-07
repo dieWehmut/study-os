@@ -15,13 +15,30 @@ func providerFor(application *app.App) (agent.Provider, error) {
 	if application == nil {
 		return nil, agent.NewProviderError(agent.ErrorConfigMissing, "application unavailable")
 	}
+	return providerForVendor(application.Config, application.Config.ActiveProvider)
+}
+
+// providerForVendor builds a provider for one vendor id. Resolving the wire
+// protocol and settings through the registry is what lets a newly registered
+// vendor work here without any change to this file.
+func providerForVendor(cfg config.Config, vendorID string) (agent.Provider, error) {
+	active := strings.ToLower(strings.TrimSpace(vendorID))
+	if active == "" {
+		active = "mock"
+	}
+	spec, ok := config.LookupVendor(active)
+	if !ok {
+		return nil, agent.NewProviderError(agent.ErrorConfigMissing, "configured AI provider is unsupported")
+	}
+	resolved := cfg.Vendor(spec.ID)
 	return agent.NewProvider(agent.ProviderConfig{
-		Active: application.Config.ActiveProvider,
-		DeepSeek: agent.DeepSeekConfig{
-			APIKey:         application.Config.DeepSeek.APIKey,
-			BaseURL:        application.Config.DeepSeek.BaseURL,
-			Model:          application.Config.DeepSeek.Model,
-			ReasoningModel: application.Config.DeepSeek.ReasoningModel,
+		Active: spec.ID,
+		Style:  string(spec.Style),
+		Vendor: agent.VendorConfig{
+			APIKey:         resolved.APIKey,
+			BaseURL:        resolved.BaseURL,
+			Model:          resolved.Model,
+			ReasoningModel: resolved.ReasoningModel,
 		},
 	})
 }
@@ -116,22 +133,27 @@ func handleAgentConfig(response http.ResponseWriter, request *http.Request, appl
 		return
 	}
 
+	// DashScope is the TTS vendor rather than a chat vendor, so it is not in the
+	// AI registry and keeps its own branch. Every chat vendor derives its env
+	// keys from the registry, so no new vendor needs a case here.
 	updates := make(map[string]string)
-	switch provider {
-	case "deepseek":
+	spec, isVendor := config.LookupVendor(provider)
+	switch {
+	case isVendor && spec.NeedsKey():
+		keys := spec.EnvKeys()
 		if input.APIKey != nil {
-			updates["DEEPSEEK_API_KEY"] = strings.TrimSpace(*input.APIKey)
+			updates[keys["api_key"]] = strings.TrimSpace(*input.APIKey)
 		}
 		if input.BaseURL != nil {
-			updates["DEEPSEEK_BASE_URL"] = strings.TrimSpace(*input.BaseURL)
+			updates[keys["base_url"]] = strings.TrimSpace(*input.BaseURL)
 		}
 		if input.Model != nil {
-			updates["DEEPSEEK_MODEL"] = strings.TrimSpace(*input.Model)
+			updates[keys["model"]] = strings.TrimSpace(*input.Model)
 		}
 		if input.ReasoningModel != nil {
-			updates["DEEPSEEK_REASONING_MODEL"] = strings.TrimSpace(*input.ReasoningModel)
+			updates[keys["reasoning_model"]] = strings.TrimSpace(*input.ReasoningModel)
 		}
-	case "dashscope":
+	case provider == "dashscope":
 		if input.APIKey != nil {
 			updates["DASHSCOPE_API_KEY"] = strings.TrimSpace(*input.APIKey)
 		}
@@ -153,17 +175,32 @@ func handleAgentConfig(response http.ResponseWriter, request *http.Request, appl
 
 	// Apply the same values to the in-memory config so the change takes effect
 	// without a restart. The API key itself is never echoed back.
-	if value, ok := updates["DEEPSEEK_API_KEY"]; ok {
-		application.Config.DeepSeek.APIKey = value
-	}
-	if value, ok := updates["DEEPSEEK_BASE_URL"]; ok {
-		application.Config.DeepSeek.BaseURL = value
-	}
-	if value, ok := updates["DEEPSEEK_MODEL"]; ok {
-		application.Config.DeepSeek.Model = value
-	}
-	if value, ok := updates["DEEPSEEK_REASONING_MODEL"]; ok {
-		application.Config.DeepSeek.ReasoningModel = value
+	payload := map[string]any{"provider": provider}
+	if isVendor && spec.NeedsKey() {
+		keys := spec.EnvKeys()
+		if application.Config.AI == nil {
+			application.Config.AI = make(map[string]config.VendorConfig)
+		}
+		vendor := application.Config.AI[spec.ID]
+		if value, ok := updates[keys["api_key"]]; ok {
+			vendor.APIKey = value
+		}
+		if value, ok := updates[keys["base_url"]]; ok {
+			vendor.BaseURL = value
+		}
+		if value, ok := updates[keys["model"]]; ok {
+			vendor.Model = value
+		}
+		if value, ok := updates[keys["reasoning_model"]]; ok {
+			vendor.ReasoningModel = value
+		}
+		application.Config.AI[spec.ID] = vendor
+
+		resolved := application.Config.Vendor(spec.ID)
+		payload["key_configured"] = resolved.APIKey != ""
+		payload["base_url"] = resolved.BaseURL
+		payload["model"] = resolved.Model
+		payload["reasoning_model"] = resolved.ReasoningModel
 	}
 	if value, ok := updates["DASHSCOPE_API_KEY"]; ok {
 		application.Config.DashScopeAPIKey = value
@@ -171,15 +208,7 @@ func handleAgentConfig(response http.ResponseWriter, request *http.Request, appl
 	if value, ok := updates["DASHSCOPE_TTS_VOICE"]; ok {
 		application.Config.DashScopeVoice = value
 	}
-
-	payload := map[string]any{"provider": provider}
-	switch provider {
-	case "deepseek":
-		payload["key_configured"] = application.Config.DeepSeek.APIKey != ""
-		payload["base_url"] = application.Config.DeepSeek.BaseURL
-		payload["model"] = application.Config.DeepSeek.Model
-		payload["reasoning_model"] = application.Config.DeepSeek.ReasoningModel
-	case "dashscope":
+	if provider == "dashscope" {
 		payload["key_configured"] = application.Config.DashScopeAPIKey != ""
 		payload["voice"] = application.Config.DashScopeVoice
 	}
@@ -207,15 +236,7 @@ func handleAgentTest(response http.ResponseWriter, request *http.Request, applic
 		writeJSON(response, http.StatusOK, map[string]any{"ok": true, "provider": "mock", "latency_ms": 0})
 		return
 	}
-	provider, err := agent.NewProvider(agent.ProviderConfig{
-		Active: providerName,
-		DeepSeek: agent.DeepSeekConfig{
-			APIKey:         application.Config.DeepSeek.APIKey,
-			BaseURL:        application.Config.DeepSeek.BaseURL,
-			Model:          application.Config.DeepSeek.Model,
-			ReasoningModel: application.Config.DeepSeek.ReasoningModel,
-		},
-	})
+	provider, err := providerForVendor(application.Config, providerName)
 	if err != nil {
 		writeJSON(response, http.StatusBadRequest, map[string]any{
 			"error":       err.Error(),

@@ -111,11 +111,16 @@ func configNeedsDefaults(cfg config.Config) bool {
 	if cfg.ListenAddress == "" || cfg.DataDir == "" || cfg.DBPath == "" || cfg.ActiveProvider == "" {
 		return true
 	}
-	// DeepSeek settings are optional for the default mock provider. Do not make
+	// Vendor credentials are optional for the default mock provider. Do not make
 	// a fully specified mock application read an env file just to fill unused
-	// fields, but still allow a DeepSeek app to inherit provider settings.
-	return cfg.ActiveProvider == "deepseek" &&
-		(cfg.DeepSeek.APIKey == "" || cfg.DeepSeek.BaseURL == "" || cfg.DeepSeek.Model == "")
+	// fields, but still let a hosted-vendor app inherit its provider settings.
+	// Base URL and model always resolve from the registry, so the key is the
+	// only setting that can genuinely be absent.
+	spec, ok := config.LookupVendor(cfg.ActiveProvider)
+	if !ok || !spec.NeedsKey() {
+		return false
+	}
+	return cfg.Vendor(spec.ID).APIKey == ""
 }
 
 func mergeConfig(configured, loaded config.Config) config.Config {
@@ -134,18 +139,7 @@ func mergeConfig(configured, loaded config.Config) config.Config {
 	if configured.EnvFilePath == "" {
 		configured.EnvFilePath = loaded.EnvFilePath
 	}
-	if configured.DeepSeek.APIKey == "" {
-		configured.DeepSeek.APIKey = loaded.DeepSeek.APIKey
-	}
-	if configured.DeepSeek.BaseURL == "" {
-		configured.DeepSeek.BaseURL = loaded.DeepSeek.BaseURL
-	}
-	if configured.DeepSeek.Model == "" {
-		configured.DeepSeek.Model = loaded.DeepSeek.Model
-	}
-	if configured.DeepSeek.ReasoningModel == "" {
-		configured.DeepSeek.ReasoningModel = loaded.DeepSeek.ReasoningModel
-	}
+	configured.AI = mergeVendors(configured.AI, loaded.AI)
 	if configured.DashScopeAPIKey == "" {
 		configured.DashScopeAPIKey = loaded.DashScopeAPIKey
 	}
@@ -156,6 +150,36 @@ func mergeConfig(configured, loaded config.Config) config.Config {
 		configured.SeedFixtures = loaded.SeedFixtures
 	}
 	return configured
+}
+
+// mergeVendors fills per-vendor gaps field by field rather than per vendor, so
+// an application that sets only one vendor's key still inherits that vendor's
+// base URL and models from the environment.
+func mergeVendors(configured, loaded map[string]config.VendorConfig) map[string]config.VendorConfig {
+	if len(loaded) == 0 {
+		return configured
+	}
+	merged := make(map[string]config.VendorConfig, len(loaded)+len(configured))
+	for id, vendor := range loaded {
+		merged[id] = vendor
+	}
+	for id, vendor := range configured {
+		fallback := merged[id]
+		if vendor.APIKey == "" {
+			vendor.APIKey = fallback.APIKey
+		}
+		if vendor.BaseURL == "" {
+			vendor.BaseURL = fallback.BaseURL
+		}
+		if vendor.Model == "" {
+			vendor.Model = fallback.Model
+		}
+		if vendor.ReasoningModel == "" {
+			vendor.ReasoningModel = fallback.ReasoningModel
+		}
+		merged[id] = vendor
+	}
+	return merged
 }
 
 func applyPathOverrides(cfg config.Config, options Options) config.Config {
