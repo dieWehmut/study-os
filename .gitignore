@@ -21,6 +21,8 @@ backend.exe
 *.exe~
 study-os.exe
 backend-e2e.exe
+.dev-backend
+.dev-backend.exe
 frontend/.e2e-data/
 frontend/test-results/
 frontend/playwright-report/
