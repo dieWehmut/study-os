@@ -10,6 +10,12 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
+# Keep this file UTF-8 *without* a BOM. It is meant to be run as
+# `irm <raw url> | iex`, and Invoke-RestMethod leaves the BOM in the returned
+# string, so `iex` then chokes on U+FEFF glued to the first command. The Chinese
+# text below still decodes correctly over HTTP because GitHub raw serves this
+# file as text/plain; charset=utf-8.
+
 $archiveName = 'study-os-pwa-windows-x64.zip'
 
 function Get-LatestAssetUrl {
