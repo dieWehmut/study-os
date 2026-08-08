@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 
+import { readReadingSession } from "@/lib/reading-session"
 import Reading from "./Reading"
 
 const source = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
@@ -10,6 +11,10 @@ function paste(markdown: string) {
 }
 
 describe("Reading page", () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
   it("moves you on once a stop is done, so the mark doubles as a page turn", () => {
     // Marking and then reaching for 下一节 is two actions for one intent.
     render(<Reading />)
@@ -108,5 +113,63 @@ describe("Reading page", () => {
     render(<Reading />)
 
     expect(screen.queryByRole("button", { name: /看导图/ })).not.toBeInTheDocument()
+  })
+
+  it("hands the document back when you come again", () => {
+    // Re-pasting the lecture notes every session is the cost that stops this
+    // from being somewhere you actually read.
+    const first = render(<Reading />)
+    paste(source)
+    first.unmount()
+
+    render(<Reading />)
+
+    expect(screen.getByLabelText("原文")).toHaveValue(source)
+    expect(screen.getByRole("button", { name: /光反应/ })).toBeInTheDocument()
+  })
+
+  it("puts you back at the stop you left off on, still marked", () => {
+    const first = render(<Reading />)
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+    first.unmount()
+
+    render(<Reading />)
+
+    expect(screen.getByText("2 / 2")).toBeInTheDocument()
+    expect(screen.getByText("已读 1 / 2")).toBeInTheDocument()
+  })
+
+  it("stops offering a document you have cleared away", () => {
+    const first = render(<Reading />)
+    paste(source)
+    paste("")
+    first.unmount()
+
+    render(<Reading />)
+
+    expect(screen.getByLabelText("原文")).toHaveValue("")
+  })
+
+  it("does not restore a place past the end of a shortened document", () => {
+    // The stored place belongs to the document that produced it. A shorter one
+    // read back would leave the reader pointing at a stop that is not there.
+    localStorage.setItem(
+      "study-os.reading",
+      JSON.stringify({ markdown: "# 一\n只有一节。", index: 9, readIds: [] }),
+    )
+
+    render(<Reading />)
+
+    expect(screen.getByText("1 / 1")).toBeInTheDocument()
+  })
+
+  it("saves the marks as they are made, not only when you leave", () => {
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+
+    expect(readReadingSession().readIds).toHaveLength(1)
   })
 })

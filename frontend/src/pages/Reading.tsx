@@ -9,30 +9,42 @@ import { FocusReader } from "@/features/reading/FocusReader"
 import { StructurePreview } from "@/features/reading/StructurePreview"
 import { chunkMarkdown } from "@/lib/chunk"
 import { markdownToMindMap } from "@/lib/mindmap"
+import { readReadingSession, writeReadingSession, type ReadingSession } from "@/lib/reading-session"
 
 export default function Reading() {
-  const [markdown, setMarkdown] = useState("")
-  const [index, setIndex] = useState(0)
   const [showMap, setShowMap] = useState(false)
-  const [readIds, setReadIds] = useState<ReadonlySet<string>>(new Set())
+  // The document, the place and the marks travel together, because a mark
+  // names a chunk id and chunk ids come from the document's own shape.
+  const [session, setSession] = useState<ReadingSession>(readReadingSession)
+  const { markdown } = session
 
   const chunks = useMemo(() => chunkMarkdown(markdown), [markdown])
   // The same headings the outline is built from, drawn sideways. No model, and
   // no second paste box to keep in sync with this one.
   const map = useMemo(() => markdownToMindMap(markdown), [markdown])
+  const readIds = useMemo(() => new Set(session.readIds), [session.readIds])
+  // A place stored against a longer draft has to land somewhere real in this
+  // one, or the reader points at a stop that is not there.
+  const index = Math.min(session.index, Math.max(chunks.length - 1, 0))
+
+  function save(next: ReadingSession) {
+    setSession(next)
+    writeReadingSession(next)
+  }
 
   function toggleRead(id: string) {
-    const next = new Set(readIds)
-    if (next.delete(id)) {
-      setReadIds(next)
+    if (readIds.has(id)) {
+      // Taking a mark back is a correction, and moving you would carry you away
+      // from the stop you came back to fix.
+      save({ ...session, index, readIds: session.readIds.filter((entry) => entry !== id) })
       return
     }
-    next.add(id)
-    setReadIds(next)
-    // Marking a stop and then reaching for 下一节 is two actions for one
-    // intent. Taking a mark back is not -- that is a correction, and moving
-    // you would carry you away from the stop you came back to fix.
-    setIndex((current) => Math.min(current + 1, chunks.length - 1))
+    // Marking a stop and then reaching for 下一节 is two actions for one intent.
+    save({
+      markdown,
+      index: Math.min(index + 1, chunks.length - 1),
+      readIds: [...session.readIds, id],
+    })
   }
 
   return (
@@ -54,12 +66,10 @@ export default function Reading() {
             aria-label="原文"
             value={markdown}
             onChange={(event) => {
-              setMarkdown(event.target.value)
               // A new document has a new set of stops; keeping the old position
               // would drop the reader somewhere arbitrary in it, and the old
               // marks would attach to stops nobody has read.
-              setIndex(0)
-              setReadIds(new Set())
+              save({ markdown: event.target.value, index: 0, readIds: [] })
             }}
             placeholder={"# 标题\n## 小节\n正文…"}
             className="min-h-40 font-mono text-xs"
@@ -104,7 +114,9 @@ export default function Reading() {
               markdown={markdown}
               activeId={chunks[index]?.id}
               readIds={readIds}
-              onSelect={(chunk) => setIndex(chunks.findIndex((item) => item.id === chunk.id))}
+              onSelect={(chunk) =>
+                save({ ...session, index: chunks.findIndex((item) => item.id === chunk.id) })
+              }
             />
           </CardContent>
         </Card>
@@ -120,7 +132,7 @@ export default function Reading() {
             <FocusReader
               chunks={chunks}
               index={index}
-              onIndexChange={setIndex}
+              onIndexChange={(next) => save({ ...session, index: next })}
               onToggleRead={toggleRead}
               readIds={readIds}
             />
