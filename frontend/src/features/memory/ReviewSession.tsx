@@ -178,9 +178,11 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
           </div>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="font-heading text-3xl font-medium sm:text-4xl">
+              {/* h2, not h1: the page already owns its title, and a second h1
+                  flattens the document outline for screen-reader users. */}
+              <h2 className="font-heading text-3xl font-medium sm:text-4xl">
                 {current.prompt.question}
-              </h1>
+              </h2>
               {current.knowledge.part_of_speech ? (
                 <CardDescription className="mt-2">
                   {current.knowledge.part_of_speech}

@@ -1,17 +1,48 @@
 import { expect, test, type Page } from "@playwright/test"
 
-async function answerCurrentPrompt(page: Page) {
-  const modeBadge = page.locator("main").getByText(/看英文，说中文|看中文，说英文|语境填空/).first()
-  await expect(modeBadge).toBeVisible()
-  const mode = (await modeBadge.textContent()) ?? ""
-  const expected = mode.includes("看英文") ? "放弃；抛弃" : "abandon"
+// The queue serves three different answer shapes and the scheduler decides which
+// comes first, so dispatch on the control that is actually on screen rather than
+// parsing the mode badge. The old helper assumed every prompt had a text box,
+// which silently stopped being true when en_to_zh became self-graded.
+async function answerCurrentPrompt(page: Page): Promise<"self-rated" | "overridden"> {
+  const selfRating = page.getByRole("group", { name: "自评掌握程度" })
+  const choices = page.getByRole("group", { name: "选择答案" })
 
-  await page.getByLabel("你的答案").fill(expected)
-  await page.getByRole("button", { name: "提交答案" }).click()
+  if (await selfRating.isVisible()) {
+    // Recognition is self-graded: there is nothing to type and no rating to
+    // override, so the reference answer is the only confirmation available.
+    // exact, because accessible-name matching is substring-based by default and
+    // "认识" is contained in "不认识" -- the opposite rating.
+    await page.getByRole("button", { name: "认识", exact: true }).click()
+    await expect(page.getByText("参考答案")).toBeVisible()
+    await page.getByRole("button", { name: "下一题" }).click()
+    return "self-rated"
+  }
+
+  if (await choices.isVisible()) {
+    await choices.getByRole("button").first().click()
+  } else {
+    // Any non-empty answer reaches the grader; the override below is what this
+    // spec actually asserts, so the text does not have to be correct.
+    await page.getByLabel("你的答案").fill("abandon")
+    await page.getByRole("button", { name: "提交答案" }).click()
+  }
+
   await expect(page.getByText(/正确|部分正确|需要重学/).first()).toBeVisible()
   await page.getByRole("button", { name: "改判为掌握" }).click()
   await expect(page.getByText(/系统他评 · 良好/)).toBeVisible()
   await page.getByRole("button", { name: "下一题" }).click()
+  return "overridden"
+}
+
+// The reviewed word is content nested under the page, not the page's own title,
+// so it is an h2. Asserting a single h1 keeps the document outline honest: a
+// second h1 here made `main h1` ambiguous and broke this spec outright.
+async function questionText(page: Page): Promise<string> {
+  const heading = page.locator("main h2")
+  await expect(heading).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator("main h1")).toHaveCount(1)
+  return (await heading.textContent())?.trim() ?? ""
 }
 
 async function currentProgress(page: Page): Promise<number> {
@@ -59,16 +90,14 @@ test("imports a fixture, reviews it, corrects a rating, and persists across relo
   await expect(page.getByText("They abandoned the project.").first()).toBeVisible()
 
   await page.goto("/memory")
-  await expect(page.locator("main h1")).toBeVisible({ timeout: 15_000 })
+  const firstQuestion = await questionText(page)
   const dueBefore = await currentProgress(page)
-  const firstQuestion = (await page.locator("main h1").textContent())?.trim() ?? ""
   await answerCurrentPrompt(page)
 
   await page.reload()
-  await expect(page.locator("main h1")).toBeVisible()
   const dueAfter = await currentProgress(page)
   expect(dueAfter).toBe(dueBefore - 1)
-  expect((await page.locator("main h1").textContent())?.trim()).not.toBe(firstQuestion)
+  expect(await questionText(page)).not.toBe(firstQuestion)
 
   await page.goto("/knowledge")
   await page.getByRole("button", { name: new RegExp(secondTerm) }).click()

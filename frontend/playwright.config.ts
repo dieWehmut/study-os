@@ -5,6 +5,12 @@ const backendPort = 8080
 const frontendPort = 5174
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const e2eDataDir = path.join(repoRoot, "frontend", ".e2e-data", `run-${Date.now()}`)
+// Absolute, because a bare name only resolves if the shell searches the working
+// directory, and cmd.exe skips it whenever NoDefaultCurrentDirectoryInExePath is
+// set -- a common hardening setting. Relying on that lookup made the documented
+// `pnpm run e2e` die on a clean checkout with "not recognized as an internal or
+// external command", before a single test ran.
+const backendBinary = path.join(repoRoot, "backend-e2e.exe")
 
 export default defineConfig({
   testDir: "./e2e",
@@ -30,7 +36,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "go build -o backend-e2e.exe ./backend && backend-e2e.exe",
+      command: `go build -o "${backendBinary}" ./backend && "${backendBinary}"`,
       url: `http://127.0.0.1:${backendPort}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,
