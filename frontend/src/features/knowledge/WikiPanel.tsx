@@ -16,6 +16,8 @@ import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 
 interface WikiPanelProps {
   item: KnowledgeItem | null
+  /** The item already carries review cards, as of the last list request. */
+  scheduled?: boolean
   onUpdated?: (item: KnowledgeItem) => void
 }
 
@@ -37,7 +39,7 @@ function chunkMarkdown(markdown: string): string[] {
   return chunks.length > 0 ? chunks : [markdown]
 }
 
-export function WikiPanel({ item, onUpdated }: WikiPanelProps) {
+export function WikiPanel({ item, scheduled = false, onUpdated }: WikiPanelProps) {
   const [tagOverride, setTagOverride] = useState<string[] | null>(null)
   const [chunkIndex, setChunkIndex] = useState(0)
   const [tagPending, setTagPending] = useState("")
@@ -46,8 +48,9 @@ export function WikiPanel({ item, onUpdated }: WikiPanelProps) {
   const current: KnowledgeItem | null = item ? { ...item, tags: tagOverride ?? item.tags } : null
   // Only a confirmed write closes the control. A failed press leaves it open,
   // because a button that looks done when nothing was written is worse than
-  // one that failed loudly.
-  const inQueue = scheduleNote?.tone === "ok" || scheduleNote?.tone === "known"
+  // one that failed loudly. The prop is what the list knew before this panel
+  // opened; the note is what this panel did since.
+  const inQueue = scheduled || scheduleNote?.tone === "ok" || scheduleNote?.tone === "known"
 
   const chunks = current?.detailed_markdown ? chunkMarkdown(current.detailed_markdown) : []
 

@@ -19,6 +19,9 @@ export default function Knowledge() {
   const [groups, setGroups] = useState<KnowledgeGroup[]>([])
   const [group, setGroup] = useState("")
   const [items, setItems] = useState<KnowledgeItem[]>([])
+  // Ids the server says already carry review cards, so 排进复习 tells the truth
+  // on first paint instead of only after being pressed.
+  const [scheduledIds, setScheduledIds] = useState<ReadonlySet<string>>(new Set())
   const [count, setCount] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<KnowledgeItem | null>(null)
@@ -48,6 +51,7 @@ export default function Knowledge() {
         if (controller.signal.aborted) return
         setItems(result.items)
         setCount(result.count)
+        setScheduledIds(new Set(result.scheduled_ids ?? []))
         setSelectedId((current) =>
           current && result.items.some((item) => item.id === current) ? current : result.items[0]?.id ?? null,
         )
@@ -251,6 +255,7 @@ export default function Knowledge() {
               <WikiPanel
                 key={selected?.id ?? "none"}
                 item={selected}
+                scheduled={selected ? scheduledIds.has(selected.id) : false}
                 onUpdated={(updated) => {
                   setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)))
                   setSelectedDetail(updated)

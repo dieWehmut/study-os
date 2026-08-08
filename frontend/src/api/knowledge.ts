@@ -13,6 +13,12 @@ export interface ListKnowledgeOptions {
 export interface KnowledgeListResponse {
   items: KnowledgeItem[]
   count: number
+  /**
+   * Which of the returned items already carry review cards. Optional because
+   * an older backend answers without it, and a missing answer must not be read
+   * as "queued" -- that would lock the control on every item in the library.
+   */
+  scheduled_ids?: string[]
 }
 
 export interface KnowledgeGroup {

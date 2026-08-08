@@ -327,3 +327,70 @@ describe("sending a knowledge point into the review queue", () => {
     expect(screen.queryByText(/3 张卡/)).not.toBeInTheDocument()
   })
 })
+
+describe("showing what is already in the review queue", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useSubjectStore.setState({ subject: "all" })
+    mocks.listGroups.mockResolvedValue({ count: 0, items: [] })
+    mocks.getKnowledge.mockResolvedValue({
+      id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。",
+    })
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k1", prompt_count: 3 })
+  })
+
+  it("says an item is already queued before you press anything", async () => {
+    // Otherwise the button reads the same on a queued item as on a loose one,
+    // and the only way to find out is to press it -- on a queue with no undo.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+      scheduled_ids: ["k1"],
+    })
+    render(<Knowledge />)
+
+    expect(await screen.findByRole("button", { name: /已排进复习/ })).toBeDisabled()
+  })
+
+  it("leaves an unqueued item pressable", async () => {
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+      scheduled_ids: [],
+    })
+    render(<Knowledge />)
+
+    expect(await screen.findByRole("button", { name: /^排进复习/ })).toBeEnabled()
+  })
+
+  it("keeps the mark on the right item when you switch between them", async () => {
+    // The flags are per item and the panel is remounted per item; reading them
+    // off anything but the id would carry one item's state onto the next.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 2,
+      items: [
+        { id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" },
+        { id: "k2", item_type: "brain_dump", term: "光合作用", concise_definition: "分为光反应和暗反应。" },
+      ],
+      scheduled_ids: ["k2"],
+    })
+    render(<Knowledge />)
+    expect(await screen.findByRole("button", { name: /^排进复习/ })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole("button", { name: /光合作用/ }))
+
+    expect(await screen.findByRole("button", { name: /已排进复习/ })).toBeDisabled()
+  })
+
+  it("keeps the button usable when the server says nothing about queued items", async () => {
+    // An older backend answers without the field. Treating a missing answer as
+    // "queued" would lock the control on every item in the library.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+    })
+    render(<Knowledge />)
+
+    expect(await screen.findByRole("button", { name: /^排进复习/ })).toBeEnabled()
+  })
+})
