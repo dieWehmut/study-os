@@ -29,11 +29,22 @@ export function StructurePreview({ markdown, activeId, onSelect }: StructurePrev
     )
   }
 
+  // The cost of the whole document, before the first stop. Per-stop weights
+  // answer "is this one long?"; only the total answers "can I afford this
+  // right now?" -- and depth is the other half of it, since ten flat sections
+  // and ten nested three deep are nothing like the same read.
+  const total = chunks.reduce((sum, chunk) => sum + chunk.size, 0)
+  const levels = Math.max(...chunks.map((chunk) => chunk.path.length - 1))
+
   return (
     <div className="flex flex-col gap-2">
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
         <ListTree aria-hidden="true" className="size-3.5" />
         <span>{chunks.length} 个小节</span>
+        <span aria-hidden="true">·</span>
+        <span className="tabular-nums">共 {total} 字</span>
+        <span aria-hidden="true">·</span>
+        <span className="tabular-nums">{levels} 层</span>
       </p>
       <ol className="flex flex-col gap-1.5">
         {chunks.map((chunk, index) => {

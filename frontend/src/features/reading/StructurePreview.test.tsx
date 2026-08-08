@@ -75,6 +75,25 @@ describe("structure preview", () => {
     expect(screen.queryAllByRole("button")).toHaveLength(0)
   })
 
+  it("says what the whole document costs before the first stop", () => {
+    // The per-stop weights answer "is this one long?". Only the total answers
+    // "can I afford this document right now?", which is the question you ask
+    // before starting rather than halfway through.
+    const total = chunkMarkdown(source).reduce((sum, chunk) => sum + chunk.size, 0)
+    render(<StructurePreview markdown={source} />)
+
+    expect(total).toBeGreaterThan(0)
+    expect(screen.getByText(`共 ${total} 字`)).toBeInTheDocument()
+  })
+
+  it("says how deep the document nests", () => {
+    // Depth is the other half of the cost: ten flat sections and ten nested
+    // three deep are the same count and nothing like the same read.
+    render(<StructurePreview markdown={source} />)
+
+    expect(screen.getByText("2 层")).toBeInTheDocument()
+  })
+
   it("shows how heavy each stop is, so a long one is not a surprise", () => {
     render(<StructurePreview markdown={source} />)
 
