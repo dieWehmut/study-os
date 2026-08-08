@@ -41,6 +41,13 @@ type githubRelease struct {
 
 func (s *Service) check(ctx context.Context) Status {
 	status := Status{CurrentVersion: s.Version, CheckedAt: time.Now().UTC()}
+	// Status holds s.mu across this call and sync.Mutex.Lock ignores contexts,
+	// so an unbounded check does not just stall its own caller -- it wedges
+	// every later one behind the mutex. Bound it here rather than on the shared
+	// client: Apply reuses that client to pull a release archive, which can
+	// legitimately run far longer than a metadata lookup.
+	ctx, cancel := context.WithTimeout(ctx, defaultUpdateTimeout)
+	defer cancel()
 	apiBase := strings.TrimRight(s.APIBase, "/")
 	if apiBase == "" {
 		apiBase = "https://api.github.com"

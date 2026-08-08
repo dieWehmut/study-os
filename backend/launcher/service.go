@@ -32,6 +32,9 @@ type Service struct {
 	activity atomic.Int64
 }
 
+// defaultUpdateTimeout bounds a single call to the GitHub releases API.
+var defaultUpdateTimeout = 20 * time.Second
+
 type Options struct {
 	StaticDir string
 	Repo      string

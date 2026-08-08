@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCompareVersions(t *testing.T) {
@@ -207,4 +208,54 @@ func mustRead(t *testing.T, path string) []byte {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return content
+}
+
+func TestUpdateCheckGivesUpOnAStalledGitHub(t *testing.T) {
+	// NewService hands the update checker http.DefaultClient, which has no
+	// timeout. GitHub accepting the connection and then never answering is
+	// indistinguishable from a healthy check until the client gives up, and it
+	// never does.
+	//
+	// The damage is wider than the one stuck request. Status holds s.mu across
+	// the network call, and sync.Mutex.Lock is not context-aware, so every later
+	// caller blocks on the mutex no matter how short its own deadline is: one
+	// stalled check wedges the update endpoint for the rest of the process.
+	previous := defaultUpdateTimeout
+	defaultUpdateTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { defaultUpdateTimeout = previous })
+
+	release := make(chan struct{})
+	stalled := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-release
+	}))
+	// httptest's Close waits for handlers to return, so the release has to
+	// happen first. Cleanups run last-registered-first.
+	t.Cleanup(stalled.Close)
+	t.Cleanup(func() { close(release) })
+
+	service := NewService(Options{Repo: "fake/study-os", Version: "0.2.0", DataDir: t.TempDir()})
+	service.APIBase = stalled.URL
+
+	// context.Background() on purpose: the service has to bound itself rather
+	// than lean on whatever deadline the HTTP handler happened to pass in.
+	done := make(chan Status, 1)
+	go func() { done <- service.Status(context.Background()) }()
+	select {
+	case status := <-done:
+		if status.Error == "" {
+			t.Fatalf("stalled update server reported success: %#v", status)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Status never returned: the update check has no request timeout")
+	}
+
+	// The second caller is the one that matters: it proves the stalled check
+	// released the mutex instead of wedging every future request behind it.
+	second := make(chan Status, 1)
+	go func() { second <- service.Status(context.Background()) }()
+	select {
+	case <-second:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a later update check is stuck behind the stalled one's mutex")
+	}
 }
