@@ -59,6 +59,27 @@ export function listGroups(): Promise<KnowledgeGroupListResponse> {
   return apiRequest<KnowledgeGroupListResponse>("/groups")
 }
 
+/** The other items sharing a group with one item -- a word's 词族, in English. */
+export interface RelatedKnowledge {
+  items: KnowledgeItem[]
+  groups: KnowledgeGroup[]
+}
+
+/**
+ * Ask what else belongs with this item.
+ *
+ * Both arrays default to empty rather than staying undefined. A backend that
+ * predates the endpoint, or a payload missing them, has to read as "no family"
+ * -- the alternative is a section of the panel that spins forever on the
+ * majority of items, which belong to no group at all.
+ */
+export async function listRelatedKnowledge(id: string): Promise<RelatedKnowledge> {
+  const related = await apiRequest<Partial<RelatedKnowledge>>(
+    `/knowledge/${encodeURIComponent(id)}/related`,
+  )
+  return { items: related.items ?? [], groups: related.groups ?? [] }
+}
+
 export interface ScheduleKnowledgeResponse {
   /**
    * "scheduled" when cards were just created, "already_scheduled" when the

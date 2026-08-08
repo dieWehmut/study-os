@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Knowledge from "./Knowledge"
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getKnowledge: vi.fn(),
   listKnowledge: vi.fn(),
   listGroups: vi.fn(),
+  listRelatedKnowledge: vi.fn(),
   scheduleKnowledge: vi.fn(),
   compareKnowledge: vi.fn(),
   updateKnowledgeTag: vi.fn(),
@@ -50,6 +51,8 @@ describe("Knowledge page", () => {
       count: 1,
       items: [{ id: "g1", name: "abandon 词族", kind: "word_family" }],
     })
+    // Most items belong to no group, so the quiet answer is the default one.
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
     mocks.compareKnowledge.mockResolvedValue({
       summary: "速度与加速度的对比",
       same_points: ["都是运动学概念"],
@@ -269,6 +272,74 @@ describe("Knowledge page", () => {
 
     expect(await screen.findByText("速度与加速度的对比")).toBeInTheDocument()
     expect(mocks.compareKnowledge).toHaveBeenCalled()
+  })
+})
+
+describe("showing the rest of a word's family", () => {
+  const abandon = {
+    id: "k1",
+    item_type: "word_sense",
+    subject: "english",
+    term: "abandon",
+    concise_definition: "放弃；抛弃",
+  }
+  const abandonment = {
+    id: "k2",
+    item_type: "word_sense",
+    subject: "english",
+    term: "abandonment",
+    concise_definition: "放弃（名词）",
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useSubjectStore.setState({ subject: "all" })
+    mocks.listGroups.mockResolvedValue({ count: 0, items: [] })
+    // Only 一个 word is in the list: the family lives behind a group id the
+    // list was never told, which is the whole reason this section exists.
+    mocks.listKnowledge.mockResolvedValue({ count: 1, items: [abandon] })
+    mocks.getKnowledge.mockImplementation((id: string) =>
+      Promise.resolve(id === "k2" ? abandonment : abandon),
+    )
+    mocks.listRelatedKnowledge.mockResolvedValue({
+      items: [abandonment],
+      groups: [{ id: "g1", name: "abandon 词族", kind: "word_family" }],
+    })
+  })
+
+  it("names the family and lists the words in it", async () => {
+    // 错因 advice already says "同词族的其他词一起过" -- until now nothing in
+    // the app could show you which words those were.
+    render(<Knowledge />)
+
+    const family = await screen.findByRole("region", { name: "词族" })
+    expect(within(family).getByText("abandon 词族")).toBeInTheDocument()
+    expect(within(family).getByRole("button", { name: /abandonment/ })).toBeInTheDocument()
+    expect(mocks.listRelatedKnowledge).toHaveBeenCalledWith("k1")
+  })
+
+  it("opens a family word the current filter left out of the list", async () => {
+    // The sibling is not in `items` -- a search, a subject chip or 复习状态 will
+    // routinely exclude it. A family link that dead-ends on the empty panel is
+    // a broken link, so the panel has to follow the id, not the visible list.
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /abandonment/ }))
+
+    await waitFor(() => expect(mocks.getKnowledge).toHaveBeenCalledWith("k2"))
+    expect(await screen.findByRole("heading", { name: "abandonment" })).toBeInTheDocument()
+  })
+
+  it("says nothing at all about a word that belongs to no family", async () => {
+    // Most items are in no group. An empty 词族 heading on every one of them
+    // would be a permanent reminder of something that is not missing.
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    render(<Knowledge />)
+
+    expect(await screen.findByRole("heading", { name: "abandon" })).toBeInTheDocument()
+    // Under either name: an empty block relabelled 同组知识点 is the same
+    // permanent reminder of something that is not missing.
+    expect(screen.queryByRole("region", { name: /^(词族|同组知识点)$/ })).not.toBeInTheDocument()
   })
 })
 

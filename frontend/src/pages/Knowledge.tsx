@@ -86,13 +86,21 @@ export default function Knowledge() {
   }, [])
 
   const selectedSummary = items.find((item) => item.id === selectedId) ?? null
-  const selected = selectedDetail?.id === selectedSummary?.id ? selectedDetail : selectedSummary
+  // The detail wins whenever it is about the item in hand, including when the
+  // list never carried that item at all: a 词族 link points at a word the
+  // current search, subject or 复习状态 filter has every right to exclude, and
+  // a link that dead-ends on the empty panel is a broken link.
+  const selected = selectedDetail?.id === selectedId ? selectedDetail : selectedSummary
 
   useEffect(() => {
-    if (!selectedSummary || selectedSummary.detailed_markdown !== undefined || typeof getKnowledge !== "function") return
+    if (!selectedId || typeof getKnowledge !== "function") return
+    // Nothing to ask for when the row already carries the wiki text, or when
+    // the detail in hand is already about this item.
+    if (selectedSummary?.detailed_markdown !== undefined) return
+    if (selectedDetail?.id === selectedId) return
 
     let active = true
-    void getKnowledge(selectedSummary.id)
+    void getKnowledge(selectedId)
       .then((item) => {
         if (active) setSelectedDetail(item)
       })
@@ -102,7 +110,7 @@ export default function Knowledge() {
     return () => {
       active = false
     }
-  }, [selectedSummary])
+  }, [selectedId, selectedSummary, selectedDetail])
 
   function retry() {
     setLoading(true)
@@ -292,6 +300,7 @@ export default function Knowledge() {
                   setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)))
                   setSelectedDetail(updated)
                 }}
+                onSelectRelated={setSelectedId}
               />
             </div>
           )}

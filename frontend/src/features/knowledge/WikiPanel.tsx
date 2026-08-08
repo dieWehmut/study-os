@@ -1,11 +1,11 @@
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-import { useState } from "react"
-import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react"
+import { useEffect, useState } from "react"
+import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight, Waypoints } from "lucide-react"
 
 import { updateKnowledgeTag } from "@/api/chat"
-import { scheduleKnowledge } from "@/api/knowledge"
+import { listRelatedKnowledge, scheduleKnowledge, type RelatedKnowledge } from "@/api/knowledge"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,12 @@ interface WikiPanelProps {
   /** The item already carries review cards, as of the last list request. */
   scheduled?: boolean
   onUpdated?: (item: KnowledgeItem) => void
+  /**
+   * Open one of the item's family. Takes an id rather than an item because the
+   * sibling routinely sits outside whatever filter the list is under, so the
+   * caller has to be able to answer for a word it is not currently showing.
+   */
+  onSelectRelated?: (id: string) => void
 }
 
 // What the last 排进复习 press actually did. "known" is not a failure: the
@@ -38,13 +44,35 @@ function chunkMarkdown(markdown: string): string[] {
   return chunks.length > 0 ? chunks : [markdown]
 }
 
-export function WikiPanel({ item, scheduled = false, onUpdated }: WikiPanelProps) {
+// One shared value, so a failed or absent answer is the same object every
+// render and the loading effect cannot depend on its identity.
+const emptyFamily: RelatedKnowledge = { items: [], groups: [] }
+
+/**
+ * What to call the block.
+ *
+ * The groups themselves say what kind of grouping they are, so the heading
+ * follows the data rather than the page's subject chip -- a 化学 point grouped
+ * some day by 反应类型 must not be announced as a 词族.
+ */
+function familyLabel(groups: RelatedKnowledge["groups"]): string {
+  return groups.length > 0 && groups.every((group) => group.kind === "word_family")
+    ? "词族"
+    : "同组知识点"
+}
+
+export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated }: WikiPanelProps) {
   const [tagOverride, setTagOverride] = useState<string[] | null>(null)
   const [chunkIndex, setChunkIndex] = useState(0)
   const [tagPending, setTagPending] = useState("")
   const [schedulePending, setSchedulePending] = useState(false)
   const [scheduleNote, setScheduleNote] = useState<ScheduleNote | null>(null)
+  const [family, setFamily] = useState<RelatedKnowledge>(emptyFamily)
   const current: KnowledgeItem | null = item ? { ...item, tags: tagOverride ?? item.tags } : null
+  // Keyed on the id, not the item: a tag toggle replaces the item object, and
+  // re-asking the server for the same word's family on every tag press would
+  // be a request that can only ever return what is already on screen.
+  const itemID = item?.id
   // Only a confirmed write closes the control. A failed press leaves it open,
   // because a button that looks done when nothing was written is worse than
   // one that failed loudly. The prop is what the list knew before this panel
@@ -52,6 +80,25 @@ export function WikiPanel({ item, scheduled = false, onUpdated }: WikiPanelProps
   const inQueue = scheduled || scheduleNote?.tone === "ok" || scheduleNote?.tone === "known"
 
   const chunks = current?.detailed_markdown ? chunkMarkdown(current.detailed_markdown) : []
+
+  // The grouping has been written by the English pipeline since it existed and
+  // was readable only by a group id nobody was ever shown. A failure stays
+  // silent: the family is context, and an error line about it would sit above
+  // the definition you actually opened the panel for.
+  useEffect(() => {
+    if (!itemID) return
+    let active = true
+    void listRelatedKnowledge(itemID)
+      .then((related) => {
+        if (active) setFamily(related)
+      })
+      .catch(() => {
+        // The word itself is the point; its family is a bonus.
+      })
+    return () => {
+      active = false
+    }
+  }, [itemID])
 
   async function toggleTag(tag: string) {
     if (!current || tagPending) return
@@ -192,6 +239,34 @@ export function WikiPanel({ item, scheduled = false, onUpdated }: WikiPanelProps
             ) : <p className="text-sm text-muted-foreground">这个知识点还没有详细百科。</p>}
           </TabsContent>
         </Tabs>
+        {/* Nothing at all for the majority of items, which belong to no group:
+            an empty heading on every one of them would be a standing reminder
+            of something that is not missing. */}
+        {family.items.length > 0 ? (
+          <section aria-label={familyLabel(family.groups)} className="mt-5 grid gap-3 rounded-lg border bg-muted/25 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Waypoints aria-hidden="true" className="size-4 text-primary" />
+              <h2 className="text-sm font-medium">{familyLabel(family.groups)}</h2>
+              {family.groups.map((group) => (
+                <Badge key={group.id} variant="outline">{group.name}</Badge>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {family.items.map((sibling) => (
+                <Button
+                  key={sibling.id}
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onSelectRelated?.(sibling.id)}
+                >
+                  {sibling.term}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">一起过一遍，比单独背这一个划算。</p>
+          </section>
+        ) : null}
       </CardContent>
     </Card>
   )
