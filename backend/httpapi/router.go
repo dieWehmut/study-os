@@ -190,6 +190,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/mistakes/{attemptID}/schedule", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeSchedule(response, request, application)
 		})
+		api.Post("/mistakes/{attemptID}/correct", func(response http.ResponseWriter, request *http.Request) {
+			handleMistakeCorrect(response, request, application)
+		})
 		api.Post("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupCreate(response, request, application)
 		})

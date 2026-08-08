@@ -243,3 +243,136 @@ func TestGetMistakeReportsAnIDThatWasNeverFiled(t *testing.T) {
 		t.Fatalf("get unknown = %v, want ErrNotFound", err)
 	}
 }
+
+func TestCorrectingAMistakeMarksItWithoutTakingItOffTheList(t *testing.T) {
+	// A 错题本 that only ever grows is one you stop opening. 订正 has to be
+	// visible on the row -- and the row has to stay, because "I got this wrong
+	// once and fixed it" is the sentence the log exists to be able to say.
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	filed, err := store.RecordMistake(ctx, models.MistakeInput{
+		Subject: "physics", Stem: "求到底端的速度。", Cause: "method",
+	})
+	if err != nil {
+		t.Fatalf("record mistake: %v", err)
+	}
+	if filed.Corrected {
+		t.Fatalf("a mistake is not corrected the moment it is filed: %#v", filed)
+	}
+
+	corrected, err := store.CorrectMistake(ctx, filed.Attempt.ID)
+	if err != nil {
+		t.Fatalf("correct mistake: %v", err)
+	}
+	if !corrected.Corrected {
+		t.Fatalf("corrected = %#v", corrected)
+	}
+
+	listed, err := store.ListMistakes(ctx, models.MistakeListOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("list mistakes: %v", err)
+	}
+	// Exactly one row: the retry is a second attempt on the same question, and
+	// a right answer is not a mistake to list.
+	if len(listed) != 1 {
+		t.Fatalf("listed = %#v", listed)
+	}
+	if listed[0].Attempt.ID != filed.Attempt.ID || !listed[0].Corrected {
+		t.Fatalf("listed[0] = %#v", listed[0])
+	}
+}
+
+func TestCorrectingAMistakeTwiceSaysTheSameThing(t *testing.T) {
+	// The button is on a page that reloads, and a double press must not file
+	// two retries -- "how many times did I get this wrong" counts causes, and
+	// a second empty-cause row would be a second thing to explain.
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	filed, err := store.RecordMistake(ctx, models.MistakeInput{
+		Subject: "chemistry", Stem: "判断过量。", Cause: "recall",
+	})
+	if err != nil {
+		t.Fatalf("record mistake: %v", err)
+	}
+	for round := range 2 {
+		corrected, err := store.CorrectMistake(ctx, filed.Attempt.ID)
+		if err != nil {
+			t.Fatalf("correct mistake, round %d: %v", round, err)
+		}
+		if !corrected.Corrected {
+			t.Fatalf("round %d: corrected = %#v", round, corrected)
+		}
+	}
+
+	var attempts int
+	if err := store.SQL().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM question_attempts WHERE question_id = ?`, filed.Question.ID,
+	).Scan(&attempts); err != nil {
+		t.Fatalf("count attempts: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want the mistake and one retry", attempts)
+	}
+}
+
+func TestCorrectMistakeReportsAnIDThatWasNeverFiled(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if _, err := store.CorrectMistake(ctx, "never-filed"); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("correct unknown = %v, want ErrNotFound", err)
+	}
+}
+
+func TestDeletingACorrectedMistakeLeavesNoQuestionBehind(t *testing.T) {
+	// 取消 on a corrected row used to leave the question alive, held up by the
+	// retry alone: the list join is inner and filters causeless attempts out,
+	// so that question became a row nothing could see and nothing could
+	// delete. A question is spent once no attempt still blames anything.
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	filed, err := store.RecordMistake(ctx, models.MistakeInput{
+		Subject: "math", Stem: "求导。", Cause: "careless",
+	})
+	if err != nil {
+		t.Fatalf("record mistake: %v", err)
+	}
+	if _, err := store.CorrectMistake(ctx, filed.Attempt.ID); err != nil {
+		t.Fatalf("correct mistake: %v", err)
+	}
+	if err := store.DeleteMistake(ctx, filed.Attempt.ID); err != nil {
+		t.Fatalf("delete mistake: %v", err)
+	}
+
+	var questions, attempts int
+	if err := store.SQL().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM questions WHERE id = ?`, filed.Question.ID).Scan(&questions); err != nil {
+		t.Fatalf("count questions: %v", err)
+	}
+	if err := store.SQL().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM question_attempts WHERE question_id = ?`, filed.Question.ID).Scan(&attempts); err != nil {
+		t.Fatalf("count attempts: %v", err)
+	}
+	if questions != 0 || attempts != 0 {
+		t.Fatalf("questions = %d, attempts = %d, want both gone", questions, attempts)
+	}
+}

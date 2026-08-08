@@ -55,6 +55,25 @@ func handleMistakeDelete(response http.ResponseWriter, request *http.Request, ap
 	response.WriteHeader(http.StatusNoContent)
 }
 
+// handleMistakeCorrect marks a filed mistake as one you have since got right.
+//
+// Distinct from DELETE on purpose: 取消 is for a row filed by accident, 订正 is
+// for a mistake you have fixed. Deleting on 订正 would erase the evidence you
+// ever got it wrong, which is the one thing the log exists to keep.
+func handleMistakeCorrect(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	corrected, err := application.Store.CorrectMistake(request.Context(), chi.URLParam(request, "attemptID"))
+	if err != nil {
+		writeStoreError(response, err)
+		return
+	}
+	// 200, not 201: pressing it twice is the same answer, not a second retry.
+	writeJSON(response, http.StatusOK, corrected)
+}
+
 func handleMistakeList(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})

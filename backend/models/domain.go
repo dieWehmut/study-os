@@ -121,6 +121,12 @@ type MistakeListOptions struct {
 type Mistake struct {
 	Question Question        `json:"question"`
 	Attempt  QuestionAttempt `json:"attempt"`
+	// Corrected reports that this question has since been answered right.
+	//
+	// Derived from the existence of an attempt carrying no cause, never
+	// stored: a flag sitting beside the rows it summarises is a second source
+	// of truth, and the two drift the first time one write half-fails.
+	Corrected bool `json:"corrected"`
 }
 
 type IntegratedNote struct {

@@ -151,3 +151,75 @@ func TestMistakeDeleteSaysSoWhenThereIsNothingToDelete(t *testing.T) {
 		t.Fatalf("expected a JSON error payload, body = %s", body)
 	}
 }
+
+func TestMistakeCorrectEndpointMarksTheRowWithoutRemovingIt(t *testing.T) {
+	// 取消 is for a row filed by mistake; 订正 is for a mistake you have since
+	// fixed. Deleting on 订正 would erase the only evidence you ever got it
+	// wrong -- which is the one thing a 错题本 exists to keep.
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	filed := requestJSON(t, router, http.MethodPost, "/api/mistakes", map[string]any{
+		"subject": "physics", "stem": "受力分析", "cause": "method",
+	})
+	var created struct {
+		Attempt struct {
+			ID string `json:"id"`
+		} `json:"attempt"`
+		Corrected bool `json:"corrected"`
+	}
+	decodeJSON(t, filed, &created)
+	if created.Corrected {
+		t.Fatalf("a mistake is not corrected the moment it is filed")
+	}
+
+	corrected := requestJSON(t, router, http.MethodPost, "/api/mistakes/"+created.Attempt.ID+"/correct", nil)
+	correctedBody := corrected.Body.String()
+	if corrected.Code != http.StatusOK {
+		t.Fatalf("correct = %d, body = %s", corrected.Code, correctedBody)
+	}
+	var result struct {
+		Corrected bool `json:"corrected"`
+	}
+	decodeJSON(t, corrected, &result)
+	if !result.Corrected {
+		t.Fatalf("corrected flag missing, body = %s", correctedBody)
+	}
+
+	listed := requestJSON(t, router, http.MethodGet, "/api/mistakes", nil)
+	listedBody := listed.Body.String()
+	var page struct {
+		Count int `json:"count"`
+		Items []struct {
+			Corrected bool `json:"corrected"`
+			Attempt   struct {
+				ID string `json:"id"`
+			} `json:"attempt"`
+		} `json:"items"`
+	}
+	decodeJSON(t, listed, &page)
+	if page.Count != 1 {
+		t.Fatalf("count after correcting = %d, body = %s", page.Count, listedBody)
+	}
+	if page.Items[0].Attempt.ID != created.Attempt.ID || !page.Items[0].Corrected {
+		t.Fatalf("listed row = %#v, body = %s", page.Items[0], listedBody)
+	}
+}
+
+func TestMistakeCorrectSaysSoWhenThereIsNothingToCorrect(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	missing := requestJSON(t, router, http.MethodPost, "/api/mistakes/never-filed/correct", nil)
+	body := missing.Body.String()
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("correct missing = %d, body = %s", missing.Code, body)
+	}
+	var failure struct {
+		Error string `json:"error"`
+	}
+	decodeJSON(t, missing, &failure)
+	if failure.Error == "" {
+		t.Fatalf("expected a JSON error payload, body = %s", body)
+	}
+}
