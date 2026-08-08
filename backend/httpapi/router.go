@@ -181,6 +181,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/mistakes", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeList(response, request, application)
 		})
+		api.Delete("/mistakes/{attemptID}", func(response http.ResponseWriter, request *http.Request) {
+			handleMistakeDelete(response, request, application)
+		})
 		api.Post("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupCreate(response, request, application)
 		})

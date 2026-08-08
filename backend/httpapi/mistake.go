@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"study-os/backend/app"
 	"study-os/backend/models"
 )
@@ -39,6 +41,18 @@ func handleMistakeCreate(response http.ResponseWriter, request *http.Request, ap
 		return
 	}
 	writeJSON(response, http.StatusCreated, filed)
+}
+
+func handleMistakeDelete(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	if err := application.Store.DeleteMistake(request.Context(), chi.URLParam(request, "attemptID")); err != nil {
+		writeStoreError(response, err)
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
 }
 
 func handleMistakeList(response http.ResponseWriter, request *http.Request, application *app.App) {

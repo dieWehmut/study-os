@@ -113,8 +113,39 @@ func (s *Store) ListMistakes(ctx context.Context, options models.MistakeListOpti
 	return mistakes, rows.Err()
 }
 
-func scanMistake(row scanner) (models.Mistake, error) {
-	var mistake models.Mistake
+// DeleteMistake removes one filed attempt, and the question with it when no
+// other attempt refers to that question.
+//
+// The list join is an inner one, so a question with no attempts is invisible
+// -- and an invisible row is one nothing can ever delete. Cleaning up here is
+// what keeps 取消 from silently leaking rows.
+func (s *Store) DeleteMistake(ctx context.Context, attemptID string) error {
+	transaction, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = transaction.Rollback() }()
+
+	var questionID string
+	if err := transaction.QueryRowContext(ctx,
+		`SELECT question_id FROM question_attempts WHERE id = ?`, attemptID,
+	).Scan(&questionID); err != nil {
+		return mapNotFound(err, "mistake")
+	}
+	if _, err := transaction.ExecContext(ctx, `DELETE FROM question_attempts WHERE id = ?`, attemptID); err != nil {
+		return err
+	}
+	if _, err := transaction.ExecContext(ctx, `
+		DELETE FROM questions
+		WHERE id = ? AND NOT EXISTS (SELECT 1 FROM question_attempts WHERE question_id = ?)`,
+		questionID, questionID,
+	); err != nil {
+		return err
+	}
+	return transaction.Commit()
+}
+
+func scanMistake(row scanner) (models.Mistake, error) {	var mistake models.Mistake
 	var occurredAt, createdAt string
 	if err := row.Scan(
 		&mistake.Attempt.ID, &mistake.Attempt.QuestionID, &mistake.Attempt.Cause, &mistake.Attempt.Note, &occurredAt,

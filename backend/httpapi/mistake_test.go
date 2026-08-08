@@ -97,3 +97,57 @@ func TestMistakeEndpointRefusesAnEmptyStem(t *testing.T) {
 		t.Fatalf("empty stem = %d, body = %s", refused.Code, refused.Body.String())
 	}
 }
+
+func TestMistakeEndpointTakesBackARowFiledWrong(t *testing.T) {
+	// Naming a cause happens in the second after getting something wrong, which
+	// is exactly when you misclick. A log you cannot correct is one you stop
+	// trusting, and then stop keeping.
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	filed := requestJSON(t, router, http.MethodPost, "/api/mistakes", map[string]any{
+		"subject": "physics", "stem": "受力分析", "cause": "careless",
+	})
+	var created struct {
+		Attempt struct {
+			ID string `json:"id"`
+		} `json:"attempt"`
+	}
+	decodeJSON(t, filed, &created)
+
+	removed := requestJSON(t, router, http.MethodDelete, "/api/mistakes/"+created.Attempt.ID, nil)
+	if removed.Code != http.StatusNoContent {
+		t.Fatalf("delete = %d, body = %s", removed.Code, removed.Body.String())
+	}
+
+	listed := requestJSON(t, router, http.MethodGet, "/api/mistakes", nil)
+	listedBody := listed.Body.String()
+	var page struct {
+		Count int `json:"count"`
+	}
+	decodeJSON(t, listed, &page)
+	if page.Count != 0 {
+		t.Fatalf("count after delete = %d, body = %s", page.Count, listedBody)
+	}
+}
+
+func TestMistakeDeleteSaysSoWhenThereIsNothingToDelete(t *testing.T) {
+	// chi answers 404 for any route it does not know, so a status-only
+	// assertion would pass before the endpoint existed. The JSON error is what
+	// proves the handler ran.
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	missing := requestJSON(t, router, http.MethodDelete, "/api/mistakes/nope", nil)
+	body := missing.Body.String()
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("delete missing = %d, body = %s", missing.Code, body)
+	}
+	var failure struct {
+		Error string `json:"error"`
+	}
+	decodeJSON(t, missing, &failure)
+	if failure.Error == "" {
+		t.Fatalf("expected a JSON error payload, body = %s", body)
+	}
+}

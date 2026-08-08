@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -104,5 +105,46 @@ func TestRecordMistakeRejectsAnEmptyStem(t *testing.T) {
 
 	if _, err := store.RecordMistake(ctx, models.MistakeInput{Subject: "math", Stem: "   "}); err == nil {
 		t.Fatal("expected an empty stem to be refused")
+	}
+}
+
+func TestDeleteMistakeTakesTheQuestionWithItWhenNothingElsePointsAtIt(t *testing.T) {
+	// The join to questions is an inner one, so an orphaned question is
+	// invisible -- and therefore permanent. Rows nobody can see and nobody can
+	// delete are how a store quietly fills up.
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	filed, err := store.RecordMistake(ctx, models.MistakeInput{Subject: "physics", Stem: "受力分析", Cause: "careless"})
+	if err != nil {
+		t.Fatalf("record mistake: %v", err)
+	}
+	if err := store.DeleteMistake(ctx, filed.Attempt.ID); err != nil {
+		t.Fatalf("delete mistake: %v", err)
+	}
+
+	var questions int
+	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM questions`).Scan(&questions); err != nil {
+		t.Fatalf("count questions: %v", err)
+	}
+	if questions != 0 {
+		t.Fatalf("questions left behind = %d", questions)
+	}
+}
+
+func TestDeleteMistakeReportsAnIDThatWasNeverFiled(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if err := store.DeleteMistake(ctx, "never-filed"); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("delete unknown = %v, want ErrNotFound", err)
 	}
 }
