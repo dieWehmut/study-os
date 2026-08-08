@@ -22,7 +22,13 @@ describe("the reading session", () => {
     // The three are one fact. A mark names a chunk id, and chunk ids are
     // derived from the document's own shape, so marks without the text they
     // were made against belong to nothing.
-    const session = { markdown: "# 一\n正文", index: 2, readIds: ["h1-0-p0"], stuckIds: [] }
+    const session = {
+      markdown: "# 一\n正文",
+      index: 2,
+      readIds: ["h1-0-p0"],
+      stuckIds: [],
+      keptIds: ["h1-0-p0"],
+    }
     writeReadingSession(session)
 
     expect(readReadingSession()).toEqual(session)
@@ -32,7 +38,13 @@ describe("the reading session", () => {
     // Finishing a stop and failing to understand it are different facts about
     // it, and both can be true at once: you read the whole thing and still do
     // not have it.
-    const session = { markdown: "# 一\n正文", index: 0, readIds: ["a"], stuckIds: ["a", "b"] }
+    const session = {
+      markdown: "# 一\n正文",
+      index: 0,
+      readIds: ["a"],
+      stuckIds: ["a", "b"],
+      keptIds: [],
+    }
     writeReadingSession(session)
 
     expect(readReadingSession()).toEqual(session)
@@ -102,11 +114,29 @@ describe("the reading session", () => {
   it("treats a missing mark list as no marks rather than giving up the document", () => {
     localStorage.setItem(readingStorageKey, JSON.stringify({ markdown: "# 一", index: 1 }))
 
-    expect(readReadingSession()).toEqual({ markdown: "# 一", index: 1, readIds: [], stuckIds: [] })
+    expect(readReadingSession()).toEqual({
+      markdown: "# 一",
+      index: 1,
+      readIds: [],
+      stuckIds: [],
+      keptIds: [],
+    })
+  })
+
+  it("reads a session saved before there was anywhere to record what was filed", () => {
+    // Same reason as the stuck list: keptIds arrived later than the sessions
+    // already on disk, and refusing them would empty the box of whoever had a
+    // document open when the app updated.
+    localStorage.setItem(
+      readingStorageKey,
+      JSON.stringify({ markdown: "# 一", index: 0, readIds: ["a"], stuckIds: [] }),
+    )
+
+    expect(readReadingSession().keptIds).toEqual([])
   })
 
   it("forgets the document once you clear the box", () => {
-    writeReadingSession({ markdown: "# 一", index: 1, readIds: ["a"], stuckIds: [] })
+    writeReadingSession({ markdown: "# 一", index: 1, readIds: ["a"], stuckIds: [], keptIds: [] })
 
     writeReadingSession(emptyReadingSession)
 
@@ -122,14 +152,14 @@ describe("summarizing what is left to read", () => {
   })
 
   it("names the document by its own title, not by its first line of prose", () => {
-    const summary = summarizeReadingSession({ markdown: source, index: 0, readIds: [], stuckIds: [] })
+    const summary = summarizeReadingSession({ markdown: source, index: 0, readIds: [], stuckIds: [], keptIds: [] })
 
     expect(summary?.title).toBe("光合作用")
   })
 
   it("counts the stops still ahead, which is what decides whether to go back", () => {
     const chunks = ["# 一", "## A", "甲。", "## B", "乙。"].join("\n")
-    const summary = summarizeReadingSession({ markdown: chunks, index: 0, readIds: [], stuckIds: [] })
+    const summary = summarizeReadingSession({ markdown: chunks, index: 0, readIds: [], stuckIds: [], keptIds: [] })
 
     expect(summary?.total).toBe(2)
     expect(summary?.remaining).toBe(2)
@@ -142,6 +172,7 @@ describe("summarizing what is left to read", () => {
       index: 1,
       readIds: ["n0-0-p0"],
       stuckIds: [],
+      keptIds: [],
     })
 
     expect(summary?.read).toBe(1)
@@ -156,6 +187,7 @@ describe("summarizing what is left to read", () => {
       index: 0,
       readIds: ["gone", "also-gone"],
       stuckIds: [],
+      keptIds: [],
     })
 
     expect(summary?.read).toBe(0)
@@ -163,13 +195,13 @@ describe("summarizing what is left to read", () => {
   })
 
   it("falls back to a plain label when the document has no heading at all", () => {
-    const summary = summarizeReadingSession({ markdown: "只有正文，没有标题。", index: 0, readIds: [], stuckIds: [] })
+    const summary = summarizeReadingSession({ markdown: "只有正文，没有标题。", index: 0, readIds: [], stuckIds: [], keptIds: [] })
 
     expect(summary?.title).toBe("未命名文档")
   })
 
   it("has nothing to offer for text that produced no stops", () => {
-    expect(summarizeReadingSession({ markdown: "   ", index: 0, readIds: [], stuckIds: [] })).toBeNull()
+    expect(summarizeReadingSession({ markdown: "   ", index: 0, readIds: [], stuckIds: [], keptIds: [] })).toBeNull()
   })
 
   it("counts what is still in the way, not only how far you got", () => {
@@ -181,6 +213,7 @@ describe("summarizing what is left to read", () => {
       index: 1,
       readIds: ["n0-0-p0"],
       stuckIds: ["n0-0-p0"],
+      keptIds: [],
     })
 
     expect(summary?.read).toBe(1)
@@ -195,13 +228,14 @@ describe("summarizing what is left to read", () => {
       index: 0,
       readIds: [],
       stuckIds: ["gone"],
+      keptIds: [],
     })
 
     expect(summary?.stuck).toBe(0)
   })
 
   it("has nothing in the way before anything is flagged", () => {
-    const summary = summarizeReadingSession({ markdown: source, index: 0, readIds: [], stuckIds: [] })
+    const summary = summarizeReadingSession({ markdown: source, index: 0, readIds: [], stuckIds: [], keptIds: [] })
 
     expect(summary?.stuck).toBe(0)
   })
@@ -211,13 +245,13 @@ describe("collecting the sections that did not land", () => {
   const source = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
 
   it("has nothing to collect before anything is flagged", () => {
-    expect(stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: [] })).toEqual([])
+    expect(stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: [], keptIds: [] })).toEqual([])
   })
 
   it("hands back the flagged sections with their words, not just their ids", () => {
     // Whoever these get carried to never saw the document, so an id is not
     // enough -- the section has to arrive with the text under it.
-    const sections = stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: ["n0-0-p0"] })
+    const sections = stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: ["n0-0-p0"], keptIds: [] })
 
     expect(sections).toHaveLength(1)
     expect(sections[0].title).toBe("光反应")
@@ -225,7 +259,7 @@ describe("collecting the sections that did not land", () => {
   })
 
   it("drops a flag naming a stop this draft no longer has", () => {
-    expect(stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: ["gone"] })).toEqual([])
+    expect(stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: ["gone"], keptIds: [] })).toEqual([])
   })
 
   it("keeps the document's own order, not the order you flagged them in", () => {
@@ -236,6 +270,7 @@ describe("collecting the sections that did not land", () => {
       index: 0,
       readIds: [],
       stuckIds: ["n0-1-p0", "n0-0-p0"],
+      keptIds: [],
     })
 
     expect(sections.map((chunk) => chunk.title)).toEqual(["光反应", "暗反应"])

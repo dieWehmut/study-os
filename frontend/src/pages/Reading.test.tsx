@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({ dumpThought: vi.fn() }))
 vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
 
 const source = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
+const kinetics = ["# 动能定理", "## 适用条件", "只对合外力做功成立。"].join("\n")
 
 function renderReading() {
   return render(
@@ -349,8 +350,6 @@ describe("taking what you got stuck on to 答疑", () => {
 })
 
 describe("keeping the documents you close", () => {
-  const kinetics = ["# 动能定理", "## 适用条件", "只对合外力做功成立。"].join("\n")
-
   beforeEach(() => {
     localStorage.clear()
   })
@@ -493,5 +492,69 @@ describe("keeping a section that landed", () => {
     renderReading()
 
     expect(screen.queryByRole("button", { name: /收进知识库/ })).not.toBeInTheDocument()
+  })
+
+  it("still knows what it filed after you close the tab and come back", async () => {
+    // The item on the other end has no undo, so a mark that forgets itself
+    // overnight is how the library ends up holding the same section twice.
+    const first = renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+    await waitFor(() => expect(screen.getByRole("button", { name: /已收进/ })).toBeDisabled())
+    first.unmount()
+
+    renderReading()
+
+    expect(screen.getByRole("button", { name: /已收进/ })).toBeDisabled()
+  })
+
+  it("does not claim a fresh document's first section is already filed", async () => {
+    // Chunk ids come from position, so n0-0-p0 exists in every document. A
+    // mark that outlives the document it was made against would tick off a
+    // section of the next one before anybody has read it.
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+    await waitFor(() => expect(screen.getByRole("button", { name: /已收进/ })).toBeDisabled())
+
+    paste(kinetics)
+
+    expect(screen.getByRole("button", { name: /收进知识库/ })).toBeEnabled()
+  })
+
+  it("does not undo a page turn made while the write was in flight", async () => {
+    // dumpThought is a network round-trip and the reader is arrow-key driven,
+    // so turning the page mid-write is ordinary. Writing back the draft as it
+    // stood at the click would roll that turn back with its own receipt.
+    let settle = (): void => {}
+    mocks.dumpThought.mockReturnValue(
+      new Promise<{ id: string; term: string }>((resolve) => {
+        settle = () => resolve({ id: "dump-1", term: "光合作用 / 光反应" })
+      }),
+    )
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+    fireEvent.click(screen.getByRole("button", { name: /下一节/ }))
+    settle()
+    await waitFor(() => expect(readReadingSession().keptIds).toEqual(["n0-0-p0"]))
+
+    expect(screen.getByText("2 / 2")).toBeInTheDocument()
+  })
+
+  it("carries what it filed onto the shelf and back again", async () => {
+    // Every other mark travels with a document you put away; this one going
+    // missing would re-offer a section the library already has.
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+    await waitFor(() => expect(screen.getByRole("button", { name: /已收进/ })).toBeDisabled())
+    fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
+    paste(kinetics)
+
+    fireEvent.click(screen.getByRole("button", { name: "打开 光合作用" }))
+
+    expect(screen.getByRole("button", { name: /已收进/ })).toBeDisabled()
   })
 })

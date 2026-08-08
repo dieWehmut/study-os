@@ -11,8 +11,14 @@ import {
 const photosynthesis = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。"].join("\n")
 const kinetics = ["# 动能定理", "## 适用条件", "只对合外力做功成立。"].join("\n")
 
-function session(markdown: string, index = 0, readIds: string[] = [], stuckIds: string[] = []) {
-  return { markdown, index, readIds, stuckIds }
+function session(
+  markdown: string,
+  index = 0,
+  readIds: string[] = [],
+  stuckIds: string[] = [],
+  keptIds: string[] = [],
+) {
+  return { markdown, index, readIds, stuckIds, keptIds }
 }
 
 describe("the reading shelf", () => {
@@ -27,13 +33,14 @@ describe("the reading shelf", () => {
   it("keeps the document with everything you had marked on it", () => {
     // Putting a document away and getting back only its text would throw away
     // the reading -- the marks are the work, the text is just the input.
-    shelveDocument(session(photosynthesis, 1, ["n0-0-p0"], ["n0-0-p0"]))
+    shelveDocument(session(photosynthesis, 1, ["n0-0-p0"], ["n0-0-p0"], ["n0-0-p0"]))
 
     const [shelved] = readShelf()
     expect(shelved.markdown).toBe(photosynthesis)
     expect(shelved.index).toBe(1)
     expect(shelved.readIds).toEqual(["n0-0-p0"])
     expect(shelved.stuckIds).toEqual(["n0-0-p0"])
+    expect(shelved.keptIds).toEqual(["n0-0-p0"])
   })
 
   it("puts the one you just closed at the front", () => {

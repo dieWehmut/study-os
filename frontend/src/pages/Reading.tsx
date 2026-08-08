@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText, Trash2 } from "lucide-react"
 
@@ -30,11 +30,10 @@ export default function Reading() {
   // Everything you closed. The box holds one document at a time, so without
   // this the second paste is a deletion.
   const [shelf, setShelf] = useState(readShelf)
-  // Sections already sent to the knowledge library. Held here rather than in
-  // the session because the durable record is the item on the other end; this
-  // only stops a second click filing a duplicate nobody can undo.
-  const [keptIds, setKeptIds] = useState<ReadonlySet<string>>(new Set<string>())
   const [keepError, setKeepError] = useState("")
+  // The session as it stands right now, for callbacks that resolve after an
+  // await. save is the only writer, so this cannot drift from the state.
+  const sessionRef = useRef(session)
   const { markdown } = session
 
   const chunks = useMemo(() => chunkMarkdown(markdown), [markdown])
@@ -43,6 +42,7 @@ export default function Reading() {
   const map = useMemo(() => markdownToMindMap(markdown), [markdown])
   const readIds = useMemo(() => new Set(session.readIds), [session.readIds])
   const stuckIds = useMemo(() => new Set(session.stuckIds), [session.stuckIds])
+  const keptIds = useMemo(() => new Set(session.keptIds), [session.keptIds])
   // A place stored against a longer draft has to land somewhere real in this
   // one, or the reader points at a stop that is not there.
   const index = Math.min(session.index, Math.max(chunks.length - 1, 0))
@@ -67,6 +67,10 @@ export default function Reading() {
   )
 
   function save(next: ReadingSession) {
+    // Kept in step with the state because 收进知识库 resolves after a network
+    // round-trip and needs the session as it stands then, not as it stood when
+    // the button was pressed. save is the only writer, so the two cannot drift.
+    sessionRef.current = next
     setSession(next)
     writeReadingSession(next)
   }
@@ -109,6 +113,11 @@ export default function Reading() {
    * about this document: how far you got, what is still in the way. This is the
    * only thing that outlives it, which is also why it is deliberately not
    * wired to 读完 -- turning a page is not a decision to remember it.
+   *
+   * Recorded only after the write lands, and read back off the session rather
+   * than component state, because the item on the other end has no undo: a
+   * mark that forgets itself overnight is how the library ends up holding the
+   * same section twice.
    */
   async function keepSection(id: string) {
     const chunk = chunks.find((item) => item.id === id)
@@ -117,7 +126,10 @@ export default function Reading() {
     setKeepError("")
     try {
       await dumpThought(buildSectionNote(chunk))
-      setKeptIds((kept) => new Set(kept).add(id))
+      // Read off the ref rather than closing over `session`, which is the
+      // draft as it stood when the click happened -- a page turn while the
+      // write was in flight would otherwise be rolled back by its own receipt.
+      save({ ...sessionRef.current, keptIds: [...sessionRef.current.keptIds, id] })
     } catch {
       // Left un-kept on purpose: a control that looks saved when nothing was
       // written is worse than one that failed loudly.

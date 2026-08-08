@@ -16,6 +16,16 @@ export interface ReadingSession {
    * and understanding it are different facts about it.
    */
   stuckIds: string[]
+  /**
+   * Stops already sent to the knowledge library.
+   *
+   * A record of what was filed, not of the filing: the durable artefact is the
+   * item on the other end, and there is no undo for it. This exists so a
+   * second click cannot hand the library the same section twice -- which also
+   * means it has to travel with the document, because ids are position-derived
+   * and a mark left behind would tick off a section of the next document.
+   */
+  keptIds: string[]
 }
 
 export const emptyReadingSession: ReadingSession = {
@@ -23,6 +33,7 @@ export const emptyReadingSession: ReadingSession = {
   index: 0,
   readIds: [],
   stuckIds: [],
+  keptIds: [],
 }
 
 /** Shared with the shelf: two notions of a valid place would drift apart. */
@@ -67,6 +78,7 @@ export function readReadingSession(): ReadingSession {
       index: normalizeIndex(session.index),
       readIds: normalizeIds(session.readIds),
       stuckIds: normalizeIds(session.stuckIds),
+      keptIds: normalizeIds(session.keptIds),
     }
   } catch {
     return emptyReadingSession

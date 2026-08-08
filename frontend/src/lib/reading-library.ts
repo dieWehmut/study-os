@@ -53,6 +53,7 @@ function toShelved(value: unknown): ShelvedDocument | null {
     index: normalizeIndex(row.index),
     readIds: normalizeIds(row.readIds),
     stuckIds: normalizeIds(row.stuckIds),
+    keptIds: normalizeIds(row.keptIds),
   }
 }
 
@@ -136,5 +137,6 @@ export function restoreDocument(id: string): ReadingSession | null {
     index: wanted.index,
     readIds: wanted.readIds,
     stuckIds: wanted.stuckIds,
+    keptIds: wanted.keptIds,
   }
 }
