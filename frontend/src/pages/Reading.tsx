@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Network, ScanText } from "lucide-react"
+import { CircleHelp, Network, ScanText } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,13 +28,33 @@ export default function Reading() {
   // no second paste box to keep in sync with this one.
   const map = useMemo(() => markdownToMindMap(markdown), [markdown])
   const readIds = useMemo(() => new Set(session.readIds), [session.readIds])
+  const stuckIds = useMemo(() => new Set(session.stuckIds), [session.stuckIds])
   // A place stored against a longer draft has to land somewhere real in this
   // one, or the reader points at a stop that is not there.
   const index = Math.min(session.index, Math.max(chunks.length - 1, 0))
+  // Resolved against this document, not read straight off the session: the
+  // marks were made against whatever draft was in the box at the time, and a
+  // stale id would list a section nobody can navigate to.
+  const stuck = useMemo(
+    () => chunks.filter((chunk) => stuckIds.has(chunk.id)),
+    [chunks, stuckIds],
+  )
 
   function save(next: ReadingSession) {
     setSession(next)
     writeReadingSession(next)
+  }
+
+  function toggleStuck(id: string) {
+    // No page turn, unlike 读完: this says the stop did not land, and moving
+    // you would carry you away from the paragraph you just flagged.
+    save({
+      ...session,
+      index,
+      stuckIds: stuckIds.has(id)
+        ? session.stuckIds.filter((entry) => entry !== id)
+        : [...session.stuckIds, id],
+    })
   }
 
   function toggleRead(id: string) {
@@ -140,10 +160,49 @@ export default function Reading() {
               onIndexChange={(next) => save({ ...session, index: next })}
               onToggleRead={toggleRead}
               readIds={readIds}
+              onToggleStuck={toggleStuck}
+              stuckIds={stuckIds}
             />
           </CardContent>
         </Card>
       </div>
+
+      {/* The reader shows one stop at a time, so it can say "this one did not
+          land" but never "here is everything that did not". That list is the
+          whole output of reading for structure first -- it is what you take to
+          答疑, or read again slowly, and it is the only artefact of a preview
+          pass worth keeping. */}
+      {stuck.length > 0 ? (
+        <Card className="border-amber-500/35 bg-amber-500/5">
+          <CardHeader className="gap-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <CircleHelp aria-hidden="true" className="size-4 text-amber-600 dark:text-amber-400" />
+              卡住的地方
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {stuck.length} 节没看懂 · 点一个跳回去，或者带着这几节去问。
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {stuck.map((chunk) => (
+              <Button
+                key={chunk.id}
+                variant="outline"
+                size="sm"
+                aria-label={`卡住：${chunk.title}`}
+                onClick={() =>
+                  save({
+                    ...session,
+                    index: chunks.findIndex((item) => item.id === chunk.id),
+                  })
+                }
+              >
+                {chunk.title}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   )
 }

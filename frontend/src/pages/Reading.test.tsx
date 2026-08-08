@@ -173,3 +173,94 @@ describe("Reading page", () => {
     expect(readReadingSession().readIds).toHaveLength(1)
   })
 })
+
+describe("collecting what you got stuck on", () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it("keeps you on the stop you did not understand", () => {
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+
+    expect(screen.getByText("1 / 2")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /卡住了/ })).toBeInTheDocument()
+  })
+
+  it("keeps the flag after you close the tab and come back", () => {
+    const first = render(<Reading />)
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+    first.unmount()
+
+    render(<Reading />)
+
+    expect(screen.getByRole("button", { name: /卡住了/ })).toBeInTheDocument()
+  })
+
+  it("lets you take the flag back once the section lands", () => {
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+    fireEvent.click(screen.getByRole("button", { name: /卡住了/ }))
+
+    expect(readReadingSession().stuckIds).toEqual([])
+  })
+
+  it("records being stuck without claiming the stop is finished", () => {
+    // The two marks answer different questions. Flagging one must not quietly
+    // tick it off as read.
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+
+    expect(readReadingSession().readIds).toEqual([])
+  })
+
+  it("gathers the flagged stops into one list, which is what a preview pass is for", () => {
+    // The reader shows one stop at a time, so it can never answer "what do I
+    // still not understand?" -- and that list is the whole output of reading
+    // for structure first.
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+
+    expect(screen.getByRole("button", { name: "卡住：光反应" })).toBeInTheDocument()
+  })
+
+  it("takes you back to a flagged stop when you pick it off the list", () => {
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+    fireEvent.click(screen.getByRole("button", { name: /下一节/ }))
+    fireEvent.click(screen.getByRole("button", { name: "卡住：光反应" }))
+
+    expect(screen.getByText("1 / 2")).toBeInTheDocument()
+  })
+
+  it("says nothing about being stuck when nothing is flagged", () => {
+    render(<Reading />)
+    paste(source)
+
+    expect(screen.queryByText("卡住的地方")).not.toBeInTheDocument()
+  })
+
+  it("drops a flag naming a stop the edited document no longer has", () => {
+    // The marks were made against a longer draft; a stale id would list a
+    // section nobody can navigate to.
+    localStorage.setItem(
+      "study-os.reading",
+      JSON.stringify({ markdown: "# 一\n只有一节。", index: 0, readIds: [], stuckIds: ["gone"] }),
+    )
+
+    render(<Reading />)
+
+    expect(screen.queryByText("卡住的地方")).not.toBeInTheDocument()
+  })
+})
