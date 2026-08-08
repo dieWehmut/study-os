@@ -1,46 +1,84 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { SquarePen, Trash2 } from "lucide-react"
 
+import { deleteMistake, listMistakes, recordMistake } from "@/api/mistakes"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   MISTAKE_CAUSES,
-  createMistake,
-  readMistakes,
   summarizeMistakes,
-  writeMistakes,
   type MistakeCause,
   type MistakeRecord,
 } from "@/lib/mistakes"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
+function describe(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
 export default function Practice() {
   const subject = useSubjectStore((state) => state.subject)
   const [question, setQuestion] = useState("")
-  // Read once, on the way in. The log is the point of the page, and one you
-  // have to rebuild every session is one nobody keeps.
-  const [records, setRecords] = useState<MistakeRecord[]>(readMistakes)
+  const [records, setRecords] = useState<MistakeRecord[]>([])
+  const [error, setError] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  // The log follows the 首页 switch like every other list in the app: while you
+  // are working through 物理, 地理 mistakes are noise.
+  //
+  // The `active` guard is what keeps a slow answer for the subject you just
+  // left from landing on top of the one you switched to.
+  useEffect(() => {
+    let active = true
+    listMistakes(subject === "all" ? {} : { subject })
+      .then((loaded) => {
+        if (!active) return
+        setRecords(loaded)
+        setError("")
+      })
+      .catch((failure: unknown) => {
+        if (active) setError(describe(failure, "读取错题失败"))
+      })
+    return () => {
+      active = false
+    }
+  }, [subject])
 
   const summary = summarizeMistakes(records)
   const pending = question.trim()
 
-  // Storing here rather than in an effect keeps the rule visible: the log
-  // changes and the log is saved, in the same breath, with no run that writes
-  // back what it just read.
-  function save(next: MistakeRecord[]) {
-    setRecords(next)
-    writeMistakes(next)
-  }
-
   // Picking the cause is the save. A separate 保存 button would be a third
   // action at the moment you least want one -- right after getting something
   // wrong, when the cheapest path is to log nothing at all.
-  function file(cause: MistakeCause) {
-    if (!pending) return
-    save([createMistake({ subject, question: pending, cause }), ...records])
-    setQuestion("")
+  //
+  // The row only appears once the write came back. A row that looks filed when
+  // nothing was written is worse than one that failed loudly: the box keeps
+  // what you typed, so the retry costs nothing.
+  async function file(cause: MistakeCause) {
+    if (!pending || busy) return
+    setBusy(true)
+    try {
+      const filed = await recordMistake({ subject, question: pending, cause })
+      setRecords((current) => [filed, ...current])
+      setQuestion("")
+      setError("")
+    } catch (failure) {
+      setError(describe(failure, "记录错题失败"))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      await deleteMistake(id)
+      setRecords((current) => current.filter((entry) => entry.id !== id))
+      setError("")
+    } catch (failure) {
+      setError(describe(failure, "删除错题失败"))
+    }
   }
 
   return (
@@ -73,13 +111,14 @@ export default function Practice() {
                 key={spec.cause}
                 variant="outline"
                 size="sm"
-                disabled={!pending}
-                onClick={() => file(spec.cause)}
+                disabled={!pending || busy}
+                onClick={() => void file(spec.cause)}
               >
                 {spec.label}
               </Button>
             ))}
           </div>
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </CardContent>
       </Card>
 
@@ -147,9 +186,7 @@ export default function Practice() {
                       variant="ghost"
                       size="icon"
                       aria-label="删除"
-                      onClick={() =>
-                        save(records.filter((entry) => entry.id !== item.id))
-                      }
+                      onClick={() => void remove(item.id)}
                     >
                       <Trash2 aria-hidden="true" />
                     </Button>
