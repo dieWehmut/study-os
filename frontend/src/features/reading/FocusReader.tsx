@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react"
+import { BookmarkPlus, Check, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { ReadingChunk } from "@/lib/chunk"
@@ -13,6 +13,12 @@ interface FocusReaderProps {
   /** Same rule as onToggleRead: no store, no control. */
   onToggleStuck?: (id: string) => void
   stuckIds?: ReadonlySet<string>
+  /**
+   * Send this section somewhere it will be reviewed. Not a toggle like the
+   * other two: it leaves the page, and there is no taking it back from here.
+   */
+  onKeep?: (id: string) => void
+  keptIds?: ReadonlySet<string>
 }
 
 /**
@@ -32,6 +38,8 @@ export function FocusReader({
   readIds,
   onToggleStuck,
   stuckIds,
+  onKeep,
+  keptIds,
 }: FocusReaderProps) {
   const chunk = chunks[index]
 
@@ -52,6 +60,7 @@ export function FocusReader({
   // Deliberately independent of isRead. Reading a section through and still not
   // having it is the common case, not a contradiction to rule out.
   const isStuck = stuckIds?.has(chunk.id) ?? false
+  const isKept = keptIds?.has(chunk.id) ?? false
 
   function move(delta: number) {
     const next = index + delta
@@ -83,7 +92,10 @@ export function FocusReader({
         ))}
       </div>
 
-      <div className="flex items-center gap-2 border-t pt-3">
+      {/* Wraps rather than squeezing: four verdicts and two page turns do not
+          fit one line on a phone, and a control pushed off the edge is a
+          control you do not have. */}
+      <div className="flex flex-wrap items-center gap-2 border-t pt-3">
         <Button
           variant="outline"
           size="sm"
@@ -97,7 +109,7 @@ export function FocusReader({
         <span className="text-xs tabular-nums text-muted-foreground">
           {index + 1} / {chunks.length}
         </span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {onToggleStuck ? (
             // Unlike 读完 this does not turn the page. Saying a stop did not
             // land is the opposite claim to being done with it, and carrying
@@ -111,6 +123,22 @@ export function FocusReader({
             >
               <HelpCircle aria-hidden="true" />
               {isStuck ? "卡住了" : "没看懂"}
+            </Button>
+          ) : null}
+          {onKeep ? (
+            // Disabled once kept rather than hidden: a control that vanishes
+            // leaves you unsure whether it fired or you missed it. There is no
+            // undo here, so this is the one action on the row that does not
+            // toggle back.
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isKept}
+              onClick={() => onKeep(chunk.id)}
+              className={isKept ? "text-emerald-700 dark:text-emerald-400" : undefined}
+            >
+              <BookmarkPlus aria-hidden="true" />
+              {isKept ? "已收进" : "收进知识库"}
             </Button>
           ) : null}
           {onToggleRead ? (

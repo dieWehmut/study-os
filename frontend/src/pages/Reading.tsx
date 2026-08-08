@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText, Trash2 } from "lucide-react"
 
+import { dumpThought } from "@/api/chat"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,6 +13,7 @@ import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
 import { chunkMarkdown } from "@/lib/chunk"
 import { markdownToMindMap } from "@/lib/mindmap"
 import { forgetDocument, readShelf, restoreDocument, shelveDocument } from "@/lib/reading-library"
+import { buildSectionNote } from "@/lib/reading-note"
 import {
   emptyReadingSession,
   readReadingSession,
@@ -28,6 +30,11 @@ export default function Reading() {
   // Everything you closed. The box holds one document at a time, so without
   // this the second paste is a deletion.
   const [shelf, setShelf] = useState(readShelf)
+  // Sections already sent to the knowledge library. Held here rather than in
+  // the session because the durable record is the item on the other end; this
+  // only stops a second click filing a duplicate nobody can undo.
+  const [keptIds, setKeptIds] = useState<ReadonlySet<string>>(new Set<string>())
+  const [keepError, setKeepError] = useState("")
   const { markdown } = session
 
   const chunks = useMemo(() => chunkMarkdown(markdown), [markdown])
@@ -84,8 +91,7 @@ export default function Reading() {
     save(restored)
   }
 
-  function toggleStuck(id: string) {
-    // No page turn, unlike 读完: this says the stop did not land, and moving
+  function toggleStuck(id: string) {    // No page turn, unlike 读完: this says the stop did not land, and moving
     // you would carry you away from the paragraph you just flagged.
     save({
       ...session,
@@ -94,6 +100,29 @@ export default function Reading() {
         ? session.stuckIds.filter((entry) => entry !== id)
         : [...session.stuckIds, id],
     })
+  }
+
+  /**
+   * Send a section that landed into the knowledge library.
+   *
+   * The one way out of 预习 and into 复习. Everything else the page produces is
+   * about this document: how far you got, what is still in the way. This is the
+   * only thing that outlives it, which is also why it is deliberately not
+   * wired to 读完 -- turning a page is not a decision to remember it.
+   */
+  async function keepSection(id: string) {
+    const chunk = chunks.find((item) => item.id === id)
+    if (!chunk || keptIds.has(id)) return
+
+    setKeepError("")
+    try {
+      await dumpThought(buildSectionNote(chunk))
+      setKeptIds((kept) => new Set(kept).add(id))
+    } catch {
+      // Left un-kept on purpose: a control that looks saved when nothing was
+      // written is worse than one that failed loudly.
+      setKeepError("收进知识库失败，等会儿再试。")
+    }
   }
 
   function toggleRead(id: string) {
@@ -255,10 +284,10 @@ export default function Reading() {
           <CardHeader className="gap-1.5">
             <CardTitle>正文</CardTitle>
             <p className="text-sm text-muted-foreground">
-              一次只放一节，方向键翻页。
+              一次只放一节，方向键翻页。看懂的可以收进知识库，之后会安排复习。
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-3">
             <FocusReader
               chunks={chunks}
               index={index}
@@ -267,7 +296,14 @@ export default function Reading() {
               readIds={readIds}
               onToggleStuck={toggleStuck}
               stuckIds={stuckIds}
+              onKeep={(id) => void keepSection(id)}
+              keptIds={keptIds}
             />
+            {keepError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {keepError}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>

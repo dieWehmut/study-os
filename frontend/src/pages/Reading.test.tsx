@@ -1,10 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { takeAskDraft } from "@/lib/ask-draft"
 import { readReadingSession } from "@/lib/reading-session"
 import Reading from "./Reading"
+
+const mocks = vi.hoisted(() => ({ dumpThought: vi.fn() }))
+
+vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
 
 const source = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
 
@@ -426,5 +430,68 @@ describe("keeping the documents you close", () => {
     fireEvent.click(screen.getByRole("button", { name: "扔掉 光合作用" }))
 
     expect(screen.getByLabelText("原文")).toHaveValue(kinetics)
+  })
+})
+
+describe("keeping a section that landed", () => {
+  beforeEach(() => {
+    localStorage.clear()
+    mocks.dumpThought.mockReset()
+    mocks.dumpThought.mockResolvedValue({ id: "dump-1", term: "光合作用 / 光反应" })
+  })
+
+  it("files the section under its place in the document, with its own words", () => {
+    // 预习 that produces nothing but a finished progress bar is reading you
+    // cannot bank. This is the one path out of it into 复习.
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    return waitFor(() => {
+      const note = mocks.dumpThought.mock.calls[0][0] as string
+      expect(note.startsWith("光合作用 / 光反应")).toBe(true)
+      expect(note).toContain("在类囊体薄膜上进行。")
+    })
+  })
+
+  it("will not file the same section twice", async () => {
+    // There is no undo in the library, so a second click is a duplicate you
+    // then have to find and delete.
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /已收进/ })).toBeDisabled())
+    expect(mocks.dumpThought).toHaveBeenCalledTimes(1)
+  })
+
+  it("says so when the library cannot be reached, rather than looking saved", async () => {
+    mocks.dumpThought.mockRejectedValue(new Error("offline"))
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/收进知识库/)
+    expect(screen.getByRole("button", { name: /收进知识库/ })).toBeEnabled()
+  })
+
+  it("files nothing just because you turned the page", () => {
+    // 读完 is a navigation act. Conflating it with this would put every
+    // paragraph you skimmed into the library.
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+
+    expect(mocks.dumpThought).not.toHaveBeenCalled()
+  })
+
+  it("offers nothing to keep while there is no section on screen", () => {
+    renderReading()
+
+    expect(screen.queryByRole("button", { name: /收进知识库/ })).not.toBeInTheDocument()
   })
 })
