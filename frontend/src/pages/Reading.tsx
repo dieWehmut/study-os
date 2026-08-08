@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react"
-import { CircleHelp, Network, ScanText } from "lucide-react"
+import { Link } from "react-router-dom"
+import { CircleHelp, MessagesSquare, Network, ScanText } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { MindMap } from "@/features/mindmap/MindMap"
 import { FocusReader } from "@/features/reading/FocusReader"
 import { StructurePreview } from "@/features/reading/StructurePreview"
+import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
 import { chunkMarkdown } from "@/lib/chunk"
 import { markdownToMindMap } from "@/lib/mindmap"
 import {
@@ -184,23 +186,35 @@ export default function Reading() {
               {stuck.length} 节没看懂 · 点一个跳回去，或者带着这几节去问。
             </p>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {stuck.map((chunk) => (
-              <Button
-                key={chunk.id}
-                variant="outline"
-                size="sm"
-                aria-label={`卡住：${chunk.title}`}
-                onClick={() =>
-                  save({
-                    ...session,
-                    index: chunks.findIndex((item) => item.id === chunk.id),
-                  })
-                }
-              >
-                {chunk.title}
-              </Button>
-            ))}
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2">
+              {stuck.map((chunk) => (
+                <Button
+                  key={chunk.id}
+                  variant="outline"
+                  size="sm"
+                  aria-label={`卡住：${chunk.title}`}
+                  onClick={() =>
+                    save({
+                      ...session,
+                      index: chunks.findIndex((item) => item.id === chunk.id),
+                    })
+                  }
+                >
+                  {chunk.title}
+                </Button>
+              ))}
+            </div>
+            {/* The whole set goes at once, not one section at a time: what is
+                in the way is usually the gap between them, and 答疑 cannot see
+                that from a single heading. */}
+            <Link
+              className={buttonVariants({ size: "sm", className: "self-start" })}
+              to="/chat"
+              onClick={() => putAskDraft(buildStuckQuestion(stuck))}
+            >
+              <MessagesSquare data-icon="inline-start" />带这 {stuck.length} 节去问
+            </Link>
           </CardContent>
         </Card>
       ) : null}
