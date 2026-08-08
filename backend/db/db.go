@@ -16,7 +16,12 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 7
+const currentSchemaVersion = 8
+
+// SchemaVersion is the version a freshly opened store is migrated to. Exported
+// so migration tests can express "the head of the ladder" instead of a literal
+// that has to be edited in three places every time the schema grows.
+const SchemaVersion = currentSchemaVersion
 
 type openOptions struct {
 	seedFixtures bool
@@ -259,6 +264,35 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 			CREATE INDEX IF NOT EXISTS chat_attachments_session_idx ON chat_attachments(session_id, created_at DESC)`); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", version, err)
 		}
+	case 8:
+		if _, err := tx.ExecContext(ctx, `
+			CREATE TABLE IF NOT EXISTS questions (
+				id TEXT PRIMARY KEY,
+				subject TEXT NOT NULL DEFAULT '',
+				stem TEXT NOT NULL,
+				source_id TEXT NOT NULL DEFAULT '',
+				created_at TEXT NOT NULL
+			)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			CREATE INDEX IF NOT EXISTS questions_subject_idx ON questions(subject, created_at DESC)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			CREATE TABLE IF NOT EXISTS question_attempts (
+				id TEXT PRIMARY KEY,
+				question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+				cause TEXT NOT NULL DEFAULT '',
+				note TEXT NOT NULL DEFAULT '',
+				occurred_at TEXT NOT NULL
+			)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			CREATE INDEX IF NOT EXISTS question_attempts_question_idx ON question_attempts(question_id, occurred_at DESC)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -293,6 +327,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 	case 7:
 		if !hasTable(ctx, tx, "chat_attachments") {
 			return errors.New("schema version 7 is recorded but chat_attachments is missing")
+		}
+	case 8:
+		if !hasTable(ctx, tx, "questions") || !hasTable(ctx, tx, "question_attempts") {
+			return errors.New("schema version 8 is recorded but the question tables are missing")
 		}
 	}
 	return nil

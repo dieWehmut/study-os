@@ -77,6 +77,48 @@ type ChatMessage struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// Question is a 题目 -- the thing that was asked. It outlives any single
+// attempt at it, because the same question gets attempted again after 订正.
+type Question struct {
+	ID        string    `json:"id"`
+	Subject   string    `json:"subject,omitempty"`
+	Stem      string    `json:"stem"`
+	SourceID  string    `json:"source_id,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// QuestionAttempt is one 作答 of a Question. Cause carries the six-way error
+// taxonomy from the Practice page; only some of those causes are ones that
+// scheduling more review can actually fix.
+type QuestionAttempt struct {
+	ID         string    `json:"id"`
+	QuestionID string    `json:"question_id"`
+	Cause      string    `json:"cause,omitempty"`
+	Note       string    `json:"note,omitempty"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+// MistakeInput files one wrong answer: the question text and why it went
+// wrong, in a single call, because a 错题 is only ever entered as a pair.
+type MistakeInput struct {
+	Subject    string `json:"subject,omitempty"`
+	Stem       string `json:"stem"`
+	Cause      string `json:"cause,omitempty"`
+	Note       string `json:"note,omitempty"`
+	OccurredAt time.Time
+}
+
+type MistakeListOptions struct {
+	Subject string
+	Limit   int
+}
+
+// Mistake pairs a Question with the attempt that got it wrong.
+type Mistake struct {
+	Question Question        `json:"question"`
+	Attempt  QuestionAttempt `json:"attempt"`
+}
+
 type IntegratedNote struct {
 	ID          string          `json:"id"`
 	Subject     string          `json:"subject,omitempty"`

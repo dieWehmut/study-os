@@ -299,8 +299,10 @@ func TestStoreUpgradesSchemaVersionOneWithOriginalName(t *testing.T) {
 	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil {
 		t.Fatalf("count upgraded migrations: %v", err)
 	}
-	if migrationCount != 7 {
-		t.Fatalf("migration count = %d, want 7", migrationCount)
+	// This fixture records version 1 itself, so a full climb leaves one row per
+	// version up to the head.
+	if migrationCount != db.SchemaVersion {
+		t.Fatalf("migration count = %d, want %d", migrationCount, db.SchemaVersion)
 	}
 }
 
@@ -311,9 +313,9 @@ func TestStoreRejectsUnsupportedFutureMigration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open future sqlite: %v", err)
 	}
-	if _, err := legacy.ExecContext(ctx, `
+	if _, err := legacy.ExecContext(ctx, fmt.Sprintf(`
 		CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-		INSERT INTO schema_migrations(version, applied_at) VALUES (8, '2026-08-01T00:00:00Z');`); err != nil {
+		INSERT INTO schema_migrations(version, applied_at) VALUES (%d, '2026-08-01T00:00:00Z');`, db.SchemaVersion+1)); err != nil {
 		_ = legacy.Close()
 		t.Fatalf("create future migration marker: %v", err)
 	}

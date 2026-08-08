@@ -197,8 +197,16 @@ func TestStoreUpgradesSchemaVersionTwoWithGroupsAndAudioColumns(t *testing.T) {
 		versions = append(versions, version)
 	}
 	rows.Close()
-	if len(versions) != 6 || versions[0] != 2 || versions[1] != 3 || versions[2] != 4 || versions[3] != 5 || versions[4] != 6 || versions[5] != 7 {
-		t.Fatalf("migration versions = %#v, want [2 3 4 5 6 7]", versions)
+	// A v1 database has to climb every rung: 2 through the current head, with
+	// no gaps. Naming the head as a literal here means every schema bump
+	// breaks a test about knowledge groups.
+	if len(versions) != db.SchemaVersion-1 {
+		t.Fatalf("migration versions = %#v, want 2..%d", versions, db.SchemaVersion)
+	}
+	for index, version := range versions {
+		if version != index+2 {
+			t.Fatalf("migration versions = %#v, want 2..%d with no gaps", versions, db.SchemaVersion)
+		}
 	}
 
 	var groupTables int

@@ -205,3 +205,21 @@ CREATE TABLE chat_attachments (
     created_at TEXT NOT NULL
 );
 CREATE INDEX chat_attachments_session_idx ON chat_attachments(session_id, created_at DESC);
+
+CREATE TABLE questions (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL DEFAULT '',
+    stem TEXT NOT NULL,
+    source_id TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX questions_subject_idx ON questions(subject, created_at DESC);
+
+CREATE TABLE question_attempts (
+    id TEXT PRIMARY KEY,
+    question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    cause TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    occurred_at TEXT NOT NULL
+);
+CREATE INDEX question_attempts_question_idx ON question_attempts(question_id, occurred_at DESC);
