@@ -142,6 +142,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/knowledge/{knowledgeID}/tag", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeTag(response, request, application)
 		})
+		api.Post("/knowledge/{knowledgeID}/schedule", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeSchedule(response, request, application)
+		})
 		api.Post("/chat", func(response http.ResponseWriter, request *http.Request) {
 			handleChatSend(response, request, application)
 		})
