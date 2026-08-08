@@ -343,3 +343,65 @@ describe("taking what you got stuck on to 答疑", () => {
     expect(screen.getByRole("link", { name: /去问/ })).toHaveAttribute("href", "/chat")
   })
 })
+
+describe("keeping the documents you close", () => {
+  const kinetics = ["# 动能定理", "## 适用条件", "只对合外力做功成立。"].join("\n")
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it("offers nothing to put away while the box is empty", () => {
+    renderReading()
+
+    expect(screen.queryByRole("button", { name: /收起这篇/ })).not.toBeInTheDocument()
+  })
+
+  it("keeps the document you close instead of losing it to the next paste", () => {
+    // The box holds one document, so a second paste used to destroy the first
+    // with no way back.
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
+
+    expect(screen.getByLabelText("原文")).toHaveValue("")
+    expect(screen.getByRole("button", { name: /光合作用/ })).toBeInTheDocument()
+  })
+
+  it("says how far you got on each one you closed, which is what picks the next", () => {
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+
+    fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
+
+    expect(screen.getByText(/1 节没看懂/)).toBeInTheDocument()
+  })
+
+  it("opens one you closed with every mark still on it", () => {
+    // The marks are the work. Handing back only the text would make the shelf
+    // a paste buffer.
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+    fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
+    paste(kinetics)
+
+    fireEvent.click(screen.getByRole("button", { name: /光合作用/ }))
+
+    expect(screen.getByLabelText("原文")).toHaveValue(source)
+    expect(readReadingSession().stuckIds).toEqual(["n0-0-p0"])
+  })
+
+  it("puts the one you were reading on the shelf, rather than dropping it for the swap", () => {
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
+    paste(kinetics)
+
+    fireEvent.click(screen.getByRole("button", { name: /光合作用/ }))
+
+    expect(screen.getByRole("button", { name: /动能定理/ })).toBeInTheDocument()
+  })
+})

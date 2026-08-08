@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { CircleHelp, MessagesSquare, Network, ScanText } from "lucide-react"
+import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText } from "lucide-react"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,9 +11,11 @@ import { StructurePreview } from "@/features/reading/StructurePreview"
 import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
 import { chunkMarkdown } from "@/lib/chunk"
 import { markdownToMindMap } from "@/lib/mindmap"
+import { readShelf, restoreDocument, shelveDocument } from "@/lib/reading-library"
 import {
   emptyReadingSession,
   readReadingSession,
+  summarizeReadingSession,
   writeReadingSession,
   type ReadingSession,
 } from "@/lib/reading-session"
@@ -23,6 +25,9 @@ export default function Reading() {
   // The document, the place and the marks travel together, because a mark
   // names a chunk id and chunk ids come from the document's own shape.
   const [session, setSession] = useState<ReadingSession>(readReadingSession)
+  // Everything you closed. The box holds one document at a time, so without
+  // this the second paste is a deletion.
+  const [shelf, setShelf] = useState(readShelf)
   const { markdown } = session
 
   const chunks = useMemo(() => chunkMarkdown(markdown), [markdown])
@@ -42,9 +47,41 @@ export default function Reading() {
     [chunks, stuckIds],
   )
 
+  // Each row is what the shelf can say about a document without opening it:
+  // its own title, and how far the reading got. Summarized here rather than in
+  // the row so a document that yields no stops drops out once, not per field.
+  const shelfRows = useMemo(
+    () =>
+      shelf.flatMap((entry) => {
+        const summary = summarizeReadingSession(entry)
+        return summary ? [{ id: entry.id, summary }] : []
+      }),
+    [shelf],
+  )
+
   function save(next: ReadingSession) {
     setSession(next)
     writeReadingSession(next)
+  }
+
+  /** Put the open document away, marks and all, and clear the box for the next. */
+  function closeDocument() {
+    setShelf(shelveDocument(session))
+    save(emptyReadingSession)
+  }
+
+  /**
+   * Swap a shelved document in for the one you are holding.
+   *
+   * Taken off the shelf before the open one goes on, which matters at the
+   * shelf's cap: shelving first would evict the oldest to make room for a slot
+   * the restore is about to free anyway.
+   */
+  function openShelved(id: string) {
+    const restored = restoreDocument(id)
+    if (!restored) return
+    setShelf(shelveDocument(session))
+    save(restored)
   }
 
   function toggleStuck(id: string) {
@@ -109,8 +146,56 @@ export default function Reading() {
               <span className="text-xs text-muted-foreground">层级来自标题，没有经过模型改写</span>
             </div>
           ) : null}
+          {/* Putting a document away is its own action, not something the box
+              does on the next paste: onChange fires per keystroke, and a paste
+              that shelves would file a copy for every letter typed. */}
+          {markdown.trim() !== "" ? (
+            <Button variant="outline" size="sm" className="self-start" onClick={closeDocument}>
+              <Archive data-icon="inline-start" />收起这篇，换一份
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
+
+      {/* Absent while the shelf is empty: a heading over nothing is worse than
+          no heading, and until you have closed something there is nothing here
+          the page can help you with. */}
+      {shelfRows.length > 0 ? (
+        <Card>
+          <CardHeader className="gap-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <Library aria-hidden="true" className="size-4 text-primary" />
+              收起来的
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {shelfRows.length} 篇 · 点一篇换回来，正在读的这份会收进来。
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {shelfRows.map(({ id, summary }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => openShelved(id)}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/50"
+              >
+                <span className="truncate text-sm font-medium">{summary.title}</span>
+                <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                  {/* What is in the way is the reason to come back, so it goes
+                      first and keeps its colour -- 已读 3 / 8 only says how far
+                      you got. Both silent at zero. */}
+                  {summary.stuck > 0 ? (
+                    <span className="font-medium text-amber-600 dark:text-amber-400">
+                      {summary.stuck} 节没看懂
+                    </span>
+                  ) : null}
+                  <span>已读 {summary.read} / {summary.total}</span>
+                </span>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Folded away by default: the outline, the prose and a full map all at
           once is the same wall of information the preview exists to avoid. */}
