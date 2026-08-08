@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { ReviewForecast } from "@/features/memory/ReviewForecast"
 import { ReviewSession } from "@/features/memory/ReviewSession"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -102,6 +103,11 @@ export default function Memory() {
           </CardContent>
         </Card>
       ) : null}
+      {/* Below today's progress and above the session: the forecast is context
+          for the work, not the work. 待复习 is one number, and one number
+          cannot show a pile-up -- FSRS spreads skipped days forward, invisibly,
+          until the day they all land on. */}
+      <ReviewForecast />
       <ReviewSession recovery={recovery} onProgress={() => setRefreshToken((value) => value + 1)} />
     </section>
   )

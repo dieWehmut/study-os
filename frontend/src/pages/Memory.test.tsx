@@ -8,6 +8,7 @@ import { useSubjectStore } from "@/store/useSubjectStore"
 const mocks = vi.hoisted(() => ({
   getDashboard: vi.fn(),
   getDueReviews: vi.fn(),
+  getReviewForecast: vi.fn(),
   answerReview: vi.fn(),
   overrideAttempt: vi.fn(),
   submitSelfRating: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/api/dashboard", () => ({ getDashboard: mocks.getDashboard }))
 vi.mock("@/api/reviews", () => ({
   getDueReviews: mocks.getDueReviews,
+  getReviewForecast: mocks.getReviewForecast,
   answerReview: mocks.answerReview,
   overrideAttempt: mocks.overrideAttempt,
   submitSelfRating: mocks.submitSelfRating,
@@ -37,6 +39,18 @@ function dashboard(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function forecast(counts: number[], start = "2026-08-09") {
+  const from = new Date(`${start}T00:00:00Z`)
+  return {
+    horizon: counts.length,
+    days: counts.map((count, index) => {
+      const day = new Date(from)
+      day.setUTCDate(day.getUTCDate() + index)
+      return { date: day.toISOString().slice(0, 10), count }
+    }),
+  }
+}
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -51,6 +65,7 @@ describe("Memory page", () => {
     useSubjectStore.setState({ subject: "all" })
     mocks.getDashboard.mockResolvedValue(dashboard())
     mocks.getDueReviews.mockResolvedValue({ items: [], count: 0 })
+    mocks.getReviewForecast.mockResolvedValue(forecast([4, 9, 2, 0, 6, 1, 3]))
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
   })
 
@@ -92,5 +107,33 @@ describe("Memory page", () => {
 
     await waitFor(() => expect(mocks.getDashboard).toHaveBeenCalled())
     expect(screen.queryByRole("progressbar", { name: "今日进度" })).not.toBeInTheDocument()
+  })
+
+  it("shows what the coming week will ask of you, not just today", async () => {
+    // 待复习 is one number, and one number cannot show a pile-up. Skipping
+    // today is invisible until the day it all lands on arrives.
+    renderPage()
+
+    expect(await screen.findByText("接下来七天")).toBeInTheDocument()
+    expect(screen.getByText(/最多的一天 9 张/)).toBeInTheDocument()
+  })
+
+  it("keeps today's queue above the week ahead", async () => {
+    // The forecast is context for the work, not the work. Pushing the session
+    // below the fold to report on it would invert what the page is for.
+    renderPage()
+
+    const week = await screen.findByText("接下来七天")
+    const session = await screen.findByRole("heading", { name: "这个科目还没有任何内容" })
+    expect(week.compareDocumentPosition(session)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
+  it("still shows the queue when the forecast could not be read", async () => {
+    // Losing an optional panel must not cost you the page it sits on.
+    mocks.getReviewForecast.mockRejectedValue(new Error("读取失败"))
+    renderPage()
+
+    expect(await screen.findByText("待复习")).toBeInTheDocument()
+    expect(screen.queryByText("接下来七天")).not.toBeInTheDocument()
   })
 })
