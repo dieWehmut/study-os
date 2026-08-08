@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Practice from "./Practice"
+import { mistakesStorageKey } from "@/lib/mistakes"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const mocks = vi.hoisted(() => ({
@@ -168,5 +169,47 @@ describe("Practice page", () => {
     expect(await screen.findByText(/网络断了/)).toBeInTheDocument()
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument()
     expect(screen.getByLabelText("错题")).toHaveValue("写不进去的题")
+  })
+
+  it("carries a log left in the browser into the database, once", async () => {
+    // Everything filed before the page had a backend is sitting in
+    // localStorage, invisible to the rest of the system. Dropping it would
+    // punish the people who used the feature first.
+    localStorage.setItem(
+      mistakesStorageKey,
+      JSON.stringify([
+        { id: "old-2", subject: "physics", question: "新一点的", cause: "misread", createdAt: "2026-08-07T01:00:00Z" },
+        { id: "old-1", subject: "physics", question: "旧一点的", cause: "recall", createdAt: "2026-08-07T00:00:00Z" },
+      ]),
+    )
+    mocks.recordMistake
+      .mockResolvedValueOnce({ id: "qa-a", subject: "physics", question: "旧一点的", cause: "recall", createdAt: "2026-08-09T00:00:00Z" })
+      .mockResolvedValueOnce({ id: "qa-b", subject: "physics", question: "新一点的", cause: "misread", createdAt: "2026-08-09T00:00:01Z" })
+
+    render(<Practice />)
+
+    expect(await screen.findByText("新一点的")).toBeInTheDocument()
+    expect(screen.getByText("旧一点的")).toBeInTheDocument()
+    // Oldest first, so the newest still lands on top once the server has them.
+    expect(mocks.recordMistake.mock.calls.map((call) => call[0].question)).toEqual(["旧一点的", "新一点的"])
+    // Clearing the key is what makes it once rather than every mount.
+    await waitFor(() => expect(localStorage.getItem(mistakesStorageKey)).toBeNull())
+  })
+
+  it("keeps the browser log when the migration could not be written", async () => {
+    // Clearing the key on a failed write would lose the rows for good. Leaving
+    // it costs one retry next time the page opens.
+    localStorage.setItem(
+      mistakesStorageKey,
+      JSON.stringify([
+        { id: "old-1", subject: "physics", question: "搬不过去的题", cause: "recall", createdAt: "2026-08-07T00:00:00Z" },
+      ]),
+    )
+    mocks.recordMistake.mockRejectedValueOnce(new Error("网络断了"))
+
+    render(<Practice />)
+
+    expect(await screen.findByText(/网络断了/)).toBeInTheDocument()
+    expect(localStorage.getItem(mistakesStorageKey)).not.toBeNull()
   })
 })

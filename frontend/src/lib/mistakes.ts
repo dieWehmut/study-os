@@ -195,3 +195,20 @@ export function writeMistakes(records: MistakeRecord[]): void {
     // filed, which is still in memory and on screen.
   }
 }
+
+/**
+ * Forget the browser-local log entirely.
+ *
+ * Removing the key rather than storing an empty array is what makes the
+ * migration into the database a one-time event: an empty array is still an
+ * answer, and readMistakes cannot tell "already carried over" from "nothing
+ * was ever filed here".
+ */
+export function clearStoredMistakes(): void {
+  if (typeof localStorage === "undefined") return
+  try {
+    localStorage.removeItem(mistakesStorageKey)
+  } catch {
+    // A blocked store just means the carry-over is attempted again next time.
+  }
+}

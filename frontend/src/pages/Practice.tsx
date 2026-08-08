@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   MISTAKE_CAUSES,
+  clearStoredMistakes,
+  readMistakes,
   summarizeMistakes,
   type MistakeCause,
   type MistakeRecord,
@@ -16,6 +18,36 @@ import { useSubjectStore } from "@/store/useSubjectStore"
 
 function describe(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+/**
+ * Carry a log filed before the page had a backend into the database.
+ *
+ * Everything logged in the localStorage era is invisible to the rest of the
+ * system -- the review queue cannot see it, another device cannot see it.
+ * Dropping it would punish whoever used the feature first.
+ *
+ * Oldest first, so that prepending each answer leaves the newest on top. The
+ * key is removed only after every row is through: clearing it on a failed
+ * write would lose them for good, while leaving it costs one retry.
+ */
+async function carryBrowserLogOver(): Promise<MistakeRecord[]> {
+  const stored = readMistakes()
+  if (stored.length === 0) return []
+
+  const carried: MistakeRecord[] = []
+  for (const record of [...stored].reverse()) {
+    carried.unshift(
+      await recordMistake({
+        subject: record.subject,
+        question: record.question,
+        cause: record.cause,
+        ...(record.note ? { note: record.note } : {}),
+      }),
+    )
+  }
+  clearStoredMistakes()
+  return carried
 }
 
 export default function Practice() {
@@ -34,9 +66,14 @@ export default function Practice() {
     let active = true
     listMistakes(subject === "all" ? {} : { subject })
       .then((loaded) => {
-        if (!active) return
+        if (!active) return []
         setRecords(loaded)
         setError("")
+        return carryBrowserLogOver()
+      })
+      .then((carried) => {
+        if (!active || carried.length === 0) return
+        setRecords((current) => [...carried, ...current])
       })
       .catch((failure: unknown) => {
         if (active) setError(describe(failure, "读取错题失败"))
