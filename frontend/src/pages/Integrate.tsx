@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
-import { Copy, Network, RefreshCw, Wand2 } from "lucide-react"
+import { Copy, ListTree, Network, RefreshCw, Wand2 } from "lucide-react"
 
-import { createIntegrate, getIntegrateNote, listIntegrateNotes, type IntegratedNote } from "@/api/integrate"
+import { createIntegrate, getIntegrateNote, listIntegrateNotes, type IntegratedNote, type MindMap as MindMapData } from "@/api/integrate"
 import { listKnowledge } from "@/api/knowledge"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select } from "@/components/ui/select"
 import { MindMap } from "@/features/mindmap/MindMap"
 import { toMermaid as exportMermaid } from "@/lib/mermaid"
+import { markdownToMindMap } from "@/lib/mindmap"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { subjectName } from "@/lib/subjects"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -36,6 +37,7 @@ export default function Integrate() {
   const [knowledgeID, setKnowledgeID] = useState("")
   const [text, setText] = useState("")
   const [note, setNote] = useState<IntegratedNote | null>(null)
+  const [structure, setStructure] = useState<MindMapData | null>(null)
   const [history, setHistory] = useState<IntegratedNote[]>([])
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState("")
@@ -81,6 +83,7 @@ export default function Integrate() {
         max_cards: 12,
       })
       setNote(result)
+      setStructure(null)
       await refreshHistory()
     } catch {
       setError("整合生成失败，请确认 AI 服务已配置或稍后重试。")
@@ -89,18 +92,46 @@ export default function Integrate() {
     }
   }
 
+  /**
+   * The same picture, drawn from the document instead of from a model.
+   *
+   * Headings and indentation already say what the shape is, so this needs no
+   * network call and returns the same tree every time -- which is what makes a
+   * map worth studying before you read. The AI path stays for material that has
+   * no headings to work from.
+   */
+  function buildFromStructure() {
+    const trimmed = text.trim()
+    if (!trimmed) {
+      setError("请先粘贴一段带标题的资料。")
+      return
+    }
+    // No title override here: supplying one tells the parser the document is
+    // untitled, which would demote its own level-1 heading to a mere section.
+    const map = markdownToMindMap(trimmed)
+    if (map.nodes.length === 0) {
+      setError("这段文字没有标题层级，无法按结构分层。可以先加上 # 标题，或改用 AI 生成。")
+      return
+    }
+    setError("")
+    setStructure(map)
+    setNote(null)
+  }
+
   async function loadHistory(noteID: string) {
     try {
       setNote(await getIntegrateNote(noteID))
+      setStructure(null)
     } catch {
       setError("读取历史笔记失败。")
     }
   }
 
   async function copyMermaid() {
-    if (!note) return
+    const map = structure ?? note?.mindmap
+    if (!map) return
     try {
-      await navigator.clipboard.writeText(exportMermaid(note.mindmap))
+      await navigator.clipboard.writeText(exportMermaid(map))
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -138,13 +169,39 @@ export default function Integrate() {
             className="min-h-32 resize-y rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
           />
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button disabled={generating || (!text.trim() && !knowledgeID)} onClick={() => void generate()}>
               <Wand2 data-icon="inline-start" />{generating ? "生成中…" : "生成导图与卡片"}
             </Button>
+            <Button variant="outline" disabled={!text.trim()} onClick={buildFromStructure}>
+              <ListTree data-icon="inline-start" />按结构生成（不调用 AI）
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            资料本身带 <code>#</code> 标题时优先用「按结构生成」：层级来自原文，每次结果一致，适合正式阅读前先看一遍。
+          </p>
         </CardContent>
       </Card>
+
+      {structure ? (
+        <Card>
+          <CardHeader className="gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>{structure.title}</CardTitle>
+              <Button size="sm" variant="outline" onClick={() => void copyMermaid()}>
+                <Copy data-icon="inline-start" />{copied ? "已复制" : "复制 Mermaid"}
+              </Button>
+            </div>
+            <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <Badge variant="secondary">来自原文结构</Badge>
+              <span>{structure.nodes.length} 个节点 · 层级由标题决定，没有经过模型改写</span>
+            </p>
+          </CardHeader>
+          <CardContent>
+            <MindMap data={structure} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {note ? (
         <div className="grid gap-4">
