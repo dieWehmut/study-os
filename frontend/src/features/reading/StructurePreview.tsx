@@ -1,4 +1,4 @@
-import { Check, CornerDownRight, ListTree } from "lucide-react"
+import { Check, CornerDownRight, HelpCircle, ListTree } from "lucide-react"
 
 import { chunkMarkdown, type ReadingChunk } from "@/lib/chunk"
 import { cn } from "@/lib/utils"
@@ -11,6 +11,9 @@ interface StructurePreviewProps {
   /** Omit while nobody is tracking a read: a 已读 0 / 3 on an untouched
    *  document is noise standing where the shape goes. */
   readIds?: ReadonlySet<string>
+  /** Same rule as readIds, and the count is hidden at zero besides: nothing
+   *  being stuck is the starting state, not a result worth reporting. */
+  stuckIds?: ReadonlySet<string>
 }
 
 /**
@@ -26,6 +29,7 @@ export function StructurePreview({
   activeId,
   onSelect,
   readIds,
+  stuckIds,
 }: StructurePreviewProps) {
   const chunks = chunkMarkdown(markdown)
 
@@ -44,6 +48,7 @@ export function StructurePreview({
   const total = chunks.reduce((sum, chunk) => sum + chunk.size, 0)
   const levels = Math.max(...chunks.map((chunk) => chunk.path.length - 1))
   const readCount = readIds ? chunks.filter((chunk) => readIds.has(chunk.id)).length : 0
+  const stuckCount = stuckIds ? chunks.filter((chunk) => stuckIds.has(chunk.id)).length : 0
 
   return (
     <div className="flex flex-col gap-2">
@@ -62,6 +67,14 @@ export function StructurePreview({
             </span>
           </>
         ) : null}
+        {stuckCount > 0 ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums font-medium text-amber-600 dark:text-amber-400">
+              卡住 {stuckCount}
+            </span>
+          </>
+        ) : null}
       </p>
       <ol className="flex flex-col gap-1.5">
         {chunks.map((chunk, index) => {
@@ -71,6 +84,7 @@ export function StructurePreview({
           const depth = Math.max(0, chunk.path.length - 2)
           const current = chunk.id === activeId
           const read = readIds?.has(chunk.id) ?? false
+          const stuck = stuckIds?.has(chunk.id) ?? false
           return (
             <li key={chunk.id} style={{ paddingInlineStart: `${depth * 1.25}rem` }}>
               <button
@@ -86,19 +100,34 @@ export function StructurePreview({
                   // Done stops recede rather than disappear: you still need to
                   // find your way back to one, but they should not compete for
                   // attention with the part you have not read.
-                  read && !current ? "opacity-70" : null,
+                  read && !current && !stuck ? "opacity-70" : null,
+                  // A stop you are stuck on is the one thing on the page you
+                  // came back to find, so the flag outranks the receding --
+                  // finishing a section and understanding it are different
+                  // facts, and only the second one earns the quiet.
+                  stuck && !current ? "border-amber-500/50 bg-amber-500/5" : null,
                 )}
               >
                 <span className="flex items-center gap-2">
                   <span className="w-5 shrink-0 text-xs tabular-nums text-muted-foreground">
                     {index + 1}
                   </span>
-                  <span className={cn("truncate text-sm font-medium", read ? "line-through" : null)}>
+                  <span
+                    className={cn(
+                      "truncate text-sm font-medium",
+                      read && !stuck ? "line-through" : null,
+                    )}
+                  >
                     {chunk.title}
                   </span>
                   {read ? (
                     <span className="flex shrink-0 items-center gap-0.5 text-[0.68rem] text-primary">
                       <Check aria-hidden="true" className="size-3" />已读
+                    </span>
+                  ) : null}
+                  {stuck ? (
+                    <span className="flex shrink-0 items-center gap-0.5 text-[0.68rem] text-amber-600 dark:text-amber-400">
+                      <HelpCircle aria-hidden="true" className="size-3" />卡住
                     </span>
                   ) : null}
                   {chunk.continues ? (

@@ -251,6 +251,25 @@ describe("collecting what you got stuck on", () => {
     expect(screen.queryByText("卡住的地方")).not.toBeInTheDocument()
   })
 
+  it("carries the flag into the outline, where the whole document is visible", () => {
+    // The list under the reader says which sections are in the way; the outline
+    // says where they sit in the document -- which is what decides whether the
+    // gap is one stubborn paragraph or a whole branch you never got.
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+
+    // Two views of the same document now name this section: the outline and the
+    // list under the reader. data-depth is the outline's own marker.
+    const outlined = screen
+      .getAllByRole("button", { name: /光反应/ })
+      .filter((button) => button.dataset.depth !== undefined)
+    expect(outlined).toHaveLength(1)
+    expect(outlined[0]).toHaveAccessibleName(/卡住/)
+    expect(screen.getByText("卡住 1")).toBeInTheDocument()
+  })
+
   it("drops a flag naming a stop the edited document no longer has", () => {
     // The marks were made against a longer draft; a stale id would list a
     // section nobody can navigate to.

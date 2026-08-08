@@ -139,6 +139,7 @@ export default function Reading() {
               markdown={markdown}
               activeId={chunks[index]?.id}
               readIds={readIds}
+              stuckIds={stuckIds}
               onSelect={(chunk) =>
                 save({ ...session, index: chunks.findIndex((item) => item.id === chunk.id) })
               }

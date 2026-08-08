@@ -132,3 +132,60 @@ describe("structure preview", () => {
     expect(screen.getByText("10 字")).toBeInTheDocument()
   })
 })
+
+describe("the stops that did not land, in the outline", () => {
+  it("keeps quiet about being stuck when nobody is tracking it", () => {
+    render(<StructurePreview markdown={source} />)
+
+    expect(screen.queryByText(/卡住/)).not.toBeInTheDocument()
+  })
+
+  it("flags the stop you did not understand", () => {
+    const [first] = chunkMarkdown(source)
+    render(<StructurePreview markdown={source} stuckIds={new Set([first.id])} />)
+
+    expect(screen.getByRole("button", { name: /光反应/ })).toHaveAccessibleName(/卡住/)
+  })
+
+  it("leaves the stops that landed unflagged", () => {
+    const [first] = chunkMarkdown(source)
+    render(<StructurePreview markdown={source} stuckIds={new Set([first.id])} />)
+
+    expect(screen.getByRole("button", { name: /暗反应/ })).not.toHaveAccessibleName(/卡住/)
+  })
+
+  it("says how many stops are still in the way", () => {
+    // The count is what decides whether a second pass is worth it, and the
+    // outline is the only place the whole document is in view at once.
+    const [first, second] = chunkMarkdown(source)
+    render(<StructurePreview markdown={source} stuckIds={new Set([first.id, second.id])} />)
+
+    expect(screen.getByText("卡住 2")).toBeInTheDocument()
+  })
+
+  it("says nothing about a count of zero", () => {
+    // A "卡住 0" sitting next to the shape is noise: nothing being stuck is the
+    // starting state, not a result worth reporting.
+    render(<StructurePreview markdown={source} stuckIds={new Set()} />)
+
+    expect(screen.queryByText(/卡住/)).not.toBeInTheDocument()
+  })
+
+  it("keeps a stop you finished but did not understand in plain view", () => {
+    // Finished stops recede so they stop competing for attention. A stop you
+    // are stuck on is the one thing on the page you came back to find, so the
+    // flag has to survive being read.
+    const [first] = chunkMarkdown(source)
+    render(
+      <StructurePreview
+        markdown={source}
+        readIds={new Set([first.id])}
+        stuckIds={new Set([first.id])}
+      />,
+    )
+
+    const stop = screen.getByRole("button", { name: /光反应/ })
+    expect(stop.className).not.toContain("opacity-70")
+    expect(stop).toHaveAccessibleName(/卡住/)
+  })
+})
