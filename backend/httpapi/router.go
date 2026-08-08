@@ -142,6 +142,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/knowledge/{knowledgeID}", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeGet(response, request, application)
 		})
+		api.Get("/knowledge/{knowledgeID}/related", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeRelated(response, request, application)
+		})
 		api.Post("/knowledge/{knowledgeID}/tag", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeTag(response, request, application)
 		})
@@ -451,6 +454,64 @@ func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, app
 	}
 	writeJSON(response, http.StatusOK, item)
 }
+
+// handleKnowledgeRelated answers with the other items sharing a group with
+// this one -- for an English word, the rest of its 词族.
+//
+// The grouping has existed since the English pipeline was written and nothing
+// could ever read it back per item: /knowledge?group= needs a group id the
+// caller was never told. Composed from the two existing reads rather than a
+// new query, so a group means the same thing here as everywhere else.
+//
+// The item itself is dropped, and a sibling shared by two groups appears once.
+// Both are the caller's problem otherwise, and every caller has the same one.
+func handleKnowledgeRelated(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	ctx := request.Context()
+	itemID := chi.URLParam(request, "knowledgeID")
+	// Reading the item first is what turns an id that never existed into a
+	// 404 rather than a cheerful empty family.
+	if _, err := application.Store.GetKnowledgeItem(ctx, itemID); err != nil {
+		writeStoreError(response, err)
+		return
+	}
+	groups, err := application.Store.ListGroupsForItem(ctx, itemID)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "list groups failed"})
+		return
+	}
+	seen := map[string]struct{}{itemID: {}}
+	siblings := make([]models.KnowledgeItem, 0)
+	for _, group := range groups {
+		members, err := application.Store.ListItemsByGroup(ctx, group.ID, models.KnowledgeListOptions{
+			Limit: maxRelatedItems,
+		})
+		if err != nil {
+			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "list group items failed"})
+			return
+		}
+		for _, member := range members {
+			if _, repeat := seen[member.ID]; repeat {
+				continue
+			}
+			seen[member.ID] = struct{}{}
+			siblings = append(siblings, member)
+		}
+	}
+	writeJSON(response, http.StatusOK, map[string]any{
+		"items":  siblings,
+		"count":  len(siblings),
+		"groups": groups,
+	})
+}
+
+// maxRelatedItems bounds one family. A 词族 is a handful of words by
+// construction; anything near this is a grouping bug, and the panel showing it
+// is a sidebar, not a list page.
+const maxRelatedItems = 50
 
 func writeImportError(response http.ResponseWriter, err error) {
 	if errors.Is(err, db.ErrNotFound) {
