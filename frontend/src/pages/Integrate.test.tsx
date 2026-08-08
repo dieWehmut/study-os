@@ -51,7 +51,7 @@ describe("Integrate page", () => {
 
     await waitFor(() => expect(mocks.createIntegrate).toHaveBeenCalled())
     expect((await screen.findAllByText("运动学整合")).length).toBeGreaterThan(0)
-    expect(screen.getByRole("img", { name: "导图：运动学整合" })).toBeInTheDocument()
+    expect(screen.getByRole("tree", { name: "导图：运动学整合" })).toBeInTheDocument()
     expect(screen.getByText("速度描述运动的快慢。")).toBeInTheDocument()
     expect(screen.getAllByText("二级结论").length).toBeGreaterThan(0)
   })
