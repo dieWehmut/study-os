@@ -9,7 +9,12 @@ import { FocusReader } from "@/features/reading/FocusReader"
 import { StructurePreview } from "@/features/reading/StructurePreview"
 import { chunkMarkdown } from "@/lib/chunk"
 import { markdownToMindMap } from "@/lib/mindmap"
-import { readReadingSession, writeReadingSession, type ReadingSession } from "@/lib/reading-session"
+import {
+  emptyReadingSession,
+  readReadingSession,
+  writeReadingSession,
+  type ReadingSession,
+} from "@/lib/reading-session"
 
 export default function Reading() {
   const [showMap, setShowMap] = useState(false)
@@ -41,7 +46,7 @@ export default function Reading() {
     }
     // Marking a stop and then reaching for 下一节 is two actions for one intent.
     save({
-      markdown,
+      ...session,
       index: Math.min(index + 1, chunks.length - 1),
       readIds: [...session.readIds, id],
     })
@@ -69,7 +74,7 @@ export default function Reading() {
               // A new document has a new set of stops; keeping the old position
               // would drop the reader somewhere arbitrary in it, and the old
               // marks would attach to stops nobody has read.
-              save({ markdown: event.target.value, index: 0, readIds: [] })
+              save({ ...emptyReadingSession, markdown: event.target.value })
             }}
             placeholder={"# 标题\n## 小节\n正文…"}
             className="min-h-40 font-mono text-xs"

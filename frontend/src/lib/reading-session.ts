@@ -10,13 +10,31 @@ export interface ReadingSession {
   markdown: string
   index: number
   readIds: string[]
+  /**
+   * Stops that were read and still did not land. Kept apart from readIds
+   * because both can be true of the same stop at once -- finishing a section
+   * and understanding it are different facts about it.
+   */
+  stuckIds: string[]
 }
 
-export const emptyReadingSession: ReadingSession = { markdown: "", index: 0, readIds: [] }
+export const emptyReadingSession: ReadingSession = {
+  markdown: "",
+  index: 0,
+  readIds: [],
+  stuckIds: [],
+}
 
 function normalizeIndex(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 0
   return Math.max(0, Math.trunc(value))
+}
+
+function normalizeIds(value: unknown): string[] {
+  // A missing list is no marks, not a broken session: sessions on disk predate
+  // the field, and refusing them would empty the box of whoever had a document
+  // open when the app updated.
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []
 }
 
 /**
@@ -45,9 +63,8 @@ export function readReadingSession(): ReadingSession {
     return {
       markdown: session.markdown,
       index: normalizeIndex(session.index),
-      readIds: Array.isArray(session.readIds)
-        ? session.readIds.filter((id): id is string => typeof id === "string")
-        : [],
+      readIds: normalizeIds(session.readIds),
+      stuckIds: normalizeIds(session.stuckIds),
     }
   } catch {
     return emptyReadingSession
