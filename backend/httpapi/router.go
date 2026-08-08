@@ -871,11 +871,30 @@ func evaluateFreeText(ctx context.Context, application *app.App, prompt models.P
 	if err != nil || response.Feedback == nil {
 		return memory.EvaluateFreeTextAnswer(answer)
 	}
-	return memory.Evaluation{
-		Outcome:  memory.Outcome(response.Feedback.Outcome),
-		Rating:   memory.Rating(response.Feedback.Rating),
-		Feedback: response.Feedback.Message,
+	return evaluationFromFeedback(*response.Feedback, answer)
+}
+
+// evaluationFromFeedback turns a vendor's grading reply into the same matched
+// outcome/rating pair every other grading path produces. The rating is derived
+// rather than trusted: models routinely omit the field, and the zero value that
+// leaves behind is not a neutral "unknown" -- Schedule's default branch reads it
+// as Again, so a learner told 正确 would silently have the card scheduled as a
+// failure and its interval collapsed. An unrecognised outcome is treated as no
+// verdict at all and falls back offline.
+func evaluationFromFeedback(feedback agent.FeedbackOutput, answer string) memory.Evaluation {
+	var evaluation memory.Evaluation
+	switch feedback.Outcome {
+	case agent.OutcomeCorrect:
+		evaluation = memory.Evaluation{Outcome: memory.OutcomeCorrect, Rating: memory.RatingGood}
+	case agent.OutcomePartial:
+		evaluation = memory.Evaluation{Outcome: memory.OutcomePartial, Rating: memory.RatingHard}
+	case agent.OutcomeIncorrect:
+		evaluation = memory.Evaluation{Outcome: memory.OutcomeIncorrect, Rating: memory.RatingAgain}
+	default:
+		return memory.EvaluateFreeTextAnswer(answer)
 	}
+	evaluation.Feedback = feedback.Message
+	return evaluation
 }
 
 func handleDashboard(response http.ResponseWriter, request *http.Request, application *app.App) {
