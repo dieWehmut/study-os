@@ -112,13 +112,20 @@ func (s *TxStore) LinkKnowledgeItemsToGroup(ctx context.Context, itemIDs []strin
 	return linked, nil
 }
 
-func (s *Store) ListItemsByGroup(ctx context.Context, groupID string, limit, offset int) ([]models.KnowledgeItem, error) {
+// ListItemsByGroup returns a group's items, optionally narrowed by the same
+// review-queue filter the plain list understands. A group and a filter that
+// could not compose would let the page show rows it said it had hidden.
+func (s *Store) ListItemsByGroup(ctx context.Context, groupID string, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
+	where := `WHERE ig.group_id = ?`
+	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {
+		where += ` AND ` + predicate
+	}
 	rows, err := s.db.QueryContext(ctx, `
 		`+knowledgeSelect+`
 		JOIN knowledge_item_groups AS ig ON ig.knowledge_item_id = knowledge_items.id
-		WHERE ig.group_id = ?
+		`+where+`
 		ORDER BY knowledge_items.term ASC
-		LIMIT ? OFFSET ?`, groupID, limit, offset)
+		LIMIT ? OFFSET ?`, groupID, options.Limit, options.Offset)
 	if err != nil {
 		return nil, err
 	}

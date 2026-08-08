@@ -356,14 +356,20 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 	}
 	limit := parseLimit(request.URL.Query().Get("limit"), 100, 500)
 	offset := parseOffset(request.URL.Query().Get("offset"))
+	scheduledFilter, ok := parseScheduledFilter(request.URL.Query().Get("scheduled"))
+	if !ok {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "scheduled must be yes or no"})
+		return
+	}
 	var items []models.KnowledgeItem
 	var err error
 	if groupID := strings.TrimSpace(request.URL.Query().Get("group")); groupID != "" {
-		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, limit, offset)
+		items, err = application.Store.ListItemsByGroup(request.Context(), groupID,
+			models.KnowledgeListOptions{Scheduled: scheduledFilter, Limit: limit, Offset: offset})
 	} else {
 		items, err = application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
 			Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"),
-			Tag: request.URL.Query().Get("tag"), Limit: limit, Offset: offset,
+			Tag: request.URL.Query().Get("tag"), Scheduled: scheduledFilter, Limit: limit, Offset: offset,
 		})
 	}
 	if err != nil {
@@ -394,6 +400,25 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 	writeJSON(response, http.StatusOK, map[string]any{
 		"items": items, "count": len(items), "scheduled_ids": scheduledIDs,
 	})
+}
+
+// parseScheduledFilter reads the review-queue filter off the query string.
+//
+// Reports ok=false for anything it does not recognise rather than falling back
+// to "no filter": the caller asked to be shown a subset, and answering with the
+// whole library under a filter that reads as applied is the worse failure.
+func parseScheduledFilter(raw string) (*bool, bool) {
+	yes, no := true, false
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "":
+		return nil, true
+	case "yes":
+		return &yes, true
+	case "no":
+		return &no, true
+	default:
+		return nil, false
+	}
 }
 
 func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, application *app.App) {

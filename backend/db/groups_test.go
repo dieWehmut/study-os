@@ -74,7 +74,7 @@ func TestKnowledgeGroupsPersistAndLinkItemsAcrossReopen(t *testing.T) {
 	if len(itemGroups) != 1 || itemGroups[0].ID != group.ID {
 		t.Fatalf("item groups = %#v", itemGroups)
 	}
-	items, err := reopened.ListItemsByGroup(ctx, group.ID, 10, 0)
+	items, err := reopened.ListItemsByGroup(ctx, group.ID, models.KnowledgeListOptions{Limit: 10})
 	if err != nil {
 		t.Fatalf("list items by group: %v", err)
 	}

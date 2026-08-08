@@ -190,6 +190,9 @@ func (s *Store) ListKnowledgeItems(ctx context.Context, options models.Knowledge
 		where = append(where, `tags_json LIKE ? ESCAPE '\'`)
 		arguments = append(arguments, `%"`+escapeLike(tag)+`"%`)
 	}
+	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {
+		where = append(where, predicate)
+	}
 	if len(where) > 0 {
 		query += ` WHERE ` + strings.Join(where, " AND ")
 	}
@@ -748,6 +751,27 @@ func (s *Store) seedFixtures(ctx context.Context) error {
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	})
+}
+
+// scheduledPredicate is the SQL for "this item does (or does not) already carry
+// review cards".
+//
+// Existence of prompt rows is the whole test, deliberately: prompts and
+// review_states are written in one transaction by the schedule endpoint, so
+// "has prompts" and "is in the queue" cannot disagree. A boolean column on
+// knowledge_items would be a second source of truth that can.
+//
+// Takes no bound argument, so callers can append it to a WHERE list without
+// keeping the arguments slice in step.
+func scheduledPredicate(scheduled *bool, table string) string {
+	if scheduled == nil {
+		return ""
+	}
+	exists := `EXISTS (SELECT 1 FROM prompts WHERE prompts.knowledge_item_id = ` + table + `.id)`
+	if *scheduled {
+		return exists
+	}
+	return `NOT ` + exists
 }
 
 const knowledgeSelect = `SELECT id, COALESCE(source_id, ''), item_type, term,

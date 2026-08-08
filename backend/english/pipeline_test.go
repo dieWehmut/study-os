@@ -63,7 +63,7 @@ func TestProcessFiltersAndGroupsEnglishItems(t *testing.T) {
 	if len(groups) != 1 || groups[0].Kind != "word_family" {
 		t.Fatalf("groups = %#v", groups)
 	}
-	items, err := store.ListItemsByGroup(ctx, groups[0].ID, 10, 0)
+	items, err := store.ListItemsByGroup(ctx, groups[0].ID, models.KnowledgeListOptions{Limit: 10})
 	if err != nil {
 		t.Fatalf("list group items: %v", err)
 	}

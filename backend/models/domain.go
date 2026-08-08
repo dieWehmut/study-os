@@ -36,8 +36,12 @@ type KnowledgeListOptions struct {
 	Query   string
 	Subject string
 	Tag     string
-	Limit   int
-	Offset  int
+	// Scheduled narrows to items that do or do not already carry review cards.
+	// Nil means either, which is what every caller wanted before this existed --
+	// so a field left unset cannot quietly hide half the library.
+	Scheduled *bool
+	Limit     int
+	Offset    int
 }
 
 type KnowledgeGroup struct {
