@@ -25,12 +25,14 @@ export const emptyReadingSession: ReadingSession = {
   stuckIds: [],
 }
 
-function normalizeIndex(value: unknown): number {
+/** Shared with the shelf: two notions of a valid place would drift apart. */
+export function normalizeIndex(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 0
   return Math.max(0, Math.trunc(value))
 }
 
-function normalizeIds(value: unknown): string[] {
+/** Shared with the shelf, for the same reason as normalizeIndex. */
+export function normalizeIds(value: unknown): string[] {
   // A missing list is no marks, not a broken session: sessions on disk predate
   // the field, and refusing them would empty the box of whoever had a document
   // open when the app updated.
