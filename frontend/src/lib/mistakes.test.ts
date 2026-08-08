@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 
 import {
   MISTAKE_CAUSES,
+  createMistake,
   mistakesStorageKey,
   readMistakes,
   summarizeMistakes,
@@ -89,6 +90,33 @@ describe("summarizing mistakes", () => {
     const summary = summarizeMistakes([record("recall", "a"), record("careless", "b")])
 
     expect(summary.byCause[0].percent).toBe(50)
+  })
+})
+
+describe("filing a mistake", () => {
+  const filed = { subject: "biology", question: "光合作用第 3 问", cause: "recall" } as const
+
+  it("gives every record its own id, even two filed in the same breath", () => {
+    // Ids now outlive the session they were made in, and a collision would let
+    // one 删除 take a row you meant to keep.
+    const a = createMistake(filed)
+    const b = createMistake(filed)
+
+    expect(a.id).not.toBe(b.id)
+  })
+
+  it("stamps the record with when it happened", () => {
+    const stamped = createMistake(filed)
+
+    expect(Number.isNaN(Date.parse(stamped.createdAt))).toBe(false)
+  })
+
+  it("survives its own round trip through storage", () => {
+    // The guard: whatever createMistake builds has to be a shape readMistakes
+    // will still accept, or the log empties itself on the next reload.
+    writeMistakes([createMistake(filed)])
+
+    expect(readMistakes()).toHaveLength(1)
   })
 })
 

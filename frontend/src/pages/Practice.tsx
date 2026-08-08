@@ -5,32 +5,41 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { MISTAKE_CAUSES, summarizeMistakes, type MistakeCause, type MistakeRecord } from "@/lib/mistakes"
+import {
+  MISTAKE_CAUSES,
+  createMistake,
+  readMistakes,
+  summarizeMistakes,
+  writeMistakes,
+  type MistakeCause,
+  type MistakeRecord,
+} from "@/lib/mistakes"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 export default function Practice() {
   const subject = useSubjectStore((state) => state.subject)
   const [question, setQuestion] = useState("")
-  const [records, setRecords] = useState<MistakeRecord[]>([])
+  // Read once, on the way in. The log is the point of the page, and one you
+  // have to rebuild every session is one nobody keeps.
+  const [records, setRecords] = useState<MistakeRecord[]>(readMistakes)
 
   const summary = summarizeMistakes(records)
   const pending = question.trim()
+
+  // Storing here rather than in an effect keeps the rule visible: the log
+  // changes and the log is saved, in the same breath, with no run that writes
+  // back what it just read.
+  function save(next: MistakeRecord[]) {
+    setRecords(next)
+    writeMistakes(next)
+  }
 
   // Picking the cause is the save. A separate 保存 button would be a third
   // action at the moment you least want one -- right after getting something
   // wrong, when the cheapest path is to log nothing at all.
   function file(cause: MistakeCause) {
     if (!pending) return
-    setRecords((current) => [
-      {
-        id: `${Date.now()}-${current.length}`,
-        subject,
-        question: pending,
-        cause,
-        createdAt: new Date().toISOString(),
-      },
-      ...current,
-    ])
+    save([createMistake({ subject, question: pending, cause }), ...records])
     setQuestion("")
   }
 
@@ -139,7 +148,7 @@ export default function Practice() {
                       size="icon"
                       aria-label="删除"
                       onClick={() =>
-                        setRecords((current) => current.filter((entry) => entry.id !== item.id))
+                        save(records.filter((entry) => entry.id !== item.id))
                       }
                     >
                       <Trash2 aria-hidden="true" />

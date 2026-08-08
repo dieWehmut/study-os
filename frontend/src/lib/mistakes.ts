@@ -114,6 +114,33 @@ export function summarizeMistakes(records: MistakeRecord[]): MistakeSummary {
 
 export const mistakesStorageKey = "study-os.mistakes"
 
+let filedThisSession = 0
+
+/**
+ * Build a record of one mistake.
+ *
+ * Lives here rather than in the page because ids now outlive the session that
+ * made them: two rows filed in the same millisecond, or one filed today and
+ * one after a reload, still have to be told apart, or a 删除 could take the
+ * row next to the one you meant.
+ */
+export function createMistake(filed: {
+  subject: string
+  question: string
+  cause: MistakeCause
+  note?: string
+}): MistakeRecord {
+  filedThisSession += 1
+  const record: MistakeRecord = {
+    id: `${Date.now().toString(36)}-${filedThisSession.toString(36)}`,
+    subject: filed.subject,
+    question: filed.question,
+    cause: filed.cause,
+    createdAt: new Date().toISOString(),
+  }
+  return filed.note ? { ...record, note: filed.note } : record
+}
+
 function isFilled(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0
 }

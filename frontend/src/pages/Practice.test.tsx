@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 
+import { mistakesStorageKey, readMistakes } from "@/lib/mistakes"
 import Practice from "./Practice"
 
 function log(question: string, cause: string) {
@@ -9,6 +10,10 @@ function log(question: string, cause: string) {
 }
 
 describe("Practice page", () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
   it("says plainly that nothing has gone wrong yet", () => {
     render(<Practice />)
 
@@ -74,5 +79,46 @@ describe("Practice page", () => {
 
     const rows = screen.getAllByRole("listitem")
     expect(rows[0].textContent).toContain("新的")
+  })
+
+  it("still has the log after you close the tab and come back", () => {
+    // Naming a cause costs you a moment at the worst possible time. Losing the
+    // answer on reload would make that a moment spent for nothing.
+    const first = render(<Practice />)
+    log("光合作用第 3 问", "想不起来")
+    first.unmount()
+
+    render(<Practice />)
+
+    expect(screen.getByText("光合作用第 3 问")).toBeInTheDocument()
+  })
+
+  it("shows a log that was already there before the page opened", () => {
+    localStorage.setItem(
+      mistakesStorageKey,
+      JSON.stringify([
+        {
+          id: "a",
+          subject: "biology",
+          question: "上次记的题",
+          cause: "recall",
+          createdAt: "2026-08-07T00:00:00Z",
+        },
+      ]),
+    )
+
+    render(<Practice />)
+
+    expect(screen.getByText("上次记的题")).toBeInTheDocument()
+    expect(screen.getByText("复习能解决 1")).toBeInTheDocument()
+  })
+
+  it("forgets a row you deleted, rather than bringing it back next time", () => {
+    render(<Practice />)
+    log("第 1 题", "看错题")
+
+    fireEvent.click(screen.getByRole("button", { name: /删除/ }))
+
+    expect(readMistakes()).toEqual([])
   })
 })
