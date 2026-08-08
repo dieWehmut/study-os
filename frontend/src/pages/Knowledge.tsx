@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
+import { insightTagsFor } from "@/lib/insights"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 export default function Knowledge() {
@@ -109,6 +110,15 @@ export default function Knowledge() {
     setRequestVersion((value) => value + 1)
   }
 
+  // Each subject sorts insights by its own three words, so a tag chosen under
+  // one subject can have no control under the next. Dropping it keeps the page
+  // honest: a filter still narrowing the list from a dropdown that no longer
+  // offers it is one you cannot see, explain, or undo.
+  function chooseSubject(next: string) {
+    if (tag && !insightTagsFor(next).includes(tag)) setTag("")
+    setSubject(next)
+  }
+
   function updateQuery(value: string) {
     setLoading(true)
     setError("")
@@ -144,7 +154,7 @@ export default function Knowledge() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">搜索知识库</CardTitle>
             <div className="flex flex-wrap items-center gap-3">
-              <SubjectChips subject={subject} onSelect={setSubject} />
+              <SubjectChips subject={subject} onSelect={chooseSubject} />
               <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-group">
                 知识分组
                 <Select
@@ -178,9 +188,7 @@ export default function Knowledge() {
                   placeholder="全部"
                   options={[
                     { value: "", label: "全部" },
-                    { value: "二级结论", label: "二级结论" },
-                    { value: "解题策略", label: "解题策略" },
-                    { value: "易错信号", label: "易错信号" },
+                    ...insightTagsFor(subject).map((name) => ({ value: name, label: name })),
                   ]}
                   className="min-w-32"
                 />

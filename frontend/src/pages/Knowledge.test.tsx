@@ -10,10 +10,14 @@ const mocks = vi.hoisted(() => ({
   listGroups: vi.fn(),
   scheduleKnowledge: vi.fn(),
   compareKnowledge: vi.fn(),
+  updateKnowledgeTag: vi.fn(),
 }))
 
 vi.mock("@/api/knowledge", () => mocks)
-vi.mock("@/api/chat", () => ({ compareKnowledge: mocks.compareKnowledge }))
+vi.mock("@/api/chat", () => ({
+  compareKnowledge: mocks.compareKnowledge,
+  updateKnowledgeTag: mocks.updateKnowledgeTag,
+}))
 
 describe("Knowledge page", () => {
   beforeEach(() => {
@@ -206,6 +210,41 @@ describe("Knowledge page", () => {
     fireEvent.pointerDown(option)
     fireEvent.click(option)
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ tag: "二级结论" })))
+  })
+
+  it("offers a subject its own insight types to filter by", async () => {
+    // 化学 does not sort its conclusions into 二级结论; it sorts them into
+    // 考点 / 题型 / 易错点. Offering only the generic words loses the sort.
+    useSubjectStore.setState({ subject: "chemistry" })
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "属性" }))
+    const option = await screen.findByRole("option", { name: "考点" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ tag: "考点" })))
+  })
+
+  it("clears a tag filter the new subject has no word for", async () => {
+    // Filter 化学 by 考点, then switch to 语文: the dropdown no longer offers
+    // 考点, so the list would stay filtered by something you can no longer see
+    // or unset from the control that set it.
+    useSubjectStore.setState({ subject: "chemistry" })
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "属性" }))
+    const option = await screen.findByRole("option", { name: "考点" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ tag: "考点" })))
+
+    fireEvent.click(screen.getByRole("button", { name: "语文" }))
+
+    await waitFor(() => {
+      const last = mocks.listKnowledge.mock.calls.at(-1)?.[0] as Record<string, unknown>
+      expect(last.subject).toBe("chinese")
+      expect(last.tag).toBeUndefined()
+    })
   })
 
   it("compares two knowledge points", async () => {
@@ -441,5 +480,59 @@ describe("showing what is already in the review queue", () => {
       const last = mocks.listKnowledge.mock.calls.at(-1)?.[0] as Record<string, unknown>
       expect(last.scheduled).toBeUndefined()
     })
+  })
+})
+
+describe("tagging a knowledge point with an insight type", () => {
+  function library(item: Record<string, unknown>) {
+    mocks.listGroups.mockResolvedValue({ count: 0, items: [] })
+    mocks.listKnowledge.mockResolvedValue({ count: 1, items: [item] })
+    mocks.getKnowledge.mockResolvedValue(item)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useSubjectStore.setState({ subject: "all" })
+  })
+
+  it("offers the item's own subject's types, not the generic ones", async () => {
+    // The panel shows one item, so the item's subject decides -- reading the
+    // toolbar chip instead would put 二级结论 on a 化学 point under 全部学科.
+    library({
+      id: "k1", item_type: "brain_dump", subject: "chemistry",
+      term: "过量判断", concise_definition: "先算物质的量之比。", tags: [],
+    })
+    render(<Knowledge />)
+
+    expect(await screen.findByRole("button", { name: "考点" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "二级结论" })).not.toBeInTheDocument()
+  })
+
+  it("keeps offering a tag the item carries from outside its vocabulary", async () => {
+    // A tag you can see but not press is a tag you can never take off.
+    library({
+      id: "k1", item_type: "brain_dump", subject: "chemistry",
+      term: "过量判断", concise_definition: "先算物质的量之比。", tags: ["二级结论"],
+    })
+    render(<Knowledge />)
+
+    expect(await screen.findByRole("button", { name: "✓ 二级结论" })).toBeInTheDocument()
+  })
+
+  it("writes the tag the subject actually uses", async () => {
+    library({
+      id: "k1", item_type: "brain_dump", subject: "chemistry",
+      term: "过量判断", concise_definition: "先算物质的量之比。", tags: [],
+    })
+    mocks.updateKnowledgeTag.mockResolvedValue({
+      id: "k1", item_type: "brain_dump", subject: "chemistry",
+      term: "过量判断", concise_definition: "先算物质的量之比。", tags: ["考点"],
+    })
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "考点" }))
+
+    await waitFor(() => expect(mocks.updateKnowledgeTag).toHaveBeenCalledWith("k1", "考点", false))
+    expect(await screen.findByRole("button", { name: "✓ 考点" })).toBeInTheDocument()
   })
 })

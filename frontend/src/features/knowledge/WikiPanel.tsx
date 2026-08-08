@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { tagOptionsFor } from "@/lib/insights"
 import { itemTypeLabel } from "@/lib/labels"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 
@@ -20,8 +21,6 @@ interface WikiPanelProps {
   scheduled?: boolean
   onUpdated?: (item: KnowledgeItem) => void
 }
-
-const attributeTags = ["二级结论", "解题策略", "易错信号"]
 
 // What the last 排进复习 press actually did. "known" is not a failure: the
 // backend answers idempotently, and reporting that as a fresh success would
@@ -109,7 +108,11 @@ export function WikiPanel({ item, scheduled = false, onUpdated }: WikiPanelProps
           {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {attributeTags.map((tag) => {
+          {/* The item's own subject decides, not the page's chip: under
+              全部学科 a 化学 point would otherwise be offered 二级结论 instead
+              of the 考点 / 题型 / 易错点 it is actually sorted by. Tags it
+              already carries are appended so none becomes unremovable. */}
+          {tagOptionsFor(item.subject ?? "", current?.tags ?? []).map((tag) => {
             const active = current?.tags?.includes(tag) ?? false
             return (
               <Button
