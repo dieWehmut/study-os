@@ -224,3 +224,18 @@ CREATE TABLE question_attempts (
     occurred_at TEXT NOT NULL
 );
 CREATE INDEX question_attempts_question_idx ON question_attempts(question_id, occurred_at DESC);
+
+CREATE TABLE voice_roles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    bio TEXT NOT NULL DEFAULT '',
+    avatar_path TEXT NOT NULL DEFAULT '',
+    provider TEXT NOT NULL DEFAULT '',
+    base_url TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    voice TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX voice_roles_order_idx ON voice_roles(sort_order, created_at);

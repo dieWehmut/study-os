@@ -66,6 +66,30 @@ type AudioAsset struct {
 	CreatedAt       time.Time       `json:"created_at"`
 }
 
+// VoiceRole is a saved 语音合成 persona: a name, a small avatar and a one-line
+// bio wrapped around the endpoint settings that produce its voice. Roles exist
+// so switching who reads a word aloud is one click rather than a settings edit.
+//
+// Only non-secret fields live here. A role may point at its own OpenAI-style
+// server, but the credential stays in the local env file, because the database
+// is backed up and exported while a key must not be.
+type VoiceRole struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Bio  string `json:"bio,omitempty"`
+	// AvatarPath is an absolute path on disk and never leaves the backend; the
+	// UI reads the avatar through the role's avatar endpoint instead.
+	AvatarPath string    `json:"-"`
+	HasAvatar  bool      `json:"has_avatar"`
+	Provider   string    `json:"provider,omitempty"`
+	BaseURL    string    `json:"base_url,omitempty"`
+	Model      string    `json:"model,omitempty"`
+	Voice      string    `json:"voice,omitempty"`
+	SortOrder  int       `json:"sort_order"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 type ChatMessage struct {
 	ID           string    `json:"id"`
 	SessionID    string    `json:"session_id,omitempty"`

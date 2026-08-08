@@ -20,6 +20,12 @@ func buildAllowedEnvKeys() map[string]bool {
 		activeProviderKey:     true,
 		"DASHSCOPE_API_KEY":   true,
 		"DASHSCOPE_TTS_VOICE": true,
+		"SPEECH_PROVIDER":     true,
+		"SPEECH_BASE_URL":     true,
+		"SPEECH_API_KEY":      true,
+		"SPEECH_MODEL":        true,
+		"SPEECH_VOICE":        true,
+		"SPEECH_FORMAT":       true,
 	}
 	for _, spec := range vendorSpecs {
 		for _, key := range spec.EnvKeys() {

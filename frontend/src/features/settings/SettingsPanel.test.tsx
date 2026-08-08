@@ -14,6 +14,14 @@ const mocks = vi.hoisted(() => ({
   saveVendorConfig: vi.fn(),
   getUpdateStatus: vi.fn(),
   applyUpdate: vi.fn(),
+  getSpeechSettings: vi.fn(),
+  saveSpeechConfig: vi.fn(),
+  listVoiceRoles: vi.fn(),
+  createVoiceRole: vi.fn(),
+  updateVoiceRole: vi.fn(),
+  deleteVoiceRole: vi.fn(),
+  setActiveVoiceRole: vi.fn(),
+  uploadVoiceRoleAvatar: vi.fn(),
 }))
 vi.mock("@/api/system", () => mocks)
 vi.mock("@/api/agent", () => ({
@@ -26,6 +34,18 @@ vi.mock("@/api/update", () => ({
   getUpdateStatus: mocks.getUpdateStatus,
   applyUpdate: mocks.applyUpdate,
 }))
+vi.mock("@/api/speech", () => ({
+  getSpeechSettings: mocks.getSpeechSettings,
+  saveSpeechConfig: mocks.saveSpeechConfig,
+  listVoiceRoles: mocks.listVoiceRoles,
+  createVoiceRole: mocks.createVoiceRole,
+  updateVoiceRole: mocks.updateVoiceRole,
+  deleteVoiceRole: mocks.deleteVoiceRole,
+  setActiveVoiceRole: mocks.setActiveVoiceRole,
+  uploadVoiceRoleAvatar: mocks.uploadVoiceRoleAvatar,
+  voiceRoleAvatarURL: (id: string, version?: string | number) =>
+    version === undefined ? `/api/speech/roles/${id}/avatar` : `/api/speech/roles/${id}/avatar?v=${version}`,
+}))
 
 const status = {
   provider: { name: "deepseek", mode: "remote", configured: true, key_configured: true, model: "deepseek-v4-flash" },
@@ -34,6 +54,27 @@ const status = {
   backup: { directory: "D:/StudyOS/data/backups", count: 1, last_created_at: "2026-08-02T00:00:00Z" },
   app: { version: "0.1.0", platform: "windows" },
 }
+
+// Mirrors backend/config/speech.go: any OpenAI-style audio endpoint is allowed,
+// and the key itself is replaced by a boolean before it leaves the backend.
+const speech = {
+  provider: "openai",
+  base_url: "https://api.openai.com/v1",
+  model: "gpt-4o-mini-tts",
+  voice: "alloy",
+  format: "wav",
+  key_configured: true,
+  configured: true,
+  providers: [
+    { id: "openai", display_name: "OpenAI 语音", base_url: "https://api.openai.com/v1", model: "gpt-4o-mini-tts", voice: "alloy", voice_hint: "alloy、echo、nova" },
+    { id: "local", display_name: "本地服务", base_url: "http://127.0.0.1:8100/v1", local: true, endpoint_hint: "任何本地 OpenAI 兼容服务" },
+  ],
+}
+
+const voiceRoles = [
+  { id: "voice-1", name: "晓晴", bio: "温柔的中文讲解声音", has_avatar: true, voice: "alloy", model: "gpt-4o-mini-tts", sort_order: 0, created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z" },
+  { id: "voice-2", name: "Nova", bio: "英文例句朗读", has_avatar: false, voice: "nova", sort_order: 1, created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z" },
+]
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
@@ -76,6 +117,14 @@ describe("SettingsPanel", () => {
       release_notes: "新增课程生成",
     })
     mocks.applyUpdate.mockResolvedValue({ status: "updating", version: "0.3.0" })
+    mocks.getSpeechSettings.mockResolvedValue({ speech, roles: voiceRoles, active_role_id: "voice-1" })
+    mocks.saveSpeechConfig.mockResolvedValue({ speech: { ...speech, voice: "nova" } })
+    mocks.listVoiceRoles.mockResolvedValue({ items: voiceRoles, count: voiceRoles.length, active_role_id: "voice-1" })
+    mocks.createVoiceRole.mockResolvedValue({ ...voiceRoles[1], id: "voice-3", name: "Fable" })
+    mocks.updateVoiceRole.mockResolvedValue(voiceRoles[0])
+    mocks.deleteVoiceRole.mockResolvedValue(undefined)
+    mocks.setActiveVoiceRole.mockResolvedValue({ active_role_id: "voice-2" })
+    mocks.uploadVoiceRoleAvatar.mockResolvedValue({ id: "voice-1", has_avatar: true, size_bytes: 1024 })
   })
 
   it("shows every registered vendor and never renders a provider secret", async () => {
@@ -197,6 +246,102 @@ describe("SettingsPanel", () => {
       provider: "deepseek",
       api_key: "",
     }))
+  })
+
+  it("saves only the speech fields the user actually touched", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.change(await screen.findByLabelText("默认发音人"), { target: { value: "nova" } })
+    fireEvent.change(screen.getByLabelText("语音合成 API Key"), { target: { value: "sk-speech-secret" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存语音配置" }))
+
+    // 省略即不改，所以没被碰过的接口地址／模型不能出现在请求体里。
+    await waitFor(() => expect(mocks.saveSpeechConfig).toHaveBeenCalledWith({
+      api_key: "sk-speech-secret",
+      voice: "nova",
+    }))
+    expect(await screen.findByText("语音合成配置已保存")).toBeInTheDocument()
+    expect(screen.queryByDisplayValue("sk-speech-secret")).not.toBeInTheDocument()
+  })
+
+  it("never echoes the stored speech key and only offers to overwrite it", async () => {
+    render(<SettingsPanel />)
+
+    const keyInput = await screen.findByLabelText("语音合成 API Key")
+    expect(keyInput).toHaveValue("")
+    expect(keyInput).toHaveAttribute("type", "password")
+    expect(keyInput).toHaveAttribute("placeholder", "留空保持不变")
+    expect(screen.getByText("密钥已配置（仅显示状态）")).toBeInTheDocument()
+    expect(screen.queryByDisplayValue(/^sk-/)).not.toBeInTheDocument()
+  })
+
+  it("fills the preset defaults into the endpoint form", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "语音服务预设" }))
+    const option = await screen.findByRole("option", { name: "本地服务" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+
+    await waitFor(() => expect(screen.getByLabelText("语音接口地址")).toHaveValue("http://127.0.0.1:8100/v1"))
+    expect(screen.getByText("本地服务通常不需要 API Key。")).toBeInTheDocument()
+  })
+
+  it("creates a voice role from the inline form", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "新增角色" }))
+    fireEvent.change(screen.getByLabelText("角色名字"), { target: { value: "Fable" } })
+    fireEvent.change(screen.getByLabelText("角色简介"), { target: { value: "英式旁白" } })
+    fireEvent.change(screen.getByLabelText("角色发音人"), { target: { value: "fable" } })
+    fireEvent.click(screen.getByRole("button", { name: "创建角色" }))
+
+    await waitFor(() => expect(mocks.createVoiceRole).toHaveBeenCalledWith({
+      name: "Fable",
+      bio: "英式旁白",
+      provider: "",
+      base_url: "",
+      model: "",
+      voice: "fable",
+      sort_order: 2,
+    }))
+    expect(await screen.findByText("语音角色已创建")).toBeInTheDocument()
+  })
+
+  it("switches the active voice role in one click", async () => {
+    render(<SettingsPanel />)
+
+    expect(await screen.findByText("温柔的中文讲解声音")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "将 Nova 设为当前角色" }))
+
+    await waitFor(() => expect(mocks.setActiveVoiceRole).toHaveBeenCalledWith("voice-2"))
+    expect(await screen.findByText("已切换当前语音角色")).toBeInTheDocument()
+    // 激活状态整体搬家：原来的当前角色重新长出"设为当前"。
+    expect(screen.getByRole("button", { name: "将 晓晴 设为当前角色" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "将 Nova 设为当前角色" })).not.toBeInTheDocument()
+  })
+
+  it("patches only the role fields that changed", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑 晓晴" }))
+    fireEvent.change(screen.getByLabelText("角色简介"), { target: { value: "更新后的简介" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存 晓晴" }))
+
+    await waitFor(() => expect(mocks.updateVoiceRole).toHaveBeenCalledWith("voice-1", { bio: "更新后的简介" }))
+  })
+
+  it("uploads an avatar and busts the cached image URL", async () => {
+    render(<SettingsPanel />)
+
+    const previousSource = (await screen.findByAltText("晓晴 的头像")).getAttribute("src")
+    fireEvent.click(screen.getByRole("button", { name: "编辑 晓晴" }))
+    const file = new File(["face"], "face.png", { type: "image/png" })
+    fireEvent.change(screen.getByLabelText("上传 晓晴 的头像"), { target: { files: [file] } })
+
+    await waitFor(() => expect(mocks.uploadVoiceRoleAvatar).toHaveBeenCalledWith("voice-1", file))
+    // 后端把新图写回同一个地址，URL 不变的话浏览器会继续画旧的那张脸。
+    await waitFor(() => expect(screen.getByAltText("晓晴 的头像").getAttribute("src")).not.toBe(previousSource))
   })
 
   it("checks for updates and applies a new version", async () => {

@@ -49,18 +49,10 @@ func New(ctx context.Context, options Options) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open application store: %w", err)
 	}
-	// Local speech stays in the chain behind the cloud voice rather than being
-	// replaced by it, so a stalled or rejected DashScope degrades to SAPI instead
-	// of taking pronunciation playback down with it.
-	local := audio.NewSAPIProvider()
-	generator := audio.Generator(local)
-	if cfg.DashScopeAPIKey != "" {
-		cloudGenerator, err := audio.NewDashScopeProvider(cfg.DashScopeAPIKey, cfg.DashScopeVoice)
-		if err != nil {
-			_ = store.Close()
-			return nil, fmt.Errorf("create cloud audio provider: %w", err)
-		}
-		generator = audio.NewFallbackGenerator(cloudGenerator, local)
+	generator, err := buildAudioGenerator(cfg)
+	if err != nil {
+		_ = store.Close()
+		return nil, err
 	}
 	audioService, err := audio.NewService(filepath.Join(cfg.DataDir, "audio-cache"),
 		audio.WithLocalDir(filepath.Join(cfg.DataDir, "audio")),
@@ -91,6 +83,57 @@ func New(ctx context.Context, options Options) (*App, error) {
 		Audio:    audioService,
 		Launcher: launcherService,
 	}, nil
+}
+
+// buildAudioGenerator assembles the synthesis chain, most specific first.
+//
+// Local SAPI speech stays at the end of the chain rather than being replaced by
+// a cloud voice, so a stalled or rejected vendor degrades to the local voice
+// instead of taking pronunciation playback down with it. The legacy DashScope
+// CosyVoice settings keep working behind the generic 语音合成 endpoint, so an
+// existing install does not lose its voice on upgrade.
+func buildAudioGenerator(cfg config.Config) (audio.Generator, error) {
+	local := audio.NewSAPIProvider()
+	chain := make([]audio.Generator, 0, 3)
+
+	if speech := cfg.Speech(); speech.BaseURL != "" {
+		speechProvider, err := audio.NewOpenAISpeechProvider(audio.SpeechSettings{
+			BaseURL:   speech.BaseURL,
+			APIKey:    speech.APIKey,
+			Model:     speech.Model,
+			Voice:     speech.Voice,
+			AuthStyle: cfg.SpeechAuthStyle(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create speech provider: %w", err)
+		}
+		chain = append(chain, speechProvider)
+	}
+	if cfg.DashScopeAPIKey != "" {
+		cloudGenerator, err := audio.NewDashScopeProvider(cfg.DashScopeAPIKey, cfg.DashScopeVoice)
+		if err != nil {
+			return nil, fmt.Errorf("create cloud audio provider: %w", err)
+		}
+		chain = append(chain, cloudGenerator)
+	}
+	if len(chain) == 0 {
+		return local, nil
+	}
+	return audio.NewFallbackGenerator(append(chain, local)...), nil
+}
+
+// RebuildAudioGenerator re-reads the current config into the synthesis chain so
+// saving 语音合成 settings takes effect immediately. A configuration that cannot
+// be built is left in place rather than replaced with nothing.
+func (a *App) RebuildAudioGenerator() {
+	if a == nil || a.Audio == nil {
+		return
+	}
+	generator, err := buildAudioGenerator(a.Config)
+	if err != nil {
+		return
+	}
+	a.Audio.SetGenerator(generator)
 }
 
 func (a *App) RecordBackup(ctx context.Context, result backup.Result) (models.BackupRecord, error) {
@@ -150,8 +193,33 @@ func mergeConfig(configured, loaded config.Config) config.Config {
 	if configured.DashScopeVoice == "" {
 		configured.DashScopeVoice = loaded.DashScopeVoice
 	}
+	configured.SpeechSettings = mergeSpeech(configured.SpeechSettings, loaded.SpeechSettings)
 	if !configured.SeedFixtures {
 		configured.SeedFixtures = loaded.SeedFixtures
+	}
+	return configured
+}
+
+// mergeSpeech fills 语音合成 gaps field by field, so an application that sets
+// only the endpoint still inherits the key and model from the environment.
+func mergeSpeech(configured, loaded config.SpeechConfig) config.SpeechConfig {
+	if configured.Provider == "" {
+		configured.Provider = loaded.Provider
+	}
+	if configured.BaseURL == "" {
+		configured.BaseURL = loaded.BaseURL
+	}
+	if configured.APIKey == "" {
+		configured.APIKey = loaded.APIKey
+	}
+	if configured.Model == "" {
+		configured.Model = loaded.Model
+	}
+	if configured.Voice == "" {
+		configured.Voice = loaded.Voice
+	}
+	if configured.Format == "" {
+		configured.Format = loaded.Format
 	}
 	return configured
 }

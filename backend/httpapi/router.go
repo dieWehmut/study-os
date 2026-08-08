@@ -97,6 +97,33 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/audio/timeline", func(response http.ResponseWriter, request *http.Request) {
 			handleAudioTimeline(response, request, application)
 		})
+		api.Get("/speech", func(response http.ResponseWriter, request *http.Request) {
+			handleSpeechSettings(response, request, application)
+		})
+		api.Patch("/speech/config", func(response http.ResponseWriter, request *http.Request) {
+			handleSpeechConfig(response, request, application)
+		})
+		api.Get("/speech/roles", func(response http.ResponseWriter, request *http.Request) {
+			handleVoiceRoleList(response, request, application)
+		})
+		api.Post("/speech/roles", func(response http.ResponseWriter, request *http.Request) {
+			handleVoiceRoleCreate(response, request, application)
+		})
+		api.Patch("/speech/roles/active", func(response http.ResponseWriter, request *http.Request) {
+			handleVoiceRoleActivate(response, request, application)
+		})
+		api.Patch("/speech/roles/{roleID}", func(response http.ResponseWriter, request *http.Request) {
+			handleVoiceRoleUpdate(response, request, application)
+		})
+		api.Delete("/speech/roles/{roleID}", func(response http.ResponseWriter, request *http.Request) {
+			handleVoiceRoleDelete(response, request, application)
+		})
+		api.Post("/speech/roles/{roleID}/avatar", func(response http.ResponseWriter, request *http.Request) {
+			handleVoiceRoleAvatarUpload(response, request, application)
+		})
+		api.Get("/speech/roles/{roleID}/avatar", func(response http.ResponseWriter, request *http.Request) {
+			handleVoiceRoleAvatarGet(response, request, application)
+		})
 		api.Get("/groups", func(response http.ResponseWriter, request *http.Request) {
 			handleGroups(response, request, application)
 		})

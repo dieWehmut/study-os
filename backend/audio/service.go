@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,12 +35,19 @@ const (
 )
 
 type Request struct {
-	Term      string `json:"term"`
-	Locale    string `json:"locale,omitempty"`
-	Voice     string `json:"voice,omitempty"`
-	Format    string `json:"format,omitempty"`
+	Term   string `json:"term"`
+	Locale string `json:"locale,omitempty"`
+	Voice  string `json:"voice,omitempty"`
+	Format string `json:"format,omitempty"`
+	// Provider names the voice that produced the audio. A saved voice role puts
+	// its own id here so two roles never share a cache entry.
 	Provider  string `json:"provider,omitempty"`
 	LocalPath string `json:"local_path,omitempty"`
+	// Model and BaseURL let a voice role redirect one request to its own
+	// OpenAI-compatible endpoint. They are deliberately credential-free: the key
+	// stays with the provider, which decides whether the target may receive it.
+	Model   string `json:"model,omitempty"`
+	BaseURL string `json:"base_url,omitempty"`
 }
 
 type Asset struct {
@@ -85,9 +93,13 @@ type TimelineGenerator interface {
 }
 
 type Service struct {
-	cacheDir  string
-	localDir  string
-	generator Generator
+	cacheDir string
+	localDir string
+	// generator is swapped when 语音合成 settings are saved, so a new endpoint
+	// takes effect without a restart. Requests already in flight keep the
+	// generator they started with.
+	generatorMutex sync.RWMutex
+	generator      Generator
 }
 
 type Option func(*Service) error
@@ -108,6 +120,27 @@ func WithGenerator(generator Generator) Option {
 		service.generator = generator
 		return nil
 	}
+}
+
+// SetGenerator replaces the synthesis chain in place. Saving 语音合成 settings
+// rebuilds the chain around the new endpoint, and the running server has to pick
+// it up without dropping the cache or restarting.
+func (service *Service) SetGenerator(generator Generator) {
+	if service == nil {
+		return
+	}
+	service.generatorMutex.Lock()
+	defer service.generatorMutex.Unlock()
+	service.generator = generator
+}
+
+func (service *Service) currentGenerator() Generator {
+	if service == nil {
+		return nil
+	}
+	service.generatorMutex.RLock()
+	defer service.generatorMutex.RUnlock()
+	return service.generator
 }
 
 func NewService(cacheDir string, options ...Option) (*Service, error) {
@@ -134,12 +167,18 @@ func CacheKey(request Request) string {
 	if normalized.Format == "" {
 		normalized.Format = "wav"
 	}
+	// Voice and endpoint are matched case-insensitively here rather than in
+	// normalizeRequest, because vendors do treat voice names as case-sensitive
+	// ("FunAudioLLM/CosyVoice2-0.5B:alex", "Kore") and the request that reaches
+	// the generator has to keep the spelling the user configured.
 	payload := strings.Join([]string{
 		normalized.Term,
 		normalized.Locale,
-		normalized.Voice,
+		strings.ToLower(normalized.Voice),
 		normalized.Format,
 		normalized.Provider,
+		normalized.Model,
+		strings.ToLower(normalized.BaseURL),
 	}, "\x00")
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])
@@ -189,7 +228,8 @@ func (service *Service) resolve(ctx context.Context, request Request, generate b
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Asset{}, err
 	}
-	if !generate || service.generator == nil {
+	generator := service.currentGenerator()
+	if !generate || generator == nil {
 		return Asset{}, fmt.Errorf("%w: no local file, cached file, or generator", ErrNotFound)
 	}
 
@@ -206,10 +246,10 @@ func (service *Service) resolve(ctx context.Context, request Request, generate b
 
 	request.Format = format
 	var timeline Timeline
-	if timelineGenerator, ok := service.generator.(TimelineGenerator); ok {
+	if timelineGenerator, ok := generator.(TimelineGenerator); ok {
 		timeline, err = timelineGenerator.GenerateWithTimeline(ctx, request, temporaryPath)
 	} else {
-		err = service.generator.Generate(ctx, request, temporaryPath)
+		err = generator.Generate(ctx, request, temporaryPath)
 	}
 	if err != nil {
 		return Asset{}, fmt.Errorf("generate pronunciation audio: %w", err)
@@ -444,10 +484,12 @@ func cleanRoot(root string) (string, error) {
 func normalizeRequest(request Request) Request {
 	request.Term = strings.ToLower(strings.Join(strings.Fields(request.Term), " "))
 	request.Locale = strings.ToLower(strings.TrimSpace(request.Locale))
-	request.Voice = strings.ToLower(strings.TrimSpace(request.Voice))
+	request.Voice = strings.TrimSpace(request.Voice)
 	request.Format = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(request.Format)), ".")
 	request.Provider = strings.ToLower(strings.TrimSpace(request.Provider))
 	request.LocalPath = strings.TrimSpace(request.LocalPath)
+	request.Model = strings.TrimSpace(request.Model)
+	request.BaseURL = strings.TrimSpace(request.BaseURL)
 	return request
 }
 
