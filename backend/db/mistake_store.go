@@ -45,7 +45,11 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 	attempt := models.QuestionAttempt{
 		ID:         newMistakeID("qa"),
 		QuestionID: question.ID,
-		Cause:      strings.TrimSpace(input.Cause),
+		// One spelling per cause, decided here. The page names a row by
+		// looking its cause up in a closed taxonomy by exact string and drops
+		// what it cannot name, so a stray "Recall " would be a mistake you
+		// filed and can never see again.
+		Cause:      strings.ToLower(strings.TrimSpace(input.Cause)),
 		Note:       strings.TrimSpace(input.Note),
 		OccurredAt: occurredAt,
 	}
@@ -170,7 +174,8 @@ func (s *TxStore) LinkQuestionToKnowledge(ctx context.Context, questionID, knowl
 	return err
 }
 
-func scanMistake(row scanner) (models.Mistake, error) {	var mistake models.Mistake
+func scanMistake(row scanner) (models.Mistake, error) {
+	var mistake models.Mistake
 	var occurredAt, createdAt string
 	if err := row.Scan(
 		&mistake.Attempt.ID, &mistake.Attempt.QuestionID, &mistake.Attempt.Cause, &mistake.Attempt.Note, &occurredAt,

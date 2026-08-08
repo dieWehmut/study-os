@@ -200,6 +200,37 @@ func TestLinkingAMistakeToTheLibraryIsWhatMakesItAnswerable(t *testing.T) {
 	}
 }
 
+func TestRecordMistakeCanonicalisesTheCauseItWasGiven(t *testing.T) {
+	// The Practice page looks a row's cause up in a closed taxonomy by exact
+	// string, and drops any row it cannot name -- so "Recall " stored verbatim
+	// is a mistake you filed and can never see again. The queue guard matches
+	// exactly for the same reason. One spelling, decided on the way in.
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	filed, err := store.RecordMistake(ctx, models.MistakeInput{
+		Subject: "physics", Stem: "受力分析", Cause: "  Recall ",
+	})
+	if err != nil {
+		t.Fatalf("record mistake: %v", err)
+	}
+	if filed.Attempt.Cause != "recall" {
+		t.Fatalf("cause = %q, want recall", filed.Attempt.Cause)
+	}
+
+	listed, err := store.ListMistakes(ctx, models.MistakeListOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("list mistakes: %v", err)
+	}
+	if len(listed) != 1 || listed[0].Attempt.Cause != "recall" {
+		t.Fatalf("listed = %#v", listed)
+	}
+}
+
 func TestGetMistakeReportsAnIDThatWasNeverFiled(t *testing.T) {
 	ctx := context.Background()
 	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))

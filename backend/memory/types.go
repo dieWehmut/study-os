@@ -26,6 +26,7 @@ const (
 	PromptDefinitionTerm   PromptType = "definition_term"
 	PromptFormulaRecall    PromptType = "formula_recall"
 	PromptVerseFill        PromptType = "verse_fill"
+	PromptMistakeRedo      PromptType = "mistake_redo"
 )
 
 type Prompt struct {
