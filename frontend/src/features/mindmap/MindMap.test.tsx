@@ -91,6 +91,30 @@ describe("MindMap", () => {
     expect(screen.getByRole("treeitem", { name: "加速度" })).not.toHaveAttribute("aria-expanded")
   })
 
+  it("draws a section differently from a point inside it", () => {
+    // Both kinds come out of the markdown converter. Drawn identically, a
+    // chapter and a single bullet look like peers, which erases the hierarchy
+    // the map exists to show.
+    render(<MindMap data={data} />)
+
+    const section = screen.getByRole("treeitem", { name: "速度" }).querySelector("rect")
+    const point = screen.getByRole("treeitem", { name: "平均速度" }).querySelector("rect")
+
+    expect(section).toHaveAttribute("fill")
+    expect(point).toHaveAttribute("fill")
+    expect(point?.getAttribute("fill")).not.toBe(section?.getAttribute("fill"))
+  })
+
+  it("keeps the trunk distinct from the sections hanging off it", () => {
+    render(<MindMap data={data} />)
+
+    const root = screen.getByRole("treeitem", { name: "运动学" }).querySelector("rect")
+    const section = screen.getByRole("treeitem", { name: "速度" }).querySelector("rect")
+
+    expect(root).toHaveAttribute("fill")
+    expect(section?.getAttribute("fill")).not.toBe(root?.getAttribute("fill"))
+  })
+
   it("reports how deep each node sits, for anyone reading it aloud", () => {
     render(<MindMap data={data} />)
 

@@ -12,6 +12,10 @@ function nodeTone(nodeType?: string): { fill: string; stroke: string; text: stri
   switch (nodeType) {
     case "root":
       return { fill: "#16a34a18", stroke: "#16a34a66", text: "#166534" }
+    // A section is a place you can stand; a point inside one is not. Drawn the
+    // same, a chapter and a single bullet read as peers.
+    case "heading":
+      return { fill: "#2563eb18", stroke: "#2563eb66", text: "#1e40af" }
     case "conclusion":
       return { fill: "#b4530918", stroke: "#b4530966", text: "#92400e" }
     case "trap":
