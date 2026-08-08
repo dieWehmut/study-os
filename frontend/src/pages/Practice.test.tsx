@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listMistakes: vi.fn(),
   recordMistake: vi.fn(),
   deleteMistake: vi.fn(),
+  scheduleMistake: vi.fn(),
 }))
 
 vi.mock("@/api/mistakes", () => mocks)
@@ -49,6 +50,7 @@ describe("Practice page", () => {
     useSubjectStore.setState({ subject: "all" })
     mocks.listMistakes.mockResolvedValue([])
     mocks.deleteMistake.mockResolvedValue(undefined)
+    mocks.scheduleMistake.mockResolvedValue("k-mistake-1")
   })
 
   it("says plainly that nothing has gone wrong yet", async () => {
@@ -211,5 +213,73 @@ describe("Practice page", () => {
 
     expect(await screen.findByText(/网络断了/)).toBeInTheDocument()
     expect(localStorage.getItem(mistakesStorageKey)).not.toBeNull()
+  })
+
+  it("offers to queue the one kind of mistake more review actually fixes", async () => {
+    // Until now the page could only *say* 想不起来 is what review repairs. The
+    // button is what makes the sentence do something.
+    render(<Practice />)
+    log("速度与加速度", "想不起来")
+    await screen.findByText("速度与加速度")
+
+    expect(screen.getByRole("button", { name: /^排进复习$/ })).toBeInTheDocument()
+  })
+
+  it("does not offer the queue on a mistake review will not fix", async () => {
+    // Rescheduling a card you misread reshuffles something that was never the
+    // problem, and the mistake comes back looking like a memory failure it
+    // never was. The row already says what to do instead.
+    render(<Practice />)
+    log("光合作用第 3 问", "看错题")
+    await screen.findByText("光合作用第 3 问")
+
+    expect(screen.queryByRole("button", { name: /排进复习/ })).not.toBeInTheDocument()
+  })
+
+  it("marks the row queued once the card was written", async () => {
+    render(<Practice />)
+    log("速度与加速度", "想不起来")
+    await screen.findByText("速度与加速度")
+
+    fireEvent.click(screen.getByRole("button", { name: /^排进复习$/ }))
+
+    expect(await screen.findByText("已排进复习")).toBeInTheDocument()
+    expect(mocks.scheduleMistake).toHaveBeenCalledWith("qa-1")
+    expect(screen.queryByRole("button", { name: /^排进复习$/ })).not.toBeInTheDocument()
+  })
+
+  it("leaves the row pressable when the card could not be written", async () => {
+    // A control that looks saved when nothing was written is worse than one
+    // that failed loudly.
+    mocks.scheduleMistake.mockRejectedValueOnce(new Error("安排复习失败"))
+    render(<Practice />)
+    log("速度与加速度", "想不起来")
+    await screen.findByText("速度与加速度")
+
+    fireEvent.click(screen.getByRole("button", { name: /^排进复习$/ }))
+
+    expect(await screen.findByText(/安排复习失败/)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^排进复习$/ })).toBeEnabled()
+  })
+
+  it("stops offering the queue on a row the database already scheduled", async () => {
+    // The list carries the item the question became, so a reload knows without
+    // asking again -- and a second press cannot make a second card.
+    mocks.listMistakes.mockResolvedValue([
+      {
+        id: "qa-old",
+        subject: "physics",
+        question: "上次排过的题",
+        cause: "recall",
+        knowledgeItemId: "k-mistake-1",
+        createdAt: "2026-08-07T00:00:00Z",
+      },
+    ])
+
+    render(<Practice />)
+    await screen.findByText("上次排过的题")
+
+    expect(screen.getByText("已排进复习")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^排进复习$/ })).not.toBeInTheDocument()
   })
 })

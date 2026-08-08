@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
-import { SquarePen, Trash2 } from "lucide-react"
+import { CalendarPlus, SquarePen, Trash2 } from "lucide-react"
 
-import { deleteMistake, listMistakes, recordMistake } from "@/api/mistakes"
+import { deleteMistake, listMistakes, recordMistake, scheduleMistake } from "@/api/mistakes"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,6 +55,8 @@ export default function Practice() {
   const [question, setQuestion] = useState("")
   const [records, setRecords] = useState<MistakeRecord[]>([])
   const [error, setError] = useState("")
+  const [queueError, setQueueError] = useState("")
+  const [queueing, setQueueing] = useState("")
   const [busy, setBusy] = useState(false)
 
   // The log follows the 首页 switch like every other list in the app: while you
@@ -115,6 +117,34 @@ export default function Practice() {
       setError("")
     } catch (failure) {
       setError(describe(failure, "删除错题失败"))
+    }
+  }
+
+  /**
+   * Put one 想不起来 back in the review queue.
+   *
+   * The answer the server gives is the id of the library entry the question
+   * became, and that id is stored on the row itself rather than in a separate
+   * "queued" set: it is the same field the list carries after a reload, so
+   * there is one thing to be right about instead of two that can disagree.
+   *
+   * A failure leaves the button pressable and says so next to the list. An
+   * error shown up in 记一笔 would be off-screen for exactly the row you were
+   * pressing.
+   */
+  async function queue(item: MistakeRecord) {
+    if (queueing) return
+    setQueueing(item.id)
+    try {
+      const knowledgeItemId = await scheduleMistake(item.id)
+      setRecords((current) =>
+        current.map((entry) => (entry.id === item.id ? { ...entry, knowledgeItemId } : entry)),
+      )
+      setQueueError("")
+    } catch (failure) {
+      setQueueError(describe(failure, "排进复习失败"))
+    } finally {
+      setQueueing("")
     }
   }
 
@@ -219,6 +249,24 @@ export default function Practice() {
                     >
                       {spec?.label}
                     </Badge>
+                    {/* Offered on 想不起来 alone. Rescheduling a card you
+                        misread, or ran out of time on, reshuffles something
+                        that was never the problem -- and the row already says
+                        what to do instead. */}
+                    {item.knowledgeItemId ? (
+                      <span className="shrink-0 text-xs text-muted-foreground">已排进复习</span>
+                    ) : spec?.reviewFixes ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={queueing === item.id}
+                        onClick={() => void queue(item)}
+                      >
+                        <CalendarPlus aria-hidden="true" />
+                        排进复习
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -232,6 +280,11 @@ export default function Practice() {
               })}
             </ul>
           )}
+          {queueError ? (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {queueError}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     </section>
