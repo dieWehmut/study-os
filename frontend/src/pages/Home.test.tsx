@@ -135,6 +135,19 @@ describe("Today page", () => {
     expect(await screen.findByText("已暂存到知识库，稍后可以整理。")).toBeInTheDocument()
   })
 
+  it("offers a way into reading, not only into reviewing", async () => {
+    // Every shortcut here leads somewhere in the review loop. Reading is where
+    // you go before the material is yours at all, and the page you land on had
+    // no door to it.
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole("link", { name: /阅读/ })).toHaveAttribute("href", "/reading")
+  })
+
   it("shows subject due counts, recent items, and quick links", async () => {
     render(
       <MemoryRouter>

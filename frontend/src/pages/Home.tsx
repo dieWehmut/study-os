@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowRight, BrainCircuit, CalendarCheck2, CloudOff, Flame, LibraryBig, MessagesSquare, Sparkles } from "lucide-react"
+import { ArrowRight, BrainCircuit, CalendarCheck2, CloudOff, Flame, LibraryBig, MessagesSquare, ScanText, Sparkles } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { getDashboard, seedDemo } from "@/api/dashboard"
@@ -204,9 +204,12 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { to: "/knowledge", label: "知识库", description: "浏览与整理知识点", icon: LibraryBig },
+          // Same order as the sidebar: reading comes before reviewing, because
+          // that is the order you actually meet the material in.
+          { to: "/reading", label: "阅读", description: "先看结构，再读正文", icon: ScanText },
           { to: "/memory", label: "记忆", description: "按计划完成复习", icon: BrainCircuit },
           { to: "/chat", label: "答疑", description: "随时问 AI，异步回答", icon: MessagesSquare },
         ].map(({ to, label, description, icon: Icon }) => (
