@@ -211,6 +211,7 @@ CREATE TABLE questions (
     subject TEXT NOT NULL DEFAULT '',
     stem TEXT NOT NULL,
     source_id TEXT NOT NULL DEFAULT '',
+    knowledge_item_id TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
 CREATE INDEX questions_subject_idx ON questions(subject, created_at DESC);

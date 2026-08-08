@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 8
+const currentSchemaVersion = 9
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -293,6 +293,13 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 			CREATE INDEX IF NOT EXISTS question_attempts_question_idx ON question_attempts(question_id, occurred_at DESC)`); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", version, err)
 		}
+	case 9:
+		if !hasColumn(ctx, tx, "questions", "knowledge_item_id") {
+			if _, err := tx.ExecContext(ctx, `
+				ALTER TABLE questions ADD COLUMN knowledge_item_id TEXT NOT NULL DEFAULT ''`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -331,6 +338,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 	case 8:
 		if !hasTable(ctx, tx, "questions") || !hasTable(ctx, tx, "question_attempts") {
 			return errors.New("schema version 8 is recorded but the question tables are missing")
+		}
+	case 9:
+		if !hasColumn(ctx, tx, "questions", "knowledge_item_id") {
+			return errors.New("schema version 9 is recorded but questions.knowledge_item_id is missing")
 		}
 	}
 	return nil

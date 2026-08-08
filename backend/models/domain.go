@@ -80,11 +80,15 @@ type ChatMessage struct {
 // Question is a 题目 -- the thing that was asked. It outlives any single
 // attempt at it, because the same question gets attempted again after 订正.
 type Question struct {
-	ID        string    `json:"id"`
-	Subject   string    `json:"subject,omitempty"`
-	Stem      string    `json:"stem"`
-	SourceID  string    `json:"source_id,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID       string `json:"id"`
+	Subject  string `json:"subject,omitempty"`
+	Stem     string `json:"stem"`
+	SourceID string `json:"source_id,omitempty"`
+	// KnowledgeItemID names the library entry this question was turned into,
+	// empty until it has been. A link rather than a flag on purpose: "which
+	// item" and "was it filed" then cannot drift apart.
+	KnowledgeItemID string    `json:"knowledge_item_id,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // QuestionAttempt is one 作答 of a Question. Cause carries the six-way error

@@ -148,3 +148,67 @@ func TestDeleteMistakeReportsAnIDThatWasNeverFiled(t *testing.T) {
 		t.Fatalf("delete unknown = %v, want ErrNotFound", err)
 	}
 }
+
+func TestLinkingAMistakeToTheLibraryIsWhatMakesItAnswerable(t *testing.T) {
+	// 想不起来 is the one cause more review actually fixes, but the queue joins
+	// review_states through prompts, which hang off a knowledge item. The link
+	// on the question is how a second press can tell it already did this --
+	// a flag would be a second source of truth that can drift from the item.
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	filed, err := store.RecordMistake(ctx, models.MistakeInput{Subject: "physics", Stem: "受力分析", Cause: "recall"})
+	if err != nil {
+		t.Fatalf("record mistake: %v", err)
+	}
+
+	fetched, err := store.GetMistake(ctx, filed.Attempt.ID)
+	if err != nil {
+		t.Fatalf("get mistake: %v", err)
+	}
+	if fetched.Question.Stem != "受力分析" {
+		t.Fatalf("fetched = %#v", fetched)
+	}
+	if fetched.Question.KnowledgeItemID != "" {
+		t.Fatalf("a freshly filed mistake already claims item %q", fetched.Question.KnowledgeItemID)
+	}
+
+	if err := store.WithTx(ctx, func(tx *db.TxStore) error {
+		return tx.LinkQuestionToKnowledge(ctx, filed.Question.ID, "k-1")
+	}); err != nil {
+		t.Fatalf("link question: %v", err)
+	}
+
+	linked, err := store.GetMistake(ctx, filed.Attempt.ID)
+	if err != nil {
+		t.Fatalf("get linked mistake: %v", err)
+	}
+	if linked.Question.KnowledgeItemID != "k-1" {
+		t.Fatalf("knowledge item = %q, want k-1", linked.Question.KnowledgeItemID)
+	}
+
+	listed, err := store.ListMistakes(ctx, models.MistakeListOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("list mistakes: %v", err)
+	}
+	if len(listed) != 1 || listed[0].Question.KnowledgeItemID != "k-1" {
+		t.Fatalf("listed = %#v -- the page cannot hide a done button it cannot see", listed)
+	}
+}
+
+func TestGetMistakeReportsAnIDThatWasNeverFiled(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if _, err := store.GetMistake(ctx, "never-filed"); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("get unknown = %v, want ErrNotFound", err)
+	}
+}

@@ -76,6 +76,14 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 	return models.Mistake{Question: question, Attempt: attempt}, nil
 }
 
+// mistakeSelect is shared by the list and the single-row read so the two can
+// never disagree about which columns a mistake is made of.
+const mistakeSelect = `
+	SELECT a.id, a.question_id, a.cause, a.note, a.occurred_at,
+	       q.subject, q.stem, q.source_id, q.knowledge_item_id, q.created_at
+	FROM question_attempts a
+	JOIN questions q ON q.id = a.question_id`
+
 // ListMistakes returns the most recent attempts, newest first, narrowed to a
 // subject when one is given -- every list in the app follows the 首页 switch.
 func (s *Store) ListMistakes(ctx context.Context, options models.MistakeListOptions) ([]models.Mistake, error) {
@@ -83,11 +91,7 @@ func (s *Store) ListMistakes(ctx context.Context, options models.MistakeListOpti
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	query := `
-		SELECT a.id, a.question_id, a.cause, a.note, a.occurred_at,
-		       q.subject, q.stem, q.source_id, q.created_at
-		FROM question_attempts a
-		JOIN questions q ON q.id = a.question_id`
+	query := mistakeSelect
 	arguments := make([]any, 0, 2)
 	if subject := strings.TrimSpace(options.Subject); subject != "" {
 		query += ` WHERE q.subject = ?`
@@ -145,11 +149,33 @@ func (s *Store) DeleteMistake(ctx context.Context, attemptID string) error {
 	return transaction.Commit()
 }
 
+// GetMistake returns one filed attempt with the question behind it.
+func (s *Store) GetMistake(ctx context.Context, attemptID string) (models.Mistake, error) {
+	mistake, err := scanMistake(s.db.QueryRowContext(ctx, mistakeSelect+`
+		WHERE a.id = ?`, attemptID))
+	if err != nil {
+		return models.Mistake{}, mapNotFound(err, "mistake")
+	}
+	return mistake, nil
+}
+
+// LinkQuestionToKnowledge records which library entry a question became.
+//
+// The link lives on the question rather than as a "scheduled" flag so that
+// "which item" and "was it filed" cannot drift apart -- the same reason
+// knowledge scheduling counts prompt rows instead of setting a boolean.
+func (s *TxStore) LinkQuestionToKnowledge(ctx context.Context, questionID, knowledgeID string) error {
+	_, err := s.tx.ExecContext(ctx,
+		`UPDATE questions SET knowledge_item_id = ? WHERE id = ?`, knowledgeID, questionID)
+	return err
+}
+
 func scanMistake(row scanner) (models.Mistake, error) {	var mistake models.Mistake
 	var occurredAt, createdAt string
 	if err := row.Scan(
 		&mistake.Attempt.ID, &mistake.Attempt.QuestionID, &mistake.Attempt.Cause, &mistake.Attempt.Note, &occurredAt,
-		&mistake.Question.Subject, &mistake.Question.Stem, &mistake.Question.SourceID, &createdAt,
+		&mistake.Question.Subject, &mistake.Question.Stem, &mistake.Question.SourceID,
+		&mistake.Question.KnowledgeItemID, &createdAt,
 	); err != nil {
 		return models.Mistake{}, err
 	}
