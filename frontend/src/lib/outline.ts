@@ -8,10 +8,18 @@
  * structure would stop being something you can trust before reading.
  */
 
+/**
+ * A section is somewhere you can stop reading; an item is a point inside one.
+ * Depth alone cannot tell them apart once the tree is built, and they want
+ * different treatment when chunking and when drawing.
+ */
+export type OutlineKind = "root" | "heading" | "item"
+
 export interface OutlineNode {
   /** Stable across runs: derived from the node's position in the document. */
   id: string
   title: string
+  kind: OutlineKind
   /** 0 for the root; heading level or list depth below it. */
   depth: number
   /** Prose lines introduced under this node, in document order. */
@@ -34,8 +42,8 @@ interface OpenNode {
   depth: number
 }
 
-function emptyNode(title: string, depth: number): OutlineNode {
-  return { id: "", title, depth, body: [], children: [] }
+function emptyNode(title: string, depth: number, kind: OutlineKind): OutlineNode {
+  return { id: "", title, kind, depth, body: [], children: [] }
 }
 
 /**
@@ -55,7 +63,7 @@ function assignIds(node: OutlineNode, path: string): void {
 }
 
 export function parseOutline(markdown: string, options: ParseOutlineOptions = {}): OutlineNode {
-  const root = emptyNode(options.title ?? "", 0)
+  const root = emptyNode(options.title ?? "", 0, "root")
   const stack: OpenNode[] = [{ node: root, depth: 0 }]
   // List depth is measured from the enclosing heading, not from the stack top,
   // so a nested list under a deep heading keeps its own relative shape.
@@ -76,7 +84,7 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
         headingDepth = 1
         continue
       }
-      appendAt(stack, emptyNode(title, depth))
+      appendAt(stack, emptyNode(title, depth, "heading"))
       headingDepth = depth
       continue
     }
@@ -84,7 +92,8 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
     const item = listPattern.exec(line)
     if (item) {
       const indent = item[1].replace(/\t/g, " ".repeat(indentWidth)).length
-      appendAt(stack, emptyNode(item[2].trim(), headingDepth + 1 + Math.floor(indent / indentWidth)))
+      const itemDepth = headingDepth + 1 + Math.floor(indent / indentWidth)
+      appendAt(stack, emptyNode(item[2].trim(), itemDepth, "item"))
       continue
     }
 

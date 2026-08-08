@@ -54,6 +54,17 @@ describe("markdown outline parser", () => {
     expect(new Set(flattenOutline(parseOutline(source)).map((node) => node.id)).size).toBe(3)
   })
 
+  it("records whether a node came from a heading or a list item", () => {
+    // A section and a bullet read very differently -- one is a place you can
+    // stop, the other is an item inside one. Consumers cannot recover the
+    // difference from depth alone once the tree is built.
+    const root = parseOutline(["# 标题", "## 条件", "- 光照"].join("\n"))
+
+    expect(root.kind).toBe("root")
+    expect(root.children[0].kind).toBe("heading")
+    expect(root.children[0].children[0].kind).toBe("item")
+  })
+
   it("flattens depth-first so reading order matches the document", () => {
     const root = parseOutline(["# 标题", "## 甲", "### 甲一", "## 乙"].join("\n"))
 
