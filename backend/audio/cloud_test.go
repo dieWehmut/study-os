@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func makeWAV(sampleRate uint32, dataSize uint32) []byte {
@@ -126,6 +127,49 @@ func TestDashScopeProviderClassifiesHTTPFailure(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "dashscope-key") {
 		t.Fatalf("error leaked the API key: %v", err)
+	}
+}
+
+func TestDashScopeProviderGivesUpOnAStalledVendor(t *testing.T) {
+	// The README promises 朗读 falls back to Windows SAPI when the cloud voice is
+	// unavailable, and audio.IsRecoverable routes ErrGeneratorUnavailable to that
+	// fallback. But the fallback only fires when the request *returns* an error,
+	// and this call goes through http.DefaultClient, whose zero Timeout means
+	// "wait forever". A DashScope that accepts the connection and then goes quiet
+	// leaves the button spinning instead of degrading to local speech.
+	previous := defaultTTSTimeout
+	defaultTTSTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { defaultTTSTimeout = previous })
+
+	release := make(chan struct{})
+	stalled := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-release
+	}))
+	// Close waits for outstanding handlers, so the release has to happen first.
+	// Cleanups run last-registered-first.
+	t.Cleanup(stalled.Close)
+	t.Cleanup(func() { close(release) })
+
+	provider, err := NewDashScopeProvider("dashscope-key", "longxiaochun")
+	if err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	provider.baseURL = stalled.URL
+
+	// context.Background() on purpose: the provider has to bound itself rather
+	// than lean on whatever deadline the caller happened to pass in.
+	done := make(chan error, 1)
+	go func() {
+		done <- provider.Generate(context.Background(), Request{Term: "abandon"},
+			filepath.Join(t.TempDir(), "audio.wav"))
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrGeneratorUnavailable) {
+			t.Fatalf("error = %v, want ErrGeneratorUnavailable so SAPI takes over", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Generate never returned: the synthesis request has no timeout")
 	}
 }
 

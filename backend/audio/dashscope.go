@@ -11,9 +11,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 const defaultDashScopeBaseURL = "https://dashscope.aliyuncs.com"
+
+// defaultTTSTimeout bounds a single CosyVoice synthesis round trip.
+var defaultTTSTimeout = 30 * time.Second
 
 // DashScopeProvider synthesizes speech through the DashScope CosyVoice
 // multimodal-generation HTTP API and writes the resulting WAV to the cache
@@ -72,6 +76,13 @@ func (p *DashScopeProvider) GenerateWithTimeline(ctx context.Context, request Re
 		return Timeline{}, fmt.Errorf("%w: encode synthesis request", ErrGeneratorUnavailable)
 	}
 	endpoint := strings.TrimRight(p.baseURL, "/") + "/api/v1/services/aigc/multimodal-generation/generation"
+	// Bound the round trip. Callers treat ErrGeneratorUnavailable as the cue to
+	// fall back to local SAPI speech, but that cue only arrives if the request
+	// actually returns -- and http.DefaultClient has no timeout, so a vendor that
+	// accepts the connection and then goes quiet never produces one. The deadline
+	// covers reading the response too, since the request carries this context.
+	ctx, cancel := context.WithTimeout(ctx, defaultTTSTimeout)
+	defer cancel()
 	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return Timeline{}, fmt.Errorf("%w: build synthesis request", ErrGeneratorUnavailable)
