@@ -49,14 +49,18 @@ func New(ctx context.Context, options Options) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open application store: %w", err)
 	}
-	generator := audio.Generator(audio.NewSAPIProvider())
+	// Local speech stays in the chain behind the cloud voice rather than being
+	// replaced by it, so a stalled or rejected DashScope degrades to SAPI instead
+	// of taking pronunciation playback down with it.
+	local := audio.NewSAPIProvider()
+	generator := audio.Generator(local)
 	if cfg.DashScopeAPIKey != "" {
 		cloudGenerator, err := audio.NewDashScopeProvider(cfg.DashScopeAPIKey, cfg.DashScopeVoice)
 		if err != nil {
 			_ = store.Close()
 			return nil, fmt.Errorf("create cloud audio provider: %w", err)
 		}
-		generator = cloudGenerator
+		generator = audio.NewFallbackGenerator(cloudGenerator, local)
 	}
 	audioService, err := audio.NewService(filepath.Join(cfg.DataDir, "audio-cache"),
 		audio.WithLocalDir(filepath.Join(cfg.DataDir, "audio")),

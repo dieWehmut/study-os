@@ -42,7 +42,7 @@ scripts\install-pwa.ps1 -Folder D:\StudyOS -SkipShortcut
 - 多厂商 AI 配置：DeepSeek / Claude / OpenAI / 通义千问 / 智谱 GLM / 火山豆包
   全部可用，设置页展示各厂商卡片、可切换活跃服务商、测试连通性；密钥永不回显
 - AI 生成：词 Wiki、造句、自由文本批改、记忆点抽取、义项压缩
-- 云端 TTS（DashScope CosyVoice，带时间轴），未配置时回退 Windows SAPI
+- 云端 TTS（DashScope CosyVoice，带时间轴），未配置或调用失败（含 30 秒超时）时回退 Windows SAPI
 - 英语词库清洗管线：按等级/标签过滤、词形还原分组、批量生成 Wiki
 - Wails v2 桌面壳：单实例、关窗即退、每日自动备份、可验证更新
 - 安装 / 发布流水线：PowerShell 安装与更新、x64/ARM64、SHA-256 校验、失败回滚，
