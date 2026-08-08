@@ -4,6 +4,7 @@ import {
   emptyReadingSession,
   readReadingSession,
   readingStorageKey,
+  summarizeReadingSession,
   writeReadingSession,
 } from "./reading-session"
 
@@ -79,5 +80,62 @@ describe("the reading session", () => {
     writeReadingSession(emptyReadingSession)
 
     expect(localStorage.getItem(readingStorageKey)).toBeNull()
+  })
+})
+
+describe("summarizing what is left to read", () => {
+  const source = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
+
+  it("has nothing to offer when no document was left open", () => {
+    expect(summarizeReadingSession(emptyReadingSession)).toBeNull()
+  })
+
+  it("names the document by its own title, not by its first line of prose", () => {
+    const summary = summarizeReadingSession({ markdown: source, index: 0, readIds: [] })
+
+    expect(summary?.title).toBe("光合作用")
+  })
+
+  it("counts the stops still ahead, which is what decides whether to go back", () => {
+    const chunks = ["# 一", "## A", "甲。", "## B", "乙。"].join("\n")
+    const summary = summarizeReadingSession({ markdown: chunks, index: 0, readIds: [] })
+
+    expect(summary?.total).toBe(2)
+    expect(summary?.remaining).toBe(2)
+  })
+
+  it("counts a stop as behind you only once it is marked", () => {
+    // Walking past a stop is not reading it. Only the mark says you did.
+    const summary = summarizeReadingSession({
+      markdown: source,
+      index: 1,
+      readIds: ["n0-0-p0"],
+    })
+
+    expect(summary?.read).toBe(1)
+    expect(summary?.remaining).toBe(1)
+  })
+
+  it("ignores a mark naming a stop this document no longer has", () => {
+    // The document was edited under the marks; a stale id must not push the
+    // count past the number of stops that exist.
+    const summary = summarizeReadingSession({
+      markdown: source,
+      index: 0,
+      readIds: ["gone", "also-gone"],
+    })
+
+    expect(summary?.read).toBe(0)
+    expect(summary?.remaining).toBe(2)
+  })
+
+  it("falls back to a plain label when the document has no heading at all", () => {
+    const summary = summarizeReadingSession({ markdown: "只有正文，没有标题。", index: 0, readIds: [] })
+
+    expect(summary?.title).toBe("未命名文档")
+  })
+
+  it("has nothing to offer for text that produced no stops", () => {
+    expect(summarizeReadingSession({ markdown: "   ", index: 0, readIds: [] })).toBeNull()
   })
 })

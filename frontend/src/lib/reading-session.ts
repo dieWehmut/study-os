@@ -1,4 +1,9 @@
+import { chunkMarkdown } from "./chunk"
+import { parseOutline } from "./outline"
+
 export const readingStorageKey = "study-os.reading"
+
+const untitledDocument = "未命名文档"
 
 /** Where the reader is in one document, and which stops are behind them. */
 export interface ReadingSession {
@@ -46,6 +51,38 @@ export function readReadingSession(): ReadingSession {
     }
   } catch {
     return emptyReadingSession
+  }
+}
+
+/** What is worth saying about a half-read document from somewhere else. */
+export interface ReadingSummary {
+  title: string
+  total: number
+  read: number
+  remaining: number
+}
+
+/**
+ * Describe a session well enough for another page to offer to resume it.
+ *
+ * The counts are recomputed from the document rather than stored, because the
+ * marks and the text drift apart the moment you edit: a mark naming a stop
+ * this draft no longer has must not push "已读" past the number of stops that
+ * exist. Text that produces no stops is nothing to go back to, so it is no
+ * summary at all rather than a card reading 0 / 0.
+ */
+export function summarizeReadingSession(session: ReadingSession): ReadingSummary | null {
+  const chunks = chunkMarkdown(session.markdown)
+  if (chunks.length === 0) return null
+
+  const stops = new Set(chunks.map((chunk) => chunk.id))
+  const read = new Set(session.readIds.filter((id) => stops.has(id))).size
+
+  return {
+    title: parseOutline(session.markdown).title || untitledDocument,
+    total: chunks.length,
+    read,
+    remaining: chunks.length - read,
   }
 }
 
