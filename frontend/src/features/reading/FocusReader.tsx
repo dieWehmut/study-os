@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { ReadingChunk } from "@/lib/chunk"
@@ -10,6 +10,9 @@ interface FocusReaderProps {
   /** Omit to hide the toggle: a control nobody records would forget the answer. */
   onToggleRead?: (id: string) => void
   readIds?: ReadonlySet<string>
+  /** Same rule as onToggleRead: no store, no control. */
+  onToggleStuck?: (id: string) => void
+  stuckIds?: ReadonlySet<string>
 }
 
 /**
@@ -27,6 +30,8 @@ export function FocusReader({
   onIndexChange,
   onToggleRead,
   readIds,
+  onToggleStuck,
+  stuckIds,
 }: FocusReaderProps) {
   const chunk = chunks[index]
 
@@ -44,6 +49,9 @@ export function FocusReader({
   // Keyed by the chunk's id, not by the index: arriving at stop 2 must not
   // inherit stop 1's mark, or the record would claim a page you never opened.
   const isRead = readIds?.has(chunk.id) ?? false
+  // Deliberately independent of isRead. Reading a section through and still not
+  // having it is the common case, not a contradiction to rule out.
+  const isStuck = stuckIds?.has(chunk.id) ?? false
 
   function move(delta: number) {
     const next = index + delta
@@ -90,6 +98,21 @@ export function FocusReader({
           {index + 1} / {chunks.length}
         </span>
         <div className="ml-auto flex items-center gap-2">
+          {onToggleStuck ? (
+            // Unlike 读完 this does not turn the page. Saying a stop did not
+            // land is the opposite claim to being done with it, and carrying
+            // you away from it would be the last thing you wanted.
+            <Button
+              variant={isStuck ? "secondary" : "ghost"}
+              size="sm"
+              aria-pressed={isStuck}
+              onClick={() => onToggleStuck(chunk.id)}
+              className={isStuck ? "text-amber-700 dark:text-amber-400" : undefined}
+            >
+              <HelpCircle aria-hidden="true" />
+              {isStuck ? "卡住了" : "没看懂"}
+            </Button>
+          ) : null}
           {onToggleRead ? (
             <Button
               variant={isRead ? "default" : "outline"}

@@ -148,3 +148,74 @@ describe("focus reader", () => {
     expect(screen.getByText(/选一个小节/)).toBeInTheDocument()
   })
 })
+
+describe("saying a stop did not land", () => {
+  it("offers no way to flag a stop when nobody is keeping track", () => {
+    render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+
+    expect(screen.queryByRole("button", { name: /没看懂/ })).not.toBeInTheDocument()
+  })
+
+  it("flags the stop you are standing on", () => {
+    const onToggleStuck = vi.fn()
+    render(
+      <FocusReader chunks={chunks} index={1} onIndexChange={vi.fn()} onToggleStuck={onToggleStuck} />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+
+    expect(onToggleStuck).toHaveBeenCalledWith(chunks[1].id)
+  })
+
+  it("does not move you on, unlike finishing one", () => {
+    // 读完 turns the page because you are done with it. Saying you did not
+    // understand a stop is the opposite claim, and carrying you away from it
+    // would be the last thing you wanted.
+    const onIndexChange = vi.fn()
+    render(
+      <FocusReader
+        chunks={chunks}
+        index={0}
+        onIndexChange={onIndexChange}
+        onToggleStuck={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /没看懂/ }))
+
+    expect(onIndexChange).not.toHaveBeenCalled()
+  })
+
+  it("remembers a stop is flagged when you come back to it", () => {
+    render(
+      <FocusReader
+        chunks={chunks}
+        index={0}
+        onIndexChange={vi.fn()}
+        onToggleStuck={vi.fn()}
+        stuckIds={new Set([chunks[0].id])}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: /卡住了/ })).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("lets a stop be both finished and not understood", () => {
+    // Reading the whole thing and still not having it is the common case, not
+    // a contradiction the controls should rule out.
+    render(
+      <FocusReader
+        chunks={chunks}
+        index={0}
+        onIndexChange={vi.fn()}
+        onToggleRead={vi.fn()}
+        onToggleStuck={vi.fn()}
+        readIds={new Set([chunks[0].id])}
+        stuckIds={new Set([chunks[0].id])}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: /已读完/ })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByRole("button", { name: /卡住了/ })).toHaveAttribute("aria-pressed", "true")
+  })
+})
