@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { deleteMistake, listMistakes, recordMistake } from "./mistakes"
+import { deleteMistake, listMistakes, recordMistake, scheduleMistake } from "./mistakes"
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -87,5 +87,61 @@ describe("mistakes API", () => {
     await deleteMistake("qa-1")
 
     expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1", { method: "DELETE" })
+  })
+
+  it("carries the link that says a row is already in the review queue", async () => {
+    // The page has to stop offering 排进复习 on a row it already scheduled, and
+    // it only ever sees the list. A link the row does not carry is one the page
+    // cannot act on.
+    mocks.apiRequest.mockResolvedValue({
+      count: 1,
+      items: [
+        {
+          question: {
+            id: "q-1",
+            subject: "physics",
+            stem: "受力分析",
+            knowledge_item_id: "k-mistake-1",
+            created_at: "2026-08-08T09:00:00Z",
+          },
+          attempt: { id: "qa-1", question_id: "q-1", cause: "recall", occurred_at: "2026-08-08T09:00:00Z" },
+        },
+      ],
+    })
+
+    const records = await listMistakes()
+
+    expect(records[0].knowledgeItemId).toBe("k-mistake-1")
+  })
+
+  it("leaves the link off a row nothing has scheduled", async () => {
+    // An absent field must read as "not queued". Reading it as queued would
+    // lock the button on every row against a backend that predates the link.
+    mocks.apiRequest.mockResolvedValue({
+      count: 1,
+      items: [
+        {
+          question: { id: "q-1", subject: "physics", stem: "受力分析", created_at: "2026-08-08T09:00:00Z" },
+          attempt: { id: "qa-1", question_id: "q-1", cause: "recall", occurred_at: "2026-08-08T09:00:00Z" },
+        },
+      ],
+    })
+
+    const records = await listMistakes()
+
+    expect(records[0].knowledgeItemId).toBeUndefined()
+  })
+
+  it("schedules by the attempt id and hands back the item it became", async () => {
+    mocks.apiRequest.mockResolvedValue({
+      status: "scheduled",
+      knowledge_id: "k-mistake-1",
+      prompt_count: 1,
+    })
+
+    const knowledgeId = await scheduleMistake("qa-1")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1/schedule", { method: "POST" })
+    expect(knowledgeId).toBe("k-mistake-1")
   })
 })

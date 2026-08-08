@@ -6,6 +6,14 @@ export interface MistakeRecord {
   question: string
   cause: MistakeCause
   note?: string
+  /**
+   * The library entry this question became, absent until it became one.
+   *
+   * A link rather than a "scheduled" flag, matching the column behind it: the
+   * page needs to know *which* item to stop offering the button for, and two
+   * fields answering "was it filed" and "into what" can disagree.
+   */
+  knowledgeItemId?: string
   createdAt: string
 }
 

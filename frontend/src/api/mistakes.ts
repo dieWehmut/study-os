@@ -10,6 +10,7 @@ interface MistakePair {
     id: string
     subject?: string
     stem: string
+    knowledge_item_id?: string
     created_at: string
   }
   attempt: {
@@ -48,7 +49,12 @@ function toRecord(pair: MistakePair): MistakeRecord | null {
     cause: pair.attempt.cause as MistakeCause,
     createdAt: pair.attempt.occurred_at,
   }
-  return pair.attempt.note?.trim() ? { ...record, note: pair.attempt.note } : record
+  // An absent link reads as "not queued". The other way round would lock the
+  // button on every row against a backend that predates the column.
+  const linked = pair.question.knowledge_item_id?.trim()
+    ? { ...record, knowledgeItemId: pair.question.knowledge_item_id }
+    : record
+  return pair.attempt.note?.trim() ? { ...linked, note: pair.attempt.note } : linked
 }
 
 export async function listMistakes(options: ListMistakesOptions = {}): Promise<MistakeRecord[]> {
@@ -88,4 +94,21 @@ export async function recordMistake(filed: {
  */
 export function deleteMistake(attemptID: string): Promise<void> {
   return apiRequest<void>(`/mistakes/${encodeURIComponent(attemptID)}`, { method: "DELETE" })
+}
+
+/**
+ * Put one 想不起来 错题 back in the spaced-review queue.
+ *
+ * Hands back the library entry the question became, which is the same link the
+ * list carries -- so the page can stop offering the button without refetching.
+ * The server refuses a cause more review cannot fix; the page only offers the
+ * button where the taxonomy agrees, and a 400 is the backstop for the two
+ * copies disagreeing.
+ */
+export async function scheduleMistake(attemptID: string): Promise<string> {
+  const scheduled = await apiRequest<{ knowledge_id: string }>(
+    `/mistakes/${encodeURIComponent(attemptID)}/schedule`,
+    { method: "POST" },
+  )
+  return scheduled.knowledge_id
 }
