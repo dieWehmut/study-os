@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest"
 
 import {
   MISTAKE_CAUSES,
+  SUBJECT_CAUSE_ACTIONS,
+  causeActionFor,
   createMistake,
   mistakesStorageKey,
   readMistakes,
@@ -13,6 +15,12 @@ import {
 
 function record(cause: MistakeCause, id: string = cause): MistakeRecord {
   return { id, subject: "biology", question: "题", cause, createdAt: "2026-08-08T00:00:00Z" }
+}
+
+function genericAction(cause: MistakeCause): string {
+  const spec = MISTAKE_CAUSES.find((entry) => entry.cause === cause)
+  if (!spec) throw new Error(`没有这个错因：${cause}`)
+  return spec.action
 }
 
 describe("mistake causes", () => {
@@ -169,5 +177,61 @@ describe("keeping the log", () => {
     )
 
     expect(readMistakes()).toEqual([record("recall", "b")])
+  })
+})
+
+describe("what to do about a cause, by subject", () => {
+  it("says something a physics student can actually go and do", () => {
+    // 思路不对 in 物理 is nearly always the wrong model picked, and the fix is
+    // a drawing, not more problems. The generic advice -- 找同类题再做两道 --
+    // sends you to do more of the thing that just failed.
+    const physics = causeActionFor("physics", "method")
+
+    expect(physics).not.toBe(genericAction("method"))
+    expect(physics).toContain("受力图")
+  })
+
+  it("falls back to the shared advice where a subject has nothing of its own", () => {
+    // Only the causes that genuinely differ get a subject entry. Padding all
+    // six for all six subjects would be 36 sentences nobody wrote and nobody
+    // reads.
+    expect(causeActionFor("physics", "time")).toBe(genericAction("time"))
+  })
+
+  it("gives the shared advice while no subject is chosen", () => {
+    // 首页 sets 全部学科 by default, and the log then mixes subjects. Advice
+    // naming 受力图 next to a 语文 row would be worse than none.
+    expect(causeActionFor("all", "method")).toBe(genericAction("method"))
+  })
+
+  it("falls back rather than throwing on a subject it has never heard of", () => {
+    // Subjects arrive from the database, which is older than this table and
+    // will outlive it. An unknown id must cost you the tailored sentence, not
+    // the row.
+    expect(causeActionFor("astronomy", "method")).toBe(genericAction("method"))
+  })
+
+  it("keeps every tailored sentence pointing at a cause that still exists", () => {
+    // The taxonomy is the single source of truth for which causes exist. A
+    // subject entry naming a renamed cause would be dead text that no page can
+    // ever reach, and nothing would say so.
+    for (const subject of Object.keys(SUBJECT_CAUSE_ACTIONS)) {
+      for (const cause of Object.keys(SUBJECT_CAUSE_ACTIONS[subject])) {
+        expect(MISTAKE_CAUSES.some((spec) => spec.cause === cause)).toBe(true)
+      }
+    }
+  })
+
+  it("never promises review will fix something the taxonomy says it will not", () => {
+    // The tailored sentence sits directly under a bar coloured by reviewFixes.
+    // A 物理 sentence reading 排进复习 under an amber bar would contradict the
+    // one invariant the whole page exists to state.
+    for (const subject of Object.keys(SUBJECT_CAUSE_ACTIONS)) {
+      for (const [cause, action] of Object.entries(SUBJECT_CAUSE_ACTIONS[subject])) {
+        const spec = MISTAKE_CAUSES.find((entry) => entry.cause === cause)
+        if (spec?.reviewFixes) continue
+        expect(action).not.toContain("复习队列")
+      }
+    }
   })
 })

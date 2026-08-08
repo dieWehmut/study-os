@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   MISTAKE_CAUSES,
+  causeActionFor,
   clearStoredMistakes,
   readMistakes,
   summarizeMistakes,
@@ -217,7 +218,12 @@ export default function Practice() {
                     style={{ width: `${percent}%` }}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">{spec.action}</p>
+                {/* The sentence is the subject's own where that subject can
+                    put it better -- 物理's 思路不对 means the wrong model, and
+                    the fix is a drawing, not two more problems. */}
+                <p className="text-xs text-muted-foreground">
+                  {causeActionFor(subject, spec.cause)}
+                </p>
               </div>
             ))}
           </CardContent>

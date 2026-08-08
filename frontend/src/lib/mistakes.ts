@@ -93,6 +93,63 @@ export const MISTAKE_CAUSES: MistakeCauseSpec[] = [
 ]
 
 /**
+ * What to do about a cause, when one subject can say it better than in general.
+ *
+ * The six causes above are cognitive layers -- where in your head the failure
+ * happened -- and they hold for every subject by construction. What does not
+ * hold is the advice. 思路不对 in 物理 is almost always the wrong model picked,
+ * and the fix is a drawing; the generic 找同类题再做两道 sends you to do more of
+ * the thing that just failed.
+ *
+ * Only the pairs that genuinely differ appear here. Filling in all six causes
+ * for all six subjects would be thirty-six sentences nobody wrote carefully and
+ * nobody reads. A missing pair is not a gap -- it means the shared sentence was
+ * already the right one.
+ */
+export const SUBJECT_CAUSE_ACTIONS: Record<string, Partial<Record<MistakeCause, string>>> = {
+  physics: {
+    method: "多半是模型选错了：重画受力图，先标接触面再标场力",
+    misread: "先把过程分段，写出每段的初末状态，再回头看问的是哪一段",
+    careless: "方向和单位各查一遍 —— 物理的手滑有一半是漏了负号",
+  },
+  chemistry: {
+    method: "先认题型：这道考的是守恒、过量判断，还是平衡移动？认错型比算错更常见",
+    careless: "配平系数和状态符号回查一遍，分数多半丢在这两处",
+  },
+  math: {
+    method: "定位到出错的那一步，而不是整题重做：从哪一行开始和标准解法分岔",
+    careless: "把中间步骤写全 —— 跳步省下的时间都赔在这里了",
+  },
+  geography: {
+    method: "把因果链一环一环写出来，从成因到表现，缺哪一环就是丢分点",
+    misread: "先看图例和比例尺，再回题干圈出限定词：时间、范围、程度",
+  },
+  chinese: {
+    method: "对着得分点拆答案：踩到几个点，缺的是哪一类",
+    unknown: "先照着范文标出得分点，再回头看自己缺的是哪一句",
+  },
+  english: {
+    recall: "排进复习队列；同词族的其他词一起过，比单背这一个划算",
+    method: "语法题看结构不看词义：先找主谓，再定从句",
+  },
+}
+
+/**
+ * The sentence to show under one cause, for the subject in hand.
+ *
+ * Falls back to the shared advice for a subject that says nothing of its own,
+ * for 全部学科 (where a sentence naming 受力图 could land next to a 语文 row),
+ * and for a subject id this table has never heard of -- subjects come from the
+ * database, which is older than this table and will outlive it. An unknown id
+ * should cost you the tailored sentence, not the row.
+ */
+export function causeActionFor(subject: string, cause: MistakeCause): string {
+  const tailored = SUBJECT_CAUSE_ACTIONS[subject]?.[cause]
+  if (tailored) return tailored
+  return MISTAKE_CAUSES.find((spec) => spec.cause === cause)?.action ?? ""
+}
+
+/**
  * Count the log, ranked by how often each cause bit you.
  *
  * Causes you have never hit are left out entirely: six rows of zero bury the

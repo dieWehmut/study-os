@@ -37,6 +37,8 @@ function causeOf(label: string): string {
       return "misread"
     case "算错 / 手滑":
       return "careless"
+    case "思路不对":
+      return "method"
     default:
       return "unknown"
   }
@@ -260,6 +262,28 @@ describe("Practice page", () => {
 
     expect(await screen.findByText(/安排复习失败/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /^排进复习$/ })).toBeEnabled()
+  })
+
+  it("says what to do about a cause a subject can put better than in general", async () => {
+    // 思路不对 in 物理 is nearly always the wrong model picked, and the fix is
+    // a drawing. The shared sentence -- 找同类题再做两道 -- sends you to do more
+    // of the thing that just failed.
+    useSubjectStore.setState({ subject: "physics" })
+    render(<Practice />)
+    log("斜面上的木块", "思路不对")
+
+    expect(await screen.findByText(/受力图/)).toBeInTheDocument()
+  })
+
+  it("keeps to the shared advice while the log mixes every subject", async () => {
+    // 全部学科 is the default, and a sentence naming 受力图 would then sit under
+    // a bar counting 语文 rows too.
+    render(<Practice />)
+    log("斜面上的木块", "思路不对")
+    await screen.findByText("斜面上的木块")
+
+    expect(screen.getByText(/找同类题再做两道/)).toBeInTheDocument()
+    expect(screen.queryByText(/受力图/)).not.toBeInTheDocument()
   })
 
   it("stops offering the queue on a row the database already scheduled", async () => {
