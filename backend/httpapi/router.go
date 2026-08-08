@@ -175,6 +175,12 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/integrate/{noteID}", func(response http.ResponseWriter, request *http.Request) {
 			handleIntegrateGet(response, request, application)
 		})
+		api.Post("/mistakes", func(response http.ResponseWriter, request *http.Request) {
+			handleMistakeCreate(response, request, application)
+		})
+		api.Get("/mistakes", func(response http.ResponseWriter, request *http.Request) {
+			handleMistakeList(response, request, application)
+		})
 		api.Post("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupCreate(response, request, application)
 		})
