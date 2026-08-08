@@ -9,7 +9,13 @@ import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { itemTypeLabel, providerLabel } from "@/lib/labels"
 import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
-import { readReadingSession, stuckSections, summarizeReadingSession } from "@/lib/reading-session"
+import { readShelf, restoreDocument } from "@/lib/reading-library"
+import {
+  readReadingSession,
+  stuckSections,
+  summarizeReadingSession,
+  writeReadingSession,
+} from "@/lib/reading-session"
 import { cn } from "@/lib/utils"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { SubjectPicker } from "@/features/subjects/SubjectPicker"
@@ -41,9 +47,20 @@ export default function Home() {
   // Read and summarized once, on the way in. Nothing on this page edits the
   // reading session, so recomputing it per render would only re-chunk the same
   // document to reach the same answer.
-  const [session] = useState(readReadingSession)
-  const [resume] = useState(() => summarizeReadingSession(session))
-  const [stuck] = useState(() => stuckSections(session))
+  //
+  // The one still in the box wins over the shelf: an open document is one you
+  // are in the middle of, a shelved one is one you already decided to walk
+  // away from. But the shelf has to be looked at, because the box holds a
+  // single document -- without this, 收起这篇 made reading vanish from the
+  // dashboard entirely, as though you had never opened anything.
+  const [resumable] = useState(() => {
+    const open = readReadingSession()
+    if (open.markdown.trim() !== "") return { session: open, shelvedId: "" }
+    const [newest] = readShelf()
+    return newest ? { session: newest, shelvedId: newest.id } : null
+  })
+  const [resume] = useState(() => (resumable ? summarizeReadingSession(resumable.session) : null))
+  const [stuck] = useState(() => (resumable ? stuckSections(resumable.session) : []))
 
   const subjectFilter = subject === "all" ? undefined : subject
 
@@ -87,6 +104,20 @@ export default function Home() {
     } finally {
       setSeeding(false)
     }
+  }
+
+  /**
+   * Make sure 阅读 opens on the document this card is about.
+   *
+   * A no-op for the one already in the box. For a shelved one it is the same
+   * swap 打开 performs over there, just reached from here -- without it the
+   * link lands you on an empty page and you have to find the document on the
+   * shelf yourself, which is the trip the card exists to save.
+   */
+  function openResumable() {
+    if (!resumable?.shelvedId) return
+    const restored = restoreDocument(resumable.shelvedId)
+    if (restored) writeReadingSession(restored)
   }
 
   async function saveDump() {
@@ -188,7 +219,7 @@ export default function Home() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Link className={buttonVariants({ size: "sm" })} to="/reading">
+              <Link className={buttonVariants({ size: "sm" })} to="/reading" onClick={openResumable}>
                 继续读<ArrowRight data-icon="inline-end" />
               </Link>
               <span className="text-sm text-muted-foreground">

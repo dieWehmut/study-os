@@ -3,9 +3,11 @@ import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Home from "./Home"
-import { readingStorageKey } from "@/lib/reading-session"
+import { readShelf, shelveDocument } from "@/lib/reading-library"
+import { readReadingSession, readingStorageKey } from "@/lib/reading-session"
 
 const halfRead = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
+const kinetics = ["# 动能定理", "## 适用条件", "只对合外力做功成立。"].join("\n")
 
 function leaveOpen(markdown: string, readIds: string[] = [], stuckIds: string[] = []) {
   localStorage.setItem(readingStorageKey, JSON.stringify({ markdown, index: 0, readIds, stuckIds }))
@@ -254,5 +256,48 @@ describe("picking up a document again", () => {
     open()
 
     expect(screen.queryByText(/没看懂/)).not.toBeInTheDocument()
+  })
+
+  it("offers the last document you put away, not only the one still open", () => {
+    // 收起这篇 used to make reading vanish from here entirely: the box holds
+    // one document, so closing it left a dashboard that behaved as though you
+    // had never read anything.
+    shelveDocument({ markdown: halfRead, index: 0, readIds: [], stuckIds: [], keptIds: [] })
+    open()
+
+    expect(screen.getByText("光合作用")).toBeInTheDocument()
+  })
+
+  it("offers the one still in the box ahead of anything on the shelf", () => {
+    // A document you have open is one you are in the middle of. A shelved one
+    // is one you already decided to walk away from.
+    shelveDocument({ markdown: kinetics, index: 0, readIds: [], stuckIds: [], keptIds: [] })
+    leaveOpen(halfRead)
+    open()
+
+    expect(screen.getByText("光合作用")).toBeInTheDocument()
+    expect(screen.queryByText("动能定理")).not.toBeInTheDocument()
+  })
+
+  it("puts a shelved document back in the box on the way to the reader", () => {
+    // Otherwise 继续读 lands you on an empty 阅读 page and you have to find the
+    // document again on the shelf -- which is the trip the card exists to save.
+    shelveDocument({ markdown: halfRead, index: 1, readIds: ["n0-0-p0"], stuckIds: [], keptIds: [] })
+    open()
+
+    fireEvent.click(screen.getByRole("link", { name: /继续读/ }))
+
+    expect(readReadingSession().markdown).toBe(halfRead)
+    expect(readReadingSession().readIds).toEqual(["n0-0-p0"])
+    expect(readShelf()).toEqual([])
+  })
+
+  it("says what is in the way on a shelved document too", () => {
+    // The flagged sections are the whole output of a preview pass. Losing them
+    // to the shelf is losing the reason the document is worth reopening.
+    shelveDocument({ markdown: halfRead, index: 0, readIds: [], stuckIds: ["n0-0-p0"], keptIds: [] })
+    open()
+
+    expect(screen.getByText(/1 节没看懂/)).toBeInTheDocument()
   })
 })
