@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { deleteMistake, listMistakes, recordMistake, scheduleMistake } from "./mistakes"
+import { correctMistake, deleteMistake, listMistakes, recordMistake, scheduleMistake } from "./mistakes"
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -143,5 +143,59 @@ describe("mistakes API", () => {
 
     expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1/schedule", { method: "POST" })
     expect(knowledgeId).toBe("k-mistake-1")
+  })
+
+  it("carries the mark that says a row has been put right", async () => {
+    // The page has to stop offering 订正 on a row already fixed, and it only
+    // ever sees the list. Server-derived, so a reload agrees with the press.
+    mocks.apiRequest.mockResolvedValue({
+      count: 1,
+      items: [
+        {
+          question: { id: "q-1", subject: "physics", stem: "受力分析", created_at: "2026-08-08T09:00:00Z" },
+          attempt: { id: "qa-1", question_id: "q-1", cause: "method", occurred_at: "2026-08-08T09:00:00Z" },
+          corrected: true,
+        },
+      ],
+    })
+
+    const records = await listMistakes()
+
+    expect(records[0].corrected).toBe(true)
+  })
+
+  it("leaves the mark off a row nothing has put right", async () => {
+    // An absent field reads as "not fixed". The other way round would hide the
+    // button on every row against a backend that predates the field.
+    mocks.apiRequest.mockResolvedValue({
+      count: 1,
+      items: [
+        {
+          question: { id: "q-1", subject: "physics", stem: "受力分析", created_at: "2026-08-08T09:00:00Z" },
+          attempt: { id: "qa-1", question_id: "q-1", cause: "method", occurred_at: "2026-08-08T09:00:00Z" },
+        },
+      ],
+    })
+
+    const records = await listMistakes()
+
+    expect(records[0].corrected).toBeUndefined()
+  })
+
+  it("corrects by the attempt id and hands back the row, still a mistake", async () => {
+    // 订正 is not 删除: the row stays, because "I got this wrong once and fixed
+    // it" is the sentence the log exists to be able to say.
+    mocks.apiRequest.mockResolvedValue({
+      question: { id: "q-1", subject: "physics", stem: "受力分析", created_at: "2026-08-08T09:00:00Z" },
+      attempt: { id: "qa-1", question_id: "q-1", cause: "method", occurred_at: "2026-08-08T09:00:00Z" },
+      corrected: true,
+    })
+
+    const fixed = await correctMistake("qa-1")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1/correct", { method: "POST" })
+    expect(fixed.id).toBe("qa-1")
+    expect(fixed.cause).toBe("method")
+    expect(fixed.corrected).toBe(true)
   })
 })

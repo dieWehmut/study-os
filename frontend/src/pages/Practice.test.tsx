@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   recordMistake: vi.fn(),
   deleteMistake: vi.fn(),
   scheduleMistake: vi.fn(),
+  correctMistake: vi.fn(),
 }))
 
 vi.mock("@/api/mistakes", () => mocks)
@@ -53,6 +54,19 @@ describe("Practice page", () => {
     mocks.listMistakes.mockResolvedValue([])
     mocks.deleteMistake.mockResolvedValue(undefined)
     mocks.scheduleMistake.mockResolvedValue("k-mistake-1")
+    // 订正 answers with the row still a mistake, now carrying the mark. The
+    // page reads the mark and keeps the text it already has, so the stub does
+    // not need to echo the question back.
+    mocks.correctMistake.mockImplementation((id: string) =>
+      Promise.resolve({
+        id,
+        subject: "all",
+        question: "题",
+        cause: "method",
+        corrected: true,
+        createdAt: "2026-08-09T00:00:00Z",
+      }),
+    )
   })
 
   it("says plainly that nothing has gone wrong yet", async () => {
@@ -305,5 +319,76 @@ describe("Practice page", () => {
 
     expect(screen.getByText("已排进复习")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^排进复习$/ })).not.toBeInTheDocument()
+  })
+
+  it("offers to mark a mistake as one you have since got right", async () => {
+    // Offered on every cause, not just the ones review fixes: a 手滑 you have
+    // learned to catch is as much a fixed mistake as a word you finally learnt.
+    render(<Practice />)
+    log("光合作用第 3 问", "算错 / 手滑")
+
+    expect(await screen.findByRole("button", { name: /^订正$/ })).toBeInTheDocument()
+  })
+
+  it("keeps the row on the list after you put it right", async () => {
+    // 订正 is not 删除. "I got this wrong once and fixed it" is the sentence the
+    // log exists to be able to say, and a row that vanished could not say it.
+    render(<Practice />)
+    log("光合作用第 3 问", "看错题")
+    await screen.findByText("光合作用第 3 问")
+
+    fireEvent.click(screen.getByRole("button", { name: /^订正$/ }))
+
+    expect(await screen.findByText("已订正")).toBeInTheDocument()
+    expect(mocks.correctMistake).toHaveBeenCalledWith("qa-1")
+    expect(screen.getByText("光合作用第 3 问")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^订正$/ })).not.toBeInTheDocument()
+  })
+
+  it("still counts a corrected mistake under the cause it happened for", async () => {
+    // A bar that shrank on 订正 would erase the diagnosis as a reward for
+    // acting on it. The count of what you fixed sits beside the chart instead.
+    render(<Practice />)
+    log("光合作用第 3 问", "看错题")
+    await screen.findByText("光合作用第 3 问")
+
+    fireEvent.click(screen.getByRole("button", { name: /^订正$/ }))
+    await screen.findByText("已订正")
+
+    expect(screen.getByText("另有原因 1")).toBeInTheDocument()
+    expect(screen.getByText("已订正 1")).toBeInTheDocument()
+  })
+
+  it("leaves the row correctable when the mark could not be written", async () => {
+    mocks.correctMistake.mockRejectedValueOnce(new Error("订正没写进去"))
+    render(<Practice />)
+    log("光合作用第 3 问", "看错题")
+    await screen.findByText("光合作用第 3 问")
+
+    fireEvent.click(screen.getByRole("button", { name: /^订正$/ }))
+
+    expect(await screen.findByText(/订正没写进去/)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^订正$/ })).toBeEnabled()
+  })
+
+  it("stops offering 订正 on a row the database already marked", async () => {
+    // The mark is derived server-side from the retry itself, so a reload and a
+    // press cannot disagree about whether this one was fixed.
+    mocks.listMistakes.mockResolvedValue([
+      {
+        id: "qa-old",
+        subject: "physics",
+        question: "上次订正过的题",
+        cause: "careless",
+        corrected: true,
+        createdAt: "2026-08-07T00:00:00Z",
+      },
+    ])
+
+    render(<Practice />)
+    await screen.findByText("上次订正过的题")
+
+    expect(screen.getByText("已订正")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^订正$/ })).not.toBeInTheDocument()
   })
 })

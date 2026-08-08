@@ -20,6 +20,8 @@ interface MistakePair {
     note?: string
     occurred_at: string
   }
+  /** The question has since been answered right. Derived server-side. */
+  corrected?: boolean
 }
 
 interface MistakeListResponse {
@@ -54,7 +56,10 @@ function toRecord(pair: MistakePair): MistakeRecord | null {
   const linked = pair.question.knowledge_item_id?.trim()
     ? { ...record, knowledgeItemId: pair.question.knowledge_item_id }
     : record
-  return pair.attempt.note?.trim() ? { ...linked, note: pair.attempt.note } : linked
+  const noted = pair.attempt.note?.trim() ? { ...linked, note: pair.attempt.note } : linked
+  // Likewise absent: an older backend answers nothing, and "not yet fixed" is
+  // the reading that leaves 订正 pressable instead of hiding it everywhere.
+  return pair.corrected ? { ...noted, corrected: true } : noted
 }
 
 export async function listMistakes(options: ListMistakesOptions = {}): Promise<MistakeRecord[]> {
@@ -111,4 +116,22 @@ export async function scheduleMistake(attemptID: string): Promise<string> {
     { method: "POST" },
   )
   return scheduled.knowledge_id
+}
+
+/**
+ * Mark one filed mistake as one you have since got right.
+ *
+ * Deliberately not deleteMistake. 取消 is for a row filed by accident; 订正 is
+ * for a mistake you fixed, and the row has to stay -- "I got this wrong once
+ * and put it right" is the sentence the log exists to be able to say. The
+ * answer comes back still a mistake, carrying the mark.
+ */
+export async function correctMistake(attemptID: string): Promise<MistakeRecord> {
+  const pair = await apiRequest<MistakePair>(
+    `/mistakes/${encodeURIComponent(attemptID)}/correct`,
+    { method: "POST" },
+  )
+  const record = toRecord(pair)
+  if (!record) throw new Error("服务端记下的错因无法识别")
+  return record
 }

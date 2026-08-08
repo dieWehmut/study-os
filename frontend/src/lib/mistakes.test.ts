@@ -99,6 +99,22 @@ describe("summarizing mistakes", () => {
 
     expect(summary.byCause[0].percent).toBe(50)
   })
+
+  it("counts what you have put right without pretending it never happened", () => {
+    // Dropping a corrected row from the chart would flatten the diagnosis every
+    // time you did the right thing. 错在哪一层 answers which layer you fail at,
+    // and fixing one instance does not change the answer -- so the row stays in
+    // its cause, and 已订正 is counted alongside rather than subtracted.
+    const summary = summarizeMistakes([
+      { ...record("recall", "a"), corrected: true },
+      record("recall", "b"),
+      record("careless", "c"),
+    ])
+
+    expect(summary.total).toBe(3)
+    expect(summary.corrected).toBe(1)
+    expect(summary.byCause.find((entry) => entry.spec.cause === "recall")?.count).toBe(2)
+  })
 })
 
 describe("filing a mistake", () => {

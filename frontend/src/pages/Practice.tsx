@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react"
-import { CalendarPlus, SquarePen, Trash2 } from "lucide-react"
+import { CalendarPlus, CheckCheck, SquarePen, Trash2 } from "lucide-react"
 
-import { deleteMistake, listMistakes, recordMistake, scheduleMistake } from "@/api/mistakes"
+import {
+  correctMistake,
+  deleteMistake,
+  listMistakes,
+  recordMistake,
+  scheduleMistake,
+} from "@/api/mistakes"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -56,8 +62,11 @@ export default function Practice() {
   const [question, setQuestion] = useState("")
   const [records, setRecords] = useState<MistakeRecord[]>([])
   const [error, setError] = useState("")
-  const [queueError, setQueueError] = useState("")
+  // Shared by every action that acts on one row -- 排进复习 and 订正 both fail
+  // the same way, and one line under the list is where you are already looking.
+  const [rowError, setRowError] = useState("")
   const [queueing, setQueueing] = useState("")
+  const [correcting, setCorrecting] = useState("")
   const [busy, setBusy] = useState(false)
 
   // The log follows the 首页 switch like every other list in the app: while you
@@ -141,11 +150,40 @@ export default function Practice() {
       setRecords((current) =>
         current.map((entry) => (entry.id === item.id ? { ...entry, knowledgeItemId } : entry)),
       )
-      setQueueError("")
+      setRowError("")
     } catch (failure) {
-      setQueueError(describe(failure, "排进复习失败"))
+      setRowError(describe(failure, "排进复习失败"))
     } finally {
       setQueueing("")
+    }
+  }
+
+  /**
+   * Mark one filed mistake as one you have since got right.
+   *
+   * Deliberately not remove(): 取消 is for a row filed by accident, 订正 is for
+   * a mistake you fixed, and the row has to stay -- "I got this wrong once and
+   * put it right" is the sentence the log exists to be able to say.
+   *
+   * Only the mark is merged onto the row we already hold. The server answers
+   * with the whole record, but taking it wholesale would let a rewrite of the
+   * question text land under your cursor as the side effect of a press.
+   */
+  async function correct(item: MistakeRecord) {
+    if (correcting) return
+    setCorrecting(item.id)
+    try {
+      const fixed = await correctMistake(item.id)
+      setRecords((current) =>
+        current.map((entry) =>
+          entry.id === item.id ? { ...entry, corrected: fixed.corrected } : entry,
+        ),
+      )
+      setRowError("")
+    } catch (failure) {
+      setRowError(describe(failure, "订正失败"))
+    } finally {
+      setCorrecting("")
     }
   }
 
@@ -200,6 +238,14 @@ export default function Practice() {
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">复习能解决 {summary.reviewFixable}</Badge>
               <Badge variant="outline">另有原因 {summary.needsOtherFix}</Badge>
+              {/* Counted beside the split, never taken out of it: a bar that
+                  shrank on 订正 would erase the diagnosis as a reward for
+                  acting on it. */}
+              {summary.corrected > 0 ? (
+                <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
+                  已订正 {summary.corrected}
+                </Badge>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -273,6 +319,26 @@ export default function Practice() {
                         排进复习
                       </Button>
                     ) : null}
+                    {/* Offered on every cause: a 手滑 you have learned to catch
+                        is as much a fixed mistake as a word you finally learnt.
+                        Independent of 排进复习 -- having put one instance right
+                        is not a reason to stop being asked. */}
+                    {item.corrected ? (
+                      <span className="shrink-0 text-xs text-emerald-600 dark:text-emerald-400">
+                        已订正
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={correcting === item.id}
+                        onClick={() => void correct(item)}
+                      >
+                        <CheckCheck aria-hidden="true" />
+                        订正
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -286,9 +352,9 @@ export default function Practice() {
               })}
             </ul>
           )}
-          {queueError ? (
+          {rowError ? (
             <p role="alert" className="mt-3 text-sm text-destructive">
-              {queueError}
+              {rowError}
             </p>
           ) : null}
         </CardContent>

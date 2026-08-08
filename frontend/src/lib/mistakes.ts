@@ -14,6 +14,15 @@ export interface MistakeRecord {
    * fields answering "was it filed" and "into what" can disagree.
    */
   knowledgeItemId?: string
+  /**
+   * You have since got this question right, absent until you had.
+   *
+   * The server derives it from the retry attempt itself rather than storing a
+   * flag, so a press and a reload cannot disagree. Absent reads as "not yet",
+   * the permissive answer: against a backend that predates the field the
+   * button stays offered rather than vanishing from every row.
+   */
+  corrected?: boolean
   createdAt: string
 }
 
@@ -44,6 +53,15 @@ export interface MistakeSummary {
   byCause: MistakeCauseCount[]
   reviewFixable: number
   needsOtherFix: number
+  /**
+   * How many of these you have since put right.
+   *
+   * Counted alongside the causes rather than taken out of them: 错在哪一层
+   * answers which layer you fail at, and having fixed one instance does not
+   * change that answer. A bar that shrank on 订正 would erase the diagnosis as
+   * a reward for acting on it.
+   */
+  corrected: number
 }
 
 /**
@@ -173,8 +191,9 @@ export function summarizeMistakes(records: MistakeRecord[]): MistakeSummary {
     (sum, entry) => (entry.spec.reviewFixes ? sum + entry.count : sum),
     0,
   )
+  const corrected = records.reduce((sum, item) => (item.corrected ? sum + 1 : sum), 0)
 
-  return { total, byCause, reviewFixable, needsOtherFix: total - reviewFixable }
+  return { total, byCause, reviewFixable, needsOtherFix: total - reviewFixable, corrected }
 }
 
 export const mistakesStorageKey = "study-os.mistakes"
