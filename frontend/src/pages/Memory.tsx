@@ -6,6 +6,7 @@ import type { DashboardData } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import { ReviewSession } from "@/features/memory/ReviewSession"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -42,6 +43,11 @@ export default function Memory() {
       active = false
     }
   }, [subject, refreshToken])
+
+  // What today asked for: everything already answered plus everything still
+  // waiting. Due alone shrinks as you work and never says how far you have come.
+  const queueTotal = dashboard.reviewed_today + dashboard.due_count
+  const queuePercent = queueTotal > 0 ? Math.round((dashboard.reviewed_today / queueTotal) * 100) : 0
 
   return (
     <section className="grid gap-4">
@@ -80,6 +86,22 @@ export default function Memory() {
           </Card>
         ))}
       </div>
+      {/* Two counts make you hold both numbers and divide to answer "am I
+          nearly done?" -- the question that decides whether you keep going.
+          Hidden when nothing was scheduled: a 0/0 bar sitting at full would
+          read as "done" on a day that never had anything to do. */}
+      {queueTotal > 0 ? (
+        <Card>
+          <CardContent className="py-4">
+            <Progress value={queuePercent} aria-label="今日进度">
+              <span className="text-sm font-medium">今日进度</span>
+              <span className="ml-auto text-sm tabular-nums text-muted-foreground">
+                {dashboard.reviewed_today} / {queueTotal}
+              </span>
+            </Progress>
+          </CardContent>
+        </Card>
+      ) : null}
       <ReviewSession recovery={recovery} onProgress={() => setRefreshToken((value) => value + 1)} />
     </section>
   )
