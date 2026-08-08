@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText, Trash2 } from "lucide-react"
 
 import { dumpThought } from "@/api/chat"
+import { scheduleKnowledge } from "@/api/knowledge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,6 +32,9 @@ export default function Reading() {
   // this the second paste is a deletion.
   const [shelf, setShelf] = useState(readShelf)
   const [keepError, setKeepError] = useState("")
+  // What the last keep achieved. Separate from the error so a scheduling
+  // failure can say the filing worked in the same breath.
+  const [keepNote, setKeepNote] = useState("")
   // The session as it stands right now, for callbacks that resolve after an
   // await. save is the only writer, so this cannot drift from the state.
   const sessionRef = useRef(session)
@@ -107,12 +111,17 @@ export default function Reading() {
   }
 
   /**
-   * Send a section that landed into the knowledge library.
+   * Send a section that landed into the knowledge library, and put it in the
+   * review queue.
    *
    * The one way out of 预习 and into 复习. Everything else the page produces is
    * about this document: how far you got, what is still in the way. This is the
    * only thing that outlives it, which is also why it is deliberately not
    * wired to 读完 -- turning a page is not a decision to remember it.
+   *
+   * Two writes, reported apart. Filing leaves the item with no cards and the
+   * due query joins review_states, so filing alone would never surface it again
+   * -- the page promises 之后会安排复习 and this is what keeps that promise.
    *
    * Recorded only after the write lands, and read back off the session rather
    * than component state, because the item on the other end has no undo: a
@@ -124,16 +133,30 @@ export default function Reading() {
     if (!chunk || keptIds.has(id)) return
 
     setKeepError("")
+    setKeepNote("")
+    let filed: { id: string }
     try {
-      await dumpThought(buildSectionNote(chunk))
-      // Read off the ref rather than closing over `session`, which is the
-      // draft as it stood when the click happened -- a page turn while the
-      // write was in flight would otherwise be rolled back by its own receipt.
-      save({ ...sessionRef.current, keptIds: [...sessionRef.current.keptIds, id] })
+      filed = await dumpThought(buildSectionNote(chunk))
     } catch {
       // Left un-kept on purpose: a control that looks saved when nothing was
       // written is worse than one that failed loudly.
       setKeepError("收进知识库失败，等会儿再试。")
+      return
+    }
+
+    // Marked kept before the second write, and never rolled back by it. The
+    // item is in the library from here on, so re-offering 收进知识库 would file
+    // the same section twice -- and read off the ref rather than closing over
+    // `session`, which is the draft as it stood when the click happened.
+    save({ ...sessionRef.current, keptIds: [...sessionRef.current.keptIds, id] })
+
+    try {
+      const scheduled = await scheduleKnowledge(filed.id)
+      setKeepNote(`已收进知识库 · ${scheduled.prompt_count} 张卡等着复习`)
+    } catch {
+      // Names which half failed. "收进知识库失败" here would send you to file a
+      // section that is already filed.
+      setKeepError("已收进知识库，但安排复习没成功。可以在知识库里再排一次。")
     }
   }
 
@@ -316,6 +339,7 @@ export default function Reading() {
                 {keepError}
               </p>
             ) : null}
+            {keepNote ? <p className="text-sm text-primary">{keepNote}</p> : null}
           </CardContent>
         </Card>
       </div>

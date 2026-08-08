@@ -6,9 +6,10 @@ import { takeAskDraft } from "@/lib/ask-draft"
 import { readReadingSession } from "@/lib/reading-session"
 import Reading from "./Reading"
 
-const mocks = vi.hoisted(() => ({ dumpThought: vi.fn() }))
+const mocks = vi.hoisted(() => ({ dumpThought: vi.fn(), scheduleKnowledge: vi.fn() }))
 
 vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
+vi.mock("@/api/knowledge", () => ({ scheduleKnowledge: mocks.scheduleKnowledge }))
 
 const source = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
 const kinetics = ["# 动能定理", "## 适用条件", "只对合外力做功成立。"].join("\n")
@@ -556,5 +557,74 @@ describe("keeping a section that landed", () => {
     fireEvent.click(screen.getByRole("button", { name: "打开 光合作用" }))
 
     expect(screen.getByRole("button", { name: /已收进/ })).toBeDisabled()
+  })
+})
+
+describe("a kept section reaching the review queue", () => {
+  beforeEach(() => {
+    localStorage.clear()
+    // This file's other suites do not reset the mocks, so a call-count
+    // assertion here would otherwise be reading their clicks as well as its own.
+    vi.clearAllMocks()
+    mocks.dumpThought.mockResolvedValue({ id: "k-kept", term: "光反应" })
+    mocks.scheduleKnowledge.mockResolvedValue({
+      status: "scheduled",
+      knowledge_id: "k-kept",
+      prompt_count: 3,
+    })
+  })
+
+  it("schedules the item it just filed", async () => {
+    // The page says 之后会安排复习. Filing alone leaves the item with no cards,
+    // and the due query joins review_states -- so without this the promise on
+    // the page is one the app never keeps.
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    await waitFor(() => expect(mocks.scheduleKnowledge).toHaveBeenCalledWith("k-kept"))
+  })
+
+  it("says how many cards the section became", async () => {
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    expect(await screen.findByText(/3 张卡/)).toBeInTheDocument()
+  })
+
+  it("still counts the section kept when only the scheduling failed", async () => {
+    // The item is in the library either way. Rolling the mark back would offer
+    // 收进知识库 again and file the same section twice, which has no undo.
+    mocks.scheduleKnowledge.mockRejectedValueOnce(new Error("offline"))
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    expect(await screen.findByRole("button", { name: /已收进/ })).toBeInTheDocument()
+  })
+
+  it("says the scheduling is what failed, not the filing", async () => {
+    mocks.scheduleKnowledge.mockRejectedValueOnce(new Error("offline"))
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/安排复习/)
+  })
+
+  it("does not try to schedule a section that was never filed", async () => {
+    mocks.dumpThought.mockRejectedValueOnce(new Error("offline"))
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    await screen.findByRole("alert")
+    expect(mocks.scheduleKnowledge).not.toHaveBeenCalled()
   })
 })
