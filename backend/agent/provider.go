@@ -523,8 +523,16 @@ type providerOptions struct {
 	httpClient *http.Client
 }
 
+// defaultProviderTimeout bounds a single vendor round trip. http.DefaultClient,
+// the previous default, has no timeout at all: a vendor that accepts the
+// connection and then stalls would hold a review answer open until the learner
+// closed the tab, and the offline grading fallback -- which only runs once
+// Generate returns an error -- never got its turn. Long enough for a reasoning
+// model to finish, short enough that a dead network looks like offline mode.
+var defaultProviderTimeout = 45 * time.Second
+
 // WithHTTPClient injects a custom HTTP client (used by tests and future proxy
-// setups). The default is http.DefaultClient.
+// setups). The default is a client bounded by defaultProviderTimeout.
 func WithHTTPClient(client *http.Client) ProviderOption {
 	return func(options *providerOptions) {
 		if client != nil {
@@ -534,7 +542,7 @@ func WithHTTPClient(client *http.Client) ProviderOption {
 }
 
 func resolveProviderOptions(options ...ProviderOption) providerOptions {
-	resolved := providerOptions{httpClient: http.DefaultClient}
+	resolved := providerOptions{httpClient: &http.Client{Timeout: defaultProviderTimeout}}
 	for _, option := range options {
 		if option != nil {
 			option(&resolved)

@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -220,5 +222,66 @@ func TestNewProviderFactoryDispatchesOnStyle(t *testing.T) {
 	_, err = NewProvider(ProviderConfig{Active: "unknown-vendor"})
 	if err == nil || ErrorClassOf(err) != ErrorConfigMissing {
 		t.Fatalf("unknown style error = %v (class %q)", err, ErrorClassOf(err))
+	}
+}
+
+func TestNetworkProvidersGiveUpOnAStalledVendor(t *testing.T) {
+	// A vendor that accepts the connection and then never answers is
+	// indistinguishable from a healthy one until the client gives up, and
+	// http.DefaultClient never does. Free-text grading is the one place a
+	// learner's answer reaches the vendor synchronously, so an unbounded call
+	// there holds their request open until they close the tab.
+	//
+	// The real budget has to survive a slow reasoning model, which is far too
+	// long to sit in a test, so lower it and assert the behaviour it buys.
+	previous := defaultProviderTimeout
+	defaultProviderTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { defaultProviderTimeout = previous })
+
+	release := make(chan struct{})
+	stalled := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-release
+	}))
+	// httptest's Close waits for handlers to return, so the release has to
+	// happen first. Cleanups run last-registered-first.
+	t.Cleanup(stalled.Close)
+	t.Cleanup(func() { close(release) })
+
+	vendor := VendorConfig{APIKey: "sk-test", BaseURL: stalled.URL, Model: "test-model"}
+	// Both wire protocols share resolveProviderOptions, so cover both rather
+	// than let one drift back to an unbounded client.
+	builds := map[string]func() (Provider, error){
+		"openai":    func() (Provider, error) { return NewOpenAIProvider("deepseek", vendor) },
+		"anthropic": func() (Provider, error) { return NewAnthropicProvider("claude", vendor) },
+	}
+	request := Request{Kind: KindEvaluateFreeText, FreeText: &FreeTextInput{
+		Question: "用 abandon 造句", Answer: "I abandon the old plan.",
+	}}
+
+	for name, build := range builds {
+		t.Run(name, func(t *testing.T) {
+			provider, err := build()
+			if err != nil {
+				t.Fatalf("construct provider: %v", err)
+			}
+			// context.Background() on purpose: the provider has to bound itself
+			// rather than lean on whatever deadline the caller happened to set.
+			done := make(chan error, 1)
+			go func() {
+				_, generateErr := provider.Generate(context.Background(), request)
+				done <- generateErr
+			}()
+			select {
+			case generateErr := <-done:
+				if generateErr == nil {
+					t.Fatal("stalled vendor returned success")
+				}
+				if class := ErrorClassOf(generateErr); class != ErrorTemporary {
+					t.Fatalf("error class = %q, want %q so grading falls back offline", class, ErrorTemporary)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("Generate never returned: the provider has no request timeout")
+			}
+		})
 	}
 }
