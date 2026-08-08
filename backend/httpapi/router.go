@@ -370,7 +370,30 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+	// Which of these are already in the review queue. The list is where you
+	// decide what to press, and without it 排进复习 reads the same on an item
+	// that is queued as on one that is not -- on a queue that has no undo.
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	scheduled, err := application.Store.ScheduledKnowledgeIDs(request.Context(), ids)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	// Built from the rows in hand rather than from the map, so the order is the
+	// list's own and an empty library answers with [] instead of null: a caller
+	// reading null as "unknown" would grey out every button on the page.
+	scheduledIDs := make([]string, 0, len(scheduled))
+	for _, item := range items {
+		if scheduled[item.ID] {
+			scheduledIDs = append(scheduledIDs, item.ID)
+		}
+	}
+	writeJSON(response, http.StatusOK, map[string]any{
+		"items": items, "count": len(items), "scheduled_ids": scheduledIDs,
+	})
 }
 
 func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, application *app.App) {

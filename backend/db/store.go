@@ -287,6 +287,45 @@ func (s *Store) DuePrompts(ctx context.Context, before time.Time, limit int) ([]
 	return s.DuePromptsWithOptions(ctx, before, DuePromptOptions{Limit: limit})
 }
 
+// ScheduledKnowledgeIDs picks out which of these items already carry cards.
+//
+// Answered for a whole page at once rather than per item: the library lists a
+// hundred rows, and a caller asking one question per row would spend a hundred
+// round-trips to draw one screen.
+//
+// Carrying prompts is the same thing as being in the queue -- the two are
+// written in one transaction -- so this needs no flag column that could drift
+// from the rows it describes.
+func (s *Store) ScheduledKnowledgeIDs(ctx context.Context, ids []string) (map[string]bool, error) {
+	scheduled := make(map[string]bool, len(ids))
+	if len(ids) == 0 {
+		return scheduled, nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	arguments := make([]any, 0, len(ids))
+	for _, id := range ids {
+		arguments = append(arguments, id)
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT knowledge_item_id FROM prompts WHERE knowledge_item_id IN (`+placeholders+`)`,
+		arguments...)
+	if err != nil {
+		return nil, fmt.Errorf("list scheduled knowledge ids: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan scheduled knowledge id: %w", err)
+		}
+		scheduled[id] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate scheduled knowledge ids: %w", err)
+	}
+	return scheduled, nil
+}
+
 type DuePromptOptions struct {
 	Limit   int
 	Subject string
