@@ -45,3 +45,20 @@ export function getKnowledge(id: string): Promise<KnowledgeItem> {
 export function listGroups(): Promise<KnowledgeGroupListResponse> {
   return apiRequest<KnowledgeGroupListResponse>("/groups")
 }
+
+export interface ScheduleKnowledgeResponse {
+  /**
+   * "scheduled" when cards were just created, "already_scheduled" when the
+   * item was in the queue before this request. The server answers both with
+   * success, so the status is the only way to tell what actually happened.
+   */
+  status: "scheduled" | "already_scheduled"
+  knowledge_id: string
+  prompt_count: number
+}
+
+export function scheduleKnowledge(id: string): Promise<ScheduleKnowledgeResponse> {
+  return apiRequest<ScheduleKnowledgeResponse>(`/knowledge/${encodeURIComponent(id)}/schedule`, {
+    method: "POST",
+  })
+}

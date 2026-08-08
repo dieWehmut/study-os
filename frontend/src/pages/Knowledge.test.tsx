@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getKnowledge: vi.fn(),
   listKnowledge: vi.fn(),
   listGroups: vi.fn(),
+  scheduleKnowledge: vi.fn(),
   compareKnowledge: vi.fn(),
 }))
 
@@ -51,6 +52,11 @@ describe("Knowledge page", () => {
       diff_points: ["速度描述快慢", "加速度描述变化快慢"],
       confusion_point: "方向",
       memory_tip: "抓差异",
+    })
+    mocks.scheduleKnowledge.mockResolvedValue({
+      status: "scheduled",
+      knowledge_id: "k1",
+      prompt_count: 3,
     })
   })
 
@@ -224,5 +230,100 @@ describe("Knowledge page", () => {
 
     expect(await screen.findByText("速度与加速度的对比")).toBeInTheDocument()
     expect(mocks.compareKnowledge).toHaveBeenCalled()
+  })
+})
+
+describe("sending a knowledge point into the review queue", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useSubjectStore.setState({ subject: "all" })
+    mocks.listGroups.mockResolvedValue({ count: 0, items: [] })
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+    })
+    mocks.getKnowledge.mockResolvedValue({
+      id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。",
+    })
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k1", prompt_count: 3 })
+  })
+
+  it("offers a way from the library into the review queue", async () => {
+    // Everything 阅读 files and everything the 暂存 box saves lands here with
+    // no prompts, which the due query cannot see. Without this control the
+    // library is where knowledge goes to be counted and never asked about.
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /排进复习/ }))
+
+    await waitFor(() => expect(mocks.scheduleKnowledge).toHaveBeenCalledWith("k1"))
+  })
+
+  it("says how many cards it made, so the click has a visible result", async () => {
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /排进复习/ }))
+
+    expect(await screen.findByText(/3 张卡/)).toBeInTheDocument()
+  })
+
+  it("does not send the same item twice", async () => {
+    // The queue has no undo, so a second press must not be possible from a
+    // control that already reported success.
+    render(<Knowledge />)
+
+    const button = await screen.findByRole("button", { name: /排进复习/ })
+    fireEvent.click(button)
+    await screen.findByText(/3 张卡/)
+    fireEvent.click(button)
+
+    expect(mocks.scheduleKnowledge).toHaveBeenCalledTimes(1)
+  })
+
+  it("says an item was already queued rather than claiming it just made cards", async () => {
+    // The backend answers idempotently, and reporting that as a fresh success
+    // would tell you cards were created when none were.
+    mocks.scheduleKnowledge.mockResolvedValueOnce({
+      status: "already_scheduled",
+      knowledge_id: "k1",
+      prompt_count: 3,
+    })
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /排进复习/ }))
+
+    expect(await screen.findByText(/已经在复习计划里/)).toBeInTheDocument()
+  })
+
+  it("stays pressable when the schedule fails", async () => {
+    // A control that looks done when nothing was written is worse than one
+    // that failed loudly.
+    mocks.scheduleKnowledge.mockRejectedValueOnce(new Error("offline"))
+    render(<Knowledge />)
+
+    const button = await screen.findByRole("button", { name: /排进复习/ })
+    fireEvent.click(button)
+
+    expect(await screen.findByText(/排进复习失败/)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /排进复习/ })).toBeEnabled()
+  })
+
+  it("does not carry one item's result onto the next", async () => {
+    // The panel is remounted per item; a receipt that outlived its subject
+    // would tell you the item you just opened is queued when it is not.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 2,
+      items: [
+        { id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" },
+        { id: "k2", item_type: "brain_dump", term: "光合作用", concise_definition: "分为光反应和暗反应。" },
+      ],
+    })
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /排进复习/ }))
+    await screen.findByText(/3 张卡/)
+    fireEvent.click(screen.getByRole("button", { name: /光合作用/ }))
+
+    expect(screen.queryByText(/3 张卡/)).not.toBeInTheDocument()
   })
 })

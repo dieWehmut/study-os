@@ -2,9 +2,10 @@ import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import { useState } from "react"
-import { BookOpenText, ChevronLeft, ChevronRight } from "lucide-react"
+import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { updateKnowledgeTag } from "@/api/chat"
+import { scheduleKnowledge } from "@/api/knowledge"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,17 @@ interface WikiPanelProps {
 
 const attributeTags = ["二级结论", "解题策略", "易错信号"]
 
+// What the last 排进复习 press actually did. "known" is not a failure: the
+// backend answers idempotently, and reporting that as a fresh success would
+// claim cards were created when none were.
+type ScheduleNote = { tone: "ok" | "known" | "error"; text: string }
+
+const scheduleNoteClass: Record<ScheduleNote["tone"], string> = {
+  ok: "text-primary",
+  known: "text-muted-foreground",
+  error: "text-destructive",
+}
+
 function chunkMarkdown(markdown: string): string[] {
   const chunks = markdown.split(/(?=^#{1,6} )/m).map((chunk) => chunk.trim()).filter(Boolean)
   return chunks.length > 0 ? chunks : [markdown]
@@ -29,7 +41,13 @@ export function WikiPanel({ item, onUpdated }: WikiPanelProps) {
   const [tagOverride, setTagOverride] = useState<string[] | null>(null)
   const [chunkIndex, setChunkIndex] = useState(0)
   const [tagPending, setTagPending] = useState("")
+  const [schedulePending, setSchedulePending] = useState(false)
+  const [scheduleNote, setScheduleNote] = useState<ScheduleNote | null>(null)
   const current: KnowledgeItem | null = item ? { ...item, tags: tagOverride ?? item.tags } : null
+  // Only a confirmed write closes the control. A failed press leaves it open,
+  // because a button that looks done when nothing was written is worse than
+  // one that failed loudly.
+  const inQueue = scheduleNote?.tone === "ok" || scheduleNote?.tone === "known"
 
   const chunks = current?.detailed_markdown ? chunkMarkdown(current.detailed_markdown) : []
 
@@ -43,6 +61,28 @@ export function WikiPanel({ item, onUpdated }: WikiPanelProps) {
       onUpdated?.(updated)
     } finally {
       setTagPending("")
+    }
+  }
+
+  // 收进知识库 and the home page's 暂存 box both file an item and stop there.
+  // The due query joins review_states, so an item carrying no cards can never
+  // surface in 复习 -- this is the one control that turns a filed point into
+  // something the schedule will ever ask you about again.
+  async function sendToReview() {
+    if (!current || schedulePending || inQueue) return
+    setSchedulePending(true)
+    setScheduleNote(null)
+    try {
+      const result = await scheduleKnowledge(current.id)
+      setScheduleNote(
+        result.status === "already_scheduled"
+          ? { tone: "known", text: "已经在复习计划里" }
+          : { tone: "ok", text: `已排进复习 · ${result.prompt_count} 张卡` },
+      )
+    } catch {
+      setScheduleNote({ tone: "error", text: "排进复习失败，请重试" })
+    } finally {
+      setSchedulePending(false)
     }
   }
 
@@ -81,7 +121,21 @@ export function WikiPanel({ item, onUpdated }: WikiPanelProps) {
               </Button>
             )
           })}
+          <Button
+            type="button"
+            size="xs"
+            variant={inQueue ? "secondary" : "default"}
+            className="ml-auto"
+            disabled={schedulePending || inQueue}
+            onClick={() => void sendToReview()}
+          >
+            <CalendarPlus data-icon="inline-start" />
+            {inQueue ? "已排进复习" : "排进复习"}
+          </Button>
         </div>
+        {scheduleNote ? (
+          <p className={`text-xs ${scheduleNoteClass[scheduleNote.tone]}`}>{scheduleNote.text}</p>
+        ) : null}
         <h2 className="font-heading text-3xl font-semibold tracking-tight">{item.term}</h2>
         {item.part_of_speech || item.pronunciation ? (
           <CardDescription>{[item.part_of_speech, item.pronunciation].filter(Boolean).join(" · ")}</CardDescription>
