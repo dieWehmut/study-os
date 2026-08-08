@@ -115,7 +115,13 @@ wails build -clean
 powershell -ExecutionPolicy Bypass -File install.ps1
 Invoke-Pester -Script scripts\tests\install.Tests.ps1        # 桌面版安装器
 Invoke-Pester -Script scripts\tests\install-pwa.Tests.ps1    # 一键 PWA 安装器
+Invoke-Pester -Script scripts\tests\encoding.Tests.ps1       # 脚本编码约定（BOM）
 ```
+
+脚本的编码是有讲究的，改动前先看 `scripts\tests\encoding.Tests.ps1` 里的说明：
+`install-pwa.ps1` 必须**不带** BOM（否则 `irm | iex` 会把 U+FEFF 粘到第一条命令上），
+而带中文的 `package-pwa-release.ps1` 必须**带** BOM（否则 PowerShell 5.1 按 GBK 解码，
+中文在写进 start.vbs 之前就已经乱码）。这两条都不会在 diff 里显示出来。
 
 ## PWA 启动器（一键安装 + 自动更新）
 
