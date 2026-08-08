@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText } from "lucide-react"
+import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText, Trash2 } from "lucide-react"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +11,7 @@ import { StructurePreview } from "@/features/reading/StructurePreview"
 import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
 import { chunkMarkdown } from "@/lib/chunk"
 import { markdownToMindMap } from "@/lib/mindmap"
-import { readShelf, restoreDocument, shelveDocument } from "@/lib/reading-library"
+import { forgetDocument, readShelf, restoreDocument, shelveDocument } from "@/lib/reading-library"
 import {
   emptyReadingSession,
   readReadingSession,
@@ -172,26 +172,43 @@ export default function Reading() {
             </p>
           </CardHeader>
           <CardContent className="grid gap-2">
+            {/* Two actions, so two sibling buttons rather than one nested in
+                the other -- the border and the hover move up to the row. Both
+                are labelled with the title, because "打开" and "扔掉" alone are
+                indistinguishable once there is more than one row. */}
             {shelfRows.map(({ id, summary }) => (
-              <button
+              <div
                 key={id}
-                type="button"
-                onClick={() => openShelved(id)}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/50"
+                className="flex items-center gap-1 rounded-lg border border-border bg-muted/25 pr-1.5 transition-colors hover:bg-muted/50"
               >
-                <span className="truncate text-sm font-medium">{summary.title}</span>
-                <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                  {/* What is in the way is the reason to come back, so it goes
-                      first and keeps its colour -- 已读 3 / 8 only says how far
-                      you got. Both silent at zero. */}
-                  {summary.stuck > 0 ? (
-                    <span className="font-medium text-amber-600 dark:text-amber-400">
-                      {summary.stuck} 节没看懂
-                    </span>
-                  ) : null}
-                  <span>已读 {summary.read} / {summary.total}</span>
-                </span>
-              </button>
+                <button
+                  type="button"
+                  aria-label={`打开 ${summary.title}`}
+                  onClick={() => openShelved(id)}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="truncate text-sm font-medium">{summary.title}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                    {/* What is in the way is the reason to come back, so it goes
+                        first and keeps its colour -- 已读 3 / 8 only says how far
+                        you got. Silent at zero. */}
+                    {summary.stuck > 0 ? (
+                      <span className="font-medium text-amber-600 dark:text-amber-400">
+                        {summary.stuck} 节没看懂
+                      </span>
+                    ) : null}
+                    <span>已读 {summary.read} / {summary.total}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`扔掉 ${summary.title}`}
+                  onClick={() => setShelf(forgetDocument(id))}
+                  className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Trash2 aria-hidden="true" className="size-3.5" />
+                </button>
+              </div>
             ))}
           </CardContent>
         </Card>

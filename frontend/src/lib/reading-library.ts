@@ -111,6 +111,20 @@ export function shelveDocument(session: ReadingSession): ShelvedDocument[] {
  * never both, which is what keeps the shelf from showing you a stale copy of
  * the thing you are reading.
  */
+/**
+ * Throw a document away for good.
+ *
+ * The shelf is a list you scan to choose from, so one you will not read again
+ * costs you every time you look at it. There is no undo, which is why the cap
+ * evicts silently but this does not: dropping the oldest of thirteen is
+ * housekeeping, and this is a decision.
+ */
+export function forgetDocument(id: string): ShelvedDocument[] {
+  const shelf = readShelf().filter((entry) => entry.id !== id)
+  writeShelf(shelf)
+  return shelf
+}
+
 export function restoreDocument(id: string): ReadingSession | null {
   const shelf = readShelf()
   const wanted = shelf.find((entry) => entry.id === id)

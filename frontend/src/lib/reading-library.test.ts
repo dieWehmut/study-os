@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest"
 
 import {
+  forgetDocument,
   readShelf,
   readingLibraryStorageKey,
   restoreDocument,
@@ -89,6 +90,33 @@ describe("the reading shelf", () => {
     shelveDocument(session(photosynthesis))
 
     expect(restoreDocument("never-shelved")).toBeNull()
+    expect(readShelf()).toHaveLength(1)
+  })
+
+  it("throws a document away for good, since a full shelf is unreadable", () => {
+    shelveDocument(session(photosynthesis))
+    const [shelved] = readShelf()
+
+    expect(forgetDocument(shelved.id)).toEqual([])
+    expect(readShelf()).toEqual([])
+  })
+
+  it("takes only the one you named, in a shelf that keeps its order", () => {
+    // Getting this wrong loses a document nobody asked to delete, and there is
+    // nowhere to get it back from.
+    shelveDocument(session(photosynthesis))
+    shelveDocument(session(kinetics))
+    const [newest] = readShelf()
+
+    forgetDocument(newest.id)
+
+    expect(readShelf().map((entry) => entry.markdown)).toEqual([photosynthesis])
+  })
+
+  it("leaves the shelf alone when told to forget something not on it", () => {
+    shelveDocument(session(photosynthesis))
+
+    expect(forgetDocument("never-shelved")).toHaveLength(1)
     expect(readShelf()).toHaveLength(1)
   })
 

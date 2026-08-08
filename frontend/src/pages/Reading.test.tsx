@@ -366,7 +366,7 @@ describe("keeping the documents you close", () => {
     fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
 
     expect(screen.getByLabelText("原文")).toHaveValue("")
-    expect(screen.getByRole("button", { name: /光合作用/ })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "打开 光合作用" })).toBeInTheDocument()
   })
 
   it("says how far you got on each one you closed, which is what picks the next", () => {
@@ -388,7 +388,7 @@ describe("keeping the documents you close", () => {
     fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
     paste(kinetics)
 
-    fireEvent.click(screen.getByRole("button", { name: /光合作用/ }))
+    fireEvent.click(screen.getByRole("button", { name: "打开 光合作用" }))
 
     expect(screen.getByLabelText("原文")).toHaveValue(source)
     expect(readReadingSession().stuckIds).toEqual(["n0-0-p0"])
@@ -400,8 +400,31 @@ describe("keeping the documents you close", () => {
     fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
     paste(kinetics)
 
-    fireEvent.click(screen.getByRole("button", { name: /光合作用/ }))
+    fireEvent.click(screen.getByRole("button", { name: "打开 光合作用" }))
 
-    expect(screen.getByRole("button", { name: /动能定理/ })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "打开 动能定理" })).toBeInTheDocument()
+  })
+
+  it("throws one away without opening it, since a shelf you only add to is unreadable", () => {
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
+
+    fireEvent.click(screen.getByRole("button", { name: "扔掉 光合作用" }))
+
+    expect(screen.queryByRole("button", { name: /光合作用/ })).not.toBeInTheDocument()
+  })
+
+  it("does not open the document on its way to the bin", () => {
+    // The row and its 扔掉 sit on top of each other; a click that both deletes
+    // and loads would replace what you are reading with what you discarded.
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /收起这篇/ }))
+    paste(kinetics)
+
+    fireEvent.click(screen.getByRole("button", { name: "扔掉 光合作用" }))
+
+    expect(screen.getByLabelText("原文")).toHaveValue(kinetics)
   })
 })
