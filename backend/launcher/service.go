@@ -35,6 +35,10 @@ type Service struct {
 // defaultUpdateTimeout bounds a single call to the GitHub releases API.
 var defaultUpdateTimeout = 20 * time.Second
 
+// watchdogInterval is how often the idle check runs. A var so tests do not have
+// to wait a real minute for the first tick.
+var watchdogInterval = time.Minute
+
 type Options struct {
 	StaticDir string
 	Repo      string
@@ -53,7 +57,7 @@ func NewService(options Options) *Service {
 	if repo == "" {
 		repo = "dieWehmut/study-os"
 	}
-	return &Service{
+	service := &Service{
 		StaticDir:  options.StaticDir,
 		Repo:       repo,
 		AssetArch:  arch,
@@ -62,6 +66,11 @@ func NewService(options Options) *Service {
 		HTTPClient: http.DefaultClient,
 		APIBase:    "https://api.github.com",
 	}
+	// Start the idle clock at boot. The zero value reads back as 1970, which
+	// time.Since reports as decades of idleness, so the watchdog's first tick
+	// would kill the server before the browser ever sent a request.
+	service.Touch()
+	return service
 }
 
 func (s *Service) Touch() {
@@ -97,7 +106,7 @@ func (s *Service) RunWatchdog(ctx context.Context, idle time.Duration) {
 	if idle <= 0 {
 		return
 	}
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(watchdogInterval)
 	defer ticker.Stop()
 	for {
 		select {
