@@ -3,6 +3,13 @@ import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Home from "./Home"
+import { readingStorageKey } from "@/lib/reading-session"
+
+const halfRead = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
+
+function leaveOpen(markdown: string, readIds: string[] = []) {
+  localStorage.setItem(readingStorageKey, JSON.stringify({ markdown, index: 0, readIds }))
+}
 
 const mocks = vi.hoisted(() => ({
   getDashboard: vi.fn(),
@@ -16,6 +23,7 @@ vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
 describe("Today page", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     mocks.getDashboard.mockResolvedValue({
       knowledge_count: 1,
       prompt_count: 3,
@@ -158,5 +166,68 @@ describe("Today page", () => {
     expect(await screen.findByText("2 待复习")).toBeInTheDocument()
     expect(screen.getByText("abandon")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /答疑/ })).toBeInTheDocument()
+  })
+})
+
+describe("picking up a document again", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    mocks.getDashboard.mockResolvedValue({
+      knowledge_count: 1,
+      prompt_count: 0,
+      due_count: 0,
+      attempt_count: 0,
+      reviewed_today: 0,
+      current_streak: 0,
+      provider: "mock",
+      offline: true,
+    })
+  })
+
+  function open() {
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+  }
+
+  it("says nothing about reading when no document was left open", () => {
+    // An empty card offering to resume nothing is a worse dashboard than no
+    // card at all.
+    open()
+
+    expect(screen.queryByText("接着读")).not.toBeInTheDocument()
+  })
+
+  it("names the document you walked away from", () => {
+    // The reason to come back is that a specific thing is unfinished. A
+    // generic 阅读 link cannot say that.
+    leaveOpen(halfRead)
+    open()
+
+    expect(screen.getByText("光合作用")).toBeInTheDocument()
+  })
+
+  it("says how much is left, which is what decides whether there is time", () => {
+    leaveOpen(halfRead, ["n0-0-p0"])
+    open()
+
+    expect(screen.getByText("已读 1 / 2 · 还剩 1 节")).toBeInTheDocument()
+  })
+
+  it("leads back into the reader, not just to the reading page in general", () => {
+    leaveOpen(halfRead)
+    open()
+
+    expect(screen.getByRole("link", { name: /继续读/ })).toHaveAttribute("href", "/reading")
+  })
+
+  it("offers nothing when the document left open produced no stops", () => {
+    leaveOpen("   ")
+    open()
+
+    expect(screen.queryByText("接着读")).not.toBeInTheDocument()
   })
 })

@@ -8,6 +8,7 @@ import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { itemTypeLabel, providerLabel } from "@/lib/labels"
+import { readReadingSession, summarizeReadingSession } from "@/lib/reading-session"
 import { cn } from "@/lib/utils"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { SubjectPicker } from "@/features/subjects/SubjectPicker"
@@ -36,6 +37,10 @@ export default function Home() {
   const [dumpText, setDumpText] = useState("")
   const [dumping, setDumping] = useState(false)
   const [dumpNotice, setDumpNotice] = useState("")
+  // Read and summarized once, on the way in. Nothing on this page edits the
+  // reading session, so recomputing it per render would only re-chunk the same
+  // document to reach the same answer.
+  const [resume] = useState(() => summarizeReadingSession(readReadingSession()))
 
   const subjectFilter = subject === "all" ? undefined : subject
 
@@ -155,6 +160,40 @@ export default function Home() {
           <span>{error}</span>
           <Button variant="outline" size="sm" disabled={loading} onClick={() => void refreshDashboard()}>重试</Button>
         </div>
+      ) : null}
+
+      {/* Ahead of 今天要巩固 for the same reason 阅读 sits above 记忆 in the
+          sidebar: this is where you meet material you do not have yet, and an
+          unfinished document is a sharper claim on the next ten minutes than a
+          queue that will still be there tomorrow. Absent entirely when there is
+          nothing to go back to -- a card offering to resume nothing is worse
+          than no card. */}
+      {resume ? (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="gap-1.5">
+            <CardTitle className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+              <ScanText aria-hidden="true" className="size-4 text-primary" />
+              接着读
+            </CardTitle>
+            <p className="font-heading text-xl font-semibold tracking-tight">{resume.title}</p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-primary transition-[width]"
+                style={{ width: `${Math.round((resume.read / resume.total) * 100)}%` }}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link className={buttonVariants({ size: "sm" })} to="/reading">
+                继续读<ArrowRight data-icon="inline-end" />
+              </Link>
+              <span className="text-sm text-muted-foreground">
+                已读 {resume.read} / {resume.total} · 还剩 {resume.remaining} 节
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
