@@ -29,6 +29,9 @@ export default function Knowledge() {
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
   const [tag, setTag] = useState("")
+  // "" means either. scheduled_ids only describes the page in hand, so the
+  // question "what still needs scheduling?" has to be asked of the server.
+  const [scheduled, setScheduled] = useState<"" | "yes" | "no">("")
   const [compareA, setCompareA] = useState("")
   const [compareB, setCompareB] = useState("")
   const [compareResult, setCompareResult] = useState<CompareOutput | null>(null)
@@ -46,6 +49,7 @@ export default function Knowledge() {
     }
     if (subject !== "all") options.subject = subject
     if (tag) options.tag = tag
+    if (scheduled) options.scheduled = scheduled
     void listKnowledge(options)
       .then((result) => {
         if (controller.signal.aborted) return
@@ -64,7 +68,7 @@ export default function Knowledge() {
         if (!controller.signal.aborted) setLoading(false)
     })
     return () => controller.abort()
-  }, [query, group, subject, tag, requestVersion])
+  }, [query, group, subject, tag, scheduled, requestVersion])
 
   useEffect(() => {
     let active = true
@@ -177,6 +181,26 @@ export default function Knowledge() {
                     { value: "二级结论", label: "二级结论" },
                     { value: "解题策略", label: "解题策略" },
                     { value: "易错信号", label: "易错信号" },
+                  ]}
+                  className="min-w-32"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-scheduled">
+                复习状态
+                <Select
+                  id="knowledge-scheduled"
+                  ariaLabel="复习状态"
+                  value={scheduled}
+                  onValueChange={(value) => {
+                    setScheduled(value as "" | "yes" | "no")
+                    setLoading(true)
+                    setError("")
+                  }}
+                  placeholder="全部"
+                  options={[
+                    { value: "", label: "全部" },
+                    { value: "no", label: "还没排复习" },
+                    { value: "yes", label: "已排进复习" },
                   ]}
                   className="min-w-32"
                 />

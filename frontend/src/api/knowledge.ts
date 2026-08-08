@@ -6,6 +6,12 @@ export interface ListKnowledgeOptions {
   group?: string
   subject?: string
   tag?: string
+  /**
+   * Narrow to items that do ("yes") or do not ("no") already carry review
+   * cards. Omitted means either -- the server rejects anything else, so the
+   * union is deliberately not `string`.
+   */
+  scheduled?: "yes" | "no"
   limit?: number
   offset?: number
 }
@@ -38,6 +44,7 @@ export function listKnowledge(options: ListKnowledgeOptions = {}): Promise<Knowl
   if (options.group !== undefined) params.set("group", options.group)
   if (options.subject !== undefined) params.set("subject", options.subject)
   if (options.tag !== undefined) params.set("tag", options.tag)
+  if (options.scheduled !== undefined) params.set("scheduled", options.scheduled)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   if (options.offset !== undefined) params.set("offset", String(options.offset))
   const suffix = params.toString()

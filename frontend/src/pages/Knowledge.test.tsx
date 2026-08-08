@@ -393,4 +393,53 @@ describe("showing what is already in the review queue", () => {
 
     expect(await screen.findByRole("button", { name: /^排进复习/ })).toBeEnabled()
   })
+
+  it("can narrow the library to the items that carry no review cards", async () => {
+    // scheduled_ids only covers the page in hand. With 500 items behind a
+    // limit of 100, filtering in the browser would answer "3 need scheduling"
+    // when 200 do -- so the filter has to reach the server.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+    })
+    render(<Knowledge />)
+    await screen.findByRole("heading", { name: "动能定理" })
+
+    fireEvent.click(screen.getByRole("combobox", { name: "复习状态" }))
+    const option = await screen.findByRole("option", { name: "还没排复习" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+
+    await waitFor(() => {
+      expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ scheduled: "no" }))
+    })
+  })
+
+  it("asks for the whole library again when the review filter is cleared", async () => {
+    // A filter that cannot be undone is a trap: the page would keep hiding
+    // rows after the learner stopped asking it to.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+    })
+    render(<Knowledge />)
+    await screen.findByRole("heading", { name: "动能定理" })
+    fireEvent.click(screen.getByRole("combobox", { name: "复习状态" }))
+    const queued = await screen.findByRole("option", { name: "已排进复习" })
+    fireEvent.pointerDown(queued)
+    fireEvent.click(queued)
+    await waitFor(() => {
+      expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ scheduled: "yes" }))
+    })
+
+    fireEvent.click(screen.getByRole("combobox", { name: "复习状态" }))
+    const all = await screen.findByRole("option", { name: "全部" })
+    fireEvent.pointerDown(all)
+    fireEvent.click(all)
+
+    await waitFor(() => {
+      const last = mocks.listKnowledge.mock.calls.at(-1)?.[0] as Record<string, unknown>
+      expect(last.scheduled).toBeUndefined()
+    })
+  })
 })
