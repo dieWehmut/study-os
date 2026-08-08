@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 
-import { MISTAKE_CAUSES, summarizeMistakes, type MistakeCause, type MistakeRecord } from "./mistakes"
+import {
+  MISTAKE_CAUSES,
+  mistakesStorageKey,
+  readMistakes,
+  summarizeMistakes,
+  writeMistakes,
+  type MistakeCause,
+  type MistakeRecord,
+} from "./mistakes"
 
 function record(cause: MistakeCause, id: string = cause): MistakeRecord {
   return { id, subject: "biology", question: "题", cause, createdAt: "2026-08-08T00:00:00Z" }
@@ -81,5 +89,57 @@ describe("summarizing mistakes", () => {
     const summary = summarizeMistakes([record("recall", "a"), record("careless", "b")])
 
     expect(summary.byCause[0].percent).toBe(50)
+  })
+})
+
+describe("keeping the log", () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it("starts empty rather than guessing, when nothing was ever saved", () => {
+    expect(readMistakes()).toEqual([])
+  })
+
+  it("hands back the same log it was given", () => {
+    // The whole point of asking someone to file a mistake is that the answer
+    // outlives the tab it was typed in.
+    const log = [record("recall", "a"), record("misread", "b")]
+    writeMistakes(log)
+
+    expect(readMistakes()).toEqual(log)
+  })
+
+  it("shrugs off a blob that is not a log at all", () => {
+    localStorage.setItem(mistakesStorageKey, "{ not json")
+
+    expect(readMistakes()).toEqual([])
+  })
+
+  it("does not take an object where a list belongs", () => {
+    localStorage.setItem(mistakesStorageKey, JSON.stringify({ recall: 3 }))
+
+    expect(readMistakes()).toEqual([])
+  })
+
+  it("drops a row that is missing the parts that make it a record", () => {
+    localStorage.setItem(
+      mistakesStorageKey,
+      JSON.stringify([{ id: "a", cause: "recall" }, record("misread", "b")]),
+    )
+
+    expect(readMistakes()).toEqual([record("misread", "b")])
+  })
+
+  it("drops a cause it no longer recognizes", () => {
+    // The page looks each cause up in the taxonomy to draw its label. A row
+    // naming a cause that has since been renamed would render a blank badge
+    // and count toward a total it belongs to nowhere in.
+    localStorage.setItem(
+      mistakesStorageKey,
+      JSON.stringify([{ ...record("recall", "a"), cause: "vibes" }, record("recall", "b")]),
+    )
+
+    expect(readMistakes()).toEqual([record("recall", "b")])
   })
 })

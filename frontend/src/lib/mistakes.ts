@@ -111,3 +111,60 @@ export function summarizeMistakes(records: MistakeRecord[]): MistakeSummary {
 
   return { total, byCause, reviewFixable, needsOtherFix: total - reviewFixable }
 }
+
+export const mistakesStorageKey = "study-os.mistakes"
+
+function isFilled(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+/**
+ * Take a stored row only if it is a whole record.
+ *
+ * Everything downstream looks a row's cause up in the taxonomy to draw its
+ * label, so a row naming a cause we have since renamed would render a blank
+ * badge and count toward a total it belongs to nowhere in. Better to lose the
+ * row than to show a mistake the page cannot describe.
+ */
+function toRecord(value: unknown): MistakeRecord | null {
+  if (typeof value !== "object" || value === null) return null
+  const row = value as Record<string, unknown>
+  if (!isFilled(row.id) || !isFilled(row.question) || !isFilled(row.createdAt)) return null
+  if (!MISTAKE_CAUSES.some((spec) => spec.cause === row.cause)) return null
+
+  const record: MistakeRecord = {
+    id: row.id,
+    subject: isFilled(row.subject) ? row.subject : "all",
+    question: row.question,
+    cause: row.cause as MistakeCause,
+    createdAt: row.createdAt,
+  }
+  return isFilled(row.note) ? { ...record, note: row.note } : record
+}
+
+export function readMistakes(): MistakeRecord[] {
+  if (typeof localStorage === "undefined") return []
+
+  try {
+    const raw = localStorage.getItem(mistakesStorageKey)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.flatMap((entry) => {
+      const record = toRecord(entry)
+      return record ? [record] : []
+    })
+  } catch {
+    return []
+  }
+}
+
+export function writeMistakes(records: MistakeRecord[]): void {
+  if (typeof localStorage === "undefined") return
+  try {
+    localStorage.setItem(mistakesStorageKey, JSON.stringify(records))
+  } catch {
+    // Best-effort: a full or blocked store must not cost you the row you just
+    // filed, which is still in memory and on screen.
+  }
+}
