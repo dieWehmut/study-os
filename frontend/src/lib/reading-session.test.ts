@@ -4,6 +4,7 @@ import {
   emptyReadingSession,
   readReadingSession,
   readingStorageKey,
+  stuckSections,
   summarizeReadingSession,
   writeReadingSession,
 } from "./reading-session"
@@ -203,5 +204,40 @@ describe("summarizing what is left to read", () => {
     const summary = summarizeReadingSession({ markdown: source, index: 0, readIds: [], stuckIds: [] })
 
     expect(summary?.stuck).toBe(0)
+  })
+})
+
+describe("collecting the sections that did not land", () => {
+  const source = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
+
+  it("has nothing to collect before anything is flagged", () => {
+    expect(stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: [] })).toEqual([])
+  })
+
+  it("hands back the flagged sections with their words, not just their ids", () => {
+    // Whoever these get carried to never saw the document, so an id is not
+    // enough -- the section has to arrive with the text under it.
+    const sections = stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: ["n0-0-p0"] })
+
+    expect(sections).toHaveLength(1)
+    expect(sections[0].title).toBe("光反应")
+    expect(sections[0].lines).toContain("在类囊体薄膜上进行。")
+  })
+
+  it("drops a flag naming a stop this draft no longer has", () => {
+    expect(stuckSections({ markdown: source, index: 0, readIds: [], stuckIds: ["gone"] })).toEqual([])
+  })
+
+  it("keeps the document's own order, not the order you flagged them in", () => {
+    // The list is read as a table of contents of what is in the way; shuffled
+    // into click order it stops lining up with the document.
+    const sections = stuckSections({
+      markdown: source,
+      index: 0,
+      readIds: [],
+      stuckIds: ["n0-1-p0", "n0-0-p0"],
+    })
+
+    expect(sections.map((chunk) => chunk.title)).toEqual(["光反应", "暗反应"])
   })
 })

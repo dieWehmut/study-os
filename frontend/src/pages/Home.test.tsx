@@ -7,8 +7,8 @@ import { readingStorageKey } from "@/lib/reading-session"
 
 const halfRead = ["# 光合作用", "## 光反应", "在类囊体薄膜上进行。", "## 暗反应", "在叶绿体基质中进行。"].join("\n")
 
-function leaveOpen(markdown: string, readIds: string[] = []) {
-  localStorage.setItem(readingStorageKey, JSON.stringify({ markdown, index: 0, readIds }))
+function leaveOpen(markdown: string, readIds: string[] = [], stuckIds: string[] = []) {
+  localStorage.setItem(readingStorageKey, JSON.stringify({ markdown, index: 0, readIds, stuckIds }))
 }
 
 const mocks = vi.hoisted(() => ({
@@ -229,5 +229,30 @@ describe("picking up a document again", () => {
     open()
 
     expect(screen.queryByText("接着读")).not.toBeInTheDocument()
+  })
+
+  it("says what is still in the way, which is the reason to go back at all", () => {
+    // "还剩 1 节" is a chore. "1 节没看懂" is the thing you actually came back
+    // for -- and it is the only output a preview pass leaves behind.
+    leaveOpen(halfRead, ["n0-0-p0"], ["n0-0-p0"])
+    open()
+
+    expect(screen.getByText(/1 节没看懂/)).toBeInTheDocument()
+  })
+
+  it("takes the flagged sections straight to 答疑, without opening the reader first", () => {
+    leaveOpen(halfRead, [], ["n0-0-p0"])
+    open()
+
+    expect(screen.getByRole("link", { name: /去问/ })).toHaveAttribute("href", "/chat")
+  })
+
+  it("says nothing about being stuck on a document that is going fine", () => {
+    // Nothing being in the way is the starting state, not a result worth
+    // reporting on a dashboard.
+    leaveOpen(halfRead, ["n0-0-p0"])
+    open()
+
+    expect(screen.queryByText(/没看懂/)).not.toBeInTheDocument()
   })
 })

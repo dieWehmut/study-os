@@ -8,7 +8,8 @@ import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { itemTypeLabel, providerLabel } from "@/lib/labels"
-import { readReadingSession, summarizeReadingSession } from "@/lib/reading-session"
+import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
+import { readReadingSession, stuckSections, summarizeReadingSession } from "@/lib/reading-session"
 import { cn } from "@/lib/utils"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { SubjectPicker } from "@/features/subjects/SubjectPicker"
@@ -40,7 +41,9 @@ export default function Home() {
   // Read and summarized once, on the way in. Nothing on this page edits the
   // reading session, so recomputing it per render would only re-chunk the same
   // document to reach the same answer.
-  const [resume] = useState(() => summarizeReadingSession(readReadingSession()))
+  const [session] = useState(readReadingSession)
+  const [resume] = useState(() => summarizeReadingSession(session))
+  const [stuck] = useState(() => stuckSections(session))
 
   const subjectFilter = subject === "all" ? undefined : subject
 
@@ -192,6 +195,27 @@ export default function Home() {
                 已读 {resume.read} / {resume.total} · 还剩 {resume.remaining} 节
               </span>
             </div>
+            {/* "还剩 1 节" is a chore; what did not land is the reason to come
+                back at all, and it is the only thing a preview pass leaves
+                behind. Silent at zero: nothing being in the way is the
+                starting state, not a result worth reporting. */}
+            {stuck.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-3 border-t border-primary/15 pt-3">
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                  {stuck.length} 节没看懂
+                </span>
+                <span className="truncate text-sm text-muted-foreground">
+                  {stuck.map((chunk) => chunk.title).join(" · ")}
+                </span>
+                <Link
+                  className={buttonVariants({ variant: "outline", size: "sm", className: "ml-auto" })}
+                  to="/chat"
+                  onClick={() => putAskDraft(buildStuckQuestion(stuck))}
+                >
+                  <MessagesSquare data-icon="inline-start" />去问
+                </Link>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

@@ -1,4 +1,4 @@
-import { chunkMarkdown } from "./chunk"
+import { chunkMarkdown, type ReadingChunk } from "./chunk"
 import { parseOutline } from "./outline"
 
 export const readingStorageKey = "study-os.reading"
@@ -69,6 +69,21 @@ export function readReadingSession(): ReadingSession {
   } catch {
     return emptyReadingSession
   }
+}
+
+/**
+ * The stops that did not land, resolved against the document as it stands.
+ *
+ * Never taken straight off the session: the flags were made against whatever
+ * draft was in the box at the time, so a stale id would name a section nobody
+ * can navigate to and quote words that are no longer in the document.
+ */
+export function stuckSections(session: ReadingSession): ReadingChunk[] {
+  const flagged = new Set(session.stuckIds)
+  // Filtering the document rather than mapping the flags is what keeps the
+  // document's own order: the list reads as a table of contents of what is in
+  // the way, and click order would stop it lining up with the text.
+  return chunkMarkdown(session.markdown).filter((chunk) => flagged.has(chunk.id))
 }
 
 /** What is worth saying about a half-read document from somewhere else. */
