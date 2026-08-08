@@ -13,6 +13,7 @@ import type { ChatMessage } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
+import { takeAskDraft } from "@/lib/ask-draft"
 import { subjectName } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -39,7 +40,10 @@ export default function Chat() {
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [activeSession, setActiveSession] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [draft, setDraft] = useState("")
+  // Read once, in the initializer, and cleared in the same breath: arriving
+  // from 阅读 with sections that did not land should find them already written
+  // out, and arriving here on your own weeks later should not.
+  const [draft, setDraft] = useState(takeAskDraft)
   const [attachments, setAttachments] = useState<ChatAttachmentResult[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)

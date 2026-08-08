@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Chat from "./Chat"
+import { putAskDraft } from "@/lib/ask-draft"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const mocks = vi.hoisted(() => ({
@@ -92,5 +93,42 @@ describe("Chat page", () => {
 
     await waitFor(() => expect(mocks.uploadChatAttachment).toHaveBeenCalled())
     expect(await screen.findByText("notes.txt")).toBeInTheDocument()
+  })
+})
+
+describe("picking up a question left by 阅读", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    useSubjectStore.setState({ subject: "all" })
+    mocks.listChatMessages.mockResolvedValue({ items: [], count: 0 })
+    mocks.listChatConversations.mockResolvedValue({ items: [], count: 0 })
+  })
+
+  it("finds the question already written, rather than asking you to retype it", () => {
+    // Retyping the sections you just flagged is the cost that stops 去问 from
+    // being the obvious thing to do next.
+    putAskDraft("这两节我没看懂")
+
+    render(<Chat />)
+
+    expect(screen.getByLabelText("发给 AI 的消息")).toHaveValue("这两节我没看懂")
+  })
+
+  it("does not hand the same question over twice", () => {
+    // The draft is a handoff between two pages, not a store. One that survived
+    // being read would turn up on an unrelated visit weeks later.
+    putAskDraft("这两节我没看懂")
+    render(<Chat />).unmount()
+
+    render(<Chat />)
+
+    expect(screen.getByLabelText("发给 AI 的消息")).toHaveValue("")
+  })
+
+  it("leaves the box empty when you came here on your own", () => {
+    render(<Chat />)
+
+    expect(screen.getByLabelText("发给 AI 的消息")).toHaveValue("")
   })
 })
