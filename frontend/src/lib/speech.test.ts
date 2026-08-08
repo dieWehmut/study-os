@@ -181,6 +181,20 @@ describe("createSpeechReader", () => {
     expect(fake.spoken[0].text).toBe("有内容")
   })
 
+  it("counts lines the way the caller does, blanks included", () => {
+    // The caller marks the line being read by indexing its own array. Reporting
+    // a position in the filtered list instead would light up the wrong line
+    // from the first blank onwards -- and pointing at the wrong line is worse
+    // than pointing at none.
+    const seen: number[] = []
+    const reader = createSpeechReader({ onLine: (index) => seen.push(index) })
+
+    reader.start(["", "第一句", "  ", "第二句"])
+    fake.finishCurrent()
+
+    expect(seen).toEqual([1, 3])
+  })
+
   it("stays silent, and says so, when there is nothing to read", () => {
     const reader = createSpeechReader()
 

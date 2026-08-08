@@ -45,6 +45,10 @@ export function createSpeechReader(options: SpeechReaderOptions = {}): SpeechRea
   const { locale = "zh-CN", rate = 0.95, onLine, onDone } = options
 
   let lines: string[] = []
+  // Where each spoken line sat in the array the caller handed over. Blanks are
+  // dropped from the queue but must not shift the reported position, or the
+  // page would mark the wrong line from the first blank onwards.
+  let origins: number[] = []
   let cursor = 0
   let active = false
   // Bumped by every start and stop. A callback carrying an older number
@@ -54,6 +58,7 @@ export function createSpeechReader(options: SpeechReaderOptions = {}): SpeechRea
   function finish() {
     active = false
     lines = []
+    origins = []
     cursor = 0
     onDone?.()
   }
@@ -66,7 +71,7 @@ export function createSpeechReader(options: SpeechReaderOptions = {}): SpeechRea
     const utterance = new SpeechSynthesisUtterance(lines[cursor])
     utterance.lang = locale
     utterance.rate = rate
-    onLine?.(cursor)
+    onLine?.(origins[cursor])
     utterance.onend = () => {
       if (token !== run) return
       cursor += 1
@@ -86,16 +91,25 @@ export function createSpeechReader(options: SpeechReaderOptions = {}): SpeechRea
       if (!speechSupported()) return false
       // Blank lines come from the chunker's spacing, not from the document;
       // reading them would just be dead air with the cursor sitting still.
-      const spoken = nextLines.map((line) => line.trim()).filter(Boolean)
+      const spoken: string[] = []
+      const spokenOrigins: number[] = []
+      nextLines.forEach((line, index) => {
+        const trimmed = line.trim()
+        if (!trimmed) return
+        spoken.push(trimmed)
+        spokenOrigins.push(index)
+      })
       run += 1
       speechSynthesis.cancel()
       if (spoken.length === 0) {
         active = false
         lines = []
+        origins = []
         cursor = 0
         return false
       }
       lines = spoken
+      origins = spokenOrigins
       cursor = 0
       active = true
       speakCurrent(run)
@@ -105,6 +119,7 @@ export function createSpeechReader(options: SpeechReaderOptions = {}): SpeechRea
       run += 1
       active = false
       lines = []
+      origins = []
       cursor = 0
       if (speechSupported()) speechSynthesis.cancel()
     },
