@@ -41,7 +41,7 @@ describe("application shell", () => {
     )
 
     expect(screen.getByRole("main")).toBeInTheDocument()
-    expect(screen.getByText("检测空间")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "练习" })).toBeInTheDocument()
     expect(screen.queryAllByRole("link", { name: "练习" })).toHaveLength(0)
   })
 
