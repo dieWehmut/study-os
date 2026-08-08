@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -335,6 +336,88 @@ type DuePromptOptions struct {
 	Mode    string
 }
 
+const (
+	forecastDefaultDays = 7
+	forecastMaxDays     = 30
+)
+
+// ReviewForecast counts, day by day, what the queue is about to hand you.
+//
+// A single 待复习 number cannot show a pile-up. FSRS spreads work forward, so
+// skipping two days is invisible until Monday arrives with ninety cards -- and
+// ninety cards is where people stop.
+//
+// Days are the learner's own calendar days. This backend runs on their machine,
+// so `from`'s location is their wall clock; bucketing in UTC would file an
+// 08:00-local card under the wrong column for anyone east of Greenwich.
+//
+// Bucketing happens in Go on parsed times rather than in SQL. due_at is stored
+// as RFC3339Nano, which trims trailing zeros, so "T00:00:00.5Z" sorts *before*
+// "T00:00:00Z" as a string ('.' is below 'Z'). The SQL bound is kept only as a
+// cheap pre-filter, and it can only ever over-include: the horizon is an exact
+// midnight, so nothing truly inside it can sort after it. Go decides.
+//
+// Everything overdue lands in today, where it belongs. A card three days late
+// is due now, not three days ago, and a separate 逾期 bucket would invite
+// planning around a backlog instead of clearing it.
+func (s *Store) ReviewForecast(ctx context.Context, from time.Time, days int, subject string) ([]models.ForecastDay, error) {
+	if days <= 0 {
+		days = forecastDefaultDays
+	}
+	if days > forecastMaxDays {
+		days = forecastMaxDays
+	}
+
+	// AddDate rather than adding 24h: a DST boundary inside the horizon makes
+	// one of these days 23 or 25 hours long, and the learner still calls it a day.
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
+	bounds := make([]time.Time, days+1)
+	for i := range bounds {
+		bounds[i] = start.AddDate(0, 0, i)
+	}
+	horizon := bounds[days]
+
+	forecast := make([]models.ForecastDay, days)
+	for i := range forecast {
+		forecast[i] = models.ForecastDay{Date: bounds[i].Format("2006-01-02")}
+	}
+
+	query := `SELECT rs.due_at FROM review_states AS rs
+		JOIN prompts AS p ON p.id = rs.prompt_id
+		WHERE rs.due_at < ?`
+	arguments := []any{formatTime(horizon)}
+	if wanted := strings.ToLower(strings.TrimSpace(subject)); wanted != "" {
+		query += ` AND EXISTS (
+			SELECT 1 FROM knowledge_items AS k WHERE k.id = p.knowledge_item_id AND k.subject = ?
+		)`
+		arguments = append(arguments, wanted)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, arguments...)
+	if err != nil {
+		return nil, fmt.Errorf("forecast reviews: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw string
+		if scanErr := rows.Scan(&raw); scanErr != nil {
+			return nil, fmt.Errorf("scan forecast due time: %w", scanErr)
+		}
+		due, parseErr := parseTime(raw)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parse forecast due time %q: %w", raw, parseErr)
+		}
+		if !due.Before(horizon) {
+			continue
+		}
+		day := sort.Search(days, func(i int) bool { return due.Before(bounds[i+1]) })
+		forecast[day].Count++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate review forecast: %w", err)
+	}
+	return forecast, nil
+}
 func (s *Store) DuePromptsWithOptions(ctx context.Context, before time.Time, options DuePromptOptions) ([]models.Prompt, error) {
 	limit := options.Limit
 	if limit <= 0 || limit > 500 {

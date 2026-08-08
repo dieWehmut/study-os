@@ -172,6 +172,16 @@ type ReviewState struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 }
 
+// ForecastDay is how many cards one day of the queue is holding.
+//
+// Date is a local calendar day (YYYY-MM-DD), not an instant: the question it
+// answers is "what does Thursday look like", and Thursday is a thing on the
+// learner's wall, not a UTC offset.
+type ForecastDay struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
+}
+
 type Attempt struct {
 	ID                  string          `json:"id"`
 	PromptID            string          `json:"prompt_id"`

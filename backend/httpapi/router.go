@@ -112,6 +112,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/reviews/due", func(response http.ResponseWriter, request *http.Request) {
 			handleDueReviews(response, request, application)
 		})
+		api.Get("/reviews/forecast", func(response http.ResponseWriter, request *http.Request) {
+			handleReviewForecast(response, request, application)
+		})
 		api.Post("/reviews/{promptID}/answer", func(response http.ResponseWriter, request *http.Request) {
 			handleAnswer(response, request, application)
 		})
@@ -636,6 +639,28 @@ func handleDemoSeed(response http.ResponseWriter, request *http.Request, applica
 		"knowledge_id": item.ID,
 		"prompt_count": len(generated),
 	})
+}
+
+// handleReviewForecast answers how much review each of the coming days holds.
+//
+// time.Now() is deliberately *not* .UTC() here, unlike the due-queue handler
+// next door: the queue asks "is this instant past", which is timezone-free,
+// while a forecast asks "which day", which is not. This backend runs on the
+// learner's own machine, so the local zone is their wall clock.
+func handleReviewForecast(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	days := parseLimit(request.URL.Query().Get("days"), 7, 30)
+	forecast, err := application.Store.ReviewForecast(
+		request.Context(), time.Now(), days, request.URL.Query().Get("subject"),
+	)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"days": forecast, "horizon": len(forecast)})
 }
 
 func handleDueReviews(response http.ResponseWriter, request *http.Request, application *app.App) {
