@@ -54,6 +54,18 @@ describe("Reading page", () => {
     expect(screen.getByRole("button", { name: /已读完/ })).toBeInTheDocument()
   })
 
+  it("carries the marks into the outline, where the whole document is visible", () => {
+    // The reader only ever shows one stop, so it can say "this one is done"
+    // but never "you are two of three through". The outline is where that
+    // question is answerable.
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+
+    expect(screen.getByText("已读 1 / 2")).toBeInTheDocument()
+  })
+
   it("shows the document's stops once something is pasted", () => {
     render(<Reading />)
     paste(source)

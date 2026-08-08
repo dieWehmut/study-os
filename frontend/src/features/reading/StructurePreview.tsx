@@ -1,4 +1,4 @@
-import { CornerDownRight, ListTree } from "lucide-react"
+import { Check, CornerDownRight, ListTree } from "lucide-react"
 
 import { chunkMarkdown, type ReadingChunk } from "@/lib/chunk"
 import { cn } from "@/lib/utils"
@@ -8,6 +8,9 @@ interface StructurePreviewProps {
   /** The chunk the reader currently has open, if any. */
   activeId?: string
   onSelect?: (chunk: ReadingChunk) => void
+  /** Omit while nobody is tracking a read: a 已读 0 / 3 on an untouched
+   *  document is noise standing where the shape goes. */
+  readIds?: ReadonlySet<string>
 }
 
 /**
@@ -18,7 +21,12 @@ interface StructurePreviewProps {
  * roughly what each opens with -- spends that effort once, up front, so the
  * actual read only has to carry the content.
  */
-export function StructurePreview({ markdown, activeId, onSelect }: StructurePreviewProps) {
+export function StructurePreview({
+  markdown,
+  activeId,
+  onSelect,
+  readIds,
+}: StructurePreviewProps) {
   const chunks = chunkMarkdown(markdown)
 
   if (chunks.length === 0) {
@@ -35,6 +43,7 @@ export function StructurePreview({ markdown, activeId, onSelect }: StructurePrev
   // and ten nested three deep are nothing like the same read.
   const total = chunks.reduce((sum, chunk) => sum + chunk.size, 0)
   const levels = Math.max(...chunks.map((chunk) => chunk.path.length - 1))
+  const readCount = readIds ? chunks.filter((chunk) => readIds.has(chunk.id)).length : 0
 
   return (
     <div className="flex flex-col gap-2">
@@ -45,6 +54,14 @@ export function StructurePreview({ markdown, activeId, onSelect }: StructurePrev
         <span className="tabular-nums">共 {total} 字</span>
         <span aria-hidden="true">·</span>
         <span className="tabular-nums">{levels} 层</span>
+        {readIds ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums font-medium text-primary">
+              已读 {readCount} / {chunks.length}
+            </span>
+          </>
+        ) : null}
       </p>
       <ol className="flex flex-col gap-1.5">
         {chunks.map((chunk, index) => {
@@ -53,6 +70,7 @@ export function StructurePreview({ markdown, activeId, onSelect }: StructurePrev
           // same for everything, so it contributes no indent.
           const depth = Math.max(0, chunk.path.length - 2)
           const current = chunk.id === activeId
+          const read = readIds?.has(chunk.id) ?? false
           return (
             <li key={chunk.id} style={{ paddingInlineStart: `${depth * 1.25}rem` }}>
               <button
@@ -65,13 +83,24 @@ export function StructurePreview({ markdown, activeId, onSelect }: StructurePrev
                   current
                     ? "border-primary/60 bg-primary/5"
                     : "border-border bg-muted/25 hover:bg-muted/50",
+                  // Done stops recede rather than disappear: you still need to
+                  // find your way back to one, but they should not compete for
+                  // attention with the part you have not read.
+                  read && !current ? "opacity-70" : null,
                 )}
               >
                 <span className="flex items-center gap-2">
                   <span className="w-5 shrink-0 text-xs tabular-nums text-muted-foreground">
                     {index + 1}
                   </span>
-                  <span className="truncate text-sm font-medium">{chunk.title}</span>
+                  <span className={cn("truncate text-sm font-medium", read ? "line-through" : null)}>
+                    {chunk.title}
+                  </span>
+                  {read ? (
+                    <span className="flex shrink-0 items-center gap-0.5 text-[0.68rem] text-primary">
+                      <Check aria-hidden="true" className="size-3" />已读
+                    </span>
+                  ) : null}
                   {chunk.continues ? (
                     <span className="flex shrink-0 items-center gap-0.5 text-[0.68rem] text-muted-foreground">
                       <CornerDownRight aria-hidden="true" className="size-3" />接上节

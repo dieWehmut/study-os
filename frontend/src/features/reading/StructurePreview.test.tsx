@@ -15,6 +15,37 @@ const source = [
 ].join("\n")
 
 describe("structure preview", () => {
+  it("keeps quiet about reading progress when nobody is tracking any", () => {
+    // The outline is also the thing you look at before starting. A "已读 0 / 3"
+    // on a document nobody has begun is noise standing where the shape goes.
+    render(<StructurePreview markdown={source} />)
+
+    expect(screen.queryByText(/已读/)).not.toBeInTheDocument()
+  })
+
+  it("checks off the stops already behind you", () => {
+    const [first] = chunkMarkdown(source)
+    render(<StructurePreview markdown={source} readIds={new Set([first.id])} />)
+
+    expect(screen.getByRole("button", { name: /光反应/ })).toHaveAccessibleName(/已读/)
+  })
+
+  it("leaves the stops you never opened unmarked", () => {
+    // A check on everything says nothing. The point of the mark is the contrast
+    // between what is done and what is still ahead.
+    const [first] = chunkMarkdown(source)
+    render(<StructurePreview markdown={source} readIds={new Set([first.id])} />)
+
+    expect(screen.getByRole("button", { name: /暗反应/ })).not.toHaveAccessibleName(/已读/)
+  })
+
+  it("says how much of the document is behind you", () => {
+    const [first, second] = chunkMarkdown(source)
+    render(<StructurePreview markdown={source} readIds={new Set([first.id, second.id])} />)
+
+    expect(screen.getByText("已读 2 / 3")).toBeInTheDocument()
+  })
+
   it("shows the skeleton before any prose is read", () => {
     render(<StructurePreview markdown={source} />)
 

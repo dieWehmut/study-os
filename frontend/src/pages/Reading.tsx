@@ -103,6 +103,7 @@ export default function Reading() {
             <StructurePreview
               markdown={markdown}
               activeId={chunks[index]?.id}
+              readIds={readIds}
               onSelect={(chunk) => setIndex(chunks.findIndex((item) => item.id === chunk.id))}
             />
           </CardContent>
