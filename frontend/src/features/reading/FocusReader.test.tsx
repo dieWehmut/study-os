@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { act, fireEvent, render, screen } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { chunkMarkdown } from "@/lib/chunk"
 import { FocusReader } from "./FocusReader"
@@ -217,5 +217,134 @@ describe("saying a stop did not land", () => {
 
     expect(screen.getByRole("button", { name: /已读完/ })).toHaveAttribute("aria-pressed", "true")
     expect(screen.getByRole("button", { name: /卡住了/ })).toHaveAttribute("aria-pressed", "true")
+  })
+})
+
+interface FakeUtterance {
+  text: string
+  lang: string
+  rate: number
+  onend: (() => void) | null
+  onerror: (() => void) | null
+}
+
+function installFakeSpeech() {
+  const spoken: FakeUtterance[] = []
+  let queue: FakeUtterance[] = []
+  const synthesis = {
+    speak: vi.fn((utterance: FakeUtterance) => {
+      spoken.push(utterance)
+      queue.push(utterance)
+    }),
+    cancel: vi.fn(() => {
+      queue = []
+    }),
+  }
+  vi.stubGlobal("speechSynthesis", synthesis)
+  vi.stubGlobal(
+    "SpeechSynthesisUtterance",
+    class {
+      text: string
+      lang = ""
+      rate = 1
+      onend: (() => void) | null = null
+      onerror: (() => void) | null = null
+      constructor(text: string) {
+        this.text = text
+      }
+    },
+  )
+  return {
+    spoken,
+    synthesis,
+    finishCurrent() {
+      act(() => {
+        queue.shift()?.onend?.()
+      })
+    },
+  }
+}
+
+describe("reading a section out loud", () => {
+  let fake: ReturnType<typeof installFakeSpeech>
+
+  beforeEach(() => {
+    fake = installFakeSpeech()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("reads the section you are standing on", () => {
+    // Being read to is the oldest accommodation there is, and the section on
+    // screen is the only one it could sensibly mean.
+    render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }))
+
+    expect(fake.spoken[0].text).toBe(chunks[0].lines[0])
+  })
+
+  it("can be stopped part-way", () => {
+    // A voice you cannot interrupt is worse than none: being read the wrong
+    // section to the end is the failure this page exists to prevent.
+    render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }))
+    fireEvent.click(screen.getByRole("button", { name: /停止朗读/ }))
+
+    expect(fake.synthesis.cancel).toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: /^朗读$/ })).toBeInTheDocument()
+  })
+
+  it("marks the line it is reading, so you do not lose it", () => {
+    render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }))
+
+    expect(screen.getByText(chunks[0].lines[0])).toHaveAttribute("data-speaking", "true")
+  })
+
+  it("stops reading the old section when you turn the page", () => {
+    // Otherwise the section you just left keeps reading itself out underneath
+    // the one you are now looking at.
+    const view = render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }))
+
+    view.rerender(<FocusReader chunks={chunks} index={1} onIndexChange={vi.fn()} />)
+
+    expect(fake.synthesis.cancel).toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: /^朗读$/ })).toBeInTheDocument()
+  })
+
+  it("goes quiet when the reader leaves the screen", () => {
+    // speechSynthesis outlives the component; without this the voice carries on
+    // from a page nobody is on any more.
+    const view = render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }))
+
+    view.unmount()
+
+    expect(fake.synthesis.cancel).toHaveBeenCalled()
+  })
+
+  it("offers itself back once the section has been read through", () => {
+    render(<FocusReader chunks={[chunks[0]]} index={0} onIndexChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }))
+
+    for (let step = 0; step < chunks[0].lines.length + 1; step += 1) fake.finishCurrent()
+
+    expect(screen.getByRole("button", { name: /^朗读$/ })).toBeInTheDocument()
+  })
+
+  it("hides the control when the browser has no voice", () => {
+    // A button that does nothing is worse than an absent one.
+    vi.stubGlobal("speechSynthesis", undefined)
+    vi.stubGlobal("SpeechSynthesisUtterance", undefined)
+
+    render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+
+    expect(screen.queryByRole("button", { name: /朗读/ })).not.toBeInTheDocument()
   })
 })

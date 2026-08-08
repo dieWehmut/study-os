@@ -1,7 +1,9 @@
-import { BookmarkPlus, Check, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react"
+import { useEffect, useState } from "react"
+import { BookmarkPlus, Check, ChevronLeft, ChevronRight, HelpCircle, Square, Volume2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { ReadingChunk } from "@/lib/chunk"
+import { createSpeechReader, speechSupported } from "@/lib/speech"
 
 interface FocusReaderProps {
   chunks: ReadingChunk[]
@@ -43,6 +45,31 @@ export function FocusReader({
 }: FocusReaderProps) {
   const chunk = chunks[index]
 
+  // Which line the voice is on, and the only record of whether it is running:
+  // the reader clears it when the section runs out, so the two can never
+  // disagree about what the button should say.
+  const [speakingLine, setSpeakingLine] = useState<number | null>(null)
+  // Built once. A control that appeared halfway through a session would be as
+  // confusing as one that did nothing, so support is settled at mount.
+  const [reader] = useState(() =>
+    speechSupported()
+      ? createSpeechReader({ onLine: setSpeakingLine, onDone: () => setSpeakingLine(null) })
+      : null,
+  )
+  const speaking = speakingLine !== null
+  const chunkId = chunk?.id
+
+  // Keyed on the stop, so the same cleanup covers both ways the voice can
+  // outlive what it is reading: turning the page, and leaving the page
+  // altogether. speechSynthesis is a browser-wide singleton and would happily
+  // carry on reading a section nobody is looking at.
+  useEffect(() => {
+    return () => {
+      reader?.stop()
+      setSpeakingLine(null)
+    }
+  }, [chunkId, reader])
+
   if (!chunk) {
     return (
       <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
@@ -68,6 +95,16 @@ export function FocusReader({
     onIndexChange(next)
   }
 
+  function toggleSpeech() {
+    if (!reader) return
+    if (speaking) {
+      reader.stop()
+      setSpeakingLine(null)
+      return
+    }
+    reader.start(chunk.lines)
+  }
+
   return (
     <div
       role="region"
@@ -88,7 +125,20 @@ export function FocusReader({
 
       <div className="flex flex-col gap-2 text-[0.95rem] leading-8">
         {chunk.lines.map((line, lineIndex) => (
-          <p key={lineIndex}>{line}</p>
+          // Marked rather than scrolled to: the section already fits on screen,
+          // and the thing being lost is which line you were on, not where the
+          // section is.
+          <p
+            key={lineIndex}
+            data-speaking={speakingLine === lineIndex ? "true" : undefined}
+            className={
+              speakingLine === lineIndex
+                ? "-mx-2 rounded-md bg-primary/10 px-2 ring-1 ring-primary/25"
+                : undefined
+            }
+          >
+            {line}
+          </p>
         ))}
       </div>
 
@@ -109,6 +159,21 @@ export function FocusReader({
         <span className="text-xs tabular-nums text-muted-foreground">
           {index + 1} / {chunks.length}
         </span>
+        {/* Absent when the browser has no voice: a button that does nothing is
+            worse than one that is not there. Sits with the page turns rather
+            than the verdicts -- it is about getting through this section, not
+            about what you made of it. */}
+        {reader ? (
+          <Button
+            variant={speaking ? "secondary" : "ghost"}
+            size="sm"
+            aria-pressed={speaking}
+            onClick={toggleSpeech}
+          >
+            {speaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+            {speaking ? "停止朗读" : "朗读"}
+          </Button>
+        ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {onToggleStuck ? (
             // Unlike 读完 this does not turn the page. Saying a stop did not
