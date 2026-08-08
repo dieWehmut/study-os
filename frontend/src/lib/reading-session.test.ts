@@ -170,4 +170,38 @@ describe("summarizing what is left to read", () => {
   it("has nothing to offer for text that produced no stops", () => {
     expect(summarizeReadingSession({ markdown: "   ", index: 0, readIds: [], stuckIds: [] })).toBeNull()
   })
+
+  it("counts what is still in the way, not only how far you got", () => {
+    // How much is read says whether the document is finished; how much is
+    // stuck says whether finishing it was any use. Only the second decides
+    // whether going back is worth the trip.
+    const summary = summarizeReadingSession({
+      markdown: source,
+      index: 1,
+      readIds: ["n0-0-p0"],
+      stuckIds: ["n0-0-p0"],
+    })
+
+    expect(summary?.read).toBe(1)
+    expect(summary?.stuck).toBe(1)
+  })
+
+  it("ignores a flag naming a stop this draft no longer has", () => {
+    // Same rule as the read count: the marks were made against whatever was in
+    // the box at the time, and a stale id would inflate the number.
+    const summary = summarizeReadingSession({
+      markdown: source,
+      index: 0,
+      readIds: [],
+      stuckIds: ["gone"],
+    })
+
+    expect(summary?.stuck).toBe(0)
+  })
+
+  it("has nothing in the way before anything is flagged", () => {
+    const summary = summarizeReadingSession({ markdown: source, index: 0, readIds: [], stuckIds: [] })
+
+    expect(summary?.stuck).toBe(0)
+  })
 })

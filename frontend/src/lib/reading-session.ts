@@ -77,6 +77,12 @@ export interface ReadingSummary {
   total: number
   read: number
   remaining: number
+  /**
+   * Stops that were read and still did not land. Carried alongside the read
+   * count because it answers a different question: how far you got, versus
+   * whether going back is worth it.
+   */
+  stuck: number
 }
 
 /**
@@ -94,12 +100,14 @@ export function summarizeReadingSession(session: ReadingSession): ReadingSummary
 
   const stops = new Set(chunks.map((chunk) => chunk.id))
   const read = new Set(session.readIds.filter((id) => stops.has(id))).size
+  const stuck = new Set(session.stuckIds.filter((id) => stops.has(id))).size
 
   return {
     title: parseOutline(session.markdown).title || untitledDocument,
     total: chunks.length,
     read,
     remaining: chunks.length - read,
+    stuck,
   }
 }
 
