@@ -18,6 +18,7 @@ describe("application shell", () => {
   it.each([
     ["/", "首页"],
     ["/knowledge", "知识库"],
+    ["/reading", "阅读"],
     ["/memory", "记忆"],
     ["/import", "导入"],
     ["/settings", "设置"],
@@ -137,6 +138,23 @@ describe("application shell", () => {
     fireEvent.click(math)
     expect(math).toHaveAttribute("aria-pressed", "true")
     expect(localStorage.getItem("study-os.subject")).toBe("math")
+  })
+
+  it("places 阅读 before 记忆, since previewing comes before reviewing", () => {
+    // The rail's order is the only place the two-phase model is visible:
+    // 阅读 prepares material you have not met yet, 记忆 returns to material
+    // you have. Listing review first would read as the whole app.
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    const labels = Array.from(document.querySelectorAll("aside nav a")).map((link) =>
+      link.textContent?.trim(),
+    )
+    expect(labels.indexOf("阅读")).toBeGreaterThan(-1)
+    expect(labels.indexOf("阅读")).toBeLessThan(labels.indexOf("记忆"))
   })
 
   it("switches subjects from the in-page subject chips", () => {

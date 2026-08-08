@@ -10,6 +10,7 @@ import Memory from "@/pages/Memory"
 import Chat from "@/pages/Chat"
 import Integrate from "@/pages/Integrate"
 import Practice from "@/pages/Practice"
+import Reading from "@/pages/Reading"
 import Settings from "@/pages/Settings"
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/knowledge" element={<Knowledge />} />
+        <Route path="/reading" element={<Reading />} />
         <Route path="/import" element={<Import />} />
         <Route path="/memory" element={<Memory />} />
         <Route path="/integrate" element={<Integrate />} />
