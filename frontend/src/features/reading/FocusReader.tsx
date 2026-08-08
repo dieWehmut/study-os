@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { ReadingChunk } from "@/lib/chunk"
@@ -7,6 +7,9 @@ interface FocusReaderProps {
   chunks: ReadingChunk[]
   index: number
   onIndexChange: (index: number) => void
+  /** Omit to hide the toggle: a control nobody records would forget the answer. */
+  onToggleRead?: (id: string) => void
+  readIds?: ReadonlySet<string>
 }
 
 /**
@@ -18,7 +21,13 @@ interface FocusReaderProps {
  * still says where in the document you are standing -- which is the one piece
  * of context reading in isolation would otherwise cost you.
  */
-export function FocusReader({ chunks, index, onIndexChange }: FocusReaderProps) {
+export function FocusReader({
+  chunks,
+  index,
+  onIndexChange,
+  onToggleRead,
+  readIds,
+}: FocusReaderProps) {
   const chunk = chunks[index]
 
   if (!chunk) {
@@ -32,6 +41,9 @@ export function FocusReader({ chunks, index, onIndexChange }: FocusReaderProps) 
   const trail = chunk.path.slice(0, -1).join(" / ")
   const hasPrevious = index > 0
   const hasNext = index < chunks.length - 1
+  // Keyed by the chunk's id, not by the index: arriving at stop 2 must not
+  // inherit stop 1's mark, or the record would claim a page you never opened.
+  const isRead = readIds?.has(chunk.id) ?? false
 
   function move(delta: number) {
     const next = index + delta
@@ -77,17 +89,29 @@ export function FocusReader({ chunks, index, onIndexChange }: FocusReaderProps) 
         <span className="text-xs tabular-nums text-muted-foreground">
           {index + 1} / {chunks.length}
         </span>
-        <Button
-          variant="outline"
-          size="sm"
-          className="ml-auto"
-          disabled={!hasNext}
-          onClick={() => move(1)}
-          aria-label="下一节"
-        >
-          下一节
-          <ChevronRight aria-hidden="true" />
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          {onToggleRead ? (
+            <Button
+              variant={isRead ? "default" : "outline"}
+              size="sm"
+              aria-pressed={isRead}
+              onClick={() => onToggleRead(chunk.id)}
+            >
+              <Check aria-hidden="true" />
+              {isRead ? "已读完" : "读完"}
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasNext}
+            onClick={() => move(1)}
+            aria-label="下一节"
+          >
+            下一节
+            <ChevronRight aria-hidden="true" />
+          </Button>
+        </div>
       </div>
     </div>
   )

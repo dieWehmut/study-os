@@ -10,6 +10,50 @@ function paste(markdown: string) {
 }
 
 describe("Reading page", () => {
+  it("moves you on once a stop is done, so the mark doubles as a page turn", () => {
+    // Marking and then reaching for 下一节 is two actions for one intent.
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+
+    expect(screen.getByText("2 / 2")).toBeInTheDocument()
+  })
+
+  it("remembers a stop was finished after you walk back to it", () => {
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+    fireEvent.click(screen.getByRole("button", { name: /上一节/ }))
+
+    expect(screen.getByRole("button", { name: /已读完/ })).toBeInTheDocument()
+  })
+
+  it("lets you take a mark back", () => {
+    // Marking the wrong stop is easy; a record you cannot correct stops being
+    // a record of what you read.
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+    fireEvent.click(screen.getByRole("button", { name: /上一节/ }))
+    fireEvent.click(screen.getByRole("button", { name: /已读完/ }))
+
+    expect(screen.getByRole("button", { name: /读完/ })).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("stays on the last stop rather than pretending there is another one", () => {
+    render(<Reading />)
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+
+    expect(screen.getByText("2 / 2")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /已读完/ })).toBeInTheDocument()
+  })
+
   it("shows the document's stops once something is pasted", () => {
     render(<Reading />)
     paste(source)

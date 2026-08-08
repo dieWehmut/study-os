@@ -14,11 +14,26 @@ export default function Reading() {
   const [markdown, setMarkdown] = useState("")
   const [index, setIndex] = useState(0)
   const [showMap, setShowMap] = useState(false)
+  const [readIds, setReadIds] = useState<ReadonlySet<string>>(new Set())
 
   const chunks = useMemo(() => chunkMarkdown(markdown), [markdown])
   // The same headings the outline is built from, drawn sideways. No model, and
   // no second paste box to keep in sync with this one.
   const map = useMemo(() => markdownToMindMap(markdown), [markdown])
+
+  function toggleRead(id: string) {
+    const next = new Set(readIds)
+    if (next.delete(id)) {
+      setReadIds(next)
+      return
+    }
+    next.add(id)
+    setReadIds(next)
+    // Marking a stop and then reaching for 下一节 is two actions for one
+    // intent. Taking a mark back is not -- that is a correction, and moving
+    // you would carry you away from the stop you came back to fix.
+    setIndex((current) => Math.min(current + 1, chunks.length - 1))
+  }
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
@@ -41,8 +56,10 @@ export default function Reading() {
             onChange={(event) => {
               setMarkdown(event.target.value)
               // A new document has a new set of stops; keeping the old position
-              // would drop the reader somewhere arbitrary in it.
+              // would drop the reader somewhere arbitrary in it, and the old
+              // marks would attach to stops nobody has read.
               setIndex(0)
+              setReadIds(new Set())
             }}
             placeholder={"# 标题\n## 小节\n正文…"}
             className="min-h-40 font-mono text-xs"
@@ -99,7 +116,13 @@ export default function Reading() {
             </p>
           </CardHeader>
           <CardContent>
-            <FocusReader chunks={chunks} index={index} onIndexChange={setIndex} />
+            <FocusReader
+              chunks={chunks}
+              index={index}
+              onIndexChange={setIndex}
+              onToggleRead={toggleRead}
+              readIds={readIds}
+            />
           </CardContent>
         </Card>
       </div>

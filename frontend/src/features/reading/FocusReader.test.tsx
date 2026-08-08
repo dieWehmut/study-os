@@ -17,6 +17,55 @@ const source = [
 const chunks = chunkMarkdown(source)
 
 describe("focus reader", () => {
+  it("offers no way to mark a stop read when nobody is keeping track", () => {
+    // The control is only honest if something stores the answer. Without a
+    // handler it would toggle, look answered, and forget.
+    render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
+
+    expect(screen.queryByRole("button", { name: /读完/ })).not.toBeInTheDocument()
+  })
+
+  it("marks the stop you just read", () => {
+    const onToggleRead = vi.fn()
+    render(
+      <FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} onToggleRead={onToggleRead} />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+
+    expect(onToggleRead).toHaveBeenCalledWith(chunks[0].id)
+  })
+
+  it("says a stop is already behind you", () => {
+    render(
+      <FocusReader
+        chunks={chunks}
+        index={0}
+        onIndexChange={vi.fn()}
+        onToggleRead={vi.fn()}
+        readIds={new Set([chunks[0].id])}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: /已读完/ })).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("keeps the mark with the stop, not with the position", () => {
+    // Stop 1 read, stop 2 not. Arriving at 2 must not inherit 1's mark, or the
+    // record would say you had read a page you never opened.
+    render(
+      <FocusReader
+        chunks={chunks}
+        index={1}
+        onIndexChange={vi.fn()}
+        onToggleRead={vi.fn()}
+        readIds={new Set([chunks[0].id])}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: /读完/ })).toHaveAttribute("aria-pressed", "false")
+  })
+
   it("shows one stop at a time, so nothing else competes for attention", () => {
     render(<FocusReader chunks={chunks} index={0} onIndexChange={vi.fn()} />)
 
