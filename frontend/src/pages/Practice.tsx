@@ -1,5 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react"
-import { CalendarPlus, CheckCheck, PenLine, Scale, Split, SquarePen, Trash2 } from "lucide-react"
+import {
+  CalendarPlus,
+  CheckCheck,
+  ListOrdered,
+  PenLine,
+  Scale,
+  Split,
+  SquarePen,
+  Trash2,
+} from "lucide-react"
 
 import {
   correctMistake,
@@ -13,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { EquationBoard } from "@/features/chemistry/EquationBoard"
+import { DerivationBoard } from "@/features/math/DerivationBoard"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
 import { MotionBoard } from "@/features/physics/MotionBoard"
 import {
@@ -56,6 +66,14 @@ function boardFor(subject: string, cause: MistakeCause): CauseBoard | null {
       close: "收起配平",
       icon: <Scale data-icon="inline-start" />,
       board: <EquationBoard />,
+    }
+  }
+  if (subject === "math" && cause === "method") {
+    return {
+      open: "逐行核对",
+      close: "收起核对",
+      icon: <ListOrdered data-icon="inline-start" />,
+      board: <DerivationBoard />,
     }
   }
   if (subject !== "physics") return null

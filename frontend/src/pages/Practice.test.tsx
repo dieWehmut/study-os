@@ -536,3 +536,46 @@ describe("re-checking the 配平 化学 keeps being told to re-check", () => {
     expect(screen.queryByRole("button", { name: "核对配平" })).not.toBeInTheDocument()
   })
 })
+
+describe("locating the step 数学 keeps being told to locate", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    filed = 0
+    useSubjectStore.setState({ subject: "math" })
+    mocks.listMistakes.mockResolvedValue([])
+  })
+
+  it("offers the board under the advice that asks for it", async () => {
+    // 数学's 思路不对 advice says "定位到出错的那一步，而不是整题重做" -- and
+    // finding that step by re-reading is exactly what does not work, since
+    // every line below the break still follows from the one above it.
+    render(<Practice />)
+    log("解一元二次方程", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "逐行核对" })).toBeInTheDocument()
+  })
+
+  it("opens a real board, not a picture of one", async () => {
+    render(<Practice />)
+    log("解一元二次方程", "思路不对")
+    fireEvent.click(await screen.findByRole("button", { name: "逐行核对" }))
+
+    fireEvent.change(screen.getByLabelText("把过程一行一行写下来"), {
+      target: { value: "2x+4=10\n2x=6\nx=4" },
+    })
+
+    expect(screen.getByRole("alert")).toHaveTextContent("第 3 行")
+  })
+
+  it("leaves 物理's 思路不对 with the drawing it already asks for", async () => {
+    // Both subjects call the cause 思路不对 and mean different things by it:
+    // 物理's is the wrong model, and the fix is a 受力图, not a line check.
+    useSubjectStore.setState({ subject: "physics" })
+    render(<Practice />)
+    log("斜面上的木块", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "画受力图" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "逐行核对" })).not.toBeInTheDocument()
+  })
+})
