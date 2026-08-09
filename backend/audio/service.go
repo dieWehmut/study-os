@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"study-os/backend/audio/speechtext"
 )
 
 var (
@@ -167,12 +169,30 @@ func CacheKey(request Request) string {
 	if normalized.Format == "" {
 		normalized.Format = "wav"
 	}
-	// Voice and endpoint are matched case-insensitively here rather than in
-	// normalizeRequest, because vendors do treat voice names as case-sensitive
-	// ("FunAudioLLM/CosyVoice2-0.5B:alex", "Kore") and the request that reaches
-	// the generator has to keep the spelling the user configured.
+	// Term, voice and endpoint are matched case-insensitively here rather than
+	// in normalizeRequest, because the request that reaches the generator has to
+	// keep the spelling it was given: vendors treat voice names as
+	// case-sensitive ("FunAudioLLM/CosyVoice2-0.5B:alex", "Kore"), and for the
+	// term itself the difference between MJ and mJ is a factor of a billion.
+	//
+	// Note the term in this payload has already been through
+	// speechtext.Normalize, so the key is derived from what will actually be
+	// spoken. Changing a normalization rule therefore retires exactly the cache
+	// entries whose audio the change would have altered, and no others.
+	//
+	// Known tradeoff: lowercasing the term here can still fold together two
+	// spellings Normalize left untouched but that are not necessarily spoken
+	// alike -- "CO" and "Co" both pass through as literal Latin letters (bare
+	// two-letter tokens are deliberately not treated as chemistry, to avoid
+	// false positives), so they now share a cache entry despite meaning
+	// different things. Lowercasing cannot simply be dropped for the term: this
+	// is also what lets "Abandon" (sentence-initial) and "abandon" reuse one
+	// recording, which is the overwhelmingly common case for vocabulary audio
+	// and is covered by an explicit test. Resolving the conflict properly needs
+	// a way to tell "ordinary capitalisation" apart from "a case-sensitive
+	// acronym", which Normalize does not attempt today.
 	payload := strings.Join([]string{
-		normalized.Term,
+		strings.ToLower(normalized.Term),
 		normalized.Locale,
 		strings.ToLower(normalized.Voice),
 		normalized.Format,
@@ -482,7 +502,14 @@ func cleanRoot(root string) (string, error) {
 }
 
 func normalizeRequest(request Request) Request {
-	request.Term = strings.ToLower(strings.Join(strings.Fields(request.Term), " "))
+	// The term keeps its capitalisation. It used to be lowercased here, which
+	// made the cache case-insensitive -- desirable -- but the same value is
+	// handed to the generator, so the voice was also being asked to read
+	// lowercased text. That is destructive rather than merely untidy: "3.6 MJ"
+	// and "3.6 mJ" are a megajoule and a millijoule, and CO and Co are carbon
+	// monoxide and cobalt. CacheKey lowercases its own copy instead, the same
+	// way it already does for Voice and BaseURL.
+	request.Term = speechtext.Normalize(strings.Join(strings.Fields(request.Term), " "))
 	request.Locale = strings.ToLower(strings.TrimSpace(request.Locale))
 	request.Voice = strings.TrimSpace(request.Voice)
 	request.Format = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(request.Format)), ".")
