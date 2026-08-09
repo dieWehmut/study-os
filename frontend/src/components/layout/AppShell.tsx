@@ -1,6 +1,5 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 
-import { readSavedSidebarWidth, SIDEBAR_WIDTH_KEY } from "@/lib/sidebar"
 import { cn } from "@/lib/utils"
 import { Header } from "./Header"
 import { NavList } from "./NavList"
@@ -11,12 +10,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const [sidebarWidth, setSidebarWidth] = useState(readSavedSidebarWidth)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
-
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth))
-  }, [sidebarWidth])
 
   useEffect(() => {
     if (mobileDrawerOpen) {
@@ -32,7 +26,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-dvh bg-background">
       {/* Desktop Sidebar */}
-      <Sidebar width={sidebarWidth} onWidthChange={setSidebarWidth} />
+      <Sidebar />
 
       {/* Mobile Drawer Overlay */}
       {mobileDrawerOpen && (
@@ -53,10 +47,9 @@ export function AppShell({ children }: AppShellProps) {
         <NavList label="移动端主导航" onNavigate={() => setMobileDrawerOpen(false)} />
       </aside>
 
-      <div
-        className="min-h-dvh md:pl-(--sidebar-width)"
-        style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
-      >
+      {/* 这里的 pl 必须和 Sidebar 的 w-64 对齐：侧栏是 fixed 的，不占文档流，
+          正文得自己让出那一栏的位置。 */}
+      <div className="min-h-dvh md:pl-64">
         <Header onMenuToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)} />
         <main className="mx-auto w-full max-w-7xl px-4 pb-10 pt-6 sm:px-6 md:pb-10 lg:px-8 lg:pt-8">
           {children}

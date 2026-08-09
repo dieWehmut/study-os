@@ -85,7 +85,7 @@ describe("application shell", () => {
     expect(drawer).toHaveAttribute("aria-hidden", "true")
   })
 
-  it("removes verbose nav descriptions and lets the sidebar stretch", () => {
+  it("removes verbose nav descriptions and gives the sidebar one fixed width", () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
@@ -93,11 +93,13 @@ describe("application shell", () => {
     )
 
     expect(screen.queryByText("今天的学习入口")).not.toBeInTheDocument()
-    const handle = screen.getByRole("separator", { name: "调整侧栏宽度" })
-    fireEvent.keyDown(handle, { key: "ArrowRight" })
+    // 侧栏宽度不再是用户能调的东西，所以既没有把手，也不该有一个由 state 驱动的
+    // 内联宽度——宽度写死在类里，才不会有"上次拖到多宽"这种要记的状态。
+    expect(screen.queryByRole("separator", { name: "调整侧栏宽度" })).not.toBeInTheDocument()
     const sidebar = container.querySelector("aside")
-    expect(sidebar?.getAttribute("style")).toContain("272px")
+    expect(sidebar?.getAttribute("style") ?? "").not.toContain("width")
   })
+
 
   it("centers the nav buttons as one group in both the sidebar and the drawer", () => {
     render(
@@ -119,10 +121,6 @@ describe("application shell", () => {
       expect(nav.className).not.toMatch(/(^|\s)mt-/)
     }
 
-    // The resize handle is a sibling of the nav, but absolute positioning keeps
-    // it out of flow so it never eats into the space the nav centers within.
-    const handle = screen.getByRole("separator", { name: "调整侧栏宽度" })
-    expect(handle.className).toContain("absolute")
   })
 
   it("puts 首页 first in the sidebar and switches subjects from the home page", () => {
