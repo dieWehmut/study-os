@@ -579,3 +579,48 @@ describe("locating the step 数学 keeps being told to locate", () => {
     expect(screen.queryByRole("button", { name: "逐行核对" })).not.toBeInTheDocument()
   })
 })
+
+describe("writing out the 因果链 地理 keeps being told to write out", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    filed = 0
+    useSubjectStore.setState({ subject: "geography" })
+    mocks.listMistakes.mockResolvedValue([])
+  })
+
+  it("offers the board under the advice that asks for it", async () => {
+    // 地理's 思路不对 advice says 把因果链一环一环写出来，缺哪一环就是丢分点 --
+    // and a chain read back as prose joins up in your head, gap and all.
+    render(<Practice />)
+    log("撒哈拉为什么干旱", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "串因果链" })).toBeInTheDocument()
+  })
+
+  it("opens a real board, not a picture of one", async () => {
+    render(<Practice />)
+    log("撒哈拉为什么干旱", "思路不对")
+    fireEvent.click(await screen.findByRole("button", { name: "串因果链" }))
+
+    fireEvent.change(screen.getByLabelText("成因"), { target: { value: "常年受副高控制" } })
+    fireEvent.change(screen.getByLabelText("结果"), { target: { value: "盛行下沉气流" } })
+    fireEvent.click(screen.getByRole("button", { name: "加上这一环" }))
+    fireEvent.change(screen.getByLabelText("成因"), { target: { value: "沿岸有寒流" } })
+    fireEvent.change(screen.getByLabelText("结果"), { target: { value: "降水稀少" } })
+    fireEvent.click(screen.getByRole("button", { name: "加上这一环" }))
+
+    expect(screen.getByRole("alert")).toHaveTextContent("盛行下沉气流")
+  })
+
+  it("leaves 数学's 思路不对 with the line check it already asks for", async () => {
+    // Three subjects now call the cause 思路不对 and mean three different
+    // things by it. The board is picked by the pair, never by the cause alone.
+    useSubjectStore.setState({ subject: "math" })
+    render(<Practice />)
+    log("解一元二次方程", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "逐行核对" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "串因果链" })).not.toBeInTheDocument()
+  })
+})

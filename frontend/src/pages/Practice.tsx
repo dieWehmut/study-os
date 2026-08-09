@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import {
   CalendarPlus,
   CheckCheck,
+  Link2,
   ListOrdered,
   PenLine,
   Scale,
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { EquationBoard } from "@/features/chemistry/EquationBoard"
+import { ChainBoard } from "@/features/geography/ChainBoard"
 import { DerivationBoard } from "@/features/math/DerivationBoard"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
 import { MotionBoard } from "@/features/physics/MotionBoard"
@@ -66,6 +68,14 @@ function boardFor(subject: string, cause: MistakeCause): CauseBoard | null {
       close: "收起配平",
       icon: <Scale data-icon="inline-start" />,
       board: <EquationBoard />,
+    }
+  }
+  if (subject === "geography" && cause === "method") {
+    return {
+      open: "串因果链",
+      close: "收起因果链",
+      icon: <Link2 data-icon="inline-start" />,
+      board: <ChainBoard />,
     }
   }
   if (subject === "math" && cause === "method") {
