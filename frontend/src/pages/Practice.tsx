@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import {
   CalendarPlus,
   CheckCheck,
+  ClipboardCheck,
   Link2,
   ListOrdered,
   PenLine,
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { EquationBoard } from "@/features/chemistry/EquationBoard"
+import { ScoringBoard } from "@/features/chinese/ScoringBoard"
 import { ChainBoard } from "@/features/geography/ChainBoard"
 import { DerivationBoard } from "@/features/math/DerivationBoard"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
@@ -68,6 +70,14 @@ function boardFor(subject: string, cause: MistakeCause): CauseBoard | null {
       close: "收起配平",
       icon: <Scale data-icon="inline-start" />,
       board: <EquationBoard />,
+    }
+  }
+  if (subject === "chinese" && cause === "method") {
+    return {
+      open: "对得分点",
+      close: "收起得分点",
+      icon: <ClipboardCheck data-icon="inline-start" />,
+      board: <ScoringBoard />,
     }
   }
   if (subject === "geography" && cause === "method") {

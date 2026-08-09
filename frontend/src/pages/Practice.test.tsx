@@ -624,3 +624,46 @@ describe("writing out the 因果链 地理 keeps being told to write out", () =>
     expect(screen.queryByRole("button", { name: "串因果链" })).not.toBeInTheDocument()
   })
 })
+
+describe("pulling the answer apart 语文 keeps being told to pull apart", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    filed = 0
+    useSubjectStore.setState({ subject: "chinese" })
+    mocks.listMistakes.mockResolvedValue([])
+  })
+
+  it("offers the board under the advice that asks for it", async () => {
+    // 语文's 思路不对 advice says 对着得分点拆答案：踩到几个点，缺的是哪一类 --
+    // and your own answer always reads complete, because you wrote all of it.
+    render(<Practice />)
+    log("赏析这两句诗", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "对得分点" })).toBeInTheDocument()
+  })
+
+  it("opens a real board, not a picture of one", async () => {
+    render(<Practice />)
+    log("赏析这两句诗", "思路不对")
+    fireEvent.click(await screen.findByRole("button", { name: "对得分点" }))
+
+    fireEvent.change(screen.getByLabelText("标准答案的得分点"), {
+      target: { value: "借景抒情\n对比手法" },
+    })
+    fireEvent.change(screen.getByLabelText("你写的答案"), {
+      target: { value: "这两句借景抒情。" },
+    })
+
+    expect(screen.getByRole("alert")).toHaveTextContent("对比手法")
+  })
+
+  it("does not offer 得分点 to 地理, which is told to chain causes instead", async () => {
+    useSubjectStore.setState({ subject: "geography" })
+    render(<Practice />)
+    log("撒哈拉为什么干旱", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "串因果链" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "对得分点" })).not.toBeInTheDocument()
+  })
+})
