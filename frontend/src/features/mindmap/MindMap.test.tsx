@@ -161,6 +161,72 @@ describe("MindMap", () => {
     expect(Math.abs(y("速度") - y("加速度"))).toBeGreaterThanOrEqual(40)
   })
 
+  it("widens a node to fit its heading rather than cutting the heading", () => {
+    // A truncated heading is the failure the map exists to avoid: you cannot
+    // preview a structure whose labels stop mid-phrase, and "副热带高气压带的…"
+    // tells you less than the paragraph it was meant to stand in for.
+    render(
+      <MindMap
+        data={{
+          title: "气压带",
+          nodes: [
+            { id: "r", label: "气压带", node_type: "root" },
+            { id: "a", label: "副热带高气压带的形成与季节移动规律及其影响", parent_id: "r", node_type: "heading" },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByText("副热带高气压带的形成与季节移动规律及其影响")).toBeInTheDocument()
+  })
+
+  it("gives a long node more width than a short one", () => {
+    render(
+      <MindMap
+        data={{
+          title: "对比",
+          nodes: [
+            { id: "r", label: "对比", node_type: "root" },
+            { id: "a", label: "短", parent_id: "r", node_type: "item" },
+            { id: "b", label: "副热带高气压带的形成与季节移动规律及其影响", parent_id: "r", node_type: "item" },
+          ],
+        }}
+      />,
+    )
+
+    const width = (name: string) =>
+      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("width"))
+
+    expect(width("副热带高气压带的形成与季节移动规律及其影响")).toBeGreaterThan(width("短"))
+  })
+
+  it("keeps a wide node from overlapping the column after it", () => {
+    // Columns no longer share one width, so a column's position has to come
+    // from the widest node before it. A fixed stride would let a long heading
+    // run straight through its own children.
+    render(
+      <MindMap
+        data={{
+          title: "根",
+          nodes: [
+            { id: "r", label: "根", node_type: "root" },
+            { id: "a", label: "副热带高气压带的形成与季节移动规律及其影响", parent_id: "r", node_type: "heading" },
+            { id: "b", label: "子", parent_id: "a", node_type: "item" },
+          ],
+        }}
+      />,
+    )
+
+    const rect = (name: string) =>
+      screen.getByRole("treeitem", { name }).querySelector("rect")!
+    const right = (name: string) =>
+      Number(rect(name).getAttribute("x")) + Number(rect(name).getAttribute("width"))
+
+    expect(Number(rect("子").getAttribute("x"))).toBeGreaterThan(
+      right("副热带高气压带的形成与季节移动规律及其影响"),
+    )
+  })
+
   it("exports mermaid text with edges", () => {
     const mermaid = toMermaid({
       title: "运动学",

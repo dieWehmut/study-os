@@ -2,11 +2,40 @@ import { useMemo, useState } from "react"
 
 import type { MindMap as MindMapData, MindNode } from "@/api/integrate"
 
-const NODE_W = 180
+const NODE_MIN_W = 110
 const NODE_H = 40
 const GAP_X = 36
 const GAP_Y = 52
 const PAD = 24
+const FONT_SIZE = 13
+/** Breathing room on each side of the label. */
+const TEXT_PAD = 18
+/** The ▸/▾ caret, kept out of the label's way. */
+const CARET_W = 14
+/** The "+12" on a folded node. Reserved on anything foldable so that folding
+ *  changes the rows and nothing else -- a box that also resized under the
+ *  cursor would make the click feel like it hit something. */
+const BADGE_W = 34
+
+/**
+ * Roughly how wide this label draws.
+ *
+ * Canvas measurement would be exact, but it is unavailable under jsdom and the
+ * layout has to be the same in a test as on screen. Two buckets are enough:
+ * CJK sits on a full em, Latin and digits on a bit over half of one.
+ */
+function labelWidth(label: string): number {
+  let total = 0
+  for (const character of label) {
+    total += /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/.test(character) ? FONT_SIZE : FONT_SIZE * 0.58
+  }
+  return total
+}
+
+function nodeWidth(label: string, foldable: boolean): number {
+  const extras = foldable ? CARET_W + BADGE_W : 0
+  return Math.max(NODE_MIN_W, Math.ceil(labelWidth(label) + TEXT_PAD * 2 + extras))
+}
 
 function nodeTone(nodeType?: string): { fill: string; stroke: string; text: string } {
   switch (nodeType) {
@@ -40,8 +69,12 @@ interface Layout {
  * Spreading a level's nodes by their index across the whole width instead lets
  * a child drift far from its parent, and the long diagonal edge that follows
  * reads as a link between unrelated branches.
+ *
+ * Columns are laid out cumulatively from the widest node in each one, because
+ * nodes size to their own label. A fixed stride would let one long heading run
+ * straight through the column holding its children.
  */
-function layout(nodes: MindNode[]): Layout {
+function layout(nodes: MindNode[], widthOf: (id: string) => number): Layout {
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const children = new Map<string, string[]>()
   const roots: string[] = []
@@ -83,19 +116,30 @@ function layout(nodes: MindNode[]): Layout {
     }
   }
 
+  const columns = Math.max(0, ...depth.values()) + 1
+  const columnWidth: number[] = Array.from({ length: columns }, () => NODE_MIN_W)
+  for (const node of nodes) {
+    const column = depth.get(node.id) ?? 0
+    columnWidth[column] = Math.max(columnWidth[column]!, widthOf(node.id))
+  }
+  const columnX: number[] = []
+  for (let column = 0; column < columns; column += 1) {
+    columnX[column] =
+      column === 0 ? PAD : columnX[column - 1]! + columnWidth[column - 1]! + GAP_X
+  }
+
   const positions = new Map<string, { x: number; y: number }>()
   for (const node of nodes) {
     positions.set(node.id, {
-      x: PAD + (depth.get(node.id) ?? 0) * (NODE_W + GAP_X),
+      x: columnX[depth.get(node.id) ?? 0]!,
       y: PAD + (row.get(node.id) ?? 0) * (NODE_H + GAP_Y),
     })
   }
 
-  const columns = Math.max(0, ...depth.values()) + 1
   return {
     positions,
     depth,
-    width: PAD * 2 + columns * (NODE_W + GAP_X) - GAP_X,
+    width: columnX[columns - 1]! + columnWidth[columns - 1]! + PAD,
     height: PAD * 2 + Math.max(1, rows) * (NODE_H + GAP_Y) - GAP_Y,
   }
 }
@@ -142,7 +186,18 @@ export function MindMap({ data }: { data: MindMapData }) {
     return true
   })
 
-  const { positions, depth, width, height } = layout(visible)
+  // Sized from the full tree, not from what is on screen, so that folding a
+  // branch moves rows without also resizing the node under the cursor.
+  const widths = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const node of data.nodes) {
+      map.set(node.id, nodeWidth(node.label, children.has(node.id)))
+    }
+    return map
+  }, [data.nodes, children])
+  const widthOf = (id: string) => widths.get(id) ?? NODE_MIN_W
+
+  const { positions, depth, width, height } = layout(visible, widthOf)
 
   function toggle(id: string) {
     if (!children.has(id)) return
@@ -161,7 +216,7 @@ export function MindMap({ data }: { data: MindMapData }) {
           const child = positions.get(node.id)
           const parent = positions.get(node.parent_id)
           if (!child || !parent) return null
-          const x1 = parent.x + NODE_W
+          const x1 = parent.x + widthOf(node.parent_id)
           const y1 = parent.y + NODE_H / 2
           const x2 = child.x
           const y2 = child.y + NODE_H / 2
@@ -183,7 +238,7 @@ export function MindMap({ data }: { data: MindMapData }) {
           const foldable = children.has(node.id)
           const folded = collapsed.has(node.id)
           const hidden = folded ? countDescendants(node.id, children) : 0
-          const label = node.label.length > 16 ? `${node.label.slice(0, 15)}…` : node.label
+          const boxWidth = widthOf(node.id)
           return (
             <g
               key={node.id}
@@ -205,7 +260,7 @@ export function MindMap({ data }: { data: MindMapData }) {
               <rect
                 x={pos.x}
                 y={pos.y}
-                width={NODE_W}
+                width={boxWidth}
                 height={NODE_H}
                 rx={10}
                 fill={tone.fill}
@@ -223,17 +278,17 @@ export function MindMap({ data }: { data: MindMapData }) {
                 </text>
               ) : null}
               <text
-                x={pos.x + NODE_W / 2}
+                x={pos.x + boxWidth / 2}
                 y={pos.y + NODE_H / 2 + 4}
                 textAnchor="middle"
-                fontSize={13}
+                fontSize={FONT_SIZE}
                 fill={tone.text}
               >
-                {label}
+                {node.label}
               </text>
               {hidden > 0 ? (
                 <text
-                  x={pos.x + NODE_W - 10}
+                  x={pos.x + boxWidth - 10}
                   y={pos.y + NODE_H / 2 + 4}
                   textAnchor="end"
                   fontSize={11}
