@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+/* 只引 gb screen 这一份变体：四份里有两份声明同名 family，全引进来等于让加载
+   顺序决定用哪一份。screen 版的字形做过屏幕优化，gb 覆盖简中常用字。 */
+@import "lxgw-wenkai-screen-webfont/lxgwwenkaigbscreen.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -33,8 +35,8 @@
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -72,8 +74,8 @@
     --sidebar-accent-foreground: 126 43% 20%;
     --sidebar-border: 135 12% 85%;
     --sidebar-ring: 121 71% 36%;
-    --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-    --font-heading: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+    --font-sans: "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+    --font-heading: "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   }
 
   .dark {
