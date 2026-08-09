@@ -122,6 +122,45 @@ describe("MindMap", () => {
     expect(screen.getByRole("treeitem", { name: "瞬时速度" })).toHaveAttribute("aria-level", "3")
   })
 
+  it("grows rightward, one column per level", () => {
+    // A mindmap reads left to right: the trunk on the left, detail extending
+    // away from it. Stacked downward instead, a deep branch runs off the
+    // bottom of a screen that is wider than it is tall.
+    render(<MindMap data={data} />)
+
+    const x = (name: string) =>
+      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("x"))
+
+    expect(x("速度")).toBeGreaterThan(x("运动学"))
+    expect(x("瞬时速度")).toBeGreaterThan(x("速度"))
+    // Same depth, same column -- otherwise depth is not readable from position.
+    expect(x("加速度")).toBe(x("速度"))
+  })
+
+  it("sits a parent level with the middle of its own children", () => {
+    // Placing nodes by their index across the whole level lets a child drift
+    // far from its parent, leaving a long diagonal edge that reads as a link
+    // between unrelated branches.
+    render(<MindMap data={data} />)
+
+    const y = (name: string) =>
+      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("y"))
+
+    const children = [y("瞬时速度"), y("平均速度")]
+    expect(y("速度")).toBeGreaterThan(Math.min(...children))
+    expect(y("速度")).toBeLessThan(Math.max(...children))
+  })
+
+  it("keeps siblings from landing on top of each other", () => {
+    render(<MindMap data={data} />)
+
+    const y = (name: string) =>
+      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("y"))
+
+    expect(Math.abs(y("瞬时速度") - y("平均速度"))).toBeGreaterThanOrEqual(40)
+    expect(Math.abs(y("速度") - y("加速度"))).toBeGreaterThanOrEqual(40)
+  })
+
   it("exports mermaid text with edges", () => {
     const mermaid = toMermaid({
       title: "运动学",

@@ -25,16 +25,6 @@ function nodeTone(nodeType?: string): { fill: string; stroke: string; text: stri
   }
 }
 
-function depthOf(node: MindNode, byId: Map<string, MindNode>): number {
-  let depth = 0
-  let current = node
-  while (current.parent_id && byId.has(current.parent_id)) {
-    current = byId.get(current.parent_id)!
-    depth++
-  }
-  return depth
-}
-
 interface Layout {
   positions: Map<string, { x: number; y: number }>
   depth: Map<string, number>
@@ -42,52 +32,72 @@ interface Layout {
   height: number
 }
 
+/**
+ * Right-facing tree: depth picks the column, the subtree picks the row.
+ *
+ * Rows go to leaves in reading order and every parent takes the midpoint of its
+ * own first and last child, so a branch stays level with the node it hangs off.
+ * Spreading a level's nodes by their index across the whole width instead lets
+ * a child drift far from its parent, and the long diagonal edge that follows
+ * reads as a link between unrelated branches.
+ */
 function layout(nodes: MindNode[]): Layout {
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const children = new Map<string, string[]>()
-  let rootId = nodes[0]?.id ?? ""
+  const roots: string[] = []
   for (const node of nodes) {
     if (!node.parent_id || !byId.has(node.parent_id)) {
-      rootId = node.id
+      roots.push(node.id)
       continue
     }
-    const list = children.get(node.parent_id) ?? []
-    list.push(node.id)
-    children.set(node.parent_id, list)
+    children.set(node.parent_id, [...(children.get(node.parent_id) ?? []), node.id])
   }
-  const depth = new Map(nodes.map((node) => [node.id, depthOf(node, byId)]))
-  const levelCounts: number[] = []
-  nodes.forEach((node) => {
-    const level = depth.get(node.id) ?? 0
-    levelCounts[level] = (levelCounts[level] ?? 0) + 1
-  })
-  const maxLevel = Math.max(0, ...Array.from(depth.values()))
-  const maxCount = Math.max(1, ...levelCounts.filter((count) => count > 0))
-  const width = maxCount * (NODE_W + GAP_X) + PAD * 2 - GAP_X
-  const height = (maxLevel + 1) * (NODE_H + GAP_Y) + PAD * 2
 
-  const order = new Map<string, number>()
-  const queue: Array<{ id: string; level: number }> = [{ id: rootId, level: 0 }]
-  const levelOrder = new Map<number, number>()
-  while (queue.length > 0) {
-    const { id, level } = queue.shift()!
-    order.set(id, levelOrder.get(level) ?? 0)
-    levelOrder.set(level, (levelOrder.get(level) ?? 0) + 1)
-    for (const child of children.get(id) ?? []) {
-      queue.push({ id: child, level: level + 1 })
+  const depth = new Map<string, number>()
+  const row = new Map<string, number>()
+  let rows = 0
+
+  // Post-order, because a parent's row is not known until its children have
+  // one. Kept iterative: the nesting depth belongs to whatever document was
+  // imported, and the call stack is not the place to find out how deep it went.
+  for (const rootId of roots) {
+    const stack = [{ id: rootId, level: 0, resolved: false }]
+    while (stack.length > 0) {
+      const frame = stack.pop()!
+      const kids = children.get(frame.id) ?? []
+      if (frame.resolved) {
+        const first = row.get(kids[0]!) ?? 0
+        row.set(frame.id, (first + (row.get(kids[kids.length - 1]!) ?? first)) / 2)
+        continue
+      }
+      depth.set(frame.id, frame.level)
+      if (kids.length === 0) {
+        row.set(frame.id, rows++)
+        continue
+      }
+      stack.push({ ...frame, resolved: true })
+      // Reversed, so the first child is popped first and keeps the lowest row.
+      for (const kid of [...kids].reverse()) {
+        stack.push({ id: kid, level: frame.level + 1, resolved: false })
+      }
     }
   }
+
   const positions = new Map<string, { x: number; y: number }>()
-  nodes.forEach((node) => {
-    const level = depth.get(node.id) ?? 0
-    const index = order.get(node.id) ?? 0
-    const count = levelCounts[level] ?? 1
+  for (const node of nodes) {
     positions.set(node.id, {
-      x: PAD + (index - (count - 1) / 2) * (NODE_W + GAP_X),
-      y: PAD + level * (NODE_H + GAP_Y),
+      x: PAD + (depth.get(node.id) ?? 0) * (NODE_W + GAP_X),
+      y: PAD + (row.get(node.id) ?? 0) * (NODE_H + GAP_Y),
     })
-  })
-  return { positions, depth, width, height }
+  }
+
+  const columns = Math.max(0, ...depth.values()) + 1
+  return {
+    positions,
+    depth,
+    width: PAD * 2 + columns * (NODE_W + GAP_X) - GAP_X,
+    height: PAD * 2 + Math.max(1, rows) * (NODE_H + GAP_Y) - GAP_Y,
+  }
 }
 
 /** Every node beneath this one, however deep. */
@@ -151,15 +161,15 @@ export function MindMap({ data }: { data: MindMapData }) {
           const child = positions.get(node.id)
           const parent = positions.get(node.parent_id)
           if (!child || !parent) return null
-          const x1 = parent.x + NODE_W / 2
-          const y1 = parent.y + NODE_H
-          const x2 = child.x + NODE_W / 2
-          const y2 = child.y
-          const mid = (y1 + y2) / 2
+          const x1 = parent.x + NODE_W
+          const y1 = parent.y + NODE_H / 2
+          const x2 = child.x
+          const y2 = child.y + NODE_H / 2
+          const mid = (x1 + x2) / 2
           return (
             <path
               key={`edge-${node.id}`}
-              d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
+              d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`}
               fill="none"
               stroke="#a1a1aa"
               strokeWidth={1.2}
