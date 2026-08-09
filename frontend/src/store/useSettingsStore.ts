@@ -18,6 +18,21 @@ import {
   type VendorInfo,
 } from "@/api/agent"
 import {
+  createVoiceRole,
+  deleteVoiceRole,
+  getSpeechSettings,
+  listVoiceRoles,
+  saveSpeechConfig,
+  setActiveVoiceRole,
+  updateVoiceRole,
+  uploadVoiceRoleAvatar,
+  type SpeechConfigInput,
+  type SpeechStatus,
+  type VoiceRole,
+  type VoiceRoleInput,
+  type VoiceRolePatch,
+} from "@/api/speech"
+import {
   normalizeDailyLimit,
   readPersistedSettings,
   writePersistedSettings,
@@ -38,16 +53,36 @@ interface SettingsStore {
   isBackingUp: boolean
   error: string | null
   notice: string | null
+  speech: SpeechStatus | null
+  voiceRoles: VoiceRole[]
+  activeVoiceRoleId: string
+  isSavingSpeech: boolean
+  speechError: string | null
+  speechNotice: string | null
   load: () => Promise<void>
   saveDailyLimit: (value: number) => Promise<void>
   createDailyBackup: () => Promise<void>
   switchProvider: (provider: string) => Promise<void>
   testProvider: (provider: string) => Promise<void>
   saveConfig: (provider: string, values: VendorConfigInput) => Promise<void>
+  loadSpeech: () => Promise<void>
+  saveSpeechSettings: (values: SpeechConfigInput) => Promise<void>
+  addVoiceRole: (input: VoiceRoleInput) => Promise<void>
+  editVoiceRole: (id: string, patch: VoiceRolePatch) => Promise<void>
+  removeVoiceRole: (id: string) => Promise<void>
+  activateVoiceRole: (id: string) => Promise<void>
+  changeVoiceRoleAvatar: (id: string, file: File) => Promise<void>
 }
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback
+}
+
+// 角色的增删改都会影响排序与激活状态，所以每次写入后统一从后端重新拉一次列表，
+// 而不是在本地拼接一个可能和数据库不一致的数组。
+async function refreshVoiceRoles(): Promise<{ voiceRoles: VoiceRole[]; activeVoiceRoleId: string }> {
+  const response = await listVoiceRoles()
+  return { voiceRoles: response.items ?? [], activeVoiceRoleId: response.active_role_id ?? "" }
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -64,6 +99,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   isBackingUp: false,
   error: null,
   notice: null,
+  speech: null,
+  voiceRoles: [],
+  activeVoiceRoleId: "",
+  isSavingSpeech: false,
+  speechError: null,
+  speechNotice: null,
 
   async load() {
     set({ isLoading: true, error: null, notice: null })
@@ -173,6 +214,82 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       })
     } catch (error) {
       set({ isSavingConfig: false, error: `配置保存失败：${errorMessage(error, "无法写入 .env.local")}` })
+    }
+  },
+
+  // 语音合成独立加载：它坏掉时诊断信息仍要能显示，不该把整个设置页拖成错误态。
+  async loadSpeech() {
+    set({ speechError: null })
+    try {
+      const response = await getSpeechSettings()
+      set({
+        speech: response.speech,
+        voiceRoles: response.roles ?? [],
+        activeVoiceRoleId: response.active_role_id ?? "",
+      })
+    } catch (error) {
+      set({ speechError: `无法读取语音合成配置：${errorMessage(error, "服务不可用")}` })
+    }
+  },
+
+  async saveSpeechSettings(values) {
+    set({ isSavingSpeech: true, speechError: null, speechNotice: null })
+    try {
+      const response = await saveSpeechConfig(values)
+      set({ speech: response.speech, isSavingSpeech: false, speechNotice: "语音合成配置已保存" })
+    } catch (error) {
+      set({ isSavingSpeech: false, speechError: `语音合成配置保存失败：${errorMessage(error, "无法写入 .env.local")}` })
+    }
+  },
+
+  async addVoiceRole(input) {
+    set({ isSavingSpeech: true, speechError: null, speechNotice: null })
+    try {
+      await createVoiceRole(input)
+      set({ ...(await refreshVoiceRoles()), isSavingSpeech: false, speechNotice: "语音角色已创建" })
+    } catch (error) {
+      set({ isSavingSpeech: false, speechError: `角色创建失败：${errorMessage(error, "服务不可用")}` })
+    }
+  },
+
+  async editVoiceRole(id, patch) {
+    set({ isSavingSpeech: true, speechError: null, speechNotice: null })
+    try {
+      await updateVoiceRole(id, patch)
+      set({ ...(await refreshVoiceRoles()), isSavingSpeech: false, speechNotice: "语音角色已保存" })
+    } catch (error) {
+      set({ isSavingSpeech: false, speechError: `角色保存失败：${errorMessage(error, "服务不可用")}` })
+    }
+  },
+
+  async removeVoiceRole(id) {
+    set({ isSavingSpeech: true, speechError: null, speechNotice: null })
+    try {
+      await deleteVoiceRole(id)
+      set({ ...(await refreshVoiceRoles()), isSavingSpeech: false, speechNotice: "语音角色已删除" })
+    } catch (error) {
+      set({ isSavingSpeech: false, speechError: `角色删除失败：${errorMessage(error, "服务不可用")}` })
+    }
+  },
+
+  async activateVoiceRole(id) {
+    set({ speechError: null, speechNotice: null })
+    try {
+      const response = await setActiveVoiceRole(id)
+      const activeVoiceRoleId = response.active_role_id ?? ""
+      set({ activeVoiceRoleId, speechNotice: activeVoiceRoleId ? "已切换当前语音角色" : "已恢复全局默认发音" })
+    } catch (error) {
+      set({ speechError: `角色切换失败：${errorMessage(error, "服务不可用")}` })
+    }
+  },
+
+  async changeVoiceRoleAvatar(id, file) {
+    set({ isSavingSpeech: true, speechError: null, speechNotice: null })
+    try {
+      await uploadVoiceRoleAvatar(id, file)
+      set({ ...(await refreshVoiceRoles()), isSavingSpeech: false, speechNotice: "头像已更新" })
+    } catch (error) {
+      set({ isSavingSpeech: false, speechError: `头像上传失败：${errorMessage(error, "服务不可用")}` })
     }
   },
 }))

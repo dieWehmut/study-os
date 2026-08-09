@@ -9,6 +9,7 @@ import (
 
 	"study-os/backend/app"
 	"study-os/backend/audio"
+	"study-os/backend/config"
 	"study-os/backend/models"
 )
 
@@ -31,14 +32,7 @@ func handleAudioRequest(response http.ResponseWriter, request *http.Request, app
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "audio service unavailable"})
 		return
 	}
-	input := audio.Request{
-		Term:      request.URL.Query().Get("term"),
-		Locale:    request.URL.Query().Get("locale"),
-		Voice:     request.URL.Query().Get("voice"),
-		Format:    request.URL.Query().Get("format"),
-		Provider:  request.URL.Query().Get("provider"),
-		LocalPath: request.URL.Query().Get("local_path"),
-	}
+	input := audioRequestFromQuery(request, application)
 	if strings.TrimSpace(input.Term) == "" && strings.TrimSpace(input.LocalPath) == "" {
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "term or local_path is required"})
 		return
@@ -78,14 +72,7 @@ func handleAudioTimeline(response http.ResponseWriter, request *http.Request, ap
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "audio service unavailable"})
 		return
 	}
-	input := audio.Request{
-		Term:      request.URL.Query().Get("term"),
-		Locale:    request.URL.Query().Get("locale"),
-		Voice:     request.URL.Query().Get("voice"),
-		Format:    request.URL.Query().Get("format"),
-		Provider:  request.URL.Query().Get("provider"),
-		LocalPath: request.URL.Query().Get("local_path"),
-	}
+	input := audioRequestFromQuery(request, application)
 	if strings.TrimSpace(input.Term) == "" && strings.TrimSpace(input.LocalPath) == "" {
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "term or local_path is required"})
 		return
@@ -96,6 +83,53 @@ func handleAudioTimeline(response http.ResponseWriter, request *http.Request, ap
 		return
 	}
 	writeJSON(response, http.StatusOK, timeline)
+}
+
+// audioRequestFromQuery builds the synthesis request and layers the selected
+// voice role on top. Playback and timeline lookups share it because both derive
+// the same cache key, and a role that only one of them applied would make the
+// timeline sidecar unreachable.
+func audioRequestFromQuery(request *http.Request, application *app.App) audio.Request {
+	query := request.URL.Query()
+	input := audio.Request{
+		Term:      query.Get("term"),
+		Locale:    query.Get("locale"),
+		Voice:     query.Get("voice"),
+		Format:    query.Get("format"),
+		Provider:  query.Get("provider"),
+		LocalPath: query.Get("local_path"),
+	}
+	if application == nil || application.Store == nil {
+		return input
+	}
+	roleID := strings.TrimSpace(query.Get("role"))
+	if roleID == "" {
+		roleID, _ = application.Store.ActiveVoiceRoleID(request.Context())
+	}
+	if roleID == "" {
+		return input
+	}
+	role, err := application.Store.GetVoiceRole(request.Context(), roleID)
+	if err != nil {
+		// A deleted or unreadable role falls back to the global voice. Losing the
+		// persona is a smaller failure than losing pronunciation entirely.
+		return input
+	}
+	baseURL := role.BaseURL
+	if baseURL == "" {
+		if spec, ok := config.LookupSpeechProvider(role.Provider); ok {
+			baseURL = spec.BaseURL
+		}
+	}
+	input.BaseURL = baseURL
+	input.Model = role.Model
+	if role.Voice != "" {
+		input.Voice = role.Voice
+	}
+	// Tag the cache entry with the role so two roles reading the same word keep
+	// separate audio instead of overwriting each other.
+	input.Provider = "role:" + role.ID
+	return input
 }
 
 func recordGeneratedAudio(request *http.Request, application *app.App, opened *audio.Opened, input audio.Request) {

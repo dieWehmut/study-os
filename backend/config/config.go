@@ -21,6 +21,9 @@ type Config struct {
 	AI              map[string]VendorConfig
 	DashScopeAPIKey string
 	DashScopeVoice  string
+	// SpeechSettings holds the 语音合成 endpoint. Read it through Speech() so
+	// preset defaults are applied.
+	SpeechSettings SpeechConfig
 	Launcher        bool
 	StaticDir       string
 	UpdateRepo      string
@@ -94,6 +97,7 @@ func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 		DashScopeAPIKey: envValue(lookup, "DASHSCOPE_API_KEY"),
 		DashScopeVoice:  valueOr(lookup, "DASHSCOPE_TTS_VOICE", "longxiaochun"),
 		AI:              loadVendors(lookup),
+		SpeechSettings:  loadSpeech(lookup),
 	}
 	cfg.DBPath = valueOr(lookup, "STUDY_OS_DB_PATH", filepath.Join(cfg.DataDir, "study.db"))
 
@@ -136,6 +140,21 @@ func loadVendors(lookup func(string) (string, bool)) map[string]VendorConfig {
 		}
 	}
 	return vendors
+}
+
+// loadSpeech reads the 语音合成 endpoint. Values are kept exactly as written --
+// voice names are case-sensitive at several vendors -- and preset defaults are
+// applied later by Config.Speech() so an unset field stays distinguishable from
+// one the user deliberately blanked.
+func loadSpeech(lookup func(string) (string, bool)) SpeechConfig {
+	return SpeechConfig{
+		Provider: valueOr(lookup, "SPEECH_PROVIDER", "custom"),
+		BaseURL:  envValue(lookup, "SPEECH_BASE_URL"),
+		APIKey:   envValue(lookup, "SPEECH_API_KEY"),
+		Model:    envValue(lookup, "SPEECH_MODEL"),
+		Voice:    envValue(lookup, "SPEECH_VOICE"),
+		Format:   strings.ToLower(envValue(lookup, "SPEECH_FORMAT")),
+	}
 }
 
 func envValue(lookup func(string) (string, bool), key string) string {

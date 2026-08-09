@@ -44,7 +44,22 @@ export function Select({
           className,
         )}
       >
-        <SelectPrimitive.Value placeholder={placeholder} className="truncate" />
+        {/*
+          The popup is unmounted while closed, so the primitive cannot look up the
+          selected item's label on its own and falls back to printing the raw
+          value. That only shows when a value differs from its label -- the
+          语音合成 preset picker rendered "local" instead of「本地服务」-- so map it
+          back here. Supplying children overrides the placeholder, hence the
+          explicit empty case.
+        */}
+        <SelectPrimitive.Value className="truncate">
+          {(selected: string | null) => {
+            if (selected === null || selected === "") {
+              return placeholder
+            }
+            return options.find((option) => option.value === selected)?.label ?? selected
+          }}
+        </SelectPrimitive.Value>
         <SelectPrimitive.Icon className="shrink-0 text-primary">
           <ChevronDown aria-hidden="true" className="size-3.5" />
         </SelectPrimitive.Icon>

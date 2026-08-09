@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react"
-import { BookmarkPlus, Check, ChevronLeft, ChevronRight, HelpCircle, Square, Volume2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { BookmarkPlus, Check, ChevronLeft, ChevronRight, HelpCircle, Loader2, Square, Volume2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { usePassageSpeech } from "@/hooks/usePassageSpeech"
 import type { ReadingChunk } from "@/lib/chunk"
 import { createSpeechReader, speechSupported } from "@/lib/speech"
 
@@ -44,31 +45,43 @@ export function FocusReader({
   keptIds,
 }: FocusReaderProps) {
   const chunk = chunks[index]
+  const chunkId = chunk?.id
 
-  // Which line the voice is on, and the only record of whether it is running:
-  // the reader clears it when the section runs out, so the two can never
-  // disagree about what the button should say.
+  // 主力：配置好的语音合成，分句预取播放，声音是克隆音色。
+  const speech = usePassageSpeech()
+  const stopSpeech = speech.stop
+
+  // 兜底：浏览器自带朗读，零配置、离线可用，声音是机械音。主力一旦出错——没配
+  // 语音合成、后端连不上、本地引擎没起来——就悄悄切过去，好过把等待和一句英文
+  // 报错甩给用户。built once：一个中途冒出来的控件和一个什么都不做的控件一样
+  // 让人心里没底，所以支不支持在挂载时就定了。
   const [speakingLine, setSpeakingLine] = useState<number | null>(null)
-  // Built once. A control that appeared halfway through a session would be as
-  // confusing as one that did nothing, so support is settled at mount.
   const [reader] = useState(() =>
     speechSupported()
       ? createSpeechReader({ onLine: setSpeakingLine, onDone: () => setSpeakingLine(null) })
       : null,
   )
-  const speaking = speakingLine !== null
-  const chunkId = chunk?.id
+  const usingFallback = speakingLine !== null
+  // 每次主动开始朗读才清零，防止兜底自己念完（onDone 把 speakingLine 归零）之
+  // 后，下面那个 effect 把同一次失败又重播一遍，念成循环。
+  const fallbackFiredRef = useRef(false)
 
-  // Keyed on the stop, so the same cleanup covers both ways the voice can
-  // outlive what it is reading: turning the page, and leaving the page
-  // altogether. speechSynthesis is a browser-wide singleton and would happily
-  // carry on reading a section nobody is looking at.
+  // 声音要跟着这次朗读走：翻页也好，离开页面也好，都不能把它落下。
   useEffect(() => {
+    if (chunkId === undefined) return
     return () => {
+      stopSpeech()
       reader?.stop()
       setSpeakingLine(null)
     }
-  }, [chunkId, reader])
+  }, [chunkId, stopSpeech, reader])
+
+  // 主力真的失败了，且这次失败还没交给过兜底，才接手。
+  useEffect(() => {
+    if (speech.status !== "error" || !reader || fallbackFiredRef.current) return
+    fallbackFiredRef.current = true
+    reader.start(chunk?.lines ?? [])
+  }, [speech.status, reader, chunk])
 
   if (!chunk) {
     return (
@@ -88,6 +101,8 @@ export function FocusReader({
   // having it is the common case, not a contradiction to rule out.
   const isStuck = stuckIds?.has(chunk.id) ?? false
   const isKept = keptIds?.has(chunk.id) ?? false
+  const isPreparing = speech.status === "preparing"
+  const isSpeaking = speech.status === "playing" || usingFallback
 
   function move(delta: number) {
     const next = index + delta
@@ -96,13 +111,14 @@ export function FocusReader({
   }
 
   function toggleSpeech() {
-    if (!reader) return
-    if (speaking) {
-      reader.stop()
+    if (isPreparing || isSpeaking) {
+      speech.stop()
+      reader?.stop()
       setSpeakingLine(null)
       return
     }
-    reader.start(chunk.lines)
+    fallbackFiredRef.current = false
+    speech.start(chunk.lines.join("\n"))
   }
 
   return (
@@ -159,20 +175,34 @@ export function FocusReader({
         <span className="text-xs tabular-nums text-muted-foreground">
           {index + 1} / {chunks.length}
         </span>
-        {/* Absent when the browser has no voice: a button that does nothing is
-            worse than one that is not there. Sits with the page turns rather
-            than the verdicts -- it is about getting through this section, not
-            about what you made of it. */}
-        {reader ? (
-          <Button
-            variant={speaking ? "secondary" : "ghost"}
-            size="sm"
-            aria-pressed={speaking}
-            onClick={toggleSpeech}
-          >
-            {speaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
-            {speaking ? "停止朗读" : "朗读"}
-          </Button>
+        {/* 一按就出声：整节一次合成要等上几分钟，逐句读就只等第一句。主力出错
+            （没配语音合成、后端连不上）会自动切浏览器朗读，不是这里就报废。 */}
+        <Button
+          variant="outline"
+          size="sm"
+          aria-pressed={isSpeaking}
+          aria-label={isPreparing || isSpeaking ? "停止朗读" : "朗读本节"}
+          onClick={toggleSpeech}
+        >
+          {isPreparing ? (
+            <Loader2 aria-hidden="true" className="animate-spin" />
+          ) : isSpeaking ? (
+            <Square aria-hidden="true" />
+          ) : (
+            <Volume2 aria-hidden="true" />
+          )}
+          {speech.status === "playing" ? (
+            <span className="tabular-nums">{speech.currentIndex + 1}/{speech.total}</span>
+          ) : isPreparing || usingFallback ? (
+            "停止朗读"
+          ) : (
+            "朗读本节"
+          )}
+        </Button>
+        {/* 兜底不存在（浏览器没有 speechSynthesis）时才把失败露出来：兜底能接
+            手的话，用户听到的只是换了个音色，不该看见一闪而过的报错。 */}
+        {speech.status === "error" && !reader && speech.error ? (
+          <span role="alert" className="text-xs text-destructive">{speech.error}</span>
         ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {onToggleStuck ? (
