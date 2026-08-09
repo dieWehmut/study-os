@@ -56,6 +56,42 @@ function speak(term: string, locale: string): boolean {
   return true
 }
 
+/**
+ * One piece of a passage, as bytes. Playback and revokeObjectURL are the
+ * caller's, because a passage is read piece by piece and only the caller knows
+ * when the last one has finished.
+ *
+ * The signal matters more here than for a single word: the local engine
+ * synthesizes at about real time, so a reader who moves on would otherwise
+ * leave minutes of work queued for text nobody will hear.
+ */
+export async function synthesizeSentence(
+  text: string,
+  options: { roleId?: string; format?: string; signal?: AbortSignal } = {},
+): Promise<Blob> {
+  const query = new URLSearchParams({ term: text })
+  if (options.roleId) query.set("role", options.roleId)
+  query.set("format", options.format ?? "wav")
+
+  const response = await fetch(`${resolveApiBase()}/audio?${query.toString()}`, {
+    method: "POST",
+    headers: { [generationHeader]: "1" },
+    signal: options.signal,
+  })
+  if (!response.ok) {
+    // 后端失败时回的是 {"error": "..."}，读得到就用它，读不到再退回状态码。
+    let message = `朗读失败（HTTP ${response.status}）`
+    try {
+      const payload = (await response.json()) as { error?: string }
+      if (payload?.error) message = payload.error
+    } catch {
+      // 响应体不是 JSON，保留上面的兜底文案。
+    }
+    throw new Error(message)
+  }
+  return response.blob()
+}
+
 export async function playPronunciation(
   term: string,
   options: { locale?: string; format?: string } = {},
