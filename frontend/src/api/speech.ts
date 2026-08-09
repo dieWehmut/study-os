@@ -154,7 +154,8 @@ const generationHeader = "X-Study-OS-Request"
 // 试听拿的是音频字节而不是 JSON，所以绕开 apiRequest 直接 fetch。调用方负责
 // 播放和 revokeObjectURL——这里只管把 blob 交出去。
 export async function synthesizeVoiceRolePreview(id: string, text: string): Promise<Blob> {
-  const query = new URLSearchParams({ term: text, role: id, format: "wav" })
+  // 不写 format，让后端用设置里选的容器——试听要听的就是设置生效后的样子。
+  const query = new URLSearchParams({ term: text, role: id })
   const response = await fetch(`${resolveApiBase()}/audio?${query.toString()}`, {
     method: "POST",
     headers: { [generationHeader]: "1" },

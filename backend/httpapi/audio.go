@@ -99,7 +99,18 @@ func audioRequestFromQuery(request *http.Request, application *app.App) audio.Re
 		Provider:  query.Get("provider"),
 		LocalPath: query.Get("local_path"),
 	}
-	if application == nil || application.Store == nil {
+	if application == nil {
+		return input
+	}
+	// An absent format means "whatever the user chose in 设置", which is the only
+	// thing that makes the 音频格式 picker a setting rather than a decoration. A
+	// caller that named a container keeps it: the reading pipeline asks for wav
+	// on purpose, because only WAV carries a duration the timeline can read back.
+	// This reads config alone, so it stays above the store guard below.
+	if input.Format == "" {
+		input.Format = application.Config.Speech().Format
+	}
+	if application.Store == nil {
 		return input
 	}
 	roleID := strings.TrimSpace(query.Get("role"))

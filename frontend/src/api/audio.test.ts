@@ -24,11 +24,30 @@ describe("pronunciation playback", () => {
     })
 
     await expect(playPronunciation("abandon")).resolves.toBe("file")
+    // 不带 format：容器交给后端按 音频格式 设置决定。客户端钉死 "wav" 会让那个
+    // 选择器怎么选都一样。
     expect(audioConstructor).toHaveBeenCalledWith(
-      "http://127.0.0.1:43123/api/audio?term=abandon&locale=en-US&format=wav",
+      "http://127.0.0.1:43123/api/audio?term=abandon&locale=en-US",
     )
     expect(play).toHaveBeenCalledOnce()
     expect(speak).not.toHaveBeenCalled()
+  })
+
+  it("still sends a format the caller named", async () => {
+    // 省略 format 是"用设置里的容器"，不是"没有 format 这回事"。调用方点名要某个
+    // 容器时必须照送，否则时间轴那条依赖 wav 的路子就没法开口要了。
+    const play = vi.fn().mockResolvedValue(undefined)
+    const audioConstructor = vi.fn(function AudioMock() { return { play } })
+    Object.defineProperty(window, "Audio", { configurable: true, value: audioConstructor })
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: { cancel: vi.fn(), speak: vi.fn() },
+    })
+
+    await expect(playPronunciation("abandon", { format: "wav" })).resolves.toBe("file")
+    expect(audioConstructor).toHaveBeenCalledWith(
+      "http://127.0.0.1:43123/api/audio?term=abandon&locale=en-US&format=wav",
+    )
   })
 
   it("asks the server to synthesize before giving up on browser speech", async () => {
@@ -59,7 +78,7 @@ describe("pronunciation playback", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce()
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe("http://127.0.0.1:43123/api/audio?term=abandon&locale=en-US&format=wav")
+    expect(url).toBe("http://127.0.0.1:43123/api/audio?term=abandon&locale=en-US")
     expect(init.method).toBe("POST")
     // The route rejects generation requests without this header, so a missing
     // one is a silent 403 rather than a synthesized word.

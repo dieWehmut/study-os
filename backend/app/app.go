@@ -96,28 +96,30 @@ func buildAudioGenerator(cfg config.Config) (audio.Generator, error) {
 	local := audio.NewSAPIProvider()
 	chain := make([]audio.Generator, 0, 3)
 
-	if speech := cfg.Speech(); speech.BaseURL != "" {
-		speechProvider, err := audio.NewOpenAISpeechProvider(audio.SpeechSettings{
-			BaseURL:   speech.BaseURL,
-			APIKey:    speech.APIKey,
-			Model:     speech.Model,
-			Voice:     speech.Voice,
-			AuthStyle: cfg.SpeechAuthStyle(),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("create speech provider: %w", err)
-		}
-		chain = append(chain, speechProvider)
+	// Always in the chain, even with no global endpoint configured. A voice role
+	// may point at its own server, and roles are rows the user adds while the
+	// process is running -- gating this on startup config meant a role's own
+	// 接口地址 was read, echoed back in the UI, and then silently dropped because
+	// nothing downstream could act on it. With no endpoint from either side the
+	// provider reports ErrGeneratorUnavailable and the chain moves on.
+	speech := cfg.Speech()
+	speechProvider, err := audio.NewOpenAISpeechProvider(audio.SpeechSettings{
+		BaseURL:   speech.BaseURL,
+		APIKey:    speech.APIKey,
+		Model:     speech.Model,
+		Voice:     speech.Voice,
+		AuthStyle: cfg.SpeechAuthStyle(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create speech provider: %w", err)
 	}
+	chain = append(chain, speechProvider)
 	if cfg.DashScopeAPIKey != "" {
 		cloudGenerator, err := audio.NewDashScopeProvider(cfg.DashScopeAPIKey, cfg.DashScopeVoice)
 		if err != nil {
 			return nil, fmt.Errorf("create cloud audio provider: %w", err)
 		}
 		chain = append(chain, cloudGenerator)
-	}
-	if len(chain) == 0 {
-		return local, nil
 	}
 	return audio.NewFallbackGenerator(append(chain, local)...), nil
 }

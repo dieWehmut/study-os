@@ -303,8 +303,67 @@ func TestJoinAudioPathKeepsAnAlreadyCompleteEndpoint(t *testing.T) {
 	}
 }
 
-func TestNewOpenAISpeechProviderRequiresAnEndpoint(t *testing.T) {
-	if _, err := NewOpenAISpeechProvider(SpeechSettings{APIKey: "k", Model: "tts-1"}); !errors.Is(err, ErrGeneratorUnavailable) {
+// Voice roles are runtime rows, added long after the generator chain is built.
+// A provider that refused to exist without a startup endpoint could never serve
+// a role created later, so the endpoint requirement belongs at synthesis time --
+// where a request carrying no endpoint at all still reports unavailable.
+func TestNewOpenAISpeechProviderAcceptsARoleSuppliedEndpoint(t *testing.T) {
+	provider, err := NewOpenAISpeechProvider(SpeechSettings{Model: "tts-1"})
+	if err != nil {
+		t.Fatalf("create provider without a global endpoint: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		_, _ = response.Write(makeWAV(24000, 24000))
+	}))
+	defer server.Close()
+
+	destination := filepath.Join(t.TempDir(), "audio.wav")
+	if _, err := provider.GenerateWithTimeline(context.Background(),
+		Request{Term: "abandon", Format: "wav", BaseURL: server.URL + "/v1"}, destination); err != nil {
+		t.Fatalf("generate against a role endpoint: %v", err)
+	}
+}
+
+func TestOpenAISpeechProviderReportsUnavailableWithNoEndpointAnywhere(t *testing.T) {
+	provider, err := NewOpenAISpeechProvider(SpeechSettings{Model: "tts-1"})
+	if err != nil {
+		t.Fatalf("create provider without a global endpoint: %v", err)
+	}
+	destination := filepath.Join(t.TempDir(), "audio.wav")
+	_, err = provider.GenerateWithTimeline(context.Background(),
+		Request{Term: "abandon", Format: "wav"}, destination)
+	if !errors.Is(err, ErrGeneratorUnavailable) {
 		t.Fatalf("error = %v, want ErrGeneratorUnavailable", err)
+	}
+}
+
+// http://host and https://host are not the same endpoint. Comparing only the
+// host sends the bearer token in cleartext to whoever answers port 80, and a
+// user typing the scheme by hand is all it takes.
+func TestOpenAISpeechProviderWithholdsKeyFromAPlaintextTwinOfItsEndpoint(t *testing.T) {
+	var authorization string
+	var sawHeader bool
+	twin := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		authorization = request.Header.Get("Authorization")
+		_, sawHeader = request.Header["Authorization"]
+		_, _ = response.Write(makeWAV(24000, 24000))
+	}))
+	defer twin.Close()
+
+	secure := "https" + strings.TrimPrefix(twin.URL, "http") + "/v1"
+	provider, err := NewOpenAISpeechProvider(SpeechSettings{
+		BaseURL: secure, APIKey: "sk-live-secret", Model: "tts-1",
+	})
+	if err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	destination := filepath.Join(t.TempDir(), "audio.wav")
+	if _, err := provider.GenerateWithTimeline(context.Background(),
+		Request{Term: "abandon", Format: "wav", BaseURL: twin.URL + "/v1"}, destination); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if sawHeader || authorization != "" {
+		t.Fatalf("key leaked to the http:// twin of the configured endpoint: %q", authorization)
 	}
 }

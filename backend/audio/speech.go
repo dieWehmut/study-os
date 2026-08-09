@@ -50,9 +50,12 @@ var _ TimelineGenerator = (*OpenAISpeechProvider)(nil)
 
 func NewOpenAISpeechProvider(settings SpeechSettings) (*OpenAISpeechProvider, error) {
 	settings.BaseURL = strings.TrimSpace(settings.BaseURL)
-	if settings.BaseURL == "" {
-		return nil, fmt.Errorf("%w: speech endpoint is not configured", ErrGeneratorUnavailable)
-	}
+	// A global endpoint is not required. Voice roles are rows added long after
+	// the generator chain is built, and each may carry its own server, so
+	// demanding one at construction time would make a role created later
+	// unreachable. GenerateWithTimeline reports ErrGeneratorUnavailable when a
+	// request supplies no endpoint either, which the fallback chain reads as
+	// "try the next generator".
 	settings.APIKey = strings.TrimSpace(settings.APIKey)
 	settings.Model = strings.TrimSpace(settings.Model)
 	settings.Voice = strings.TrimSpace(settings.Voice)
@@ -192,10 +195,17 @@ func (p *OpenAISpeechProvider) keyForEndpoint(endpoint string) string {
 	return ""
 }
 
+// sameEndpointHost reports whether two endpoints are the same origin, scheme
+// included. Host alone is not enough: http://api.example.com and
+// https://api.example.com differ only in whether the credential crosses the
+// network in cleartext, which is the entire question being asked here.
 func sameEndpointHost(left, right string) bool {
 	leftURL, leftErr := url.Parse(strings.TrimSpace(left))
 	rightURL, rightErr := url.Parse(strings.TrimSpace(right))
 	if leftErr != nil || rightErr != nil {
+		return false
+	}
+	if !strings.EqualFold(leftURL.Scheme, rightURL.Scheme) {
 		return false
 	}
 	return strings.EqualFold(leftURL.Host, rightURL.Host)

@@ -6,8 +6,11 @@ export type PronunciationSource = "file" | "browser" | "unavailable"
 // is a silent 403 rather than a synthesized word.
 const generationHeader = "X-Study-OS-Request"
 
-function audioURL(term: string, locale: string, format: string): string {
-  const query = new URLSearchParams({ term, locale, format })
+// format 省略时不写进 query，交给后端用设置里选的容器。硬写 "wav" 会让 音频格式
+// 那个选择器怎么选都一样。
+function audioURL(term: string, locale: string, format?: string): string {
+  const query = new URLSearchParams({ term, locale })
+  if (format) query.set("format", format)
   return `${resolveApiBase()}/audio?${query.toString()}`
 }
 
@@ -71,7 +74,7 @@ export async function synthesizeSentence(
 ): Promise<Blob> {
   const query = new URLSearchParams({ term: text })
   if (options.roleId) query.set("role", options.roleId)
-  query.set("format", options.format ?? "wav")
+  if (options.format) query.set("format", options.format)
 
   const response = await fetch(`${resolveApiBase()}/audio?${query.toString()}`, {
     method: "POST",
@@ -100,8 +103,7 @@ export async function playPronunciation(
   if (!normalizedTerm) return "unavailable"
 
   const locale = options.locale ?? "en-US"
-  const format = options.format ?? "wav"
-  const url = audioURL(normalizedTerm, locale, format)
+  const url = audioURL(normalizedTerm, locale, options.format)
 
   // Cached or local audio first -- it is free and instant.
   if (await play(url)) return "file"
