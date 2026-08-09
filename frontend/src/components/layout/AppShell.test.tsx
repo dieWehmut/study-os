@@ -100,6 +100,24 @@ describe("application shell", () => {
     expect(sidebar?.getAttribute("style") ?? "").not.toContain("width")
   })
 
+  it("heads both rails with the same avatar and name", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // 抽屉关着时是 aria-hidden 的，所以走 DOM 而不是 role 查询。两条栏必须共用
+    // 同一个身份区——只在桌面端加，手机上翻开抽屉就会看见一条秃头的导航。
+    const avatars = document.querySelectorAll("aside img[alt$='头像']")
+    expect(avatars).toHaveLength(2)
+    for (const avatar of avatars) {
+      // 身份区必须排在导航前面：它是栏首，不是脚注。
+      const nav = avatar.closest("aside")?.querySelector("nav")
+      expect(avatar.compareDocumentPosition(nav!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+
 
   it("centers the nav buttons as one group in both the sidebar and the drawer", () => {
     render(

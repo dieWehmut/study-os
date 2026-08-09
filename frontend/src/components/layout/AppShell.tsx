@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { Header } from "./Header"
 import { NavList } from "./NavList"
 import { Sidebar } from "./Sidebar"
+import { SidebarProfile } from "./SidebarProfile"
 
 interface AppShellProps {
   children: ReactNode
@@ -40,10 +41,11 @@ export function AppShell({ children }: AppShellProps) {
       <aside
         aria-hidden={!mobileDrawerOpen}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-56 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-300 md:hidden",
           mobileDrawerOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
+        <SidebarProfile onNavigate={() => setMobileDrawerOpen(false)} />
         <NavList label="移动端主导航" onNavigate={() => setMobileDrawerOpen(false)} />
       </aside>
 
