@@ -438,3 +438,63 @@ describe("drawing the 受力图 物理 keeps being told to draw", () => {
     expect(screen.queryByRole("button", { name: "画受力图" })).not.toBeInTheDocument()
   })
 })
+
+describe("dividing the process 物理 keeps being told to divide", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    filed = 0
+    useSubjectStore.setState({ subject: "physics" })
+    mocks.listMistakes.mockResolvedValue([])
+  })
+
+  it("offers the board under the advice that asks for it", async () => {
+    // 物理's 看错题 advice says "先把过程分段，写出每段的初末状态" -- another
+    // sentence the app has been printing without being able to carry it out.
+    render(<Practice />)
+    log("小球落地前后", "看错题")
+
+    expect(await screen.findByRole("button", { name: "把过程分段" })).toBeInTheDocument()
+  })
+
+  it("opens a real board, not a picture of one", async () => {
+    render(<Practice />)
+    log("小球落地前后", "看错题")
+    fireEvent.click(await screen.findByRole("button", { name: "把过程分段" }))
+
+    fireEvent.change(screen.getByLabelText("这一段叫什么"), { target: { value: "自由下落" } })
+    fireEvent.change(screen.getByLabelText("初速度（m/s）"), { target: { value: "0" } })
+    fireEvent.change(screen.getByLabelText("加速度（m/s²）"), { target: { value: "10" } })
+    fireEvent.change(screen.getByLabelText("时间（s）"), { target: { value: "2" } })
+    fireEvent.click(screen.getByRole("button", { name: "加上这一段" }))
+
+    expect(screen.getByText("末速度 20 m/s")).toBeInTheDocument()
+  })
+
+  it("shows one board at a time, the one whose advice you opened", async () => {
+    // Both boards hang off the same 物理 log. Two open at once would leave the
+    // 受力图 sitting under a sentence about 分段, which is the generic-advice
+    // problem again, one level down.
+    render(<Practice />)
+    log("斜面上的滑块", "思路不对")
+    // Awaited before the second: filing sets busy, which disables every cause
+    // button until the write comes back, so a click fired now lands on nothing.
+    await screen.findByText("斜面上的滑块")
+    log("小球落地前后", "看错题")
+
+    fireEvent.click(await screen.findByRole("button", { name: "画受力图" }))
+    fireEvent.click(screen.getByRole("button", { name: "把过程分段" }))
+
+    expect(screen.getByLabelText("这一段叫什么")).toBeInTheDocument()
+    expect(screen.queryByLabelText("力的名称")).not.toBeInTheDocument()
+  })
+
+  it("does not offer 分段 to 地理", async () => {
+    useSubjectStore.setState({ subject: "geography" })
+    render(<Practice />)
+    log("等高线判读", "看错题")
+
+    await screen.findByText("等高线判读")
+    expect(screen.queryByRole("button", { name: "把过程分段" })).not.toBeInTheDocument()
+  })
+})

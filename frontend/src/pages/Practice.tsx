@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { CalendarPlus, CheckCheck, PenLine, SquarePen, Trash2 } from "lucide-react"
+import { useEffect, useState, type ReactNode } from "react"
+import { CalendarPlus, CheckCheck, PenLine, Split, SquarePen, Trash2 } from "lucide-react"
 
 import {
   correctMistake,
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
+import { MotionBoard } from "@/features/physics/MotionBoard"
 import {
   MISTAKE_CAUSES,
   causeActionFor,
@@ -26,6 +27,46 @@ import { useSubjectStore } from "@/store/useSubjectStore"
 
 function describe(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+interface CauseBoard {
+  open: string
+  close: string
+  icon: ReactNode
+  board: ReactNode
+}
+
+/**
+ * The tool that carries out one subject's advice for one cause, if there is one.
+ *
+ * Keyed by subject and cause because that is exactly how `causeActionFor`
+ * chooses the sentence, and the two must not drift: a board offered where the
+ * sentence does not ask for it is as wrong as a sentence asking for a board
+ * that is not there.
+ *
+ * Deliberately not part of SUBJECT_CAUSE_ACTIONS -- that table returns strings
+ * and is imported by code with no React in scope. Most pairs have no board, and
+ * that is the normal case, not a gap.
+ */
+function boardFor(subject: string, cause: MistakeCause): CauseBoard | null {
+  if (subject !== "physics") return null
+  if (cause === "method") {
+    return {
+      open: "画受力图",
+      close: "收起受力图",
+      icon: <PenLine data-icon="inline-start" />,
+      board: <FreeBodyBoard />,
+    }
+  }
+  if (cause === "misread") {
+    return {
+      open: "把过程分段",
+      close: "收起分段",
+      icon: <Split data-icon="inline-start" />,
+      board: <MotionBoard />,
+    }
+  }
+  return null
 }
 
 /**
@@ -254,7 +295,9 @@ export default function Practice() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {summary.byCause.map(({ spec, count, percent }) => (
+            {summary.byCause.map(({ spec, count, percent }) => {
+              const board = boardFor(subject, spec.cause)
+              return (
               <div key={spec.cause} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium">{spec.label}</span>
@@ -275,11 +318,11 @@ export default function Practice() {
                 <p className="text-xs text-muted-foreground">
                   {causeActionFor(subject, spec.cause)}
                 </p>
-                {/* Only where the sentence above actually asks for a drawing.
-                    物理's 思路不对 says 重画受力图; 语文's 默写 does not, and a
-                    board offered there would be the generic advice the
-                    per-subject table was written to end. */}
-                {subject === "physics" && spec.cause === "method" ? (
+                {/* Only where the sentence above actually asks for one.
+                    语文's 默写 asks for nothing that can be drawn, and a board
+                    offered there would be the generic advice the per-subject
+                    table was written to end. */}
+                {board ? (
                   <div className="flex flex-col gap-2 pt-1">
                     <Button
                       type="button"
@@ -288,14 +331,15 @@ export default function Practice() {
                       className="self-start"
                       onClick={() => setDrawing((open) => (open === spec.cause ? "" : spec.cause))}
                     >
-                      <PenLine data-icon="inline-start" />
-                      {drawing === spec.cause ? "收起受力图" : "画受力图"}
+                      {board.icon}
+                      {drawing === spec.cause ? board.close : board.open}
                     </Button>
-                    {drawing === spec.cause ? <FreeBodyBoard /> : null}
+                    {drawing === spec.cause ? board.board : null}
                   </div>
                 ) : null}
               </div>
-            ))}
+              )
+            })}
           </CardContent>
         </Card>
       ) : null}
