@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   deleteVoiceRole: vi.fn(),
   setActiveVoiceRole: vi.fn(),
   uploadVoiceRoleAvatar: vi.fn(),
+  synthesizeVoiceRolePreview: vi.fn(),
 }))
 vi.mock("@/api/system", () => mocks)
 vi.mock("@/api/agent", () => ({
@@ -43,6 +44,7 @@ vi.mock("@/api/speech", () => ({
   deleteVoiceRole: mocks.deleteVoiceRole,
   setActiveVoiceRole: mocks.setActiveVoiceRole,
   uploadVoiceRoleAvatar: mocks.uploadVoiceRoleAvatar,
+  synthesizeVoiceRolePreview: mocks.synthesizeVoiceRolePreview,
   voiceRoleAvatarURL: (id: string, version?: string | number) =>
     version === undefined ? `/api/speech/roles/${id}/avatar` : `/api/speech/roles/${id}/avatar?v=${version}`,
 }))
@@ -353,5 +355,52 @@ describe("SettingsPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "立即更新" }))
     await waitFor(() => expect(mocks.applyUpdate).toHaveBeenCalledOnce())
+  })
+
+  // 试听按钮读的是角色简介——它是这个角色的"名片"，最能听出音色像不像。
+  function stubAudioPlayback() {
+    URL.createObjectURL = vi.fn(() => "blob:preview")
+    URL.revokeObjectURL = vi.fn()
+    return vi.spyOn(window.HTMLMediaElement.prototype, "play").mockResolvedValue(undefined)
+  }
+
+  it("试听一个角色时朗读它的简介", async () => {
+    const play = stubAudioPlayback()
+    mocks.synthesizeVoiceRolePreview.mockResolvedValue(new Blob(["audio"], { type: "audio/wav" }))
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "试听 晓晴" }))
+
+    await waitFor(() =>
+      expect(mocks.synthesizeVoiceRolePreview).toHaveBeenCalledWith("voice-1", "温柔的中文讲解声音"),
+    )
+    await waitFor(() => expect(play).toHaveBeenCalled())
+    // 播完要把 blob 收回去，否则试听几次就攒下一堆再也用不到的音频。
+    expect(URL.createObjectURL).toHaveBeenCalled()
+  })
+
+  it("角色没写简介时改读它的名字，而不是一声不响", async () => {
+    stubAudioPlayback()
+    mocks.synthesizeVoiceRolePreview.mockResolvedValue(new Blob(["audio"], { type: "audio/wav" }))
+    mocks.getSpeechSettings.mockResolvedValue({
+      speech,
+      roles: [{ ...voiceRoles[1], bio: "" }],
+      active_role_id: "",
+    })
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "试听 Nova" }))
+
+    await waitFor(() => expect(mocks.synthesizeVoiceRolePreview).toHaveBeenCalledWith("voice-2", "Nova"))
+  })
+
+  it("试听失败时说明原因，而不是静静地什么都不发生", async () => {
+    stubAudioPlayback()
+    mocks.synthesizeVoiceRolePreview.mockRejectedValue(new Error("语音服务没有响应"))
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "试听 晓晴" }))
+
+    expect(await screen.findByText("语音服务没有响应")).toBeInTheDocument()
   })
 })

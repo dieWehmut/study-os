@@ -147,3 +147,28 @@ export function voiceRoleAvatarURL(id: string, version?: string | number): strin
   const url = `${resolveApiBase()}/speech/roles/${encodeURIComponent(id)}/avatar`
   return version === undefined ? url : `${url}?v=${encodeURIComponent(String(version))}`
 }
+
+// 生成路由要求带上这个头，缺了就是一声不响的 403 而不是一段音频。
+const generationHeader = "X-Study-OS-Request"
+
+// 试听拿的是音频字节而不是 JSON，所以绕开 apiRequest 直接 fetch。调用方负责
+// 播放和 revokeObjectURL——这里只管把 blob 交出去。
+export async function synthesizeVoiceRolePreview(id: string, text: string): Promise<Blob> {
+  const query = new URLSearchParams({ term: text, role: id, format: "wav" })
+  const response = await fetch(`${resolveApiBase()}/audio?${query.toString()}`, {
+    method: "POST",
+    headers: { [generationHeader]: "1" },
+  })
+  if (!response.ok) {
+    // 后端在失败时回的是 {"error": "..."}，能读到就用它，读不到再退回状态码。
+    let message = `试听失败（HTTP ${response.status}）`
+    try {
+      const payload = (await response.json()) as { error?: string }
+      if (payload?.error) message = payload.error
+    } catch {
+      // 响应体不是 JSON，保留上面的兜底文案。
+    }
+    throw new Error(message)
+  }
+  return response.blob()
+}
