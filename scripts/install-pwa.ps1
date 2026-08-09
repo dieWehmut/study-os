@@ -68,10 +68,19 @@ function Assert-StudyOSPwaChecksum {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Expected
+        # Not [string]: GitHub serves the .sha256 sidecar as
+        # application/octet-stream, and Windows PowerShell 5.1 -- what `irm ... |
+        # iex` runs on a stock Windows box -- returns .Content as Byte[] for that
+        # content type. Typing this [string] made the published one-liner fail on
+        # every real install with a parameter-conversion error.
+        [Parameter(Mandatory = $true)][AllowNull()]$Expected
     )
 
-    $want = $Expected.Trim().Split(' ')[0].ToLowerInvariant()
+    if ($Expected -is [byte[]]) {
+        # The sidecar is hex plus an optional filename -- ASCII either way.
+        $Expected = [Text.Encoding]::UTF8.GetString($Expected)
+    }
+    $want = ([string]$Expected).Trim().Split(' ')[0].ToLowerInvariant()
     $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($want -ne $actual) {
         throw '安装包校验失败，已停止安装'

@@ -68,6 +68,20 @@ Describe 'Study OS one-liner PWA installer contracts' {
         { Assert-StudyOSPwaChecksum -Path $path -Expected "$hash  study-os-pwa-windows-x64.zip`n" } | Should Not Throw
     }
 
+    It 'accepts a sidecar delivered as bytes, the way GitHub actually serves it' {
+        # GitHub sends release assets as application/octet-stream, and Windows
+        # PowerShell 5.1 -- which is what `irm ... | iex` runs on a stock Windows
+        # box -- hands back .Content as Byte[] for that content type, not String.
+        # Every test here had fed a [string], so the one published install
+        # command failed on the checksum step and no test could see it.
+        $path = Join-Path $TestDrive 'bytes.zip'
+        New-TestZip -Path $path -Entries @{ 'start.vbs' = 'fixture' }
+        $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $bytes = [Text.Encoding]::ASCII.GetBytes("$hash  study-os-pwa-windows-x64.zip`n")
+
+        { Assert-StudyOSPwaChecksum -Path $path -Expected $bytes } | Should Not Throw
+    }
+
     It 'refuses an archive that would write outside the install folder' {
         $traversal = Join-Path $TestDrive 'traversal.zip'
         New-TestZip -Path $traversal -Entries @{ '../evil.vbs' = 'escape' }
