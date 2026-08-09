@@ -498,3 +498,41 @@ describe("dividing the process 物理 keeps being told to divide", () => {
     expect(screen.queryByRole("button", { name: "把过程分段" })).not.toBeInTheDocument()
   })
 })
+
+describe("re-checking the 配平 化学 keeps being told to re-check", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    filed = 0
+    useSubjectStore.setState({ subject: "chemistry" })
+    mocks.listMistakes.mockResolvedValue([])
+  })
+
+  it("offers the board under the advice that asks for it", async () => {
+    // 化学's 手滑 advice says "配平系数和状态符号回查一遍" -- an instruction to
+    // re-read your own handwriting, which is what already failed.
+    render(<Practice />)
+    log("氢氧化钙受热", "算错 / 手滑")
+
+    expect(await screen.findByRole("button", { name: "核对配平" })).toBeInTheDocument()
+  })
+
+  it("opens a real board, not a picture of one", async () => {
+    render(<Practice />)
+    log("氢氧化钙受热", "算错 / 手滑")
+    fireEvent.click(await screen.findByRole("button", { name: "核对配平" }))
+
+    fireEvent.change(screen.getByLabelText("化学方程式"), { target: { value: "H2 + O2 = H2O" } })
+
+    expect(screen.getByRole("alert")).toHaveTextContent("O：左 2，右 1")
+  })
+
+  it("does not offer 配平 to 数学", async () => {
+    useSubjectStore.setState({ subject: "math" })
+    render(<Practice />)
+    log("求导算错", "算错 / 手滑")
+
+    await screen.findByText("求导算错")
+    expect(screen.queryByRole("button", { name: "核对配平" })).not.toBeInTheDocument()
+  })
+})

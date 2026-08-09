@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react"
-import { CalendarPlus, CheckCheck, PenLine, Split, SquarePen, Trash2 } from "lucide-react"
+import { CalendarPlus, CheckCheck, PenLine, Scale, Split, SquarePen, Trash2 } from "lucide-react"
 
 import {
   correctMistake,
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { EquationBoard } from "@/features/chemistry/EquationBoard"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
 import { MotionBoard } from "@/features/physics/MotionBoard"
 import {
@@ -49,6 +50,14 @@ interface CauseBoard {
  * that is the normal case, not a gap.
  */
 function boardFor(subject: string, cause: MistakeCause): CauseBoard | null {
+  if (subject === "chemistry" && cause === "careless") {
+    return {
+      open: "核对配平",
+      close: "收起配平",
+      icon: <Scale data-icon="inline-start" />,
+      board: <EquationBoard />,
+    }
+  }
   if (subject !== "physics") return null
   if (cause === "method") {
     return {
