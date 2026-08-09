@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { CalendarPlus, CheckCheck, SquarePen, Trash2 } from "lucide-react"
+import { CalendarPlus, CheckCheck, PenLine, SquarePen, Trash2 } from "lucide-react"
 
 import {
   correctMistake,
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
 import {
   MISTAKE_CAUSES,
   causeActionFor,
@@ -68,6 +69,10 @@ export default function Practice() {
   const [queueing, setQueueing] = useState("")
   const [correcting, setCorrecting] = useState("")
   const [busy, setBusy] = useState(false)
+  // Which cause row has its drawing board open, "" for none. A cause rather
+  // than a flag: the row is the reason the board is on screen, and a second
+  // executable piece of advice would need to say which one it belongs to.
+  const [drawing, setDrawing] = useState<MistakeCause | "">("")
 
   // The log follows the 首页 switch like every other list in the app: while you
   // are working through 物理, 地理 mistakes are noise.
@@ -270,6 +275,25 @@ export default function Practice() {
                 <p className="text-xs text-muted-foreground">
                   {causeActionFor(subject, spec.cause)}
                 </p>
+                {/* Only where the sentence above actually asks for a drawing.
+                    物理's 思路不对 says 重画受力图; 语文's 默写 does not, and a
+                    board offered there would be the generic advice the
+                    per-subject table was written to end. */}
+                {subject === "physics" && spec.cause === "method" ? (
+                  <div className="flex flex-col gap-2 pt-1">
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant={drawing === spec.cause ? "secondary" : "outline"}
+                      className="self-start"
+                      onClick={() => setDrawing((open) => (open === spec.cause ? "" : spec.cause))}
+                    >
+                      <PenLine data-icon="inline-start" />
+                      {drawing === spec.cause ? "收起受力图" : "画受力图"}
+                    </Button>
+                    {drawing === spec.cause ? <FreeBodyBoard /> : null}
+                  </div>
+                ) : null}
               </div>
             ))}
           </CardContent>

@@ -286,7 +286,9 @@ describe("Practice page", () => {
     render(<Practice />)
     log("斜面上的木块", "思路不对")
 
-    expect(await screen.findByText(/受力图/)).toBeInTheDocument()
+    // Anchored on the sentence's own wording: the button it now offers says
+    // 画受力图, and a bare /受力图/ would match both and assert neither.
+    expect(await screen.findByText(/重画受力图/)).toBeInTheDocument()
   })
 
   it("keeps to the shared advice while the log mixes every subject", async () => {
@@ -390,5 +392,49 @@ describe("Practice page", () => {
 
     expect(screen.getByText("已订正")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^订正$/ })).not.toBeInTheDocument()
+  })
+})
+
+describe("drawing the 受力图 物理 keeps being told to draw", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    filed = 0
+    useSubjectStore.setState({ subject: "physics" })
+    mocks.listMistakes.mockResolvedValue([])
+  })
+
+  it("offers the board where the advice to draw one is printed", async () => {
+    // 物理's 思路不对 advice says "重画受力图，先标接触面再标场力". A sentence
+    // telling you to do something the app cannot do is worse than no sentence.
+    render(<Practice />)
+    log("斜面上的滑块", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "画受力图" })).toBeInTheDocument()
+  })
+
+  it("opens a real board, not a picture of one", async () => {
+    render(<Practice />)
+    log("斜面上的滑块", "思路不对")
+    fireEvent.click(await screen.findByRole("button", { name: "画受力图" }))
+
+    fireEvent.change(screen.getByLabelText("力的名称"), { target: { value: "重力" } })
+    fireEvent.change(screen.getByLabelText("大小（N）"), { target: { value: "10" } })
+    fireEvent.change(screen.getByLabelText("方向（度）"), { target: { value: "270" } })
+    fireEvent.click(screen.getByRole("button", { name: "场力" }))
+    fireEvent.click(screen.getByRole("button", { name: "加上这个力" }))
+
+    expect(screen.getByText(/10\.0 N/)).toBeInTheDocument()
+  })
+
+  it("does not offer a 受力图 to 语文", async () => {
+    // The board is 物理's own tool. Offering it under 默写不出来 would be the
+    // generic-advice problem the per-subject table was written to end.
+    useSubjectStore.setState({ subject: "chinese" })
+    render(<Practice />)
+    log("默写第三句", "思路不对")
+
+    await screen.findByText("默写第三句")
+    expect(screen.queryByRole("button", { name: "画受力图" })).not.toBeInTheDocument()
   })
 })
