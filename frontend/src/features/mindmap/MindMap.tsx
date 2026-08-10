@@ -2,20 +2,22 @@ import { useMemo, useState } from "react"
 
 import type { MindMap as MindMapData, MindNode } from "@/api/integrate"
 
-const NODE_MIN_W = 110
+const NODE_MIN_W = 56
 const NODE_H = 40
 const GAP_X = 36
 const GAP_Y = 52
 const PAD = 24
 const FONT_SIZE = 13
-/** Breathing room on each side of the label. */
-const TEXT_PAD = 18
-/** The ▸/▾ caret, kept out of the label's way. */
+/** How far the underline runs past the end of the label. */
+const TEXT_PAD = 10
+/** The ▸/▾ caret, sitting at the far end where the branch leaves. */
 const CARET_W = 14
 /** The "+12" on a folded node. Reserved on anything foldable so that folding
- *  changes the rows and nothing else -- a box that also resized under the
+ *  changes the rows and nothing else -- a node that also resized under the
  *  cursor would make the click feel like it hit something. */
 const BADGE_W = 34
+/** Where the underline sits in a node's row, measured from the row's top. */
+const BASELINE = NODE_H / 2 + 8
 
 /**
  * Roughly how wide this label draws.
@@ -32,25 +34,60 @@ function labelWidth(label: string): number {
   return total
 }
 
-function nodeWidth(label: string, foldable: boolean): number {
+/**
+ * How much room the node claims in its column.
+ *
+ * Includes space for the caret and the folded count even while neither is on
+ * screen, so that folding a node moves rows and nothing else. A node whose
+ * column also widened under the cursor would make the click feel like it hit
+ * something.
+ */
+function claimWidth(label: string, foldable: boolean): number {
   const extras = foldable ? CARET_W + BADGE_W : 0
-  return Math.max(NODE_MIN_W, Math.ceil(labelWidth(label) + TEXT_PAD * 2 + extras))
+  return Math.max(NODE_MIN_W, Math.ceil(lineWidth(label) + extras))
 }
 
-function nodeTone(nodeType?: string): { fill: string; stroke: string; text: string } {
+/**
+ * How long the underline is actually drawn -- the label, and no more.
+ *
+ * Deliberately not `claimWidth`. Drawing the reserved caret and badge space as
+ * line would leave every foldable node with a 48px blank tail in its own
+ * colour, running out past the label and into the connector; parent line,
+ * connector and child line then read as one continuous stroke and you cannot
+ * see where one node ends. The reservation belongs to the layout, not the ink.
+ */
+function lineWidth(label: string): number {
+  return Math.ceil(labelWidth(label) + TEXT_PAD)
+}
+
+/**
+ * How a node is drawn -- as a line under its label, not as a box around it.
+ *
+ * 「节点样式别是一个一个像 obsidian canvas 那样的一个一个方框就行」(0807:16). A box
+ * per node is a container you have to read past before reaching the label, and
+ * with forty of them the map becomes the grid it was meant to replace. The
+ * label alone is the node; the line under it is only there to carry the branch
+ * on to its children.
+ *
+ * Weight, not colour, is what separates a section from a point. 0807:16 also
+ * says colour does not matter, and a hierarchy carried by hue alone is no
+ * hierarchy to anyone who cannot see the difference. Colour stays as a second,
+ * redundant channel -- never as the only one.
+ */
+function nodeTone(nodeType?: string): { stroke: string; text: string; weight: number } {
   switch (nodeType) {
     case "root":
-      return { fill: "#16a34a18", stroke: "#16a34a66", text: "#166534" }
+      return { stroke: "#16a34a", text: "#14532d", weight: 2.6 }
     // A section is a place you can stand; a point inside one is not. Drawn the
     // same, a chapter and a single bullet read as peers.
     case "heading":
-      return { fill: "#2563eb18", stroke: "#2563eb66", text: "#1e40af" }
+      return { stroke: "#2563eb", text: "#1e3a8a", weight: 1.8 }
     case "conclusion":
-      return { fill: "#b4530918", stroke: "#b4530966", text: "#92400e" }
+      return { stroke: "#b45309", text: "#7c2d12", weight: 1.8 }
     case "trap":
-      return { fill: "#dc262618", stroke: "#dc262666", text: "#991b1b" }
+      return { stroke: "#dc2626", text: "#7f1d1d", weight: 1.8 }
     default:
-      return { fill: "#f4f4f5", stroke: "#d4d4d8", text: "#18181b" }
+      return { stroke: "#a1a1aa", text: "#27272a", weight: 1 }
   }
 }
 
@@ -191,7 +228,7 @@ export function MindMap({ data }: { data: MindMapData }) {
   const widths = useMemo(() => {
     const map = new Map<string, number>()
     for (const node of data.nodes) {
-      map.set(node.id, nodeWidth(node.label, children.has(node.id)))
+      map.set(node.id, claimWidth(node.label, children.has(node.id)))
     }
     return map
   }, [data.nodes, children])
@@ -216,10 +253,15 @@ export function MindMap({ data }: { data: MindMapData }) {
           const child = positions.get(node.id)
           const parent = positions.get(node.parent_id)
           if (!child || !parent) return null
-          const x1 = parent.x + widthOf(node.parent_id)
-          const y1 = parent.y + NODE_H / 2
+          // Underline to underline, not centre to centre: the branch is the same
+          // stroke as the line the label sits on, so it reads as one continuous
+          // trunk rather than a wire between two objects. Which means it has to
+          // start where the ink stops, not at the column edge -- the reserved
+          // caret space between the two would otherwise show as a break.
+          const x1 = parent.x + lineWidth(byId.get(node.parent_id)!.label)
+          const y1 = parent.y + BASELINE
           const x2 = child.x
-          const y2 = child.y + NODE_H / 2
+          const y2 = child.y + BASELINE
           const mid = (x1 + x2) / 2
           return (
             <path
@@ -238,7 +280,12 @@ export function MindMap({ data }: { data: MindMapData }) {
           const foldable = children.has(node.id)
           const folded = collapsed.has(node.id)
           const hidden = folded ? countDescendants(node.id, children) : 0
-          const boxWidth = widthOf(node.id)
+          const span = widthOf(node.id)
+          // The line stops at the label. The claim runs further, and the caret
+          // and count live in that difference -- past the ink, before the
+          // branch leaves.
+          const ink = lineWidth(node.label)
+          const baseline = pos.y + BASELINE
           return (
             <g
               key={node.id}
@@ -257,19 +304,41 @@ export function MindMap({ data }: { data: MindMapData }) {
               }}
               style={{ cursor: foldable ? "pointer" : "default" }}
             >
+              {/* Invisible, and the only thing here with any area: without it
+                  the click target is the glyphs themselves, and the gaps
+                  between characters stop being part of the node. */}
               <rect
                 x={pos.x}
                 y={pos.y}
-                width={boxWidth}
+                width={span}
                 height={NODE_H}
-                rx={10}
-                fill={tone.fill}
+                fill="transparent"
+                stroke="none"
+                aria-hidden="true"
+              />
+              <text
+                x={pos.x}
+                y={baseline - 5}
+                fontSize={FONT_SIZE}
+                fill={tone.text}
+                fontWeight={node.node_type === "root" ? 600 : undefined}
+              >
+                {node.label}
+              </text>
+              <line
+                x1={pos.x}
+                y1={baseline}
+                x2={pos.x + ink}
+                y2={baseline}
                 stroke={tone.stroke}
+                strokeWidth={tone.weight}
+                strokeLinecap="round"
               />
               {foldable ? (
                 <text
-                  x={pos.x + 12}
-                  y={pos.y + NODE_H / 2 + 4}
+                  x={pos.x + span - (hidden > 0 ? BADGE_W : 0) - 4}
+                  y={baseline - 5}
+                  textAnchor="end"
                   fontSize={10}
                   fill={tone.text}
                   opacity={0.65}
@@ -277,19 +346,10 @@ export function MindMap({ data }: { data: MindMapData }) {
                   {folded ? "▸" : "▾"}
                 </text>
               ) : null}
-              <text
-                x={pos.x + boxWidth / 2}
-                y={pos.y + NODE_H / 2 + 4}
-                textAnchor="middle"
-                fontSize={FONT_SIZE}
-                fill={tone.text}
-              >
-                {node.label}
-              </text>
               {hidden > 0 ? (
                 <text
-                  x={pos.x + boxWidth - 10}
-                  y={pos.y + NODE_H / 2 + 4}
+                  x={pos.x + span}
+                  y={baseline - 5}
                   textAnchor="end"
                   fontSize={11}
                   fill={tone.text}

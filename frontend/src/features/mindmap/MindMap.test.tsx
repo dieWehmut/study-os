@@ -4,6 +4,29 @@ import { describe, expect, it } from "vitest"
 import { MindMap } from "./MindMap"
 import { toMermaid } from "@/lib/mermaid"
 
+/**
+ * The line a node's label sits on.
+ *
+ * Geometry used to be read off each node's box. There are no boxes now, so the
+ * underline is what carries a node's position and width -- and it is also what
+ * the edges join, which is why it is worth asserting on directly.
+ */
+function underline(name: string): SVGLineElement {
+  return screen.getByRole("treeitem", { name }).querySelector("line")!
+}
+
+function left(name: string): number {
+  return Number(underline(name).getAttribute("x1"))
+}
+
+function right(name: string): number {
+  return Number(underline(name).getAttribute("x2"))
+}
+
+function baseline(name: string): number {
+  return Number(underline(name).getAttribute("y1"))
+}
+
 const data = {
   title: "运动学",
   nodes: [
@@ -91,28 +114,47 @@ describe("MindMap", () => {
     expect(screen.getByRole("treeitem", { name: "加速度" })).not.toHaveAttribute("aria-expanded")
   })
 
+  it("paints no boxes", () => {
+    // 「节点样式别是一个一个像 obsidian canvas 那样的一个一个方框就行」(0807:16).
+    // A box per node is a container you read past before reaching the label, and
+    // forty of them make the map the grid it was meant to replace.
+    //
+    // Rectangles still exist -- each node needs one, unpainted, or the click
+    // target becomes the glyphs themselves and the gaps between characters stop
+    // belonging to the node. So the check is that none of them paints anything,
+    // which is the requirement; "no rect at all" would be a stricter rule than
+    // was asked for, bought by making the map worse to click.
+    render(<MindMap data={data} />)
+
+    const boxes = [...screen.getByRole("tree").querySelectorAll("rect")]
+    expect(boxes.length).toBeGreaterThan(0)
+    for (const box of boxes) {
+      expect(box.getAttribute("fill")).toBe("transparent")
+      expect(box.getAttribute("stroke")).toBe("none")
+    }
+  })
+
   it("draws a section differently from a point inside it", () => {
     // Both kinds come out of the markdown converter. Drawn identically, a
     // chapter and a single bullet look like peers, which erases the hierarchy
-    // the map exists to show.
+    // the map exists to show. Weight, not colour -- 0807:16 says colour does
+    // not matter, and a distinction only colour carries is no distinction to
+    // anyone who cannot see it.
     render(<MindMap data={data} />)
 
-    const section = screen.getByRole("treeitem", { name: "速度" }).querySelector("rect")
-    const point = screen.getByRole("treeitem", { name: "平均速度" }).querySelector("rect")
+    const section = underline("速度").getAttribute("stroke-width")
+    const point = underline("平均速度").getAttribute("stroke-width")
 
-    expect(section).toHaveAttribute("fill")
-    expect(point).toHaveAttribute("fill")
-    expect(point?.getAttribute("fill")).not.toBe(section?.getAttribute("fill"))
+    expect(section).toBeTruthy()
+    expect(point).not.toBe(section)
   })
 
   it("keeps the trunk distinct from the sections hanging off it", () => {
     render(<MindMap data={data} />)
 
-    const root = screen.getByRole("treeitem", { name: "运动学" }).querySelector("rect")
-    const section = screen.getByRole("treeitem", { name: "速度" }).querySelector("rect")
-
-    expect(root).toHaveAttribute("fill")
-    expect(section?.getAttribute("fill")).not.toBe(root?.getAttribute("fill"))
+    expect(underline("速度").getAttribute("stroke-width")).not.toBe(
+      underline("运动学").getAttribute("stroke-width"),
+    )
   })
 
   it("reports how deep each node sits, for anyone reading it aloud", () => {
@@ -122,19 +164,33 @@ describe("MindMap", () => {
     expect(screen.getByRole("treeitem", { name: "瞬时速度" })).toHaveAttribute("aria-level", "3")
   })
 
+  it("stops a foldable node's line at its label, not at its reserved space", () => {
+    // A foldable node claims room for a caret and a "+N" it is not currently
+    // showing. Drawing that reservation as line leaves a blank tail in the
+    // node's own colour running out past the label and into the connector, and
+    // parent line, connector and child line then read as one unbroken stroke
+    // with no visible node boundary. Found by looking at the rendered map --
+    // every geometry test here passed while it was wrong.
+    render(<MindMap data={data} />)
+
+    const foldable = right("速度") - left("速度")
+    const leaf = right("平均速度") - left("平均速度")
+
+    // 「速度」 is two characters, 「平均速度」 is four. If the reservation were
+    // being drawn, the shorter foldable label would own the longer line.
+    expect(foldable).toBeLessThan(leaf)
+  })
+
   it("grows rightward, one column per level", () => {
     // A mindmap reads left to right: the trunk on the left, detail extending
     // away from it. Stacked downward instead, a deep branch runs off the
     // bottom of a screen that is wider than it is tall.
     render(<MindMap data={data} />)
 
-    const x = (name: string) =>
-      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("x"))
-
-    expect(x("速度")).toBeGreaterThan(x("运动学"))
-    expect(x("瞬时速度")).toBeGreaterThan(x("速度"))
+    expect(left("速度")).toBeGreaterThan(left("运动学"))
+    expect(left("瞬时速度")).toBeGreaterThan(left("速度"))
     // Same depth, same column -- otherwise depth is not readable from position.
-    expect(x("加速度")).toBe(x("速度"))
+    expect(left("加速度")).toBe(left("速度"))
   })
 
   it("sits a parent level with the middle of its own children", () => {
@@ -143,22 +199,16 @@ describe("MindMap", () => {
     // between unrelated branches.
     render(<MindMap data={data} />)
 
-    const y = (name: string) =>
-      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("y"))
-
-    const children = [y("瞬时速度"), y("平均速度")]
-    expect(y("速度")).toBeGreaterThan(Math.min(...children))
-    expect(y("速度")).toBeLessThan(Math.max(...children))
+    const children = [baseline("瞬时速度"), baseline("平均速度")]
+    expect(baseline("速度")).toBeGreaterThan(Math.min(...children))
+    expect(baseline("速度")).toBeLessThan(Math.max(...children))
   })
 
   it("keeps siblings from landing on top of each other", () => {
     render(<MindMap data={data} />)
 
-    const y = (name: string) =>
-      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("y"))
-
-    expect(Math.abs(y("瞬时速度") - y("平均速度"))).toBeGreaterThanOrEqual(40)
-    expect(Math.abs(y("速度") - y("加速度"))).toBeGreaterThanOrEqual(40)
+    expect(Math.abs(baseline("瞬时速度") - baseline("平均速度"))).toBeGreaterThanOrEqual(40)
+    expect(Math.abs(baseline("速度") - baseline("加速度"))).toBeGreaterThanOrEqual(40)
   })
 
   it("widens a node to fit its heading rather than cutting the heading", () => {
@@ -194,8 +244,7 @@ describe("MindMap", () => {
       />,
     )
 
-    const width = (name: string) =>
-      Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("width"))
+    const width = (name: string) => right(name) - left(name)
 
     expect(width("副热带高气压带的形成与季节移动规律及其影响")).toBeGreaterThan(width("短"))
   })
@@ -217,14 +266,7 @@ describe("MindMap", () => {
       />,
     )
 
-    const rect = (name: string) =>
-      screen.getByRole("treeitem", { name }).querySelector("rect")!
-    const right = (name: string) =>
-      Number(rect(name).getAttribute("x")) + Number(rect(name).getAttribute("width"))
-
-    expect(Number(rect("子").getAttribute("x"))).toBeGreaterThan(
-      right("副热带高气压带的形成与季节移动规律及其影响"),
-    )
+    expect(left("子")).toBeGreaterThan(right("副热带高气压带的形成与季节移动规律及其影响"))
   })
 
   it("exports mermaid text with edges", () => {
