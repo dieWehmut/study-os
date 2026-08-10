@@ -54,6 +54,29 @@ describe("markdown to mindmap", () => {
     expect(map.nodes.some((node) => node.label.includes("类囊体"))).toBe(false)
   })
 
+  it("keeps the prose as a note on the section it was written under", () => {
+    // 0807:15 「每个节点可以是笔记、图片」. The outline parser already collects
+    // these lines; dropping them here is what left the map a bare skeleton with
+    // no way back to what the wiki actually said.
+    const map = markdownToMindMap(source)
+
+    expect(map.nodes.find((node) => node.label === "光反应")?.note).toBe("在类囊体薄膜上进行。")
+  })
+
+  it("joins a section's several prose lines into one note", () => {
+    const map = markdownToMindMap(["# 生物", "## 细胞", "第一行。", "第二行。"].join("\n"))
+
+    expect(map.nodes.find((node) => node.label === "细胞")?.note).toBe("第一行。\n第二行。")
+  })
+
+  it("leaves the note off a section that has no prose", () => {
+    // An empty string would make every node look annotated, and the drawing
+    // would then have to tell "" apart from "absent" to know whether to mark it.
+    const map = markdownToMindMap(source)
+
+    expect(map.nodes.find((node) => node.label === "暗反应")).not.toHaveProperty("note")
+  })
+
   it("says what kind each node is, so the drawing can tell them apart", () => {
     const map = markdownToMindMap(source)
 

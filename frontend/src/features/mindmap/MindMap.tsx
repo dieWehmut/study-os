@@ -16,8 +16,20 @@ const CARET_W = 14
  *  changes the rows and nothing else -- a node that also resized under the
  *  cursor would make the click feel like it hit something. */
 const BADGE_W = 34
+/** The 笔记 marker on a node that has prose written under it. */
+const NOTE_W = 18
 /** Where the underline sits in a node's row, measured from the row's top. */
 const BASELINE = NODE_H / 2 + 8
+/**
+ * The opened note.
+ *
+ * Wide enough for a sentence to be a sentence rather than a column of two-word
+ * lines, and no wider -- a note as wide as the map would cover the branches it
+ * is supposed to explain.
+ */
+const NOTE_PANEL_W = 264
+const NOTE_LINE_H = 20
+const NOTE_PANEL_PAD = 10
 
 /**
  * Roughly how wide this label draws.
@@ -42,8 +54,8 @@ function labelWidth(label: string): number {
  * column also widened under the cursor would make the click feel like it hit
  * something.
  */
-function claimWidth(label: string, foldable: boolean): number {
-  const extras = foldable ? CARET_W + BADGE_W : 0
+function claimWidth(label: string, foldable: boolean, noted: boolean): number {
+  const extras = (foldable ? CARET_W + BADGE_W : 0) + (noted ? NOTE_W : 0)
   return Math.max(NODE_MIN_W, Math.ceil(lineWidth(label) + extras))
 }
 
@@ -58,6 +70,21 @@ function claimWidth(label: string, foldable: boolean): number {
  */
 function lineWidth(label: string): number {
   return Math.ceil(labelWidth(label) + TEXT_PAD)
+}
+
+/**
+ * How tall an opened note draws.
+ *
+ * Estimated from the same two-bucket character width the labels use, for the
+ * same reason: the panel has to reserve its space before the browser has laid
+ * any text out, and it has to reserve the same space under jsdom.
+ */
+function notePanelHeight(note: string): number {
+  const perLine = NOTE_PANEL_W - NOTE_PANEL_PAD * 2
+  const lines = note
+    .split("\n")
+    .reduce((total, line) => total + Math.max(1, Math.ceil(labelWidth(line) / perLine)), 0)
+  return lines * NOTE_LINE_H + NOTE_PANEL_PAD * 2
 }
 
 /**
@@ -196,9 +223,17 @@ function countDescendants(id: string, children: Map<string, string[]>): number {
  * to replace. Folding a branch you are not working on is the thing paper
  * cannot do: the shape stays, the detail goes, and the count on the folded
  * node says exactly how much is waiting there so nothing disappears quietly.
+ *
+ * Notes fold the same way and for the same reason. A node's label is a heading
+ * lifted out of the wiki; the prose it was lifted from is what tells you
+ * whether you still understand it (0807:15). Open on demand, one at a time --
+ * every note open at once is the wall of prose again.
  */
 export function MindMap({ data }: { data: MindMapData }) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
+  // One at a time, not a set: two notes open side by side overlap each other
+  // and the branches between them.
+  const [openNote, setOpenNote] = useState<string | null>(null)
 
   const byId = useMemo(() => new Map(data.nodes.map((node) => [node.id, node])), [data.nodes])
   const children = useMemo(() => {
@@ -228,7 +263,7 @@ export function MindMap({ data }: { data: MindMapData }) {
   const widths = useMemo(() => {
     const map = new Map<string, number>()
     for (const node of data.nodes) {
-      map.set(node.id, claimWidth(node.label, children.has(node.id)))
+      map.set(node.id, claimWidth(node.label, children.has(node.id), Boolean(node.note)))
     }
     return map
   }, [data.nodes, children])
@@ -244,6 +279,10 @@ export function MindMap({ data }: { data: MindMapData }) {
       return next
     })
   }
+
+  // Folding a branch takes its open note with it, otherwise the panel is left
+  // hanging beside a node that is no longer on screen.
+  const notedId = openNote && visible.some((node) => node.id === openNote) ? openNote : null
 
   return (
     <div className="overflow-auto rounded-xl border border-border bg-card p-2">
@@ -358,9 +397,97 @@ export function MindMap({ data }: { data: MindMapData }) {
                   {`+${hidden}`}
                 </text>
               ) : null}
+              {node.note ? (
+                <g
+                  role="button"
+                  // Named for the node, because a map of forty nodes read aloud
+                  // as forty identical "展开笔记" buttons names nothing.
+                  aria-label={`${notedId === node.id ? "收起" : "展开"}笔记：${node.label}`}
+                  aria-expanded={notedId === node.id}
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                  onClick={(event) => {
+                    // The marker sits inside the node's own click target, which
+                    // toggles the fold. Ungated, reading a note collapses the
+                    // branch you were reading it in.
+                    event.stopPropagation()
+                    setOpenNote((previous) => (previous === node.id ? null : node.id))
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setOpenNote((previous) => (previous === node.id ? null : node.id))
+                  }}
+                >
+                  <rect
+                    x={pos.x + ink}
+                    y={pos.y + 6}
+                    width={NOTE_W}
+                    height={NODE_H - 12}
+                    fill="transparent"
+                    stroke="none"
+                    aria-hidden="true"
+                  />
+                  <text
+                    x={pos.x + ink + 4}
+                    y={baseline - 5}
+                    fontSize={11}
+                    fill={tone.stroke}
+                    opacity={0.8}
+                    aria-hidden="true"
+                  >
+                    ≡
+                  </text>
+                </g>
+              ) : null}
             </g>
           )
         })}
+        {/* Last, so it draws over the branches rather than under them -- a note
+            you can read through is not a note. */}
+        {(() => {
+          if (!notedId) return null
+          const node = byId.get(notedId)
+          const pos = positions.get(notedId)
+          if (!node?.note || !pos) return null
+          const lines = node.note.split("\n")
+          const panelH = notePanelHeight(node.note)
+          return (
+            <g role="note" aria-label={`笔记：${node.label}`}>
+              <rect
+                x={pos.x}
+                y={pos.y + NODE_H + 4}
+                width={NOTE_PANEL_W}
+                height={panelH}
+                rx={8}
+                fill="#ffffff"
+                stroke={nodeTone(node.node_type).stroke}
+                strokeWidth={1}
+                opacity={0.98}
+              />
+              <foreignObject
+                x={pos.x + NOTE_PANEL_PAD}
+                y={pos.y + NODE_H + 4 + NOTE_PANEL_PAD}
+                width={NOTE_PANEL_W - NOTE_PANEL_PAD * 2}
+                height={panelH - NOTE_PANEL_PAD * 2}
+              >
+                {/* foreignObject rather than <text>: SVG text does not wrap, and
+                    a note is prose. The estimate above only has to reserve the
+                    room; the browser does the actual wrapping. */}
+                <div
+                  style={{
+                    font: "12px/20px inherit",
+                    color: "#3f3f46",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {lines.join("\n")}
+                </div>
+              </foreignObject>
+            </g>
+          )
+        })()}
       </svg>
     </div>
   )

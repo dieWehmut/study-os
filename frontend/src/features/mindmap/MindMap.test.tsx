@@ -32,7 +32,13 @@ const data = {
   nodes: [
     { id: "n0", label: "运动学", node_type: "root" },
     { id: "n1", label: "速度", parent_id: "n0", node_type: "heading" },
-    { id: "n3", label: "瞬时速度", parent_id: "n1", node_type: "heading" },
+    {
+      id: "n3",
+      label: "瞬时速度",
+      parent_id: "n1",
+      node_type: "heading",
+      note: "某一时刻或某一位置的速度，是平均速度在时间趋于零时的极限。",
+    },
     { id: "n5", label: "定义", parent_id: "n3", node_type: "item" },
     { id: "n4", label: "平均速度", parent_id: "n1", node_type: "item" },
     { id: "n2", label: "加速度", parent_id: "n0", node_type: "conclusion" },
@@ -267,6 +273,41 @@ describe("MindMap", () => {
     )
 
     expect(left("子")).toBeGreaterThan(right("副热带高气压带的形成与季节移动规律及其影响"))
+  })
+
+  it("shows the note a node carries, once you open it", () => {
+    // 0807:15 「每个节点可以是笔记、图片」. The label is a heading lifted out of
+    // the wiki; the sentence it was lifted from is what tells you whether you
+    // still understand it. Reaching that should not mean leaving the map.
+    render(<MindMap data={data} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "展开笔记：瞬时速度" }))
+
+    expect(screen.getByText(/某一时刻或某一位置的速度/)).toBeInTheDocument()
+  })
+
+  it("keeps the note out of the way until asked", () => {
+    // Every note open at once is the wall of prose the map exists to replace.
+    render(<MindMap data={data} />)
+
+    expect(screen.queryByText(/某一时刻或某一位置的速度/)).not.toBeInTheDocument()
+  })
+
+  it("offers nothing to open on a node with no note", () => {
+    render(<MindMap data={data} />)
+
+    expect(screen.queryByRole("button", { name: "展开笔记：平均速度" })).not.toBeInTheDocument()
+  })
+
+  it("opening a note does not fold the branch under it", () => {
+    // The note sits inside the node's own click target, which already toggles
+    // the fold. Without stopping the event, reading a note collapses the branch
+    // you were reading it in.
+    render(<MindMap data={data} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "展开笔记：瞬时速度" }))
+
+    expect(screen.getByRole("treeitem", { name: "定义" })).toBeInTheDocument()
   })
 
   it("exports mermaid text with edges", () => {

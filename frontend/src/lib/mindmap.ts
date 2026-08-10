@@ -14,8 +14,10 @@ const fallbackTitle = "未命名"
  * list indentation already say everything the layout needs, so nothing here
  * has to be guessed.
  *
- * Prose stays out. A map carrying whole paragraphs is just the document again
- * in a worse shape; the paragraphs belong to the reader, the skeleton here.
+ * Prose does not become nodes -- a map carrying whole paragraphs is just the
+ * document again in a worse shape. It rides along on the node it was written
+ * under instead (0807:15), so the skeleton stays readable and the sentence it
+ * was abstracted from is still one click away.
  */
 export function markdownToMindMap(markdown: string, options: ParseOutlineOptions = {}): MindMap {
   const root = parseOutline(markdown, options)
@@ -29,11 +31,15 @@ export function markdownToMindMap(markdown: string, options: ParseOutlineOptions
 
   for (const node of flattenOutline(root)) {
     const parentId = parents.get(node)
+    const note = node.body.join("\n")
     nodes.push({
       id: node.id,
       label: node === root ? title : node.title,
       parent_id: parentId,
       node_type: node.kind,
+      // Omitted, not empty: "has a note" is what decides whether the drawing
+      // marks a node as openable, and "" would mark every node in the map.
+      ...(note ? { note } : {}),
     })
     for (const child of node.children) parents.set(child, node.id)
   }
