@@ -310,6 +310,33 @@ describe("MindMap", () => {
     expect(screen.getByRole("treeitem", { name: "定义" })).toBeInTheDocument()
   })
 
+  it("scales to its container when asked to fit", () => {
+    // A map is sized in pixels from its own content, and on /integrate it gets a
+    // full-width card, so overflowing into a scroll is the right answer there.
+    // Hung off a wiki (ROADMAP §5.4) it lives in a ~300px column instead, where
+    // the same fixed width clips every deep branch off the right edge -- a real
+    // 22-node map of a word wiki rendered as a 1600px vertical ribbon with two
+    // thirds of it unreachable.
+    //
+    // A viewBox is what lets the drawing keep its own coordinates while the
+    // element takes the width it is given. Opt-in, so the scrolling call sites
+    // keep the behaviour they were designed around.
+    render(<MindMap data={data} fit />)
+
+    const svg = screen.getByRole("tree", { name: "导图：运动学" })
+
+    expect(svg.getAttribute("viewBox")).toBe(`0 0 ${svg.dataset.width} ${svg.dataset.height}`)
+    expect(svg.getAttribute("width")).toBe("100%")
+  })
+
+  it("keeps its intrinsic size when not fitting", () => {
+    render(<MindMap data={data} />)
+
+    const svg = screen.getByRole("tree", { name: "导图：运动学" })
+
+    expect(svg.getAttribute("width")).toBe(svg.dataset.width)
+  })
+
   it("exports mermaid text with edges", () => {
     const mermaid = toMermaid({
       title: "运动学",

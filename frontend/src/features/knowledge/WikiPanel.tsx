@@ -1,7 +1,7 @@
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight, Waypoints } from "lucide-react"
 
 import { updateKnowledgeTag } from "@/api/chat"
@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { tagOptionsFor } from "@/lib/insights"
 import { itemTypeLabel } from "@/lib/labels"
+import { markdownToMindMap } from "@/lib/mindmap"
+import { MindMap } from "@/features/mindmap/MindMap"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 
 interface WikiPanelProps {
@@ -80,6 +82,25 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
   const inQueue = scheduled || scheduleNote?.tone === "ok" || scheduleNote?.tone === "known"
 
   const chunks = current?.detailed_markdown ? chunkMarkdown(current.detailed_markdown) : []
+
+  // The same markdown, read as a shape instead of as prose (0807:75 -- a
+  // markdown wiki needs no model to become a map, only a parser). Memoised
+  // because every tag press and every family response rebuilds this panel, and
+  // re-parsing the whole wiki each time buys nothing: the source has not moved.
+  //
+  // Read off `item` rather than `current`, which differs from it only by the
+  // tag overlay: depending on that freshly-spread object would re-parse the
+  // whole wiki on every tag press, which is exactly what the memo is for.
+  //
+  // Titled with the term rather than the document's own heading: a wiki entry
+  // usually opens at `##`, having been written *about* the word, so its map
+  // would otherwise root at 用法 or 例句 and never name what it is a map of.
+  const markdown = item?.detailed_markdown ?? ""
+  const term = item?.term ?? ""
+  const map = useMemo(
+    () => (markdown ? markdownToMindMap(markdown, { title: term }) : null),
+    [markdown, term],
+  )
 
   // The grouping has been written by the English pipeline since it existed and
   // was readable only by a group id nobody was ever shown. A failure stays
@@ -199,6 +220,7 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
           <TabsList aria-label="Wiki视图">
             <TabsTrigger value="concise">简明</TabsTrigger>
             <TabsTrigger value="detail">详细百科</TabsTrigger>
+            <TabsTrigger value="map">导图</TabsTrigger>
           </TabsList>
           <TabsContent value="concise" className="grid gap-5 pt-5">
             <section className="grid gap-2">
@@ -237,6 +259,28 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
                 </div>
               </div>
             ) : <p className="text-sm text-muted-foreground">这个知识点还没有详细百科。</p>}
+          </TabsContent>
+          <TabsContent value="map" className="pt-5">
+            {/* A one-section wiki has no shape worth drawing: a root with a
+                single branch tells you nothing the heading above it did not,
+                so the reader is sent to the prose instead of being handed a
+                picture of one line. `markdownToMindMap` already answers this
+                by returning no nodes for a document with no sections. */}
+            {map && map.nodes.length > 0 ? (
+              <div className="grid gap-2">
+                {/* `fit`: this panel is a narrow column, and an unscaled map
+                    would put most of a real wiki's branches past its right
+                    edge. */}
+                <MindMap data={map} fit />
+                <p className="text-xs text-muted-foreground">
+                  点节点折叠分支，点 ≡ 看该节的原文。
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {chunks.length > 0 ? "这篇百科只有一段，没有可拆的层级。" : "这个知识点还没有详细百科。"}
+              </p>
+            )}
           </TabsContent>
         </Tabs>
         {/* Nothing at all for the majority of items, which belong to no group:

@@ -229,7 +229,7 @@ function countDescendants(id: string, children: Map<string, string[]>): number {
  * whether you still understand it (0807:15). Open on demand, one at a time --
  * every note open at once is the wall of prose again.
  */
-export function MindMap({ data }: { data: MindMapData }) {
+export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolean }) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
   // One at a time, not a set: two notes open side by side overlap each other
   // and the branches between them.
@@ -285,8 +285,28 @@ export function MindMap({ data }: { data: MindMapData }) {
   const notedId = openNote && visible.some((node) => node.id === openNote) ? openNote : null
 
   return (
-    <div className="overflow-auto rounded-xl border border-border bg-card p-2">
-      <svg width={width} height={height} role="tree" aria-label={`导图：${data.title}`}>
+    <div className={`${fit ? "overflow-hidden" : "overflow-auto"} rounded-xl border border-border bg-card p-2`}>
+      {/*
+        A map is measured in pixels from its own labels, so on a full-width card
+        letting it overflow into a scroll keeps every label at full size. Hung
+        off a wiki it gets a narrow column instead, and the same fixed width
+        puts most of the tree past the right edge where scrolling a nested pane
+        is the only way to reach it.
+
+        `viewBox` is the seam: the drawing keeps the coordinate space `layout`
+        computed, while the element takes whatever width the column offers, so
+        no branch is ever unreachable. `data-width` exposes that intrinsic size
+        for tests, which otherwise could not tell "scaled" from "clipped".
+      */}
+      <svg
+        width={fit ? "100%" : width}
+        height={fit ? undefined : height}
+        viewBox={fit ? `0 0 ${width} ${height}` : undefined}
+        data-width={width}
+        data-height={height}
+        role="tree"
+        aria-label={`导图：${data.title}`}
+      >
         {visible.map((node) => {
           if (!node.parent_id || !byId.has(node.parent_id)) return null
           const child = positions.get(node.id)

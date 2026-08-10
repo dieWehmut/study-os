@@ -77,11 +77,17 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
     if (heading) {
       const depth = heading[1].length
       const title = heading[2].trim()
-      // A leading level-1 heading titles the document itself rather than
-      // becoming a lone child that every other section hangs beside.
-      if (depth === 1 && !root.title && root.body.length === 0 && root.children.length === 0) {
+      // The document's opening heading can be the document's own name rather
+      // than a section of it, in two ways: an unclaimed `# X` names a document
+      // that arrived without a title, and a heading at any level repeating a
+      // title we were handed is that same name written twice. Wiki entries are
+      // the second case -- each is written *about* a term and so opens
+      // "## <term>" -- and treating either as a section produces a lone branch
+      // that every other section then hangs beside.
+      const opening = root.body.length === 0 && root.children.length === 0
+      if (opening && (depth === 1 ? !root.title : title === root.title)) {
         root.title = title
-        headingDepth = 1
+        headingDepth = depth
         continue
       }
       appendAt(stack, emptyNode(title, depth, "heading"))

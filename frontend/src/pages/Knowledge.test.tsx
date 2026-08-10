@@ -187,6 +187,19 @@ describe("Knowledge page", () => {
     expect(await screen.findByText(/还没有详细百科/)).toBeInTheDocument()
   })
 
+  it("draws the wiki's own headings as a map", async () => {
+    // 0807:75 「只要 wiki 本身是 markdown 格式的信息，那其实靠固定的程序就能实现
+    // 文转 mindmap」. The markdown is already on this panel; the map is a second
+    // reading of it rather than a second document, which is why it hangs off the
+    // wiki instead of opening a page of its own (ROADMAP §5.4).
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("tab", { name: "导图" }))
+
+    expect(await screen.findByRole("tree", { name: "导图：abandon" })).toBeInTheDocument()
+    expect(screen.getByRole("treeitem", { name: /^Usage$/ })).toBeInTheDocument()
+  })
+
   it("filters by a knowledge group", async () => {
     mocks.listKnowledge.mockResolvedValueOnce({ count: 0, items: [] })
     render(<Knowledge />)

@@ -122,4 +122,16 @@ describe("markdown to mindmap", () => {
 
     expect(map.nodes.find((node) => !node.parent_id)?.label).toBe("未命名")
   })
+
+  it("does not repeat the given title as the map's first branch", () => {
+    // Every wiki entry in the library is written *about* a term, so it opens
+    // "## <term>". Handed that same term as the title, the map used to root at
+    // it and then hang a single child called the same thing -- so the real
+    // shape of every page began with a duplicate of its own name.
+    const map = markdownToMindMap("## abandon\n\n放弃。\n\n## 搭配\n- abandon ship", {
+      title: "abandon",
+    })
+
+    expect(map.nodes.filter((node) => node.label === "abandon")).toHaveLength(1)
+  })
 })
