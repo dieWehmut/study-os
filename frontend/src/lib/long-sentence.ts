@@ -94,9 +94,55 @@ const REPORTING = new Set([
   "mean",
   "means",
   "meant",
+  "report",
+  "reports",
+  "reported",
+  "admit",
+  "admits",
+  "admitted",
+  "claim",
+  "claims",
+  "claimed",
+  "note",
+  "notes",
+  "noted",
+  "explain",
+  "explains",
+  "explained",
+  "conclude",
+  "concludes",
+  "concluded",
+  "realize",
+  "realizes",
+  "realized",
+  "assume",
+  "assumes",
+  "assumed",
+  "decide",
+  "decides",
+  "decided",
+  "agree",
+  "agrees",
+  "agreed",
+  "reveal",
+  "reveals",
+  "revealed",
+  "predict",
+  "predicts",
+  "predicted",
+  "insist",
+  "insists",
+  "insisted",
 ])
 
-/** Verbs that are finite on their own, whatever the shape of the word. */
+/**
+ * Verbs that are finite on their own, whatever the shape of the word.
+ *
+ * Every one of them is also an auxiliary, which is the second job this set
+ * does: a verb sitting directly behind one of these is a participle sharing its
+ * tense, not a second finite verb. 「had studied」 is one verb, and counting it
+ * as two ends a relative clause halfway through itself.
+ */
 const FINITE = new Set([
   "is",
   "are",
@@ -162,6 +208,37 @@ const IRREGULAR_PAST = new Set([
  */
 const NOT_VERBS = new Set(["this", "his", "its", "hers", "theirs", "ours", "yours", "thus", "us"])
 
+/**
+ * Words after which an -s word is a noun rather than a verb.
+ *
+ * 「the samples」 「the results」 「The scientists」 -- a real 长难句 is built out
+ * of these, and reading one as a verb is what cuts a clause down to two words.
+ */
+const DETERMINERS = new Set([
+  "the",
+  "a",
+  "an",
+  "this",
+  "these",
+  "those",
+  "its",
+  "his",
+  "her",
+  "their",
+  "our",
+  "your",
+  "my",
+  "some",
+  "any",
+  "no",
+  "each",
+  "every",
+  "both",
+  "all",
+  "several",
+  "many",
+])
+
 function word(token: string): string {
   return token.replace(/[^A-Za-z']/g, "").toLowerCase()
 }
@@ -169,16 +246,39 @@ function word(token: string): string {
 /**
  * Whether this word could be a finite verb.
  *
- * Deliberately loose -- an auxiliary, a known irregular past, or an -ed/-es/-s
- * ending. A clause has a verb; a prepositional phrase does not, and that is the
- * only distinction being asked of it.
+ * Deliberately loose, because of the only question it is asked: does this span
+ * contain a verb at all? A clause has one, a prepositional phrase does not, and
+ * a false positive there costs nothing.
  */
-function isFiniteVerb(token: string): boolean {
+function couldBeVerb(token: string): boolean {
   const plain = word(token)
   if (plain === "") return false
   if (FINITE.has(plain) || IRREGULAR_PAST.has(plain)) return true
   if (NOT_VERBS.has(plain) || /(?:ous|ss)$/.test(plain)) return false
   return /(?:ed|es|s)$/.test(plain) && plain.length > 3
+}
+
+/**
+ * Whether this word is confidently the verb of a clause.
+ *
+ * A stricter reading than `couldBeVerb`, because the question is different and
+ * so is the cost of getting it wrong. Here the answer decides *where a clause
+ * stops*, and a word wrongly called a verb ends the clause early -- the tail
+ * then falls into the main clause, which is the one place it must not be.
+ *
+ * So an -s word is only a verb when no determiner sits in front of it, and a
+ * word already covered by an auxiliary is not a second verb. Under-reporting is
+ * safe: the clause simply runs on to the next marker, comma, or the end.
+ */
+function isClauseVerb(tokens: string[], index: number): boolean {
+  const plain = word(tokens[index] as string)
+  if (plain === "") return false
+  if (FINITE.has(plain) || IRREGULAR_PAST.has(plain)) return true
+  if (NOT_VERBS.has(plain) || /(?:ous|ss)$/.test(plain)) return false
+
+  const previous = index > 0 ? word(tokens[index - 1] as string) : ""
+  if (/ed$/.test(plain) && plain.length > 3) return true
+  return /(?:es|s)$/.test(plain) && plain.length > 3 && !DETERMINERS.has(previous)
 }
 
 /**
@@ -188,7 +288,7 @@ function isFiniteVerb(token: string): boolean {
  * with no verb in it -- teaching the opposite of what the sentence does.
  */
 function hasFiniteVerb(tokens: string[]): boolean {
-  return tokens.some(isFiniteVerb)
+  return tokens.some(couldBeVerb)
 }
 
 interface Segment {
@@ -216,7 +316,11 @@ function endOfClause(tokens: string[], start: number, role: ClauseRole): number 
     const token = tokens[index] as string
     if (index > start && markerRole(tokens, index) !== null) return index
     if (token.endsWith(",")) return index + 1
-    if (index > start && isFiniteVerb(token)) {
+    if (index > start && isClauseVerb(tokens, index)) {
+      // 「had studied」 is one verb, so the participle behind an auxiliary is
+      // not a second one. Without this the clause ends inside its own verb.
+      const previous = word(tokens[index - 1] as string)
+      if (FINITE.has(previous)) continue
       if (role === "relative" && seenVerb) return index
       seenVerb = true
     }

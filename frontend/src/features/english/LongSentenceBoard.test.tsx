@@ -50,6 +50,21 @@ describe("taking a 长难句 apart to find its 主谓", () => {
     expect(screen.getByText("Although he was tired").closest("li")).toHaveTextContent("状语从句")
   })
 
+  it("leads with the main clause instead of burying it under the 从句", () => {
+    // A real 长难句 lifts four or five clauses out, and in sentence order the
+    // 主句 lands at the bottom of them. The board exists to hand you the 主谓 --
+    // putting them last is the reading problem it was supposed to remove.
+    render(<LongSentenceBoard />)
+
+    type(
+      "The scientists who had studied the samples reported that the results were surprising, although they admitted that more work was needed.",
+    )
+
+    const clauses = screen.getAllByRole("listitem")
+    expect(clauses[0]).toHaveTextContent("The scientists … reported")
+    expect(clauses[1]).toHaveTextContent("who had studied the samples")
+  })
+
   it("says nothing about a sentence that was never hard", () => {
     // A plain sentence dressed up as a 长难句 teaches you to distrust the board.
     // 主谓 are already adjacent here; there is nothing to lift.

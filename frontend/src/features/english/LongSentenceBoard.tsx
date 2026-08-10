@@ -33,6 +33,10 @@ export function LongSentenceBoard() {
   const written = sentence.trim() !== ""
   const split = splitSentence(sentence)
   const subordinate = split.clauses.filter((clause) => clause.role !== "main")
+  // Main clauses first, in the order they were written. In sentence order the
+  // 主句 lands underneath everything lifted off it -- which is the reading
+  // problem this board exists to remove, reproduced in the answer.
+  const ordered = [split.clauses.filter((clause) => clause.role === "main"), subordinate].flat()
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
@@ -56,7 +60,7 @@ export function LongSentenceBoard() {
           </p>
 
           <ul className="flex flex-col gap-1">
-            {split.clauses.map((clause, index) => (
+            {ordered.map((clause, index) => (
               <li
                 key={`${index}-${clause.text}`}
                 className={

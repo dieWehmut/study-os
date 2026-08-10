@@ -59,6 +59,50 @@ describe("splitSentence", () => {
     expect(split.clauses.filter((clause) => clause.role === "main")).toHaveLength(2)
   })
 
+  it("keeps an auxiliary and its participle together as one verb", () => {
+    // 「had studied」 is one finite verb, not two. Counted as two it ends the
+    // relative clause at 「studied」, and the rest of the clause spills into the
+    // main clause it was never part of.
+    const split = splitSentence("The scientists who had studied the samples reported the result.")
+
+    expect(split.clauses.find((clause) => clause.role === "relative")?.text).toBe(
+      "who had studied the samples",
+    )
+  })
+
+  it("does not end a clause on a plural noun", () => {
+    // scientists/samples/results all end in -s. Every real 长难句 is full of
+    // them, and stopping at one cuts the clause down to two words.
+    const split = splitSentence("The scientists who had studied the samples reported the result.")
+
+    expect(split.clauses.find((clause) => clause.role === "main")?.text).toBe(
+      "The scientists … reported the result.",
+    )
+  })
+
+  it("reads that after a reporting verb it has not been told about", () => {
+    // The list of verbs taking a that-clause cannot be complete, but it should
+    // at least cover the ones an exam passage actually uses.
+    const split = splitSentence("The team reported that the results were surprising.")
+
+    expect(split.clauses.find((clause) => clause.marker === "that")?.role).toBe("nominal")
+  })
+
+  it("takes a real 长难句 apart without losing half of it", () => {
+    // The point of the whole file, on the kind of sentence it exists for: four
+    // 从句 lifted off, and the 主谓 left sitting next to each other.
+    const split = splitSentence(
+      "The scientists who had studied the samples reported that the results were surprising, although they admitted that more work was needed.",
+    )
+
+    expect(split.clauses.find((clause) => clause.role === "main")?.text).toBe(
+      "The scientists … reported",
+    )
+    expect(split.clauses.map((clause) => clause.text)).toContain("who had studied the samples")
+    expect(split.clauses.map((clause) => clause.text)).toContain("that the results were surprising")
+    expect(split.clauses.map((clause) => clause.text)).toContain("that more work was needed.")
+  })
+
   it("does not treat a preposition as a clause marker", () => {
     // "before" introduces a clause only when a subject and verb follow it.
     // Splitting "before noon" would hand back a fragment with no verb and call
