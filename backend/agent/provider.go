@@ -5,6 +5,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -192,11 +193,52 @@ type SummaryOutput struct {
 }
 
 type WordWikiOutput struct {
-	DetailedMarkdown  string   `json:"detailed_markdown"`
-	ConciseDefinition string   `json:"concise_definition,omitempty"`
-	MemoryTips        []string `json:"memory_tips,omitempty"`
-	Collocations      []string `json:"collocations,omitempty"`
-	WordFamily        []string `json:"word_family,omitempty"`
+	DetailedMarkdown  string     `json:"detailed_markdown"`
+	ConciseDefinition string     `json:"concise_definition,omitempty"`
+	MemoryTips        stringList `json:"memory_tips,omitempty"`
+	Collocations      stringList `json:"collocations,omitempty"`
+	WordFamily        stringList `json:"word_family,omitempty"`
+}
+
+// stringList accepts either a JSON array of strings or a bare string, because a
+// model asked for "tips" that has exactly one tip writes a sentence rather than
+// a one-element array -- and that reading of the prompt is not wrong.
+//
+// Against a plain []string that is a type error, and json.Unmarshal fails the
+// *whole object*. These fields share a struct with detailed_markdown, the only
+// field without omitempty because it is the entire payload; so the shape a
+// vendor chose for a decoration decided whether the wiki survived. DeepSeek
+// answers memory_tips as a sentence every time, so word-wiki generation failed
+// 100% against it, discarding a complete ~900-character wiki on every call.
+// 生成导图 reads that same markdown, so the map had nothing to draw either.
+type stringList []string
+
+func (l *stringList) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*l = nil
+		return nil
+	}
+	if trimmed[0] == '[' {
+		var items []string
+		if err := json.Unmarshal(data, &items); err != nil {
+			return err
+		}
+		*l = items
+		return nil
+	}
+	var single string
+	if err := json.Unmarshal(data, &single); err != nil {
+		return err
+	}
+	// One sentence is one item, not none. Silently dropping it would trade a
+	// loud decode failure for a quiet data loss, which is the harder bug.
+	if strings.TrimSpace(single) == "" {
+		*l = nil
+		return nil
+	}
+	*l = stringList{single}
+	return nil
 }
 
 type SentenceOutput struct {

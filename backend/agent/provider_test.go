@@ -285,3 +285,47 @@ func TestNetworkProvidersGiveUpOnAStalledVendor(t *testing.T) {
 		})
 	}
 }
+
+// The wiki is the one field with no `omitempty`: it is the whole payload, and
+// the four beside it are decoration. Decoding the lot into one struct means a
+// vendor's reading of a decorative field decides whether the payload survives.
+//
+// DeepSeek really does answer `"memory_tips": "a-band-on ..."` -- a single tip
+// is naturally a sentence, and the prompt never said otherwise. Against a
+// []string that is a type error, so json.Unmarshal fails and every wiki this
+// project ever asked DeepSeek for was thrown away with a 899-character
+// detailed_markdown sitting inside it. 生成导图 reads that same markdown, so the
+// map had nothing to draw either.
+func TestWordWikiSurvivesAScalarWhereAListWasExpected(t *testing.T) {
+	scalars := map[string]string{
+		"memory_tips":  `{"detailed_markdown":"## abandon\n\n### 用法\n放弃。","memory_tips":"a-band-on 乐队抛下你"}`,
+		"collocations": `{"detailed_markdown":"## abandon\n\n### 用法\n放弃。","collocations":"abandon ship"}`,
+		"word_family":  `{"detailed_markdown":"## abandon\n\n### 用法\n放弃。","word_family":"abandoned"}`,
+	}
+
+	for field, content := range scalars {
+		t.Run(field, func(t *testing.T) {
+			response, err := decodeProviderOutput(KindWordWiki, content)
+			if err != nil {
+				t.Fatalf("decode: %v -- a decorative %s must not cost the wiki", err, field)
+			}
+			if response.WordWiki == nil || response.WordWiki.DetailedMarkdown == "" {
+				t.Fatal("detailed_markdown was dropped")
+			}
+		})
+	}
+}
+
+// A scalar is one item, not no items: dropping it silently would trade a decode
+// failure for a quieter data loss.
+func TestWordWikiReadsALoneTipAsAOneItemList(t *testing.T) {
+	content := `{"detailed_markdown":"## abandon\n\n正文","memory_tips":"a-band-on 乐队抛下你"}`
+
+	response, err := decodeProviderOutput(KindWordWiki, content)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got := response.WordWiki.MemoryTips; len(got) != 1 || got[0] != "a-band-on 乐队抛下你" {
+		t.Fatalf("memory_tips = %#v, want the sentence kept as the only tip", got)
+	}
+}

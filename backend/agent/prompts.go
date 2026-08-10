@@ -105,7 +105,18 @@ func systemPromptFor(kind Kind) string {
 	case KindSummary:
 		return base + " 输出字段：title、key_points（字符串数组）、abstract。"
 	case KindWordWiki:
-		return base + " 输出字段：detailed_markdown（完整 Markdown，含释义、词族、搭配、例句、易混、记忆提示）、concise_definition、memory_tips、collocations、word_family。"
+		// The three list fields say「字符串数组」for the same reason key_points
+		// above does: unannotated, a model with one tip to give writes a
+		// sentence. stringList now survives that, but the prompt should not
+		// invite the ambiguity in the first place.
+		//
+		// The heading rule is not cosmetic: detailed_markdown is the sole input
+		// to 生成导图, and 0807:75 says a markdown wiki needs no model to become
+		// a map, only a parser. A wiki written as one unbroken block parses to a
+		// root with no branches -- nothing to draw. Asking for ### sections is
+		// what makes the same text readable as prose *and* as a shape.
+		return base + " 输出字段：detailed_markdown（完整 Markdown）、concise_definition、memory_tips（字符串数组）、collocations（字符串数组）、word_family（字符串数组）。" +
+			"detailed_markdown 首行用「## 词条名」，正文按「### 释义」「### 词族」「### 搭配」「### 例句」「### 易混」「### 记忆提示」分节，每节 2-4 行；这样它同时是一张导图的骨架。"
 	case KindMakeSentence:
 		return base + " 输出字段：sentence（包含目标词的英文句子）、translation（中文翻译）、blanked（用 _____ 替换目标词）。"
 	case KindEvaluateFreeText:
