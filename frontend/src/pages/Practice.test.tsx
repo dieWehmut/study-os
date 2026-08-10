@@ -667,3 +667,44 @@ describe("pulling the answer apart 语文 keeps being told to pull apart", () =>
     expect(screen.queryByRole("button", { name: "对得分点" })).not.toBeInTheDocument()
   })
 })
+
+describe("taking apart the 长难句 英语 keeps being told to look at structurally", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    filed = 0
+    useSubjectStore.setState({ subject: "english" })
+    mocks.listMistakes.mockResolvedValue([])
+  })
+
+  it("offers the board under the advice that asks for it", async () => {
+    // 英语's 思路不对 advice says 语法题看结构不看词义：先找主谓，再定从句 -- and
+    // 找主谓 is the half that fails, because the two are pushed apart by
+    // everything hanging off the subject.
+    render(<Practice />)
+    log("这句从句套从句读不动", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "拆长难句" })).toBeInTheDocument()
+  })
+
+  it("opens a real board, not a picture of one", async () => {
+    render(<Practice />)
+    log("这句从句套从句读不动", "思路不对")
+    fireEvent.click(await screen.findByRole("button", { name: "拆长难句" }))
+
+    fireEvent.change(screen.getByLabelText("这句长难句"), {
+      target: { value: "The book that I bought yesterday is on the table." },
+    })
+
+    expect(screen.getByText("The book … is on the table.")).toBeInTheDocument()
+  })
+
+  it("does not offer 长难句 to 语文, which is told to check 得分点 instead", async () => {
+    useSubjectStore.setState({ subject: "chinese" })
+    render(<Practice />)
+    log("赏析这两句诗", "思路不对")
+
+    expect(await screen.findByRole("button", { name: "对得分点" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "拆长难句" })).not.toBeInTheDocument()
+  })
+})

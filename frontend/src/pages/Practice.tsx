@@ -7,6 +7,7 @@ import {
   ListOrdered,
   PenLine,
   Scale,
+  Scissors,
   Split,
   SquarePen,
   Trash2,
@@ -25,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { EquationBoard } from "@/features/chemistry/EquationBoard"
 import { ScoringBoard } from "@/features/chinese/ScoringBoard"
+import { LongSentenceBoard } from "@/features/english/LongSentenceBoard"
 import { ChainBoard } from "@/features/geography/ChainBoard"
 import { DerivationBoard } from "@/features/math/DerivationBoard"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
@@ -78,6 +80,14 @@ function boardFor(subject: string, cause: MistakeCause): CauseBoard | null {
       close: "收起得分点",
       icon: <ClipboardCheck data-icon="inline-start" />,
       board: <ScoringBoard />,
+    }
+  }
+  if (subject === "english" && cause === "method") {
+    return {
+      open: "拆长难句",
+      close: "收起长难句",
+      icon: <Scissors data-icon="inline-start" />,
+      board: <LongSentenceBoard />,
     }
   }
   if (subject === "geography" && cause === "method") {
