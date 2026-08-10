@@ -273,7 +273,7 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
                     edge. */}
                 <MindMap data={map} fit />
                 <p className="text-xs text-muted-foreground">
-                  点节点折叠分支，点 ≡ 看该节的原文。
+                  点节点折叠分支，点 ≡ 看该节原文，点 ▣ 看该节配图。
                 </p>
               </div>
             ) : (

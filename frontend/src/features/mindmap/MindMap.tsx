@@ -30,6 +30,33 @@ const BASELINE = NODE_H / 2 + 8
 const NOTE_PANEL_W = 264
 const NOTE_LINE_H = 20
 const NOTE_PANEL_PAD = 10
+/**
+ * How much of an opened panel a picture is given.
+ *
+ * A fixed box, with the picture fitted inside it: SVG cannot ask an image how
+ * tall it wants to be, and the panel has to reserve its room before anything is
+ * fetched. Letterboxing a wide diagram costs some white space; guessing the
+ * aspect ratio instead would stretch it.
+ */
+const NOTE_IMAGE_H = 148
+
+/**
+ * Only pictures a browser will fetch as a picture.
+ *
+ * A map's markdown is written by a model or pasted in by hand, so the src is
+ * untrusted input reaching an element that dereferences it. `data:` is the one
+ * that matters -- a `data:image/svg+xml` document can carry script, and an
+ * <image> pointing at one would run it. Anything whose scheme we do not
+ * recognise is refused rather than guessed at; a bare or rooted path has no
+ * scheme and stays, which is the form every wiki actually uses.
+ */
+function safeImageSrc(src?: string): string | undefined {
+  const trimmed = src?.trim()
+  if (!trimmed) return undefined
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(trimmed)
+  if (scheme && !/^https?$/i.test(scheme[1])) return undefined
+  return trimmed
+}
 
 /**
  * Roughly how wide this label draws.
@@ -79,12 +106,24 @@ function lineWidth(label: string): number {
  * same reason: the panel has to reserve its space before the browser has laid
  * any text out, and it has to reserve the same space under jsdom.
  */
-function notePanelHeight(note: string): number {
+function notePanelHeight(note: string, hasImage: boolean): number {
   const perLine = NOTE_PANEL_W - NOTE_PANEL_PAD * 2
   const lines = note
-    .split("\n")
-    .reduce((total, line) => total + Math.max(1, Math.ceil(labelWidth(line) / perLine)), 0)
-  return lines * NOTE_LINE_H + NOTE_PANEL_PAD * 2
+    ? note
+        .split("\n")
+        .reduce((total, line) => total + Math.max(1, Math.ceil(labelWidth(line) / perLine)), 0)
+    : 0
+  return lines * NOTE_LINE_H + (hasImage ? NOTE_IMAGE_H : 0) + NOTE_PANEL_PAD * 2
+}
+
+/**
+ * What the node is offering to open.
+ *
+ * 0807:15 gives a node two things it may carry, and a marker that always says
+ * 笔记 would announce a diagram as prose to anyone reading the map aloud.
+ */
+function carriedLabel(node: MindNode): string {
+  return node.note ? "笔记" : "图片"
 }
 
 /**
@@ -263,7 +302,7 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
   const widths = useMemo(() => {
     const map = new Map<string, number>()
     for (const node of data.nodes) {
-      map.set(node.id, claimWidth(node.label, children.has(node.id), Boolean(node.note)))
+      map.set(node.id, claimWidth(node.label, children.has(node.id), Boolean(node.note || node.image)))
     }
     return map
   }, [data.nodes, children])
@@ -284,6 +323,25 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
   // hanging beside a node that is no longer on screen.
   const notedId = openNote && visible.some((node) => node.id === openNote) ? openNote : null
 
+  // The canvas has to cover the opened panel too.
+  //
+  // `layout` deliberately does not know about panels: it sizes the closed tree,
+  // and a panel is state that only exists after a click. But an SVG crops at
+  // its own edge, so a note hanging off a node in the last column had its right
+  // half — on a picture, most of the picture — simply cut away. Taking the max
+  // here rather than reserving the room inside `layout` means the map is not
+  // permanently padded by 264px of white space for a panel that is usually shut.
+  const noted = notedId ? byId.get(notedId) : undefined
+  const notedAt = notedId ? positions.get(notedId) : undefined
+  const notedSource = safeImageSrc(noted?.image)
+  const panelH =
+    noted && notedAt && (noted.note || notedSource)
+      ? notePanelHeight(noted.note ?? "", Boolean(notedSource))
+      : 0
+  const canvasW = notedAt && panelH ? Math.max(width, notedAt.x + NOTE_PANEL_W + PAD) : width
+  const canvasH =
+    notedAt && panelH ? Math.max(height, notedAt.y + NODE_H + 4 + panelH + PAD) : height
+
   return (
     <div className={`${fit ? "overflow-hidden" : "overflow-auto"} rounded-xl border border-border bg-card p-2`}>
       {/*
@@ -299,11 +357,11 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
         for tests, which otherwise could not tell "scaled" from "clipped".
       */}
       <svg
-        width={fit ? "100%" : width}
-        height={fit ? undefined : height}
-        viewBox={fit ? `0 0 ${width} ${height}` : undefined}
-        data-width={width}
-        data-height={height}
+        width={fit ? "100%" : canvasW}
+        height={fit ? undefined : canvasH}
+        viewBox={fit ? `0 0 ${canvasW} ${canvasH}` : undefined}
+        data-width={canvasW}
+        data-height={canvasH}
         role="tree"
         aria-label={`导图：${data.title}`}
       >
@@ -417,12 +475,12 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
                   {`+${hidden}`}
                 </text>
               ) : null}
-              {node.note ? (
+              {node.note || node.image ? (
                 <g
                   role="button"
                   // Named for the node, because a map of forty nodes read aloud
                   // as forty identical "展开笔记" buttons names nothing.
-                  aria-label={`${notedId === node.id ? "收起" : "展开"}笔记：${node.label}`}
+                  aria-label={`${notedId === node.id ? "收起" : "展开"}${carriedLabel(node)}：${node.label}`}
                   aria-expanded={notedId === node.id}
                   tabIndex={0}
                   style={{ cursor: "pointer" }}
@@ -457,7 +515,10 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
                     opacity={0.8}
                     aria-hidden="true"
                   >
-                    ≡
+                    {/* Two glyphs, because the two things a node can carry are
+                        not interchangeable: ≡ promises a sentence, ▣ promises a
+                        picture, and the reader can tell before clicking. */}
+                    {node.note ? "≡" : "▣"}
                   </text>
                 </g>
               ) : null}
@@ -467,17 +528,20 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
         {/* Last, so it draws over the branches rather than under them -- a note
             you can read through is not a note. */}
         {(() => {
-          if (!notedId) return null
-          const node = byId.get(notedId)
-          const pos = positions.get(notedId)
-          if (!node?.note || !pos) return null
-          const lines = node.note.split("\n")
-          const panelH = notePanelHeight(node.note)
+          // Reuses what the canvas was sized against, rather than measuring the
+          // panel a second time: two copies of this arithmetic that disagree is
+          // exactly the clipping bug the canvas sizing above exists to prevent.
+          if (!noted || !notedAt || !panelH) return null
+          const node = noted
+          const pos = notedAt
+          const source = notedSource
+          const lines = node.note ? node.note.split("\n") : []
+          const top = pos.y + NODE_H + 4
           return (
-            <g role="note" aria-label={`笔记：${node.label}`}>
+            <g role="note" aria-label={`${carriedLabel(node)}：${node.label}`}>
               <rect
                 x={pos.x}
-                y={pos.y + NODE_H + 4}
+                y={top}
                 width={NOTE_PANEL_W}
                 height={panelH}
                 rx={8}
@@ -486,11 +550,30 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
                 strokeWidth={1}
                 opacity={0.98}
               />
+              {source ? (
+                // Above the prose, because the picture is what the sentence
+                // under it is describing. `meet` rather than `slice`: a diagram
+                // cropped to fill the box loses the axis labels that made it a
+                // diagram.
+                <image
+                  x={pos.x + NOTE_PANEL_PAD}
+                  y={top + NOTE_PANEL_PAD}
+                  width={NOTE_PANEL_W - NOTE_PANEL_PAD * 2}
+                  height={NOTE_IMAGE_H}
+                  href={source}
+                  preserveAspectRatio="xMidYMid meet"
+                  role="img"
+                  // Falls back to the node's own label: an <image> with no
+                  // accessible name is announced as an unnamed graphic, and the
+                  // heading it hangs under is the best description available.
+                  aria-label={node.image_alt || node.label}
+                />
+              ) : null}
               <foreignObject
                 x={pos.x + NOTE_PANEL_PAD}
-                y={pos.y + NODE_H + 4 + NOTE_PANEL_PAD}
+                y={top + NOTE_PANEL_PAD + (source ? NOTE_IMAGE_H : 0)}
                 width={NOTE_PANEL_W - NOTE_PANEL_PAD * 2}
-                height={panelH - NOTE_PANEL_PAD * 2}
+                height={panelH - NOTE_PANEL_PAD * 2 - (source ? NOTE_IMAGE_H : 0)}
               >
                 {/* foreignObject rather than <text>: SVG text does not wrap, and
                     a note is prose. The estimate above only has to reserve the

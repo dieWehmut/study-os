@@ -114,6 +114,22 @@ describe("MindMap", () => {
     expect(screen.queryByRole("treeitem", { name: "平均速度" })).not.toBeInTheDocument()
   })
 
+  it("gives a re-opened branch back exactly as it was left", () => {
+    // 0807:13 calls this out as the one usage detail worth naming: folding a
+    // middle level and opening it again must not disturb what the reader had
+    // already folded underneath it. Reading a fold as "hide my descendants"
+    // would quietly reset them, so the reader loses their place every time
+    // they collapse an ancestor to see around it.
+    render(<MindMap data={data} />)
+
+    fireEvent.click(screen.getByRole("treeitem", { name: "瞬时速度" }))
+    fireEvent.click(screen.getByRole("treeitem", { name: "速度" }))
+    fireEvent.click(screen.getByRole("treeitem", { name: "速度" }))
+
+    expect(screen.getByRole("treeitem", { name: "瞬时速度" })).toBeInTheDocument()
+    expect(screen.queryByRole("treeitem", { name: "定义" })).not.toBeInTheDocument()
+  })
+
   it("offers no fold on a node with nothing under it", () => {
     render(<MindMap data={data} />)
 
@@ -308,6 +324,111 @@ describe("MindMap", () => {
     fireEvent.click(screen.getByRole("button", { name: "展开笔记：瞬时速度" }))
 
     expect(screen.getByRole("treeitem", { name: "定义" })).toBeInTheDocument()
+  })
+
+  it("shows the picture a node carries, once you open it", () => {
+    // The other half of 0807:15 「每个节点可以是笔记、图片」. A diagram is the thing
+    // a 图文笔记 is for: the prose under 光反应 describes a membrane, and the
+    // picture of it is what makes the description land.
+    render(
+      <MindMap
+        data={{
+          title: "光合作用",
+          nodes: [
+            { id: "r", label: "光合作用", node_type: "root" },
+            {
+              id: "a",
+              label: "光反应",
+              parent_id: "r",
+              node_type: "heading",
+              note: "发生在类囊体薄膜。",
+              image: "/img/light.png",
+              image_alt: "示意图",
+            },
+          ],
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "展开笔记：光反应" }))
+
+    const picture = screen.getByRole("img", { name: "示意图" })
+    expect(picture).toHaveAttribute("href", "/img/light.png")
+  })
+
+  it("offers a picture-only node something to open", () => {
+    // The parser omits `note` rather than emptying it when the body was nothing
+    // but an image (mindmap.ts). Gating the marker on the note alone therefore
+    // hides the picture completely -- the node draws as a bare label with no
+    // hint that anything is under it.
+    render(
+      <MindMap
+        data={{
+          title: "甲",
+          nodes: [
+            { id: "r", label: "甲", node_type: "root" },
+            { id: "a", label: "乙", parent_id: "r", node_type: "item", image: "/only.png" },
+          ],
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "展开图片：乙" }))
+
+    expect(screen.getByRole("img", { name: "乙" })).toHaveAttribute("href", "/only.png")
+  })
+
+  it("keeps the picture out of the way until asked", () => {
+    render(
+      <MindMap
+        data={{
+          title: "甲",
+          nodes: [
+            { id: "r", label: "甲", node_type: "root" },
+            { id: "a", label: "乙", parent_id: "r", node_type: "item", image: "/only.png" },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument()
+  })
+
+  it("makes room for an opened panel instead of clipping it", () => {
+    // `layout` sizes the canvas from the closed tree, because a panel is state
+    // that only exists after a click. Left at that, the panel is drawn 264px
+    // wide hanging off a node near the right edge, and everything past the
+    // canvas is cropped by the SVG viewport -- on a real map the picture was
+    // more than half gone while every assertion about the DOM still passed.
+    // This is the fourth defect in this component that lives in geometry
+    // rather than in the tree, so it gets a test that measures.
+    render(<MindMap data={data} />)
+    const svg = screen.getByRole("tree", { name: "导图：运动学" })
+    const closed = Number(svg.dataset.width)
+
+    fireEvent.click(screen.getByRole("button", { name: "展开笔记：瞬时速度" }))
+
+    const panel = svg.querySelector("[role='note'] rect")!
+    const right = Number(panel.getAttribute("x")) + Number(panel.getAttribute("width"))
+    expect(Number(svg.dataset.width)).toBeGreaterThanOrEqual(right)
+
+    // And it gives the room back, so the map does not stay stretched around a
+    // panel the reader has already dismissed.
+    fireEvent.click(screen.getByRole("button", { name: "收起笔记：瞬时速度" }))
+    expect(Number(svg.dataset.width)).toBe(closed)
+  })
+
+  it("makes room below for a panel opened on the last row", () => {
+    // The same defect on the other axis: a note hanging off the bottom row has
+    // its whole height below the canvas, which is where a picture's 148px sit.
+    render(<MindMap data={data} />)
+    const svg = screen.getByRole("tree", { name: "导图：运动学" })
+
+    fireEvent.click(screen.getByRole("button", { name: "展开笔记：瞬时速度" }))
+
+    const panel = svg.querySelector("[role='note'] rect")!
+    const bottom = Number(panel.getAttribute("y")) + Number(panel.getAttribute("height"))
+    expect(Number(svg.dataset.height)).toBeGreaterThanOrEqual(bottom)
   })
 
   it("scales to its container when asked to fit", () => {

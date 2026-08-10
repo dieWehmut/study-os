@@ -134,4 +134,35 @@ describe("markdown to mindmap", () => {
 
     expect(map.nodes.filter((node) => node.label === "abandon")).toHaveLength(1)
   })
+
+  it("carries a markdown image on the node it was written under", () => {
+    // 0807:15 「每个节点可以是笔记、图片」. The map is derived from markdown and
+    // never stored, so a node's picture has to ride the same text its note
+    // rides. An image line is already just another body line, and lands in the
+    // note as a literal "![示意图](/img/light.png)" -- the right node, the wrong
+    // form. Lifting it out keeps the promise made at the top of mindmap.ts:
+    // what the parser sees once, the reader gets every time.
+    const map = markdownToMindMap(
+      "## 光合作用\n\n### 光反应\n\n![示意图](/img/light.png)\n\n发生在类囊体薄膜。",
+      { title: "光合作用" },
+    )
+
+    const light = map.nodes.find((node) => node.label === "光反应")
+    expect(light?.image).toBe("/img/light.png")
+    expect(light?.image_alt).toBe("示意图")
+    // The picture leaves the prose behind rather than being repeated in it.
+    expect(light?.note).toBe("发生在类囊体薄膜。")
+  })
+
+  it("leaves no empty note behind when the image was the whole body", () => {
+    // `note` is omitted rather than empty on purpose (mindmap.ts:40) -- "has a
+    // note" is what puts the ≡ marker on a node. Lifting the image out must
+    // preserve that, or a node whose only body line was a picture would offer
+    // to open a blank panel.
+    const map = markdownToMindMap("## 甲\n\n### 乙\n\n![只此一个](/only.png)", { title: "甲" })
+
+    const node = map.nodes.find((node) => node.label === "乙")
+    expect(node?.image).toBe("/only.png")
+    expect(node?.note).toBeUndefined()
+  })
 })

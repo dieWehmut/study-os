@@ -17,6 +17,18 @@ export interface MindNode {
    * to know whether to mark it as openable.
    */
   note?: string
+  /**
+   * The picture written under this node, as the other half of 0807:15's
+   * 「每个节点可以是笔记、图片」.
+   *
+   * A source path, not an upload: the map is derived from markdown every time
+   * it is drawn and never stored, so there is nowhere for a node to keep an
+   * image of its own. Whatever `![](...)` the wiki carries is the image, which
+   * also means the picture survives a re-parse exactly like the shape does.
+   */
+  image?: string
+  /** The `![alt]` text, for readers who cannot see the image. */
+  image_alt?: string
 }
 
 export interface MindMap {
