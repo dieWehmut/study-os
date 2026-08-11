@@ -40,6 +40,17 @@ export function measure(text: string, fontSize: number): number {
 }
 
 /**
+ * The marks that may not open a line.
+ *
+ * 禁则处理: in Chinese typesetting a full stop or a closing bracket belongs to
+ * the character before it, so a break must not fall between them. Arithmetic
+ * that is right to the pixel still reads wrong here -- the observed case was
+ * 「合外力的冲量等于物体动量的变化量」 filling a line exactly and stranding its
+ * 「。」 alone below.
+ */
+const noLineStart = /^[。、，．！？；：）」』】》〉］｝”’…]/
+
+/**
  * Break a latin run that is wider than a whole line.
  *
  * Only as a last resort. A word cut in half is a word destroyed, but a word
@@ -87,7 +98,24 @@ export function wrap(text: string, fontSize: number, maxWidth: number): string[]
   }
 
   const push = (piece: string) => {
-    if (line && measure(line + piece, fontSize) > maxWidth) flush()
+    if (line && measure(line + piece, fontSize) > maxWidth) {
+      // 追い出し rather than letting the mark hang past the budget: a hanging
+      // 。 would overflow by a full em, and `boxPad` is exactly one em, so it
+      // would touch the border. Carrying the previous character down instead
+      // costs one character of ragged right edge and keeps every line inside
+      // the width -- which is the one thing this file exists to guarantee.
+      // Needs two characters to give one away; a line of one keeps the orphan,
+      // there being nothing better available.
+      const characters = [...line]
+      if (noLineStart.test(piece) && characters.length >= 2) {
+        const carried = characters.pop() as string
+        line = characters.join("")
+        flush()
+        line = carried
+      } else {
+        flush()
+      }
+    }
     // Same reason at the other end: a break's own space must not open the next
     // line by indenting it.
     if (!line && piece.trim() === "") return

@@ -50,6 +50,13 @@ describe("text metrics", () => {
     }
   })
 
+  it("does not leave a full stop stranded at the head of a line", () => {
+    // 手动验的时候看见的：`合外力的冲量等于物体动量的变化量` 刚好占满一行，
+    // 于是句号被推到下一行，独自站在行首。中文排版里句读不能开头 —— 算宽度
+    // 算得再准，这一行读起来还是错的。把前一个字一起带下去，行宽照旧不超。
+    expect(wrap("一二三。", 20, 60)).toEqual(["一二", "三。"])
+  })
+
   it("keeps every character it was given", () => {
     const text = "混合 text 与中文 mixed 的一行"
     expect(wrap(text, 16, 90).join("").replace(/ /g, "")).toBe(text.replace(/ /g, ""))
