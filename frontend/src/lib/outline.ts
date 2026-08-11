@@ -56,6 +56,34 @@ export const listPattern = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/
 /** Two spaces per level is the CommonMark-ish convention; a tab counts as one. */
 const indentWidth = 2
 
+/**
+ * Split a table row into its cells.
+ *
+ * Escaped bars are put back rather than split on, because `\|x\|` is how a cell
+ * writes an absolute value -- splitting there would cut one cell into three and
+ * shift every column after it under the wrong header. The outer pipes are
+ * optional, as GFM makes them, and both forms turn up in real material.
+ */
+export function splitTableRow(line: string): string[] {
+  const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "")
+  return trimmed
+    .split(/(?<!\\)\|/)
+    .map((cell) => cell.replace(/\\\|/g, "|").trim())
+}
+
+/**
+ * The `| --- | :--: |` line under a table's header.
+ *
+ * Its presence is what makes the lines around it a table at all. Without that
+ * requirement any sentence containing a bar -- `|x|`, `A | B` -- would be read
+ * as columns, and the map would shred the prose it was supposed to summarise.
+ */
+export function isTableDelimiter(line: string): boolean {
+  if (!/\|/.test(line)) return false
+  const cells = splitTableRow(line)
+  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/.test(cell))
+}
+
 interface OpenNode {
   node: OutlineNode
   depth: number
@@ -125,6 +153,43 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
       const indent = item[1].replace(/\t/g, " ".repeat(indentWidth)).length
       const itemDepth = headingDepth + 1 + Math.floor(indent / indentWidth)
       appendAt(stack, emptyNode(item[3].trim(), itemDepth, "item", index))
+      continue
+    }
+
+    // A table is structure, not prose: its rows are the things being compared,
+    // which is exactly what a map is for (0807:75 -- a markdown wiki becomes a
+    // map by a fixed program, and a comparison table is the densest structure
+    // 教辅 material has). Left in the body it reaches the reader as raw pipe
+    // syntax inside a note panel, the one form less readable than the table.
+    //
+    // Recognised by looking ahead for the alignment row rather than by the bars
+    // alone, because bars are ordinary punctuation in study material.
+    if (/\|/.test(line) && index + 1 < source.length && isTableDelimiter(source[index + 1].trimEnd())) {
+      const header = splitTableRow(line)
+      // The header and the alignment row are the table's frame, not its
+      // contents, so neither becomes a node -- but the header's words are what
+      // name the fields on every row below it.
+      let cursor = index + 2
+      const rowDepth = headingDepth + 1
+      while (cursor < source.length) {
+        const row = source[cursor].trimEnd()
+        if (row.trim() === "" || !/\|/.test(row)) break
+        const cells = splitTableRow(row)
+        // The first cell is the row's subject; the rest is what the table says
+        // about it, kept as prose under the node rather than as more nodes --
+        // a map whose leaves are single table cells is the table again, worse.
+        const node = emptyNode(cells[0] ?? "", rowDepth, "item", cursor)
+        node.body = cells
+          .slice(1)
+          // Empty cells are dropped rather than written as "例子：": half-filled
+          // tables are normal, and a bare label reads as a missing answer.
+          .map((cell, column) => (cell ? `${header[column + 1] ?? ""}：${cell}`.replace(/^：/, "") : ""))
+          .filter(Boolean)
+        appendAt(stack, node)
+        cursor += 1
+      }
+      // -1 because the loop's own increment supplies the last step.
+      index = cursor - 1
       continue
     }
 

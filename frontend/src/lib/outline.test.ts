@@ -92,4 +92,101 @@ describe("markdown outline parser", () => {
 
     expect(root.line).toBe(-1)
   })
+
+  describe("tables", () => {
+    it("turns each data row into a node named by its first cell", () => {
+      // A comparison table is the densest structure 教辅 material has, and it is
+      // pure structure -- the rows are the things being compared. Left as prose
+      // it reaches the reader as raw pipe syntax inside a note panel, which is
+      // the one form less readable than the table itself.
+      const root = parseOutline(
+        [
+          "# 力学",
+          "## 对比",
+          "| 概念 | 定义 | 例子 |",
+          "| --- | --- | --- |",
+          "| 动量 | mv | 小球碰撞 |",
+          "| 冲量 | Ft | 撞击 |",
+        ].join("\n"),
+      )
+
+      const table = root.children[0]
+      expect(table.children.map((child) => child.title)).toEqual(["动量", "冲量"])
+    })
+
+    it("keeps the rest of a row as prose, labelled by the header", () => {
+      // The first cell is the row's subject; the others are what the table says
+      // about it. Naming them from the header row is what stops the note being
+      // a bare list of values whose columns you have to remember.
+      const root = parseOutline(
+        [
+          "## 对比",
+          "| 概念 | 定义 | 例子 |",
+          "| --- | --- | --- |",
+          "| 动量 | mv | 小球碰撞 |",
+        ].join("\n"),
+      )
+
+      expect(root.children[0].children[0].body).toEqual(["定义：mv", "例子：小球碰撞"])
+    })
+
+    it("never makes a node out of the alignment row", () => {
+      // "---" is punctuation, not content. A node called "---" sitting between
+      // the header and the first real row is the tell that a parser is reading
+      // the table as text.
+      const root = parseOutline(
+        ["## 对比", "| 概念 | 定义 |", "| :-- | --: |", "| 动量 | mv |"].join("\n"),
+      )
+
+      expect(root.children[0].children.map((child) => child.title)).toEqual(["动量"])
+    })
+
+    it("tells each row which line it can be renamed on", () => {
+      // Same contract as every other node: a row's label lives on exactly one
+      // source line, so an edit to it stays surgical.
+      const root = parseOutline(
+        ["## 对比", "| 概念 | 定义 |", "| --- | --- |", "| 动量 | mv |"].join("\n"),
+      )
+
+      expect(root.children[0].children[0].line).toBe(3)
+    })
+
+    it("leaves a lone piped line as prose", () => {
+      // Without the alignment row it is not a table -- and a pipe turns up in
+      // ordinary study material constantly (|x| for absolute value, "A | B" in
+      // notation). Reading those as tables would shred the sentence they are in.
+      const root = parseOutline(["## 记号", "| 动量 | mv |", "读作 p 等于 mv。"].join("\n"))
+
+      expect(root.children[0].children).toEqual([])
+      expect(root.children[0].body).toEqual(["| 动量 | mv |", "读作 p 等于 mv。"])
+    })
+
+    it("reads a table written without outer pipes", () => {
+      // GFM makes the outer pipes optional and real material uses both forms.
+      const root = parseOutline(["## 对比", "概念 | 定义", "--- | ---", "动量 | mv"].join("\n"))
+
+      expect(root.children[0].children.map((child) => child.title)).toEqual(["动量"])
+    })
+
+    it("does not split a cell on an escaped pipe", () => {
+      // |x| is absolute value, and a table cell carrying it escapes the bars.
+      // Splitting there would cut one cell into three and shift every column
+      // after it under the wrong header.
+      const root = parseOutline(
+        ["## 对比", "| 概念 | 定义 |", "| --- | --- |", "| 位移 | \\|x\\| 的方向 |"].join("\n"),
+      )
+
+      expect(root.children[0].children[0].body).toEqual(["定义：|x| 的方向"])
+    })
+
+    it("drops an empty cell instead of writing an empty field", () => {
+      // Half-filled tables are normal in study material. "例子：" with nothing
+      // after it reads as a missing answer rather than an absent column.
+      const root = parseOutline(
+        ["## 对比", "| 概念 | 定义 | 例子 |", "| --- | --- | --- |", "| 动量 | mv |  |"].join("\n"),
+      )
+
+      expect(root.children[0].children[0].body).toEqual(["定义：mv"])
+    })
+  })
 })

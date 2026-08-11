@@ -1,4 +1,4 @@
-import { headingPattern, listPattern } from "./outline"
+import { headingPattern, isTableDelimiter, listPattern, splitTableRow } from "./outline"
 
 /**
  * Editing a mindmap, by editing the markdown it was drawn from.
@@ -50,8 +50,46 @@ export function renameOutlineLine(markdown: string, line: number, title: string)
     return lines.join("\n")
   }
 
+  // A table row is a node too, and the label the map drew is its first cell.
+  if (isTableRow(lines, line)) {
+    const cells = splitTableRow(source)
+    // Escaped rather than refused: an unescaped bar would silently become a
+    // column break, pushing every value after it under the wrong header.
+    cells[0] = trimmed.replace(/\|/g, "\\|")
+    const indent = source.match(/^\s*/)?.[0] ?? ""
+    const body = cells.join(" | ")
+    // The row's own pipe style is put back. GFM makes the outer pair optional
+    // and the parser reads either form, so swapping one for the other would be
+    // an edit to punctuation the reader never touched.
+    const bare = source.trim()
+    const outer = bare.startsWith("|") && bare.endsWith("|")
+    lines[line] = `${indent}${outer ? `| ${body} |` : body}`
+    return lines.join("\n")
+  }
+
   // Prose carries no title. Rewriting it would replace a whole sentence with a
   // node label -- the map's own root, when it was titled from the item's term
   // rather than from the document, reports line -1 for exactly this reason.
   return null
+}
+
+/**
+ * Is this the kind of row the parser would have made a node from?
+ *
+ * Walks upward to the alignment row instead of just testing for bars, because
+ * that row is the only thing that makes a table a table. A sentence that
+ * happens to contain one -- 「读作 p | q」 -- has to stay a sentence: rewriting
+ * it as cells would reflow the prose around the word being renamed.
+ */
+function isTableRow(lines: string[], line: number): boolean {
+  const own = lines[line].trimEnd()
+  if (!own.includes("|") || isTableDelimiter(own)) return false
+  let cursor = line - 1
+  while (cursor >= 0) {
+    const above = lines[cursor].trimEnd()
+    if (isTableDelimiter(above)) return true
+    if (!above.includes("|")) return false
+    cursor -= 1
+  }
+  return false
 }

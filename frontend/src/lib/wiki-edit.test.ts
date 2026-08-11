@@ -71,4 +71,44 @@ describe("renameOutlineLine", () => {
   it("trims the title, because a trailing space is invisible in the map", () => {
     expect(renameOutlineLine("# 甲\n## 乙", 1, "  丙  ")).toBe("# 甲\n## 丙")
   })
+
+  it("rewrites a table row's first cell and leaves its other columns alone", () => {
+    // A row is a node like any other, so the map offers the same ✎ on it. If
+    // the write refused, that pencil would be a control that always fails --
+    // the label it edits is the first cell, so that is what a rename means.
+    const source = ["| 概念 | 定义 |", "| --- | --- |", "| 动量 | mv |"].join("\n")
+
+    expect(renameOutlineLine(source, 2, "线动量")).toBe(
+      ["| 概念 | 定义 |", "| --- | --- |", "| 线动量 | mv |"].join("\n"),
+    )
+  })
+
+  it("keeps a row's own pipe style", () => {
+    // GFM makes the outer pipes optional and the parser reads both. Rewriting
+    // one form into the other would edit a line the reader did not touch.
+    const source = ["概念 | 定义", "--- | ---", "动量 | mv"].join("\n")
+
+    expect(renameOutlineLine(source, 2, "线动量")).toBe(
+      ["概念 | 定义", "--- | ---", "线动量 | mv"].join("\n"),
+    )
+  })
+
+  it("escapes a bar typed into a title, instead of splitting the row", () => {
+    // An unescaped bar in the first cell would silently become a new column and
+    // push every value after it under the wrong header.
+    const source = ["| 概念 | 定义 |", "| --- | --- |", "| 动量 | mv |"].join("\n")
+
+    expect(renameOutlineLine(source, 2, "|p| 大小")).toBe(
+      ["| 概念 | 定义 |", "| --- | --- |", "| \\|p\\| 大小 | mv |"].join("\n"),
+    )
+  })
+
+  it("refuses to rename the row that holds the table together", () => {
+    // The alignment row is punctuation and the header names every field below
+    // it; neither is a node, so neither can be reached from the map. Refusing
+    // here is belt-and-braces against a stale line number landing on one.
+    const source = ["| 概念 | 定义 |", "| --- | --- |", "| 动量 | mv |"].join("\n")
+
+    expect(renameOutlineLine(source, 1, "甲")).toBeNull()
+  })
 })
