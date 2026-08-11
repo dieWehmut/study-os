@@ -70,4 +70,26 @@ describe("markdown outline parser", () => {
 
     expect(flattenOutline(root).map((node) => node.title)).toEqual(["标题", "甲", "甲一", "乙"])
   })
+
+  it("remembers which source line each node was written on", () => {
+    // A map drawn from markdown can only be edited by editing that markdown.
+    // Rebuilding the whole document from the tree would be lossy -- blank
+    // lines, list markers and any formatting the parser does not model would
+    // all be rewritten. Knowing the one line a title came from makes a rename
+    // surgical instead: that line changes, the rest of the file is untouched.
+    const root = parseOutline(["# 标题", "", "## 甲", "正文", "- 项"].join("\n"))
+
+    expect(root.line).toBe(0)
+    expect(root.children[0].line).toBe(2)
+    expect(root.children[0].children[0].line).toBe(4)
+  })
+
+  it("says a title it was handed came from no line at all", () => {
+    // A wiki entry opens at "## <term>", so the map is titled from the item's
+    // own term instead. That title is nowhere in the document, and offering to
+    // edit it would write over whatever happens to sit on line 0.
+    const root = parseOutline(["## 甲", "## 乙"].join("\n"), { title: "词条" })
+
+    expect(root.line).toBe(-1)
+  })
 })

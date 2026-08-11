@@ -18,6 +18,17 @@ const CARET_W = 14
 const BADGE_W = 34
 /** The 笔记 marker on a node that has prose written under it. */
 const NOTE_W = 18
+/** The 重命名 marker on a node whose title can be written back to its source. */
+const EDIT_W = 18
+/**
+ * The open title editor.
+ *
+ * Wider than the node it replaces, because a title being retyped is usually
+ * being made longer, and a field that scrolls its own contents hides the half
+ * you are not typing in.
+ */
+const EDIT_PANEL_W = 208
+const EDIT_PANEL_H = 30
 /** Where the underline sits in a node's row, measured from the row's top. */
 const BASELINE = NODE_H / 2 + 8
 /**
@@ -80,9 +91,14 @@ function labelWidth(label: string): number {
  * screen, so that folding a node moves rows and nothing else. A node whose
  * column also widened under the cursor would make the click feel like it hit
  * something.
+ *
+ * The two markers are counted only when the node actually carries them, unlike
+ * the caret: whether a node has a note, or a line to be renamed on, is fixed
+ * for as long as the map is on screen, so reserving their width unconditionally
+ * would pad every bare node for something that can never appear on it.
  */
-function claimWidth(label: string, foldable: boolean, noted: boolean): number {
-  const extras = (foldable ? CARET_W + BADGE_W : 0) + (noted ? NOTE_W : 0)
+function claimWidth(label: string, foldable: boolean, noted: boolean, editable: boolean): number {
+  const extras = (foldable ? CARET_W + BADGE_W : 0) + (noted ? NOTE_W : 0) + (editable ? EDIT_W : 0)
   return Math.max(NODE_MIN_W, Math.ceil(lineWidth(label) + extras))
 }
 
@@ -267,12 +283,42 @@ function countDescendants(id: string, children: Map<string, string[]>): number {
  * lifted out of the wiki; the prose it was lifted from is what tells you
  * whether you still understand it (0807:15). Open on demand, one at a time --
  * every note open at once is the wall of prose again.
+ *
+ * And a map you can retitle in place (0807:13 「可轻易编辑」). The map holds no
+ * state of its own -- it is re-derived from markdown every time it is drawn --
+ * so a rename cannot be kept here: `onRename` hands the new title back with the
+ * source line it belongs on, and the caller writes it into the markdown the map
+ * came from. Without that handler there is nowhere for an edit to land, so the
+ * affordance is not offered at all.
  */
-export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolean }) {
+export function MindMap({
+  data,
+  fit = false,
+  onRename,
+}: {
+  data: MindMapData
+  fit?: boolean
+  onRename?: (line: number, title: string) => void
+}) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
   // One at a time, not a set: two notes open side by side overlap each other
   // and the branches between them.
   const [openNote, setOpenNote] = useState<string | null>(null)
+  // The draft lives here rather than in the node, because the node is rebuilt
+  // from the markdown on every draw -- half-typed text kept there would be
+  // thrown away by the first re-render.
+  const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
+
+  /**
+   * Whether this node's title has somewhere to be written back to.
+   *
+   * Both halves matter. A node with no `line` was never read out of a document
+   * -- the root of a wiki entry's map is titled from the item's term -- and a
+   * map arriving without `onRename` came over the wire with no local markdown
+   * behind it. Either way a pencil would be a control that silently does
+   * nothing, which is worse than no control at all.
+   */
+  const renamable = (node: MindNode) => Boolean(onRename) && node.line !== undefined
 
   const byId = useMemo(() => new Map(data.nodes.map((node) => [node.id, node])), [data.nodes])
   const children = useMemo(() => {
@@ -302,10 +348,18 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
   const widths = useMemo(() => {
     const map = new Map<string, number>()
     for (const node of data.nodes) {
-      map.set(node.id, claimWidth(node.label, children.has(node.id), Boolean(node.note || node.image)))
+      map.set(
+        node.id,
+        claimWidth(
+          node.label,
+          children.has(node.id),
+          Boolean(node.note || node.image),
+          Boolean(onRename) && node.line !== undefined,
+        ),
+      )
     }
     return map
-  }, [data.nodes, children])
+  }, [data.nodes, children, onRename])
   const widthOf = (id: string) => widths.get(id) ?? NODE_MIN_W
 
   const { positions, depth, width, height } = layout(visible, widthOf)
@@ -342,6 +396,28 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
   const canvasH =
     notedAt && panelH ? Math.max(height, notedAt.y + NODE_H + 4 + panelH + PAD) : height
 
+  // Folding takes an open editor with it for the same reason it takes an open
+  // note: a field hanging beside a node that is no longer drawn would write its
+  // title back to a line the reader can no longer see.
+  const editingAt = editing && visible.some((node) => node.id === editing.id)
+    ? positions.get(editing.id)
+    : undefined
+  // The editor is wider than the node it sits on, so it can hang past the right
+  // edge of a map exactly like a note panel does.
+  const boardW = editingAt ? Math.max(canvasW, editingAt.x + EDIT_PANEL_W + PAD) : canvasW
+  const boardH = editingAt
+    ? Math.max(canvasH, editingAt.y + NODE_H + 4 + EDIT_PANEL_H + PAD)
+    : canvasH
+
+
+  function commitRename(node: MindNode, title: string) {
+    // Guarded even though the pencil is only drawn when both hold: between the
+    // click and the Enter the map may have been re-derived from markdown that
+    // no longer has this line.
+    if (onRename && node.line !== undefined) onRename(node.line, title)
+    setEditing(null)
+  }
+
   return (
     <div className={`${fit ? "overflow-hidden" : "overflow-auto"} rounded-xl border border-border bg-card p-2`}>
       {/*
@@ -357,11 +433,11 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
         for tests, which otherwise could not tell "scaled" from "clipped".
       */}
       <svg
-        width={fit ? "100%" : canvasW}
-        height={fit ? undefined : canvasH}
-        viewBox={fit ? `0 0 ${canvasW} ${canvasH}` : undefined}
-        data-width={canvasW}
-        data-height={canvasH}
+        width={fit ? "100%" : boardW}
+        height={fit ? undefined : boardH}
+        viewBox={fit ? `0 0 ${boardW} ${boardH}` : undefined}
+        data-width={boardW}
+        data-height={boardH}
         role="tree"
         aria-label={`导图：${data.title}`}
       >
@@ -522,6 +598,51 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
                   </text>
                 </g>
               ) : null}
+              {renamable(node) ? (
+                <g
+                  role="button"
+                  // Named for the node, like the note marker: forty identical
+                  // "重命名" buttons name nothing to anyone reading the map aloud.
+                  aria-label={`重命名：${node.label}`}
+                  tabIndex={0}
+                  style={{ cursor: "text" }}
+                  onClick={(event) => {
+                    // Same trap the note marker hit: this sits inside the node's
+                    // own click target, so ungated, starting a rename folds the
+                    // branch you were renaming in.
+                    event.stopPropagation()
+                    setEditing({ id: node.id, draft: node.label })
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setEditing({ id: node.id, draft: node.label })
+                  }}
+                >
+                  <rect
+                    // Past the note marker when the node carries one, which is
+                    // the width `claimWidth` reserved for exactly this pair.
+                    x={pos.x + ink + (node.note || node.image ? NOTE_W : 0)}
+                    y={pos.y + 6}
+                    width={EDIT_W}
+                    height={NODE_H - 12}
+                    fill="transparent"
+                    stroke="none"
+                    aria-hidden="true"
+                  />
+                  <text
+                    x={pos.x + ink + (node.note || node.image ? NOTE_W : 0) + 4}
+                    y={baseline - 5}
+                    fontSize={11}
+                    fill={tone.stroke}
+                    opacity={0.55}
+                    aria-hidden="true"
+                  >
+                    ✎
+                  </text>
+                </g>
+              ) : null}
             </g>
           )
         })}
@@ -589,6 +710,70 @@ export function MindMap({ data, fit = false }: { data: MindMapData; fit?: boolea
                 </div>
               </foreignObject>
             </g>
+          )
+        })()}
+        {/* After the note panel, because an editor a note draws over is an
+            editor you cannot see what you are typing into. */}
+        {(() => {
+          if (!editing || !editingAt) return null
+          const node = byId.get(editing.id)
+          if (!node) return null
+          const top = editingAt.y + NODE_H + 4
+          return (
+            <foreignObject
+              x={editingAt.x}
+              y={top}
+              width={EDIT_PANEL_W}
+              height={EDIT_PANEL_H}
+            >
+              {/* foreignObject for the same reason the note uses one: SVG has no
+                  text input of its own, and reimplementing caret handling on
+                  <text> to avoid one input element is not a trade worth making. */}
+              <input
+                aria-label="节点标题"
+                value={editing.draft}
+                // Focused on mount so the pencil click lands in the field. A
+                // ref-and-effect would do the same thing one frame later, which
+                // is one frame in which a keystroke goes to the tree instead.
+                autoFocus
+                onChange={(event) => setEditing({ id: editing.id, draft: event.target.value })}
+                onKeyDown={(event) => {
+                  // Stopped in every branch: the tree behind this listens for
+                  // Enter and Space to fold, and typing a space into a title
+                  // would otherwise collapse the branch being renamed.
+                  event.stopPropagation()
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    commitRename(node, editing.draft)
+                    return
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault()
+                    // Discarded, not committed. Escape is what someone presses
+                    // on realising they are editing the wrong node, and the
+                    // rename it would otherwise save has no undo.
+                    setEditing(null)
+                  }
+                }}
+                // Abandoned on blur rather than saved: clicking away is how you
+                // leave an edit you did not mean to start, and a map that
+                // rewrites the wiki whenever focus moves is not one you can
+                // click around in.
+                onBlur={() => setEditing(null)}
+                style={{
+                  width: "100%",
+                  height: EDIT_PANEL_H - 4,
+                  boxSizing: "border-box",
+                  font: `${FONT_SIZE}px/1.4 inherit`,
+                  color: "#27272a",
+                  padding: "0 8px",
+                  borderRadius: 6,
+                  border: `1px solid ${nodeTone(node.node_type).stroke}`,
+                  background: "#ffffff",
+                  outline: "none",
+                }}
+              />
+            </foreignObject>
           )
         })()}
       </svg>

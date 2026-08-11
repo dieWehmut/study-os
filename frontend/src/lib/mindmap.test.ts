@@ -165,4 +165,23 @@ describe("markdown to mindmap", () => {
     expect(node?.image).toBe("/only.png")
     expect(node?.note).toBeUndefined()
   })
+
+  it("tells each node which source line it can be renamed on", () => {
+    // 0807:13 「可轻易编辑」. The map holds no state of its own, so an edit has to
+    // go back into the markdown -- and the node has to say where.
+    const map = markdownToMindMap(["# 生物", "", "## 光合作用", "- 光照"].join("\n"))
+
+    expect(map.nodes.find((node) => node.label === "光合作用")?.line).toBe(2)
+    expect(map.nodes.find((node) => node.label === "光照")?.line).toBe(3)
+  })
+
+  it("gives no line to a root the document never named", () => {
+    // A wiki entry is written about a term and opens at "## <term>", so the map
+    // is titled from the item instead. Offering to rename that would write over
+    // whatever sits on line 0.
+    const map = markdownToMindMap("## 甲\n\n## 乙", { title: "词条" })
+
+    expect(map.nodes[0].label).toBe("词条")
+    expect(map.nodes[0].line).toBeUndefined()
+  })
 })

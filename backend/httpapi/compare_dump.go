@@ -98,6 +98,47 @@ func dumpTerm(text string) string {
 	return term
 }
 
+// handleKnowledgeWikiSave replaces a wiki's prose.
+//
+// The mindmap is derived from this markdown every time it is drawn rather than
+// stored (0807:75 「靠固定的程序就能实现文转 mindmap」), so this one field is what
+// editing a map writes to. Only the markdown moves: the term, subject and tags
+// are the library's index of the item, not something a prose editor should
+// reach.
+func handleKnowledgeWikiSave(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	var input struct {
+		DetailedMarkdown string `json:"detailed_markdown"`
+	}
+	request.Body = http.MaxBytesReader(response, request.Body, maxImportJSONBytes)
+	if err := decodeRequest(request, &input); err != nil {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	// Refused rather than written: there is no undo, and a blank save is far
+	// likelier to be a mis-click or a failed editor mount than a deliberate
+	// erasure of the wiki -- which would erase the map with it.
+	if strings.TrimSpace(input.DetailedMarkdown) == "" {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "正文不能为空"})
+		return
+	}
+	item, err := application.Store.GetKnowledgeItem(request.Context(), chi.URLParam(request, "knowledgeID"))
+	if err != nil {
+		writeStoreError(response, err)
+		return
+	}
+	item.DetailedMarkdown = input.DetailedMarkdown
+	item.UpdatedAt = time.Now().UTC()
+	if err := application.Store.UpdateKnowledgeItem(request.Context(), item); err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "保存正文失败"})
+		return
+	}
+	writeJSON(response, http.StatusOK, item)
+}
+
 func handleKnowledgeTag(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})

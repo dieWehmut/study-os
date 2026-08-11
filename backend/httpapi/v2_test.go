@@ -641,6 +641,87 @@ func TestKnowledgeTagEndpointAddsAndFilters(t *testing.T) {
 	}
 }
 
+func TestKnowledgeWikiSaveRoundTripsMarkdown(t *testing.T) {
+	// The mindmap is re-derived from `detailed_markdown` on every draw and is
+	// never stored, so editing the map means editing that markdown. Nothing
+	// could write it: /knowledge was read, tag and schedule only, which left
+	// every wiki in the library exactly as its generator first wrote it.
+	application := testApplication(t, config.Config{})
+	ctx := context.Background()
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	if err := application.Store.CreateKnowledgeItem(ctx, models.KnowledgeItem{
+		ID: "k-wiki", ItemType: "concept", Term: "光合作用", ConciseDefinition: "光能转化为化学能",
+		Subject: "biology", DetailedMarkdown: "# 光合作用\n\n旧的正文。", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create item: %v", err)
+	}
+	router := httpapi.NewRouter(application)
+
+	// An image line, because that is the one thing a wiki could not previously
+	// carry: a node's picture is lifted out of `![](...)` in this markdown.
+	markdown := "# 光合作用\n\n## 光反应\n\n发生在类囊体薄膜。\n\n![示意图](/api/chat/attachments/a1)\n"
+	saved := requestJSON(t, router, http.MethodPut, "/api/knowledge/k-wiki/wiki", map[string]any{"detailed_markdown": markdown})
+	if saved.Code != http.StatusOK {
+		t.Fatalf("wiki save = %d, body = %s", saved.Code, saved.Body.String())
+	}
+
+	fetched := requestJSON(t, router, http.MethodGet, "/api/knowledge/k-wiki", nil)
+	var item models.KnowledgeItem
+	body := fetched.Body.String()
+	decodeJSON(t, fetched, &item)
+	if item.DetailedMarkdown != markdown {
+		t.Fatalf("markdown did not survive the round trip:\n got = %q\nwant = %q\nbody = %s", item.DetailedMarkdown, markdown, body)
+	}
+	// The term is what the library lists and what the wiki is titled by; a save
+	// that carried only the markdown field must not blank the rest of the row.
+	if item.Term != "光合作用" || item.Subject != "biology" {
+		t.Fatalf("save clobbered the item: %+v", item)
+	}
+}
+
+func TestKnowledgeWikiSaveRejectsEmptyMarkdown(t *testing.T) {
+	// There is no undo. An empty save is far more likely to be a mis-click or a
+	// failed editor mount than a deliberate "erase this wiki", and erasing it
+	// erases the map with it.
+	application := testApplication(t, config.Config{})
+	ctx := context.Background()
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	if err := application.Store.CreateKnowledgeItem(ctx, models.KnowledgeItem{
+		ID: "k-blank", ItemType: "concept", Term: "动量", ConciseDefinition: "质量与速度之积",
+		Subject: "physics", DetailedMarkdown: "# 动量\n\n要保住的正文。", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create item: %v", err)
+	}
+	router := httpapi.NewRouter(application)
+
+	blank := requestJSON(t, router, http.MethodPut, "/api/knowledge/k-blank/wiki", map[string]any{"detailed_markdown": "   \n\t"})
+	if blank.Code != http.StatusBadRequest {
+		t.Fatalf("blank save = %d, want 400, body = %s", blank.Code, blank.Body.String())
+	}
+
+	fetched := requestJSON(t, router, http.MethodGet, "/api/knowledge/k-blank", nil)
+	var item models.KnowledgeItem
+	decodeJSON(t, fetched, &item)
+	if item.DetailedMarkdown != "# 动量\n\n要保住的正文。" {
+		t.Fatalf("rejected save still wrote: %q", item.DetailedMarkdown)
+	}
+}
+
+func TestKnowledgeWikiSaveIsNotFoundForUnknownItem(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	missing := requestJSON(t, router, http.MethodPut, "/api/knowledge/nope/wiki", map[string]any{"detailed_markdown": "# 甲"})
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unknown item = %d, want 404, body = %s", missing.Code, missing.Body.String())
+	}
+	// chi answers 404 for an unregistered route too, so the status alone would
+	// pass before the endpoint exists. The JSON body is what tells them apart.
+	if !strings.Contains(missing.Body.String(), `"error"`) {
+		t.Fatalf("want a JSON error, got %s", missing.Body.String())
+	}
+}
+
 func TestDueReviewsRecoveryModeFiltersEasyPrompts(t *testing.T) {
 	application := testApplication(t, config.Config{})
 	ctx := context.Background()

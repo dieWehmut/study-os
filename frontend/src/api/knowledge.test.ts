@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { listRelatedKnowledge } from "./knowledge"
+import { listRelatedKnowledge, saveKnowledgeWiki } from "./knowledge"
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -41,5 +41,29 @@ describe("knowledge API", () => {
 
     expect(related.items).toEqual([])
     expect(related.groups).toEqual([])
+  })
+
+  it("saves wiki markdown with the PUT the route is registered under", async () => {
+    // PUT is the verb a full replacement of a resource goes by -- and chi
+    // answers 404 for any unregistered method, so the client has to mean it.
+    mocks.apiRequest.mockResolvedValue({ id: "k-1" })
+
+    await saveKnowledgeWiki("k-1", "# 光合作用\n\n## 光反应\n")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/knowledge/k-1/wiki", {
+      method: "PUT",
+      body: JSON.stringify({ detailed_markdown: "# 光合作用\n\n## 光反应\n" }),
+    })
+  })
+
+  it("escapes an id when saving, just like when reading", async () => {
+    mocks.apiRequest.mockResolvedValue({ id: "k/1" })
+
+    await saveKnowledgeWiki("k/1", "# 甲")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/knowledge/k%2F1/wiki", {
+      method: "PUT",
+      body: JSON.stringify({ detailed_markdown: "# 甲" }),
+    })
   })
 })

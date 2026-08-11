@@ -45,6 +45,22 @@ const data = {
   ],
 }
 
+// The same tree, but as it comes out of a document: every node answers "which
+// line am I on". The root keeps no line, exactly like the root of a wiki
+// entry's map, which is titled from the item's term rather than read out of the
+// wiki.
+const editable = {
+  title: "运动学",
+  nodes: [
+    { id: "n0", label: "运动学", node_type: "root" },
+    { id: "n1", label: "速度", parent_id: "n0", node_type: "heading", line: 3 },
+    { id: "n3", label: "瞬时速度", parent_id: "n1", node_type: "heading", line: 4 },
+    { id: "n5", label: "定义", parent_id: "n3", node_type: "item", line: 5 },
+    { id: "n4", label: "平均速度", parent_id: "n1", node_type: "item", line: 6 },
+    { id: "n2", label: "加速度", parent_id: "n0", node_type: "conclusion", line: 7 },
+  ],
+}
+
 describe("MindMap", () => {
   it("draws the map as a navigable tree", () => {
     render(<MindMap data={data} />)
@@ -456,6 +472,73 @@ describe("MindMap", () => {
     const svg = screen.getByRole("tree", { name: "导图：运动学" })
 
     expect(svg.getAttribute("width")).toBe(svg.dataset.width)
+  })
+
+  it("offers a rename on a node that came from a source line", () => {
+    // 0807:13 「可轻易编辑」, the last unmet requirement in ROADMAP §5.2.
+    //
+    // Its own affordance rather than a double-click: single click already folds,
+    // so a double-click would fold and unfold on the way to the editor. A third
+    // marker beside ≡ and ▣ also inherits their keyboard reachability.
+    render(<MindMap data={editable} onRename={() => {}} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "重命名：速度" }))
+
+    expect(screen.getByRole("textbox", { name: "节点标题" })).toHaveValue("速度")
+  })
+
+  it("hands the edited title back with the line to write it on", () => {
+    const renames: Array<[number, string]> = []
+    render(<MindMap data={editable} onRename={(line, title) => renames.push([line, title])} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "重命名：速度" }))
+    fireEvent.change(screen.getByRole("textbox", { name: "节点标题" }), {
+      target: { value: "瞬时速率" },
+    })
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "节点标题" }), { key: "Enter" })
+
+    // The line, not the node id: the map is re-derived from markdown on every
+    // draw, so ids are positional and mean nothing to whoever holds the source.
+    expect(renames).toEqual([[3, "瞬时速率"]])
+  })
+
+  it("abandons an edit on escape", () => {
+    const renames: string[] = []
+    render(<MindMap data={editable} onRename={(_, title) => renames.push(title)} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "重命名：速度" }))
+    fireEvent.change(screen.getByRole("textbox", { name: "节点标题" }), { target: { value: "改坏了" } })
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "节点标题" }), { key: "Escape" })
+
+    expect(renames).toEqual([])
+    expect(screen.queryByRole("textbox", { name: "节点标题" })).not.toBeInTheDocument()
+  })
+
+  it("offers no rename on a node the document never named", () => {
+    // The root of a wiki entry's map is titled from the item's term, so it has
+    // no line -- renaming it would write over whatever sits there.
+    render(<MindMap data={editable} onRename={() => {}} />)
+
+    expect(screen.queryByRole("button", { name: "重命名：运动学" })).not.toBeInTheDocument()
+  })
+
+  it("offers no rename when nothing can receive one", () => {
+    // /integrate draws maps that came over the wire, with no local markdown to
+    // write back to. A pencil there would be a control that silently does
+    // nothing.
+    render(<MindMap data={editable} />)
+
+    expect(screen.queryByRole("button", { name: "重命名：速度" })).not.toBeInTheDocument()
+  })
+
+  it("does not fold the branch it is renaming", () => {
+    // Same trap the note marker had: the pencil sits inside the node's own click
+    // target, which toggles the fold.
+    render(<MindMap data={editable} onRename={() => {}} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "重命名：速度" }))
+
+    expect(screen.getByRole("treeitem", { name: "速度" })).toHaveAttribute("aria-expanded", "true")
   })
 
   it("exports mermaid text with edges", () => {

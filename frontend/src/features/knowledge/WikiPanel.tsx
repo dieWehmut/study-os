@@ -5,7 +5,12 @@ import { useEffect, useMemo, useState } from "react"
 import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight, Waypoints } from "lucide-react"
 
 import { updateKnowledgeTag } from "@/api/chat"
-import { listRelatedKnowledge, scheduleKnowledge, type RelatedKnowledge } from "@/api/knowledge"
+import {
+  listRelatedKnowledge,
+  saveKnowledgeWiki,
+  scheduleKnowledge,
+  type RelatedKnowledge,
+} from "@/api/knowledge"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,6 +21,7 @@ import { itemTypeLabel } from "@/lib/labels"
 import { markdownToMindMap } from "@/lib/mindmap"
 import { MindMap } from "@/features/mindmap/MindMap"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
+import { renameOutlineLine } from "@/lib/wiki-edit"
 
 interface WikiPanelProps {
   item: KnowledgeItem | null
@@ -38,6 +44,17 @@ type ScheduleNote = { tone: "ok" | "known" | "error"; text: string }
 const scheduleNoteClass: Record<ScheduleNote["tone"], string> = {
   ok: "text-primary",
   known: "text-muted-foreground",
+  error: "text-destructive",
+}
+
+// What the last 改名 press did. "refused" is the title's fault, not the
+// network's: an empty title or one that would restructure the document can
+// never be written, and the wiki must not be asked to try.
+type RenameNote = { tone: "ok" | "refused" | "error"; text: string }
+
+const renameNoteClass: Record<RenameNote["tone"], string> = {
+  ok: "text-primary",
+  refused: "text-destructive",
   error: "text-destructive",
 }
 
@@ -69,6 +86,8 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
   const [tagPending, setTagPending] = useState("")
   const [schedulePending, setSchedulePending] = useState(false)
   const [scheduleNote, setScheduleNote] = useState<ScheduleNote | null>(null)
+  const [renameNote, setRenameNote] = useState<RenameNote | null>(null)
+  const [renamePending, setRenamePending] = useState(false)
   const [family, setFamily] = useState<RelatedKnowledge>(emptyFamily)
   const current: KnowledgeItem | null = item ? { ...item, tags: tagOverride ?? item.tags } : null
   // Keyed on the id, not the item: a tag toggle replaces the item object, and
@@ -153,6 +172,48 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
       setScheduleNote({ tone: "error", text: "排进复习失败，请重试" })
     } finally {
       setSchedulePending(false)
+    }
+  }
+
+  /**
+   * 0807:13 「可轻易编辑」 -- the edit the map itself cannot keep.
+   *
+   * The map is re-derived from `detailed_markdown` on every draw, so a renamed
+   * node only exists once that markdown has changed. The rewrite is done a line
+   * at a time (`renameOutlineLine`) rather than by regenerating the document
+   * from the tree, because the parser does not model blank lines, code fences
+   * or tables and a regenerated wiki would quietly launder all three.
+   */
+  async function renameNode(line: number, title: string) {
+    if (!item || renamePending) return
+    const next = renameOutlineLine(markdown, line, title)
+    if (next === null) {
+      // Refused before any request. The reasons are all properties of the title
+      // itself -- blank, multi-line, or a leading `#` that would re-level every
+      // section after it -- so the server would only refuse it again.
+      setRenameNote({ tone: "refused", text: "这个标题存不下来，换一个" })
+      return
+    }
+    // Retyping a title as itself is not an edit. Saving anyway would report
+    // success for a write that changed nothing.
+    if (next === markdown) {
+      setRenameNote(null)
+      return
+    }
+    setRenamePending(true)
+    setRenameNote(null)
+    try {
+      const saved = await saveKnowledgeWiki(item.id, next)
+      // The panel keeps no copy of the markdown, so this is what makes the new
+      // title visible: the caller replaces the item and the map is re-derived.
+      onUpdated?.(saved)
+      setRenameNote({ tone: "ok", text: `已改名为「${title.trim()}」` })
+    } catch {
+      // The map redraws from the item it was handed, so the old title is still
+      // on screen. Silence here would read as a rename that quietly did nothing.
+      setRenameNote({ tone: "error", text: "改名失败，请重试" })
+    } finally {
+      setRenamePending(false)
     }
   }
 
@@ -271,9 +332,12 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
                 {/* `fit`: this panel is a narrow column, and an unscaled map
                     would put most of a real wiki's branches past its right
                     edge. */}
-                <MindMap data={map} fit />
+                <MindMap data={map} fit onRename={(line, title) => void renameNode(line, title)} />
+                {renameNote ? (
+                  <p className={`text-xs ${renameNoteClass[renameNote.tone]}`}>{renameNote.text}</p>
+                ) : null}
                 <p className="text-xs text-muted-foreground">
-                  点节点折叠分支，点 ≡ 看该节原文，点 ▣ 看该节配图。
+                  点节点折叠分支，点 ≡ 看该节原文，点 ▣ 看该节配图，点 ✎ 改这一节的标题。
                 </p>
               </div>
             ) : (

@@ -84,6 +84,11 @@ export function markdownToMindMap(markdown: string, options: ParseOutlineOptions
       parent_id: parentId,
       node_type: node.kind,
       ...picture,
+      // Omitted when the outline reports -1, which is a node whose title was
+      // never in the document: the root of a wiki entry's map is named from the
+      // item's term. Carrying -1 through would hand the editor a line number
+      // that addresses the last line of the file.
+      ...(node.line >= 0 ? { line: node.line } : {}),
       // Omitted, not empty: "has a note" is what decides whether the drawing
       // marks a node as openable, and "" would mark every node in the map.
       // Which is also why the picture had to come out first -- a node whose

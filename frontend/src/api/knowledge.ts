@@ -96,3 +96,20 @@ export function scheduleKnowledge(id: string): Promise<ScheduleKnowledgeResponse
     method: "POST",
   })
 }
+
+/**
+ * Replace one item's wiki prose.
+ *
+ * The mindmap is re-derived from this markdown on every draw rather than stored
+ * (0807:75), so this is the write behind editing a map: the shape follows the
+ * source, and both come back identical on the next parse.
+ *
+ * Returns the saved item, so a caller can hand it straight to whatever holds
+ * the list rather than re-fetching to find out what it just wrote.
+ */
+export function saveKnowledgeWiki(id: string, markdown: string): Promise<KnowledgeItem> {
+  return apiRequest<KnowledgeItem>(`/knowledge/${encodeURIComponent(id)}/wiki`, {
+    method: "PUT",
+    body: JSON.stringify({ detailed_markdown: markdown }),
+  })
+}

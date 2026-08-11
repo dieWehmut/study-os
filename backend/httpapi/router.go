@@ -175,6 +175,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/knowledge/{knowledgeID}/tag", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeTag(response, request, application)
 		})
+		api.Put("/knowledge/{knowledgeID}/wiki", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeWikiSave(response, request, application)
+		})
 		api.Post("/knowledge/{knowledgeID}/schedule", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeSchedule(response, request, application)
 		})

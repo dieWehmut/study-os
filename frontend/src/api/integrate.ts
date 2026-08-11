@@ -29,6 +29,19 @@ export interface MindNode {
   image?: string
   /** The `![alt]` text, for readers who cannot see the image. */
   image_alt?: string
+  /**
+   * Which line of the source wiki this node's label was written on.
+   *
+   * 0807:13 「可轻易编辑」. A map holds no state of its own -- it is re-derived
+   * from markdown on every draw -- so an edit has to land back in that source,
+   * and the node is the only thing that knows where it came from.
+   *
+   * Absent when the node was not read out of a document: the root of a wiki
+   * entry's map is titled from the item's term, and a map that arrived over the
+   * wire has no local source at all. Absent therefore means "not editable
+   * here", which is the reading that cannot corrupt anything.
+   */
+  line?: number
 }
 
 export interface MindMap {
