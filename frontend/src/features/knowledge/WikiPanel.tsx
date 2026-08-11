@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { tagOptionsFor } from "@/lib/insights"
 import { itemTypeLabel } from "@/lib/labels"
 import { markdownToMindMap } from "@/lib/mindmap"
+import { VisualCard } from "@/features/card/VisualCard"
 import { MindMap } from "@/features/mindmap/MindMap"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { renameOutlineLine } from "@/lib/wiki-edit"
@@ -282,6 +283,7 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
             <TabsTrigger value="concise">简明</TabsTrigger>
             <TabsTrigger value="detail">详细百科</TabsTrigger>
             <TabsTrigger value="map">导图</TabsTrigger>
+            <TabsTrigger value="card">信息图</TabsTrigger>
           </TabsList>
           <TabsContent value="concise" className="grid gap-5 pt-5">
             <section className="grid gap-2">
@@ -345,6 +347,17 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
                 {chunks.length > 0 ? "这篇百科只有一段，没有可拆的层级。" : "这个知识点还没有详细百科。"}
               </p>
             )}
+          </TabsContent>
+          <TabsContent value="card" className="pt-5">
+            {/* The card re-derives itself from the same markdown on every draw,
+                exactly as the map does, so a wiki edited in the 详细百科 tab is
+                redrawn here with no cache to invalidate. */}
+            <div className="grid gap-2">
+              <VisualCard markdown={markdown} title={term} />
+              <p className="text-xs text-muted-foreground">
+                结构由正文的层级和序号推出，同一篇每次画出来都一样。
+              </p>
+            </div>
           </TabsContent>
         </Tabs>
         {/* Nothing at all for the majority of items, which belong to no group:

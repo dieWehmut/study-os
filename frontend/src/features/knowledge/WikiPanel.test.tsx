@@ -119,3 +119,19 @@ describe("WikiPanel node renaming", () => {
     expect(screen.getByRole("button", { name: "重命名：暗反应" })).toBeInTheDocument()
   })
 })
+
+describe("WikiPanel 信息图 tab", () => {
+  it("offers the wiki as a structured picture as well as a map", () => {
+    // 导图画的是层级，信息图画的是这段内容本身是什么形状 ——
+    // 一个用来找位置，一个用来在读之前就看懂大意（0807:73）。
+    render(
+      <Harness
+        start={{ ...item, detailed_markdown: ["## 步骤", "1. 加热", "2. 冷却", "3. 结晶"].join("\n") }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole("tab", { name: "信息图" }))
+
+    expect(screen.getByRole("img", { name: /流程/ })).toBeInTheDocument()
+  })
+})
