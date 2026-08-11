@@ -98,6 +98,50 @@ function lineHeight(size: number): number {
   return size + lineGap
 }
 
+/**
+ * Where the ray from a box's centre toward (tx, ty) crosses that box's border.
+ *
+ * Boxes paint over links -- which is right, a diagram is boxes joined by lines,
+ * not boxes sitting on a web. But it means a link drawn centre-to-centre
+ * disappears under both ends, and the arrowhead with it. That head is the only
+ * thing distinguishing a 循环 from a ring of plain lines, so burying it deletes
+ * exactly the half of the information the structure was chosen to carry, and
+ * deletes it invisibly: the picture still looks finished.
+ *
+ * Trimming here rather than with a z-index or a clip path keeps it arithmetic,
+ * so `card-layout.test` can see it with no renderer at all -- the same reason
+ * every other measurement in this module is computed instead of measured.
+ */
+function edgePoint(shape: Shape, tx: number, ty: number): { x: number; y: number } {
+  const cx = shape.x + shape.w / 2
+  const cy = shape.y + shape.h / 2
+  const dx = tx - cx
+  const dy = ty - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  // The border is met on whichever axis runs out of room first.
+  const scale = Math.min(
+    dx === 0 ? Infinity : shape.w / 2 / Math.abs(dx),
+    dy === 0 ? Infinity : shape.h / 2 / Math.abs(dy),
+  )
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
+/** A link between two boxes, trimmed so both ends stay visible. */
+function join(from: Shape, to: Shape, arrow: boolean): Link {
+  const fromCentre = { x: from.x + from.w / 2, y: from.y + from.h / 2 }
+  const toCentre = { x: to.x + to.w / 2, y: to.y + to.h / 2 }
+  const start = edgePoint(from, toCentre.x, toCentre.y)
+  const end = edgePoint(to, fromCentre.x, fromCentre.y)
+  return {
+    id: arrow ? `${from.id}->${to.id}` : `${from.id}-${to.id}`,
+    x1: start.x,
+    y1: start.y,
+    x2: end.x,
+    y2: end.y,
+    arrow,
+  }
+}
+
 /** Everything this block says, as the lines it will actually draw. */
 function blockLines(block: Block, innerWidth: number): string[] {
   return [
@@ -289,28 +333,13 @@ function layoutRing(blocks: Block[], centre: Block | null, arrows: boolean): Fra
   if (centre) {
     const hub = shapes[0]
     for (const shape of ring) {
-      links.push({
-        id: `${hub.id}-${shape.id}`,
-        x1: cx,
-        y1: cy,
-        x2: shape.x + shape.w / 2,
-        y2: shape.y + shape.h / 2,
-        arrow: false,
-      })
+      links.push(join(hub, shape, false))
     }
   }
 
   if (arrows) {
     ring.forEach((from, index) => {
-      const to = ring[(index + 1) % ring.length]
-      links.push({
-        id: `${from.id}->${to.id}`,
-        x1: from.x + from.w / 2,
-        y1: from.y + from.h / 2,
-        x2: to.x + to.w / 2,
-        y2: to.y + to.h / 2,
-        arrow: true,
-      })
+      links.push(join(from, ring[(index + 1) % ring.length], true))
     })
   }
 

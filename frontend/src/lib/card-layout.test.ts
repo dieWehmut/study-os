@@ -20,6 +20,17 @@ const inside = (frame: Frame) =>
 const overlaps = (a: Frame["shapes"][number], b: Frame["shapes"][number]) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
+/**
+ * Far enough inside a box that the box would paint over it.
+ *
+ * 1px of slack because a point computed to land exactly on a border can miss by
+ * an ulp, and a sub-pixel difference is not something a reader can see. It is
+ * nowhere near enough slack to excuse a centre-to-centre link, which lands half
+ * a box width in.
+ */
+const buried = (x: number, y: number, s: Frame["shapes"][number]) =>
+  x > s.x + 1 && x < s.x + s.w - 1 && y > s.y + 1 && y < s.y + s.h - 1
+
 const list = ["## 条件", "- 光照", "- 温度", "- 水分"].join("\n")
 const steps = ["## 步骤", "1. 加热", "2. 冷却", "3. 结晶"].join("\n")
 const cycle = ["## 水循环", "1. 蒸发", "2. 凝结", "3. 降水", "4. 回到蒸发"].join("\n")
@@ -95,6 +106,21 @@ describe("card layout", () => {
 
   it("draws no arrows for 并列", () => {
     expect(frameOf(list).links.filter((link) => link.arrow)).toHaveLength(0)
+  })
+
+  it("stops every link at the border of the boxes it joins", () => {
+    // 盒子画在线之上（图里本该如此），所以连到盒心的线，箭头尖就埋在
+    // 目标盒子底下。循环的箭头正是它跟一圈普通连线的唯一区别 ——
+    // 埋掉了，方向那一半信息就没了，而画面上看不出少了什么。
+    for (const source of [list, steps, cycle, radial]) {
+      const { shapes, links } = frameOf(source)
+      for (const link of links) {
+        for (const shape of shapes) {
+          expect(buried(link.x1, link.y1, shape)).toBe(false)
+          expect(buried(link.x2, link.y2, shape)).toBe(false)
+        }
+      }
+    }
   })
 
   it("draws an arrow between consecutive steps of a 流程", () => {
