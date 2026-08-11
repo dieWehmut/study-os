@@ -32,6 +32,17 @@ export interface OutlineNode {
    * prose itself. Addressing the single line instead keeps the rest byte-equal.
    */
   line: number
+  /**
+   * Whether this node was written with a number rather than a bullet.
+   *
+   * The list marker is otherwise thrown away, and with it the one thing that
+   * tells a 流程 apart from a 并列: `structures.md` §1.1 derives 流程 from 并列 by
+   * adding arrows and numbering, and numbering is the half that survives into
+   * plain markdown. False for headings and table rows, which are not list items
+   * at all -- reading a numbered heading as a step would turn every 教辅 chapter
+   * into a flowchart.
+   */
+  ordered: boolean
   /** Prose lines introduced under this node, in document order. */
   body: string[]
   children: OutlineNode[]
@@ -175,8 +186,14 @@ export function splitLongItem(text: string): { title: string; note?: string } {
   return { title: subject, note: rest }
 }
 
-function emptyNode(title: string, depth: number, kind: OutlineKind, line: number): OutlineNode {
-  return { id: "", title, kind, depth, line, body: [], children: [] }
+function emptyNode(
+  title: string,
+  depth: number,
+  kind: OutlineKind,
+  line: number,
+  ordered = false,
+): OutlineNode {
+  return { id: "", title, kind, depth, line, ordered, body: [], children: [] }
 }
 
 /**
@@ -290,7 +307,8 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
       // map carrying whole paragraphs is the document again in a worse shape.
       const source = item[3].trim()
       const { title, note } = splitLongItem(source)
-      const node = emptyNode(title, itemDepth, "item", index)
+      // `1.` and `1)` are both numbering; `-`, `*`, `+` are not.
+      const node = emptyNode(title, itemDepth, "item", index, /^\d/.test(item[2]))
       // With a subject, the note is the explanation after it. Without one there
       // is nothing to split on, so the whole line is what gets carried.
       if (note) node.body.push(note)

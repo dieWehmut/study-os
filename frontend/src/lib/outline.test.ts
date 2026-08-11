@@ -378,4 +378,39 @@ describe("markdown outline parser", () => {
       expect(root.children[0].body).toEqual([])
     })
   })
+
+  describe("ordered items", () => {
+    it("remembers that a numbered item was numbered", () => {
+      // 流程 = 并列 + 箭头 + 序号（structures.md §1.1）。记号被扔掉之后，
+      // 「1. 加热 2. 冷却」和「- 加热 - 冷却」在树里完全一样，
+      // 判定就只剩下猜。
+      const root = parseOutline(["## 步骤", "1. 加热", "2. 冷却"].join("\n"))
+
+      expect(root.children[0].children.map((child) => child.ordered)).toEqual([true, true])
+    })
+
+    it("says a bullet is not ordered", () => {
+      const root = parseOutline(["## 条件", "- 光照", "- 温度"].join("\n"))
+
+      expect(root.children[0].children.map((child) => child.ordered)).toEqual([false, false])
+    })
+
+    it("reads a parenthesised number as a number too", () => {
+      // `1)` 和 `1.` 是同一件事，listPattern 本来就同时认。
+      const root = parseOutline("1) 第一步")
+
+      expect(root.children[0].ordered).toBe(true)
+    })
+
+    it("leaves a heading and a table row unordered", () => {
+      // 两者都不是列表项，序号对它们没有意义——写成 true 会让
+      // 一张普通表格被读成流程。
+      const root = parseOutline(
+        ["## 对比", "| 概念 | 定义 |", "| --- | --- |", "| 动量 | mv |"].join("\n"),
+      )
+
+      expect(root.children[0].ordered).toBe(false)
+      expect(root.children[0].children[0].ordered).toBe(false)
+    })
+  })
 })
