@@ -35,6 +35,13 @@ const list = ["## 条件", "- 光照", "- 温度", "- 水分"].join("\n")
 const steps = ["## 步骤", "1. 加热", "2. 冷却", "3. 结晶"].join("\n")
 const cycle = ["## 水循环", "1. 蒸发", "2. 凝结", "3. 降水", "4. 回到蒸发"].join("\n")
 const radial = ["光合作用是绿色植物制造有机物的过程。", "- 光反应", "- 暗反应", "- 产物"].join("\n")
+/** Same shape, but with branches wide enough that the ring outgrows `minWidth`. */
+const radialWide = [
+  "光合作用是绿色植物制造有机物的过程。",
+  "- 光反应：在类囊体薄膜上进行",
+  "- 暗反应：在叶绿体基质中进行",
+  "- 产物：糖类和氧气",
+].join("\n")
 
 describe("card layout", () => {
   it("draws one shape per block", () => {
@@ -144,6 +151,37 @@ describe("card layout", () => {
   it("is at least as wide as two columns need", () => {
     // 比这更窄的卡片放不下两列，所有骨架都会退化成一列 —— 那就又是方框长条了。
     expect(frameOf(list).w).toBeGreaterThanOrEqual(640)
+  })
+
+  it("reserves no more canvas than the drawing uses", () => {
+    // 三个分支只占到圆的上半和两侧，画布却按整个圆的外接矩形留：底下空出
+    // 半个半径。阅读页那张 991×863 的卡有 150px 是画面底下的白，读者还得
+    // 滚过它才知道下面没东西。画布要框住画出来的东西，不是框住那个
+    // 想象出来的圆。
+    const frame = frameOf(radialWide)
+    const margin = 32 // pad，跟网格四周留的一样宽
+
+    expect(Math.min(...frame.shapes.map((shape) => shape.y))).toBeCloseTo(margin, 0)
+    expect(frame.h - Math.max(...frame.shapes.map((shape) => shape.y + shape.h))).toBeCloseTo(
+      margin,
+      0,
+    )
+    expect(Math.min(...frame.shapes.map((shape) => shape.x))).toBeCloseTo(margin, 0)
+    expect(frame.w - Math.max(...frame.shapes.map((shape) => shape.x + shape.w))).toBeCloseTo(
+      margin,
+      0,
+    )
+  })
+
+  it("centres a drawing that is narrower than the width the card must take", () => {
+    // 环画得比 640 窄时，多出来的宽度不能全堆在右边 —— 那看起来是画歪了，
+    // 而不是卡片有个下限。
+    const frame = frameOf(radial)
+    const left = Math.min(...frame.shapes.map((shape) => shape.x))
+    const right = frame.w - Math.max(...frame.shapes.map((shape) => shape.x + shape.w))
+
+    expect(frame.w).toBe(640)
+    expect(right).toBeCloseTo(left, 0)
   })
 
   it("gives the same markdown the same frame every time", () => {

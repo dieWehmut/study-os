@@ -290,10 +290,10 @@ function layoutRing(blocks: Block[], centre: Block | null, arrows: boolean): Fra
     Math.hypot(centreWidth, centreHeight) / 2 + gap + Math.hypot(boxWidth, boxHeight) / 2
   const radius = Math.max(bySpacing, byCentre)
 
-  const w = Math.max(minWidth, pad * 2 + radius * 2 + boxWidth)
-  const h = pad * 2 + radius * 2 + boxHeight
-  const cx = w / 2
-  const cy = h / 2
+  // Any origin does: the drawing is moved onto its own frame below, once the
+  // frame is known.
+  const cx = pad + radius + boxWidth / 2
+  const cy = pad + radius + boxHeight / 2
 
   const shapes: Shape[] = []
   const texts: CardText[] = []
@@ -330,6 +330,33 @@ function layoutRing(blocks: Block[], centre: Block | null, arrows: boolean): Fra
     paint(block, shape, texts)
   })
 
+  // The frame is the bounding box of what was drawn, not of the circle it was
+  // drawn on -- and for an odd number of boxes those differ badly. Three
+  // branches reach the top of the circle but only half a radius below its
+  // centre, so reserving the circle's box left 150px of white below the
+  // drawing: a third of an 863px card, which the reader has to scroll past to
+  // find out there is nothing in it. Moving the drawing onto its own frame
+  // afterwards keeps the geometry above free to work in circle coordinates.
+  const left = Math.min(...shapes.map((shape) => shape.x))
+  const top = Math.min(...shapes.map((shape) => shape.y))
+  const right = Math.max(...shapes.map((shape) => shape.x + shape.w))
+  const bottom = Math.max(...shapes.map((shape) => shape.y + shape.h))
+  const w = Math.max(minWidth, right - left + pad * 2)
+  const h = bottom - top + pad * 2
+  // Centred when `minWidth` wins, so the slack sits on both sides rather than
+  // leaving the drawing pinned to the left edge of an over-wide card.
+  const dx = (w - (right - left)) / 2 - left
+  const dy = pad - top
+  for (const shape of shapes) {
+    shape.x += dx
+    shape.y += dy
+  }
+  for (const text of texts) {
+    text.x += dx
+    text.y += dy
+  }
+
+  // Links after the move, so they are computed from where the boxes ended up.
   if (centre) {
     const hub = shapes[0]
     for (const shape of ring) {
