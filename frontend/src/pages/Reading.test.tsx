@@ -131,6 +131,43 @@ describe("Reading page", () => {
     expect(screen.queryByRole("button", { name: /看导图/ })).not.toBeInTheDocument()
   })
 
+  it("keeps the card folded away until it is asked for", () => {
+    // Same rule as the map, for the same reason: two drawings and the prose all
+    // at once is the wall of information the preview exists to avoid.
+    renderReading()
+    paste(source)
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument()
+  })
+
+  it("says what shape the document is, drawn from the text already pasted", () => {
+    // 0807 §73 的用法是「读之前先看这篇是什么形状」—— 导图给的是层级，
+    // 信息图给的是结构本身，两个问题不一样，所以是两个按钮。
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /看信息图/ }))
+
+    expect(screen.getByRole("img", { name: /^光合作用·并列/ })).toBeInTheDocument()
+    expect(screen.getAllByLabelText("原文")).toHaveLength(1)
+  })
+
+  it("puts the card away again", () => {
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /看信息图/ }))
+    fireEvent.click(screen.getByRole("button", { name: /收起信息图/ }))
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument()
+  })
+
+  it("has no card to offer before anything is pasted", () => {
+    renderReading()
+
+    expect(screen.queryByRole("button", { name: /看信息图/ })).not.toBeInTheDocument()
+  })
+
   it("hands the document back when you come again", () => {
     // Re-pasting the lecture notes every session is the cost that stops this
     // from being somewhere you actually read.

@@ -21,7 +21,16 @@ import { parseOutline } from "@/lib/outline"
 
 export interface VisualCardProps {
   markdown: string
-  title: string
+  /**
+   * What to call the drawing, when the caller knows better than the document.
+   *
+   * Omitted on purpose by callers whose markdown carries its own `# 标题`:
+   * handing a title in makes `parseOutline` treat a matching `#` heading as an
+   * ordinary child instead of the root, which leaves the whole article as a
+   * single block and so draws nothing at all. A wiki entry needs it (those open
+   * at `##`, having been written *about* the word); a pasted document does not.
+   */
+  title?: string
 }
 
 /** Where an arrow's head sits, drawn as a small triangle at the line's end. */
@@ -40,21 +49,30 @@ function arrowHead(x1: number, y1: number, x2: number, y2: number): string {
 export function VisualCard({ markdown, title }: VisualCardProps) {
   const drawing = useMemo(() => {
     if (!markdown.trim()) return null
-    const { centre, blocks } = readCard(parseOutline(markdown, { title }))
+    const root = parseOutline(markdown, { title })
+    const { centre, blocks } = readCard(root)
     if (blocks.length < 2) return null
     const structure = classify(blocks, centre)
-    return { structure, frame: layoutCard(blocks, structure, centre) }
+    return {
+      structure,
+      // The document's own heading, once the parser has found it.
+      name: title || root.title,
+      frame: layoutCard(blocks, structure, centre),
+    }
   }, [markdown, title])
 
   if (!drawing) {
+    // Neither message names the kind of material: the same component draws a
+    // wiki entry and a pasted article, and the wording only ever shows when no
+    // picture was drawn -- exactly when the reader needs to know why.
     return (
       <p className="text-sm text-muted-foreground">
-        {markdown.trim() ? "这篇百科只有一段，没有可拆的结构。" : "这个知识点还没有详细百科。"}
+        {markdown.trim() ? "这一篇只有一段，没有可拆的结构。" : "还没有正文可以画。"}
       </p>
     )
   }
 
-  const { frame, structure } = drawing
+  const { frame, structure, name } = drawing
 
   return (
     // Scrolling rather than scaling. `width="100%"` looks accommodating and is
@@ -66,7 +84,7 @@ export function VisualCard({ markdown, title }: VisualCardProps) {
     <div className="overflow-x-auto">
       <svg
         role="img"
-        aria-label={`${title}·${structure}结构信息图`}
+        aria-label={`${name}·${structure}结构信息图`}
         data-structure={structure}
         data-width={frame.w}
         data-height={frame.h}

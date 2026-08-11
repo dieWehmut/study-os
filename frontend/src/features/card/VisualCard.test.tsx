@@ -30,6 +30,15 @@ describe("VisualCard", () => {
     expect(Number(svg.dataset.height)).toBeGreaterThan(0)
   })
 
+  it("names itself from the document when the caller has no name for it", () => {
+    // 阅读页粘进来的文章自带 `# 标题`，调用方没有别的名字可给 —— 而把名字
+    // 当参数传进去反而更糟：parseOutline 见到 root 已有标题，就把 `# 标题`
+    // 降成一个子节点，整篇于是只剩一个块，什么也画不出来。
+    render(<VisualCard markdown={["# 光合作用", "## 光反应", "## 暗反应"].join("\n")} />)
+
+    expect(screen.getByRole("img", { name: /^光合作用·/ })).toBeInTheDocument()
+  })
+
   it("keeps the text at its own size and lets the card scroll instead", () => {
     // 手动验的时候撞上的：知识库的面板在 1029px 窗口下只有 309px 宽，
     // 而卡片天生 ≥640px，`width="100%"` 就把整张图缩到 34% —— 正文
@@ -58,5 +67,14 @@ describe("VisualCard", () => {
 
     expect(screen.queryByRole("img")).not.toBeInTheDocument()
     expect(screen.getByText(/只有一段|没有可拆/)).toBeInTheDocument()
+  })
+
+  it("does not call the material a 百科 when it might not be one", () => {
+    // 同一个组件也画阅读页粘进来的文章。空状态要是写死「百科」，
+    // 在那儿就是个错字 —— 而错字出现的时机恰好是没画出图的时候，
+    // 也就是读者最需要看懂为什么的时候。
+    render(<VisualCard markdown="## 只有一节" />)
+
+    expect(screen.queryByText(/百科/)).not.toBeInTheDocument()
   })
 })

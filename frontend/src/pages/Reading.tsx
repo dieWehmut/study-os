@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText, Trash2 } from "lucide-react"
+import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText, Shapes, Trash2 } from "lucide-react"
 
 import { dumpThought } from "@/api/chat"
 import { scheduleKnowledge } from "@/api/knowledge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { VisualCard } from "@/features/card/VisualCard"
 import { MindMap } from "@/features/mindmap/MindMap"
 import { FocusReader } from "@/features/reading/FocusReader"
 import { StructurePreview } from "@/features/reading/StructurePreview"
@@ -25,6 +26,10 @@ import {
 
 export default function Reading() {
   const [showMap, setShowMap] = useState(false)
+  // A second, independent fold rather than a tab strip: the map answers "how is
+  // this document nested" and the card answers "what shape is this material",
+  // and a reader who wants one rarely wants the other at the same moment.
+  const [showCard, setShowCard] = useState(false)
   // The document, the place and the marks travel together, because a mark
   // names a chunk id and chunk ids come from the document's own shape.
   const [session, setSession] = useState<ReadingSession>(readReadingSession)
@@ -207,6 +212,9 @@ export default function Reading() {
               <Button variant="outline" size="sm" onClick={() => setShowMap((open) => !open)}>
                 <Network data-icon="inline-start" />{showMap ? "收起导图" : "看导图"}
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowCard((open) => !open)}>
+                <Shapes data-icon="inline-start" />{showCard ? "收起信息图" : "看信息图"}
+              </Button>
               <span className="text-xs text-muted-foreground">层级来自标题，没有经过模型改写</span>
             </div>
           ) : null}
@@ -290,6 +298,24 @@ export default function Reading() {
           </CardHeader>
           <CardContent>
             <MindMap data={map} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Folded on the same terms as the map. No `title` handed in: the pasted
+          document carries its own `# 标题`, and naming it here would make the
+          parser demote that heading to an ordinary child -- leaving one block,
+          which draws nothing at all. */}
+      {showCard && map.nodes.length > 0 ? (
+        <Card>
+          <CardHeader className="gap-1.5">
+            <CardTitle>这一篇是什么形状</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              结构是从标题和列表本身读出来的 · 先认出形状，再往里填细节。
+            </p>
+          </CardHeader>
+          <CardContent>
+            <VisualCard markdown={markdown} />
           </CardContent>
         </Card>
       ) : null}
