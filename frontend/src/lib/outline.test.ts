@@ -189,4 +189,83 @@ describe("markdown outline parser", () => {
       expect(root.children[0].children[0].body).toEqual(["定义：mv"])
     })
   })
+
+  describe("code fences", () => {
+    it("does not read a comment inside a fence as a section", () => {
+      // "#" opens a comment in Python, Shell, YAML and Ruby, so fenced code in
+      // 教辅 material is full of lines that look exactly like headings. Read as
+      // one, a comment becomes a section of the map -- and everything written
+      // after the fence gets filed underneath it.
+      const root = parseOutline(
+        ["# 算法", "## 示例", "```python", "# 计算平均值", "```", "## 复杂度"].join("\n"),
+      )
+
+      expect(root.children.map((child) => child.title)).toEqual(["示例", "复杂度"])
+    })
+
+    it("does not read a bullet inside a fence as a list item", () => {
+      // A YAML sequence and a markdown bullet are the same characters.
+      const root = parseOutline(["## 配置", "```yaml", "- 步骤一", "- 步骤二", "```"].join("\n"))
+
+      expect(root.children[0].children).toEqual([])
+    })
+
+    it("does not read a table inside a fence as a table", () => {
+      // Fenced output showing a formatted table would otherwise have its rows
+      // lifted out as nodes, mixing a code sample's output into the structure.
+      const root = parseOutline(
+        ["## 输出", "```", "| 概念 | 定义 |", "| --- | --- |", "| 动量 | mv |", "```"].join("\n"),
+      )
+
+      expect(root.children[0].children).toEqual([])
+    })
+
+    it("keeps the fenced lines verbatim, indentation and blanks included", () => {
+      // Indentation is the syntax in Python, and a blank line inside a fence is
+      // part of the sample. The rest of the parser trims prose and skips blanks
+      // because neither carries meaning in a sentence; inside a fence both do.
+      const root = parseOutline(
+        ["## 示例", "```python", "def f():", "    return 1", "", "f()", "```"].join("\n"),
+      )
+
+      expect(root.children[0].body).toEqual([
+        "```python",
+        "def f():",
+        "    return 1",
+        "",
+        "f()",
+        "```",
+      ])
+    })
+
+    it("closes on its own fence character, not the other one", () => {
+      // A tilde fence is how you show markdown that itself contains backticks.
+      // Closing it on the inner ``` would end the block early and read the rest
+      // of the sample as document structure.
+      const root = parseOutline(
+        ["## 示例", "~~~markdown", "```", "## 里面的标题", "```", "~~~", "## 之后"].join("\n"),
+      )
+
+      expect(root.children.map((child) => child.title)).toEqual(["示例", "之后"])
+    })
+
+    it("leaves an unclosed fence as ordinary prose", () => {
+      // A wiki truncated mid-sample is the common failure, not a rare one. If an
+      // unclosed fence ran to the end of the document -- as CommonMark has it --
+      // one stray ``` would collapse every remaining section into prose and the
+      // map would lose its shape entirely. Degrading to the old reading keeps
+      // the structure that is still there.
+      const root = parseOutline(["## 示例", "```python", "x = 1", "## 复杂度"].join("\n"))
+
+      expect(root.children.map((child) => child.title)).toEqual(["示例", "复杂度"])
+    })
+
+    it("still numbers later lines from the real document", () => {
+      // The line each node can be renamed on is an offset into the source. A
+      // fence is skipped, not removed, so the count has to survive it.
+      const root = parseOutline(["## 甲", "```", "x", "```", "## 乙"].join("\n"))
+
+      expect(root.children[1].line).toBe(4)
+    })
+  })
 })

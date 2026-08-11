@@ -72,6 +72,42 @@ export function splitTableRow(line: string): string[] {
 }
 
 /**
+ * A fence line: ``` or ~~~ , three or more, with an optional info string.
+ *
+ * Both characters are matched because a tilde fence is how you show markdown
+ * that itself contains backticks, and 教辅 material about markdown does exactly
+ * that. The marker is captured so a close can be required to match its open.
+ */
+const fencePattern = /^(\s*)(`{3,}|~{3,})(.*)$/
+
+/**
+ * Where the fence opened at `start - 1` closes, or -1 if it never does.
+ *
+ * Looked up before the fence is honoured, rather than discovered by running to
+ * the end of the document. CommonMark ends an unclosed fence at end of input,
+ * which here would mean one stray ``` in a wiki truncated mid-sample collapses
+ * every section after it into prose -- the map would lose its shape at exactly
+ * the moment the reader needs it most. Requiring the close first makes a
+ * half-written fence degrade to what the parser did before fences existed.
+ */
+function fenceClose(source: string[], start: number, marker: string): number {
+  for (let cursor = start; cursor < source.length; cursor += 1) {
+    const candidate = fencePattern.exec(source[cursor].trimEnd())
+    // Same character, at least as long, and nothing after it: an info string is
+    // what makes a fence an opening one, so ```python can never be a close.
+    if (
+      candidate &&
+      candidate[2][0] === marker[0] &&
+      candidate[2].length >= marker.length &&
+      candidate[3].trim() === ""
+    ) {
+      return cursor
+    }
+  }
+  return -1
+}
+
+/**
  * The `| --- | :--: |` line under a table's header.
  *
  * Its presence is what makes the lines around it a table at all. Without that
@@ -122,6 +158,31 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
   for (let index = 0; index < source.length; index += 1) {
     const line = source[index].trimEnd()
     if (line.trim() === "") continue
+
+    // A fence is a hole in the syntax. Inside it "#" opens a Python comment,
+    // "-" is a YAML sequence and "|" draws a table nobody wrote -- none of them
+    // structure, all of them indistinguishable from it line by line. So the
+    // block is taken whole, and taken raw: indentation is the syntax in Python
+    // and a blank line is part of the sample, where the prose path trims both
+    // because neither means anything in a sentence.
+    //
+    // The ``` lines are kept, unlike a table's alignment row, which is dropped
+    // as punctuation. They are not punctuation here: the note panel draws prose
+    // in a proportional font, so the fence is the only thing left telling the
+    // reader that "x = 1" is code rather than a sentence.
+    const fence = fencePattern.exec(line)
+    if (fence) {
+      const close = fenceClose(source, index + 1, fence[2])
+      if (close !== -1) {
+        const target = stack[stack.length - 1].node
+        for (let cursor = index; cursor <= close; cursor += 1) target.body.push(source[cursor])
+        index = close
+        continue
+      }
+      // Never closed, so it was never a fence. Falling through reads the line
+      // as the parser read it before fences existed, which leaves the sections
+      // after it standing.
+    }
 
     const heading = headingPattern.exec(line)
     if (heading) {
