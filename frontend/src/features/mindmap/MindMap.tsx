@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 
 import type { MindMap as MindMapData, MindNode } from "@/api/integrate"
+import { plainInline } from "@/lib/markdown-inline"
 
 const NODE_MIN_W = 56
 const NODE_H = 40
@@ -391,7 +392,10 @@ export function MindMap({
       map.set(
         node.id,
         claimWidth(
-          node.label,
+          // What the node will draw, not what the markdown wrote. An emphasised
+          // label's asterisks are not on screen, so sizing by them pads the
+          // column with room for characters that never appear.
+          plainInline(node.label),
           children.has(node.id),
           Boolean(node.note || node.image),
           Boolean(onRename) && node.line !== undefined,
@@ -526,7 +530,13 @@ export function MindMap({
           // The line stops at the label. The claim runs further, and the caret
           // and count live in that difference -- past the ink, before the
           // branch leaves.
-          const ink = lineWidth(node.label)
+          // Computed once and used for the text, the underline and every
+          // accessible name, so that what is drawn, what is measured and what is
+          // read aloud cannot drift apart. `node.label` stays the source text --
+          // the rename editor seeds from it, and writing these words back would
+          // delete the author's emphasis from the document.
+          const shown = plainInline(node.label)
+          const ink = lineWidth(shown)
           const baseline = pos.y + BASELINE
           return (
             <g
@@ -534,7 +544,7 @@ export function MindMap({
               role="treeitem"
               // The label alone names the node; the caret and the count are
               // decoration and would otherwise be read out as part of it.
-              aria-label={node.label}
+              aria-label={shown}
               aria-level={(depth.get(node.id) ?? 0) + 1}
               aria-expanded={foldable ? !folded : undefined}
               tabIndex={0}
@@ -565,7 +575,7 @@ export function MindMap({
                 fill={tone.text}
                 fontWeight={node.node_type === "root" ? 600 : undefined}
               >
-                {node.label}
+                {shown}
               </text>
               <line
                 x1={pos.x}
@@ -605,7 +615,7 @@ export function MindMap({
                   role="button"
                   // Named for the node, because a map of forty nodes read aloud
                   // as forty identical "展开笔记" buttons names nothing.
-                  aria-label={`${notedId === node.id ? "收起" : "展开"}${carriedLabel(node)}：${node.label}`}
+                  aria-label={`${notedId === node.id ? "收起" : "展开"}${carriedLabel(node)}：${shown}`}
                   aria-expanded={notedId === node.id}
                   tabIndex={0}
                   style={{ cursor: "pointer" }}
@@ -652,7 +662,7 @@ export function MindMap({
                   role="button"
                   // Named for the node, like the note marker: forty identical
                   // "重命名" buttons name nothing to anyone reading the map aloud.
-                  aria-label={`重命名：${node.label}`}
+                  aria-label={`重命名：${shown}`}
                   tabIndex={0}
                   style={{ cursor: "text" }}
                   onClick={(event) => {
@@ -708,7 +718,7 @@ export function MindMap({
           const lines = node.note ? node.note.split("\n") : []
           const top = pos.y + NODE_H + NOTE_PANEL_GAP
           return (
-            <g role="note" aria-label={`${carriedLabel(node)}：${node.label}`}>
+            <g role="note" aria-label={`${carriedLabel(node)}：${plainInline(node.label)}`}>
               <rect
                 x={pos.x}
                 y={top}
@@ -736,7 +746,7 @@ export function MindMap({
                   // Falls back to the node's own label: an <image> with no
                   // accessible name is announced as an unnamed graphic, and the
                   // heading it hangs under is the best description available.
-                  aria-label={node.image_alt || node.label}
+                  aria-label={node.image_alt || plainInline(node.label)}
                 />
               ) : null}
               <foreignObject

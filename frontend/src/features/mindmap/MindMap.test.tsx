@@ -604,6 +604,45 @@ describe("MindMap", () => {
     expect(screen.getByRole("treeitem", { name: "速度" })).toHaveAttribute("aria-expanded", "true")
   })
 
+  it("draws the words a bold label was written to show, not its asterisks", () => {
+    // SVG text has no emphasis to render into, so `**内核**` arrives on screen as
+    // four literal asterisks around the term -- the same defect `liftImage`
+    // already fixes for pictures. 2489 labels in sample/distill carry bold.
+    render(<MindMap data={{ title: "T", nodes: [{ id: "n0", label: "**内核 kernel**" }] }} />)
+
+    expect(screen.getByRole("treeitem", { name: "内核 kernel" })).toBeInTheDocument()
+    expect(screen.queryByText("**内核 kernel**")).not.toBeInTheDocument()
+  })
+
+  it("measures a label by what it draws, not by its markup", () => {
+    // Width is computed from the label, so markup left in the measurement pads
+    // every emphasised node with room for characters that are never drawn -- and
+    // the columns after it inherit the error, since each starts from the widest
+    // node in the one before.
+    const bare = render(<MindMap data={{ title: "T", nodes: [{ id: "n0", label: "内核" }] }} />)
+    const plain = right("内核")
+    bare.unmount()
+
+    render(<MindMap data={{ title: "T", nodes: [{ id: "n0", label: "**内核**" }] }} />)
+
+    expect(right("内核")).toBe(plain)
+  })
+
+  it("seeds a rename from the source text, so saving cannot flatten it", () => {
+    // The one place the raw label must survive. The editor writes its contents
+    // back to the markdown line, so seeding it with the drawn words would delete
+    // the author's emphasis from the document on the first save of any node.
+    const marked = {
+      title: "T",
+      nodes: [{ id: "n0", label: "T", line: 0 }, { id: "n1", label: "**内核**", parent_id: "n0", line: 1 }],
+    }
+    render(<MindMap data={marked} onRename={() => {}} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "重命名：内核" }))
+
+    expect(screen.getByRole("textbox", { name: "节点标题" })).toHaveValue("**内核**")
+  })
+
   it("exports mermaid text with edges", () => {
     const mermaid = toMermaid({
       title: "运动学",
