@@ -46,6 +46,35 @@ describe("structure classification", () => {
     expect(readingOf(["这是一段总述。", "1. 第一步", "2. 第二步"].join("\n"))).toBe("流程")
   })
 
+  it("keeps a heavy list in a grid even though it has a centre", () => {
+    // 语料把这件事说死了：sample/distill 里 48 篇读成发散，最重的那个块
+    // 没有一篇在 3 行以内，中位数 14 行、最多 72 行。环的预算是周长，
+    // 撑开 n 个盒子的半径又随盒子对角线长，所以段落级的节点不只是难看 ——
+    // 它把其余每个节点一起往外推：最重的那篇画出来 8357px 宽，
+    // 而任何网格都封在 1624。段落该进网格。
+    const heavy = ["这是一段总述。", "- 甲", "  - 一", "  - 二", "  - 三", "  - 四", "- 乙"].join("\n")
+
+    expect(readingOf(heavy)).toBe("并列")
+  })
+
+  it("draws a heavy cycle as a sequence rather than an unreadable ring", () => {
+    // 闭合那一条信息确实丢了。但落回的是并列→流程这条推导链的上一环，
+    // 不是掉出链外：编号和箭头都还在，丢的只有绕回去那一根。
+    // 用一根箭头换整张图可读，这个换是值的。
+    const heavy = [
+      "## 周期",
+      "1. 间期",
+      "  - 一",
+      "  - 二",
+      "  - 三",
+      "  - 四",
+      "2. 分裂期",
+      "3. 回到间期",
+    ].join("\n")
+
+    expect(readingOf(heavy)).toBe("流程")
+  })
+
   it("falls back to 并列 for a single block", () => {
     // 一个块没有结构可言。并列是根结构，落回它永远是合法输出。
     expect(readingOf("## 只有一节")).toBe("并列")

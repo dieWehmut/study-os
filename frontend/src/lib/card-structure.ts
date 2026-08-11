@@ -55,16 +55,49 @@ function isClosed(blocks: Block[]): boolean {
 }
 
 /**
+ * How much a node can carry and still belong on a ring.
+ *
+ * A ring is not just another arrangement of the same boxes. Its budget is a
+ * circumference, and the radius that keeps `n` boxes apart grows with the box's
+ * diagonal, so a paragraph-sized node does not merely look wrong -- it pushes
+ * every other node outward too. Measured on sample/distill, the heaviest ring
+ * came out 8357px wide, against 1624 for every single grid.
+ *
+ * The number is low because the corpus says it has to be: of the 48 files that
+ * read as 发散 before this guard, **not one** had a heaviest block under 4
+ * lines. The median was 14 and the maximum 72. So this is not a threshold that
+ * splits the population -- it is the finding that real study material has
+ * section-sized children at the top level, and sections belong in a grid.
+ *
+ * `structures.md` agrees on the substance: 发散's branches are 主题词 and 循环's
+ * steps are stages. Neither is a paragraph.
+ */
+const ringNodeLines = 3
+
+function weightOf(block: Block): number {
+  return block.lines.length + block.fields.length + block.children.length
+}
+
+function fitsOnARing(blocks: Block[]): boolean {
+  return blocks.every((block) => weightOf(block) <= ringNodeLines)
+}
+
+/**
  * @param blocks the card's top-level units
- * @param centre the prose written above them, if any -- the root's own body
+ * @param centre the prose written above them -- the root's own body
  */
 export function classify(blocks: Block[], centre: string[]): Structure {
   // One box is not a structure, and neither is none.
   if (blocks.length < 2) return "并列"
 
-  if (isSequence(blocks)) return isClosed(blocks) ? "循环" : "流程"
+  // Falling back along the derivation law rather than out of it: a heavy cycle
+  // keeps its numbering and arrows as a 流程 and loses only the one arrow that
+  // wrapped around. That is a bounded loss, and the alternative is a ring no
+  // one can read.
+  const ringable = fitsOnARing(blocks)
+  if (isSequence(blocks)) return isClosed(blocks) && ringable ? "循环" : "流程"
 
   // 并列 vs 发散: does the centre have anything in it? A list written under a
   // paragraph has a subject; a list written under a bare heading does not.
-  return centre.length > 0 ? "发散" : "并列"
+  return centre.length > 0 && ringable ? "发散" : "并列"
 }
