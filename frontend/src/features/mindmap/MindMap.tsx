@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 
 import type { MindMap as MindMapData, MindNode } from "@/api/integrate"
 import { plainInline } from "@/lib/markdown-inline"
+import { measure } from "@/lib/text-metrics"
 
 const NODE_MIN_W = 56
 const NODE_H = 40
@@ -80,18 +81,16 @@ function safeImageSrc(src?: string): string | undefined {
 }
 
 /**
- * Roughly how wide this label draws.
+ * How wide this label draws, at the map's own font size.
  *
- * Canvas measurement would be exact, but it is unavailable under jsdom and the
- * layout has to be the same in a test as on screen. Two buckets are enough:
- * CJK sits on a full em, Latin and digits on a bit over half of one.
+ * The table lives in `lib/text-metrics` because the 信息图 tab measures the same
+ * sentences. Two copies would drift silently in the worst way: one string would
+ * wrap differently in the 导图 tab than in the 信息图 tab, with nothing on screen
+ * saying why. Two buckets were also too coarse -- `i` and `W` differ threefold,
+ * so a line of code came out nearly twice as wide as it draws.
  */
 function labelWidth(label: string): number {
-  let total = 0
-  for (const character of label) {
-    total += /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/.test(character) ? FONT_SIZE : FONT_SIZE * 0.58
-  }
-  return total
+  return measure(label, FONT_SIZE)
 }
 
 /**
