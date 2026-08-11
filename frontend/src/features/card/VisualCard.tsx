@@ -57,63 +57,72 @@ export function VisualCard({ markdown, title }: VisualCardProps) {
   const { frame, structure } = drawing
 
   return (
-    <svg
-      role="img"
-      aria-label={`${title}·${structure}结构信息图`}
-      data-structure={structure}
-      data-width={frame.w}
-      data-height={frame.h}
-      viewBox={`0 0 ${frame.w} ${frame.h}`}
-      width="100%"
-      className="h-auto max-w-full rounded-lg border bg-card"
-    >
-      {frame.links.map((link) => (
-        <g key={link.id} data-link>
-          <line
-            x1={link.x1}
-            y1={link.y1}
-            x2={link.x2}
-            y2={link.y2}
-            className="stroke-border"
+    // Scrolling rather than scaling. `width="100%"` looks accommodating and is
+    // not: the card is ≥640px by construction and 知识库's wiki panel is 309px
+    // at a 1029px window, so fitting meant drawing at 34% -- 14px body text
+    // rendered at 4.8px. A map can be scaled because you read its shape; a card
+    // is read as words, so an unreadable card is a blank one. Panning is a cost
+    // the reader can see and undo. Illegibility is not.
+    <div className="overflow-x-auto">
+      <svg
+        role="img"
+        aria-label={`${title}·${structure}结构信息图`}
+        data-structure={structure}
+        data-width={frame.w}
+        data-height={frame.h}
+        viewBox={`0 0 ${frame.w} ${frame.h}`}
+        width={frame.w}
+        height={frame.h}
+        className="rounded-lg border bg-card"
+      >
+        {frame.links.map((link) => (
+          <g key={link.id} data-link>
+            <line
+              x1={link.x1}
+              y1={link.y1}
+              x2={link.x2}
+              y2={link.y2}
+              className="stroke-border"
+              strokeWidth={1.5}
+            />
+            {link.arrow ? (
+              <polygon
+                points={arrowHead(link.x1, link.y1, link.x2, link.y2)}
+                className="fill-muted-foreground"
+              />
+            ) : null}
+          </g>
+        ))}
+        {frame.shapes.map((shape) => (
+          <rect
+            key={shape.id}
+            data-block
+            data-role={shape.role}
+            x={shape.x}
+            y={shape.y}
+            width={shape.w}
+            height={shape.h}
+            rx={10}
+            className={
+              shape.role === "centre"
+                ? "fill-primary/10 stroke-primary"
+                : "fill-muted/40 stroke-border"
+            }
             strokeWidth={1.5}
           />
-          {link.arrow ? (
-            <polygon
-              points={arrowHead(link.x1, link.y1, link.x2, link.y2)}
-              className="fill-muted-foreground"
-            />
-          ) : null}
-        </g>
-      ))}
-      {frame.shapes.map((shape) => (
-        <rect
-          key={shape.id}
-          data-block
-          data-role={shape.role}
-          x={shape.x}
-          y={shape.y}
-          width={shape.w}
-          height={shape.h}
-          rx={10}
-          className={
-            shape.role === "centre"
-              ? "fill-primary/10 stroke-primary"
-              : "fill-muted/40 stroke-border"
-          }
-          strokeWidth={1.5}
-        />
-      ))}
-      {frame.texts.map((text) => (
-        <text
-          key={text.id}
-          x={text.x}
-          y={text.y}
-          fontSize={text.size}
-          className={text.bold ? "fill-foreground font-medium" : "fill-muted-foreground"}
-        >
-          {text.text}
-        </text>
-      ))}
-    </svg>
+        ))}
+        {frame.texts.map((text) => (
+          <text
+            key={text.id}
+            x={text.x}
+            y={text.y}
+            fontSize={text.size}
+            className={text.bold ? "fill-foreground font-medium" : "fill-muted-foreground"}
+          >
+            {text.text}
+          </text>
+        ))}
+      </svg>
+    </div>
   )
 }

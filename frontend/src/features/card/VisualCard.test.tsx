@@ -21,13 +21,28 @@ describe("VisualCard", () => {
   })
 
   it("sizes the viewBox from the frame it was given", () => {
-    // 卡片自己算出宽高，元素按容器给的宽度缩放 —— 尺寸不锁，
-    // 但也不能因此把图顶出面板。
+    // 画布是算出来的，viewBox 得跟它一致 —— 不一致的话要么裁掉一块，
+    // 要么在下面留一条白，而两种都看不出是错的。
     const { container } = render(<VisualCard markdown={["## 甲", "## 乙"].join("\n")} title="词条" />)
     const svg = container.querySelector("svg")!
 
     expect(svg.getAttribute("viewBox")).toBe(`0 0 ${svg.dataset.width} ${svg.dataset.height}`)
     expect(Number(svg.dataset.height)).toBeGreaterThan(0)
+  })
+
+  it("keeps the text at its own size and lets the card scroll instead", () => {
+    // 手动验的时候撞上的：知识库的面板在 1029px 窗口下只有 309px 宽，
+    // 而卡片天生 ≥640px，`width="100%"` 就把整张图缩到 34% —— 正文
+    // 14px 变成 4.8px，一个字也读不了。缩放是有代价的选择，而卡片是
+    // 拿来读的，读不了就等于没画。宽度写死成算出来的那个数，装不下的
+    // 时候横向滚动：要平移，但字还在。
+    const { container } = render(
+      <VisualCard markdown={["## 甲", "## 乙", "## 丙"].join("\n")} title="词条" />,
+    )
+    const svg = container.querySelector("svg")!
+
+    expect(svg.getAttribute("width")).toBe(svg.dataset.width)
+    expect(svg.parentElement?.className).toContain("overflow-x-auto")
   })
 
   it("says so instead of drawing an empty box", () => {
