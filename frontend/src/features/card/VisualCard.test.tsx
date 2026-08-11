@@ -39,6 +39,14 @@ describe("VisualCard", () => {
     expect(screen.getByRole("img", { name: /^光合作用·/ })).toBeInTheDocument()
   })
 
+  it("names itself by the words a mark was written around, not the mark", () => {
+    // 无障碍名字是读屏唯一能拿到的文本，而 `**光合作用**` 会被逐字念出星号。
+    // 盒子里的字已经走 plainInline 了，标题这条路是从 parseOutline 直接来的。
+    render(<VisualCard markdown={["# **光合作用**", "## 光反应", "## 暗反应"].join("\n")} />)
+
+    expect(screen.getByRole("img", { name: /^光合作用·/ })).toBeInTheDocument()
+  })
+
   it("keeps the text at its own size and lets the card scroll instead", () => {
     // 手动验的时候撞上的：知识库的面板在 1029px 窗口下只有 309px 宽，
     // 而卡片天生 ≥640px，`width="100%"` 就把整张图缩到 34% —— 正文

@@ -17,6 +17,7 @@ import { useMemo } from "react"
 import { readCard } from "@/lib/card-blocks"
 import { layoutCard } from "@/lib/card-layout"
 import { classify } from "@/lib/card-structure"
+import { plainInline } from "@/lib/markdown-inline"
 import { parseOutline } from "@/lib/outline"
 
 export interface VisualCardProps {
@@ -55,8 +56,11 @@ export function VisualCard({ markdown, title }: VisualCardProps) {
     const structure = classify(blocks, centre)
     return {
       structure,
-      // The document's own heading, once the parser has found it.
-      name: title || root.title,
+      // The document's own heading, once the parser has found it. Flattened for
+      // the same reason `readCard` flattens the boxes -- but here it is the
+      // accessible name, which is the only text a screen reader ever gets, and
+      // `**` in it is read out one asterisk at a time.
+      name: plainInline(title || root.title),
       frame: layoutCard(blocks, structure, centre),
     }
   }, [markdown, title])

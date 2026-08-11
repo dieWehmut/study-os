@@ -38,6 +38,18 @@ describe("plainInline", () => {
     expect(plainInline("a * b * c")).toBe("a * b * c")
   })
 
+  it("leaves multiplication alone even with no spaces around it", () => {
+    // 手动验的时候撞上的：`3*4*5` 被画成了 `345`。空格那条规则挡不住紧挨着写
+    // 的乘号 —— CommonMark 确实把 `3*4*5` 读成强调（词内强调对 `*` 是合法的），
+    // 但一张数学卡上它是乘法，悄悄吃掉运算符就是把答案改错了。判据跟 `_` 早就
+    // 用的那条一样：定界符紧贴着字母或数字，那它是算式或标识符，不是强调。
+    expect(plainInline("3*4*5")).toBe("3*4*5")
+    expect(plainInline("a*b*c")).toBe("a*b*c")
+    expect(plainInline("P*Q*R")).toBe("P*Q*R")
+    // 中文没有这个歧义 —— 没人用 `*` 乘汉字 —— 所以中文里的强调照旧脱掉。
+    expect(plainInline("写得很*重要*的一句")).toBe("写得很重要的一句")
+  })
+
   it("leaves an identifier's underscores alone", () => {
     // snake_case is everywhere in 教辅 code, and markdown does not treat an
     // underscore inside a word as emphasis either.

@@ -15,6 +15,7 @@
  */
 
 import type { OutlineNode } from "./outline"
+import { plainInline } from "./markdown-inline"
 
 export interface Field {
   name: string
@@ -103,13 +104,18 @@ function toBlock(node: OutlineNode): Block {
   const lines: string[] = []
   const fields: Field[] = []
   for (const line of node.body) {
-    const field = readField(line)
+    // Flattened before the colon is looked for, not after. The budget below is
+    // derived from drawn pixels, so measuring `**通用纪律**` as eight characters
+    // spends half of it on four glyphs that never appear -- and leaves a field
+    // whose name cannot match the plain `通用纪律` of the block beside it, which
+    // is what geometry groups columns by.
+    const field = readField(plainInline(line))
     if (field) fields.push(field)
-    else lines.push(line)
+    else lines.push(plainInline(line))
   }
   return {
     id: node.id,
-    title: node.title,
+    title: plainInline(node.title),
     lines,
     fields,
     ordered: node.ordered,
@@ -134,5 +140,5 @@ function deepestFork(node: OutlineNode): OutlineNode {
 
 export function readCard(root: OutlineNode): CardSource {
   const fork = deepestFork(root)
-  return { centre: [...fork.body], blocks: fork.children.map(toBlock) }
+  return { centre: fork.body.map(plainInline), blocks: fork.children.map(toBlock) }
 }

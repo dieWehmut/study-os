@@ -114,4 +114,33 @@ describe("card blocks", () => {
   it("returns nothing for an empty document", () => {
     expect(readCard(parseOutline(""))).toEqual({ centre: [], blocks: [] })
   })
+
+  it("draws the words a mark was written around, not the mark", () => {
+    // 卡片跟导图一样画的是 SVG text，背后没有 markdown 渲染器，所以
+    // `**骨架**` 就是照着画四个星号。导图早就有 plainInline 在挡这件事，
+    // 卡这条路上没接 —— 语料 5783 条待绘字符串里 1329 条这样写。
+    const { centre, blocks } = cardOf(
+      [
+        "**总述**：这一段是**开头**。",
+        "## **骨架**",
+        "接口是 `render(kernel)`",
+        "- 见[结构库](https://example.com/a)",
+        "## 乙",
+      ].join("\n"),
+    )
+
+    expect(centre).toEqual(["总述：这一段是开头。"])
+    expect(blocks[0].title).toBe("骨架")
+    expect(blocks[0].lines).toEqual(["接口是 render(kernel)"])
+    expect(blocks[0].children.map((child) => child.title)).toEqual(["见结构库"])
+  })
+
+  it("measures a field name by its words, so emphasis does not spend the budget", () => {
+    // 名字预算是 8 —— 从画出来的像素推的（260px 的盒子，14px 正文）。
+    // `**通用纪律**` 是 8 个字符里有 4 个星号，等于一半预算花在了不画的东西上，
+    // 而且它跟别处的「通用纪律」不是同一个名字，几何就归不到同一列。
+    const { blocks } = cardOf(["## 甲", "**通用纪律**：先认结构再填细节"].join("\n"))
+
+    expect(blocks[0].fields).toEqual([{ name: "通用纪律", value: "先认结构再填细节" }])
+  })
 })

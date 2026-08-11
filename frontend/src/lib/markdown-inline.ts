@@ -22,15 +22,26 @@
  * silently deletes the operators out of a formula. Longest delimiter first, so
  * `**a**` is never seen as two `*a*`.
  *
- * Each carries its own replacement because the underscore pattern has to look
- * behind at the character before it, and so must put that character back --
- * otherwise `a _b_ c` comes out having lost a space.
+ * Whitespace is only half of it. `3*4*5` has no spaces to flank, and CommonMark
+ * genuinely reads it as emphasis -- word-internal emphasis is legal for `*`. On
+ * a 数学 card it is multiplication, and eating the operators draws `345`: not
+ * noise the reader can see through, a different number. So `*` gets the same
+ * neighbour test `_` already had, and for the same reason -- a delimiter pressed
+ * against a letter or a digit belongs to an expression, not to emphasis.
+ *
+ * Latin and digits only, deliberately. Nobody multiplies 汉字, so guarding on
+ * CJK would refuse 「写得很*重要*的」 -- the one form Chinese emphasis takes, since
+ * it is written without spaces -- to protect an expression that cannot occur.
+ *
+ * Each carries its own replacement because the patterns that look behind at the
+ * character before them must put that character back -- otherwise `a _b_ c`
+ * comes out having lost a space.
  */
 const emphasis: Array<[RegExp, string]> = [
   [/\*\*(?=\S)([\s\S]*?\S)\*\*/g, "$1"],
   [/__(?=\S)([\s\S]*?\S)__/g, "$1"],
   [/~~(?=\S)([\s\S]*?\S)~~/g, "$1"],
-  [/\*(?=\S)([^*]*?\S)\*/g, "$1"],
+  [/(^|[^\w])\*(?=\S)([^*]*?\S)\*(?!\w)/g, "$1$2"],
   // Word-internal underscores are snake_case, not emphasis -- markdown agrees.
   [/(^|[^\w\u4e00-\u9fff])_(?=\S)([^_]*?\S)_(?![\w\u4e00-\u9fff])/g, "$1$2"],
 ]
