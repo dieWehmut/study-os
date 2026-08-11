@@ -27,6 +27,17 @@ function baseline(name: string): number {
   return Number(underline(name).getAttribute("y1"))
 }
 
+/**
+ * The top of a node's row -- its click target, which is the only part of a node
+ * with any area.
+ *
+ * Overlap is a claim about rows, not about ink: a panel that stops just above a
+ * label still covers the row that label was given.
+ */
+function top(name: string): number {
+  return Number(screen.getByRole("treeitem", { name }).querySelector("rect")!.getAttribute("y"))
+}
+
 const data = {
   title: "运动学",
   nodes: [
@@ -58,6 +69,21 @@ const editable = {
     { id: "n5", label: "定义", parent_id: "n3", node_type: "item", line: 5 },
     { id: "n4", label: "平均速度", parent_id: "n1", node_type: "item", line: 6 },
     { id: "n2", label: "加速度", parent_id: "n0", node_type: "conclusion", line: 7 },
+  ],
+}
+
+// The same shape the markdown table parser hands out: siblings packed one row
+// apart, each carrying one note line per column. Copied from the live 近义辨析
+// table in the abandon wiki, where opening one row's note covered the next row
+// outright -- the defect the note-overlap tests exist for.
+const table = {
+  title: "abandon",
+  nodes: [
+    { id: "n0", label: "abandon", node_type: "root" },
+    { id: "n1", label: "近义辨析", parent_id: "n0", node_type: "heading" },
+    { id: "n2", label: "desert", parent_id: "n1", node_type: "item", note: "侧重：违背责任而擅离\n语体：中性\n例：desert one's post" },
+    { id: "n3", label: "give up", parent_id: "n1", node_type: "item", note: "侧重：停止尝试\n例：give up smoking" },
+    { id: "n4", label: "abandon（舍去）", parent_id: "n1", node_type: "item" },
   ],
 }
 
@@ -445,6 +471,43 @@ describe("MindMap", () => {
     const panel = svg.querySelector("[role='note'] rect")!
     const bottom = Number(panel.getAttribute("y")) + Number(panel.getAttribute("height"))
     expect(Number(svg.dataset.height)).toBeGreaterThanOrEqual(bottom)
+  })
+
+  it("pushes the row below an opened note down instead of covering it", () => {
+    // The panel is drawn last so it sits over the branches, which is right for a
+    // curve and wrong for a label: the sibling one row down was simply hidden
+    // underneath it. Rare while every node was a heading, routine now that a
+    // markdown table turns each row into a tightly packed sibling carrying a
+    // note per column -- opening 「desert」 covered 「give up」 outright on the
+    // real 近义辨析 table this fixture is copied from. Reserving the room in the
+    // layout is the only fix that holds whatever height the note turns out to be.
+    render(<MindMap data={table} />)
+    const svg = screen.getByRole("tree", { name: "导图：abandon" })
+    const before = top("give up")
+
+    fireEvent.click(screen.getByRole("button", { name: "展开笔记：desert" }))
+
+    const panel = svg.querySelector("[role='note'] rect")!
+    const bottom = Number(panel.getAttribute("y")) + Number(panel.getAttribute("height"))
+    expect(top("give up")).toBeGreaterThanOrEqual(bottom)
+
+    // And the room comes back, so a map read through note by note does not
+    // ratchet itself taller with every click.
+    fireEvent.click(screen.getByRole("button", { name: "收起笔记：desert" }))
+    expect(top("give up")).toBe(before)
+  })
+
+  it("keeps a parent level with its children after a note pushes them apart", () => {
+    // Rows are what get pushed, and a parent's row is the midpoint of its own
+    // first and last child. Push the children without re-deriving that midpoint
+    // and the branch leaves its parent at an angle -- the one thing the
+    // midpoint rule exists to prevent. Shifting every row below the note by a
+    // flat amount would land 「近义辨析」 here at 200 rather than 158.
+    render(<MindMap data={table} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "展开笔记：desert" }))
+
+    expect(top("近义辨析")).toBe((top("desert") + top("abandon（舍去）")) / 2)
   })
 
   it("scales to its container when asked to fit", () => {

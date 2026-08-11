@@ -42,6 +42,15 @@ const NOTE_PANEL_W = 264
 const NOTE_LINE_H = 20
 const NOTE_PANEL_PAD = 10
 /**
+ * The open panel's drop below its node's bottom edge.
+ *
+ * A hairline, so the panel reads as hanging off the node above it rather than
+ * as belonging to the row below. The layout reserves this plus the panel's own
+ * height, which leaves the ordinary row gap between the panel and whatever
+ * follows it.
+ */
+const NOTE_PANEL_GAP = 4
+/**
  * How much of an opened panel a picture is given.
  *
  * A fixed box, with the picture fitted inside it: SVG cannot ask an image how
@@ -181,6 +190,23 @@ interface Layout {
 }
 
 /**
+ * A node that has something opened under it, and how much room that needs.
+ *
+ * Threaded into the layout rather than drawn over it: the panel is drawn last
+ * so that it covers the branch curves, which is right for a curve and wrong for
+ * a label. Without a reservation the sibling one row down is simply hidden
+ * underneath -- rare while every node was a heading, routine once a markdown
+ * table turns each row into a tightly packed sibling carrying a note per column.
+ *
+ * Only the note needs this. The title editor also opens downward but is 30px
+ * tall, so it already fits inside the gap between two rows.
+ */
+interface Spacer {
+  id: string
+  height: number
+}
+
+/**
  * Right-facing tree: depth picks the column, the subtree picks the row.
  *
  * Rows go to leaves in reading order and every parent takes the midpoint of its
@@ -193,7 +219,7 @@ interface Layout {
  * nodes size to their own label. A fixed stride would let one long heading run
  * straight through the column holding its children.
  */
-function layout(nodes: MindNode[], widthOf: (id: string) => number): Layout {
+function layout(nodes: MindNode[], widthOf: (id: string) => number, spacer?: Spacer): Layout {
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const children = new Map<string, string[]>()
   const roots: string[] = []
@@ -206,8 +232,13 @@ function layout(nodes: MindNode[], widthOf: (id: string) => number): Layout {
   }
 
   const depth = new Map<string, number>()
-  const row = new Map<string, number>()
-  let rows = 0
+  const rowTop = new Map<string, number>()
+  // Rows are walked as pixels rather than counted as indices, because the room
+  // an opened note needs is measured in pixels and does not divide into whole
+  // rows. Counting rows and rounding up would pad the map by nearly a blank row
+  // every time a two-line note was opened.
+  let cursor = PAD
+  let deepest = PAD
 
   // Post-order, because a parent's row is not known until its children have
   // one. Kept iterative: the nesting depth belongs to whatever document was
@@ -218,13 +249,22 @@ function layout(nodes: MindNode[], widthOf: (id: string) => number): Layout {
       const frame = stack.pop()!
       const kids = children.get(frame.id) ?? []
       if (frame.resolved) {
-        const first = row.get(kids[0]!) ?? 0
-        row.set(frame.id, (first + (row.get(kids[kids.length - 1]!) ?? first)) / 2)
+        const first = rowTop.get(kids[0]!) ?? cursor
+        rowTop.set(frame.id, (first + (rowTop.get(kids[kids.length - 1]!) ?? first)) / 2)
+        // A parent carrying the note pushes what comes after it, exactly like a
+        // leaf does. Safe to do here: its whole subtree is already placed, so
+        // everything still to be placed really is below it.
+        if (frame.id === spacer?.id) cursor += spacer.height
         continue
       }
       depth.set(frame.id, frame.level)
       if (kids.length === 0) {
-        row.set(frame.id, rows++)
+        rowTop.set(frame.id, cursor)
+        deepest = Math.max(deepest, cursor)
+        // The panel's own footprint is inserted on top of the ordinary gap, so
+        // the space that used to separate two rows now separates the panel from
+        // the row below it.
+        cursor += NODE_H + GAP_Y + (frame.id === spacer?.id ? spacer.height : 0)
         continue
       }
       stack.push({ ...frame, resolved: true })
@@ -251,7 +291,7 @@ function layout(nodes: MindNode[], widthOf: (id: string) => number): Layout {
   for (const node of nodes) {
     positions.set(node.id, {
       x: columnX[depth.get(node.id) ?? 0]!,
-      y: PAD + (row.get(node.id) ?? 0) * (NODE_H + GAP_Y),
+      y: rowTop.get(node.id) ?? PAD,
     })
   }
 
@@ -259,7 +299,7 @@ function layout(nodes: MindNode[], widthOf: (id: string) => number): Layout {
     positions,
     depth,
     width: columnX[columns - 1]! + columnWidth[columns - 1]! + PAD,
-    height: PAD * 2 + Math.max(1, rows) * (NODE_H + GAP_Y) - GAP_Y,
+    height: deepest + NODE_H + PAD,
   }
 }
 
@@ -362,7 +402,24 @@ export function MindMap({
   }, [data.nodes, children, onRename])
   const widthOf = (id: string) => widths.get(id) ?? NODE_MIN_W
 
-  const { positions, depth, width, height } = layout(visible, widthOf)
+  // Folding a branch takes its open note with it, otherwise the panel is left
+  // hanging beside a node that is no longer on screen.
+  const notedId = openNote && visible.some((node) => node.id === openNote) ? openNote : null
+  const noted = notedId ? byId.get(notedId) : undefined
+  const notedSource = safeImageSrc(noted?.image)
+  // Measured before the layout runs, so the rows below can be moved out of the
+  // way. The height depends only on what the note says, never on where the node
+  // ended up, so there is no circularity in asking for it first.
+  const panelH =
+    noted && (noted.note || notedSource)
+      ? notePanelHeight(noted.note ?? "", Boolean(notedSource))
+      : 0
+
+  const { positions, depth, width, height } = layout(
+    visible,
+    widthOf,
+    notedId && panelH ? { id: notedId, height: NOTE_PANEL_GAP + panelH } : undefined,
+  )
 
   function toggle(id: string) {
     if (!children.has(id)) return
@@ -373,28 +430,20 @@ export function MindMap({
     })
   }
 
-  // Folding a branch takes its open note with it, otherwise the panel is left
-  // hanging beside a node that is no longer on screen.
-  const notedId = openNote && visible.some((node) => node.id === openNote) ? openNote : null
-
   // The canvas has to cover the opened panel too.
   //
-  // `layout` deliberately does not know about panels: it sizes the closed tree,
-  // and a panel is state that only exists after a click. But an SVG crops at
-  // its own edge, so a note hanging off a node in the last column had its right
-  // half — on a picture, most of the picture — simply cut away. Taking the max
-  // here rather than reserving the room inside `layout` means the map is not
-  // permanently padded by 264px of white space for a panel that is usually shut.
-  const noted = notedId ? byId.get(notedId) : undefined
+  // `layout` reserves the room *under* the node so nothing is covered, but it
+  // knows nothing about how wide a panel is, and an SVG crops at its own edge:
+  // a note hanging off a node in the last column had its right half — on a
+  // picture, most of the picture — simply cut away. Taking the max here rather
+  // than reserving the width inside `layout` means the map is not permanently
+  // padded by 264px of white space for a panel that is usually shut.
   const notedAt = notedId ? positions.get(notedId) : undefined
-  const notedSource = safeImageSrc(noted?.image)
-  const panelH =
-    noted && notedAt && (noted.note || notedSource)
-      ? notePanelHeight(noted.note ?? "", Boolean(notedSource))
-      : 0
   const canvasW = notedAt && panelH ? Math.max(width, notedAt.x + NOTE_PANEL_W + PAD) : width
   const canvasH =
-    notedAt && panelH ? Math.max(height, notedAt.y + NODE_H + 4 + panelH + PAD) : height
+    notedAt && panelH
+      ? Math.max(height, notedAt.y + NODE_H + NOTE_PANEL_GAP + panelH + PAD)
+      : height
 
   // Folding takes an open editor with it for the same reason it takes an open
   // note: a field hanging beside a node that is no longer drawn would write its
@@ -657,7 +706,7 @@ export function MindMap({
           const pos = notedAt
           const source = notedSource
           const lines = node.note ? node.note.split("\n") : []
-          const top = pos.y + NODE_H + 4
+          const top = pos.y + NODE_H + NOTE_PANEL_GAP
           return (
             <g role="note" aria-label={`${carriedLabel(node)}：${node.label}`}>
               <rect
