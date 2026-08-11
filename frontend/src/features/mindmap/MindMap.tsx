@@ -95,6 +95,46 @@ function labelWidth(label: string): number {
 }
 
 /**
+ * The widest a label is allowed to draw.
+ *
+ * Every column starts from the widest node in the one before it, so a label's
+ * width is not its own problem: the widest run-on bullet in sample/distill
+ * measures 2280px and carries its whole branch off the canvas with it. 340px is
+ * about twenty CJK characters -- long enough for the names people actually
+ * write, short enough that four levels of nesting still fit side by side.
+ */
+const LABEL_MAX_W = 340
+
+/**
+ * A label cut to what can be drawn, marked so the cut is visible.
+ *
+ * By width rather than by character count, because the two buckets differ by
+ * nearly half: twenty Latin characters and twenty CJK characters are not the
+ * same label, and a count would leave one short of the budget and the other
+ * still over it.
+ *
+ * Visual only. The full text stays the accessible name -- a screen reader has
+ * no canvas to run out of -- and stays `node.label`, which the rename editor
+ * seeds from: clipping there would truncate the author's sentence in the
+ * document on the first save. What was withheld is in the note, which the
+ * parser now writes for exactly this case, so it is one click away.
+ */
+function clipLabel(label: string): string {
+  if (labelWidth(label) <= LABEL_MAX_W) return label
+  // The ellipsis has to fit inside the budget too, or a clipped label would be
+  // wider than an unclipped one at the limit.
+  const budget = LABEL_MAX_W - labelWidth("…")
+  let total = 0
+  let kept = ""
+  for (const character of label) {
+    total += labelWidth(character)
+    if (total > budget) break
+    kept += character
+  }
+  return `${kept}…`
+}
+
+/**
  * How much room the node claims in its column.
  *
  * Includes space for the caret and the folded count even while neither is on
@@ -394,8 +434,9 @@ export function MindMap({
         claimWidth(
           // What the node will draw, not what the markdown wrote. An emphasised
           // label's asterisks are not on screen, so sizing by them pads the
-          // column with room for characters that never appear.
-          plainInline(node.label),
+          // column with room for characters that never appear -- and neither are
+          // the words past the clip, which is what bounds the column at all.
+          clipLabel(plainInline(node.label)),
           children.has(node.id),
           Boolean(node.note || node.image),
           Boolean(onRename) && node.line !== undefined,
@@ -530,13 +571,17 @@ export function MindMap({
           // The line stops at the label. The claim runs further, and the caret
           // and count live in that difference -- past the ink, before the
           // branch leaves.
-          // Computed once and used for the text, the underline and every
-          // accessible name, so that what is drawn, what is measured and what is
-          // read aloud cannot drift apart. `node.label` stays the source text --
-          // the rename editor seeds from it, and writing these words back would
-          // delete the author's emphasis from the document.
-          const shown = plainInline(node.label)
-          const ink = lineWidth(shown)
+          // Two readings of one label, and the split is deliberate. `spoken` is
+          // every word, because a screen reader has no canvas to run out of.
+          // `drawn` is what fits, and is the single source for the text, the
+          // underline and the column width, so those three cannot drift apart.
+          //
+          // Neither is `node.label`, which stays the source text: the rename
+          // editor seeds from it, and writing either of these back would delete
+          // the author's emphasis or truncate their sentence in the document.
+          const spoken = plainInline(node.label)
+          const drawn = clipLabel(spoken)
+          const ink = lineWidth(drawn)
           const baseline = pos.y + BASELINE
           return (
             <g
@@ -544,7 +589,7 @@ export function MindMap({
               role="treeitem"
               // The label alone names the node; the caret and the count are
               // decoration and would otherwise be read out as part of it.
-              aria-label={shown}
+              aria-label={spoken}
               aria-level={(depth.get(node.id) ?? 0) + 1}
               aria-expanded={foldable ? !folded : undefined}
               tabIndex={0}
@@ -575,7 +620,7 @@ export function MindMap({
                 fill={tone.text}
                 fontWeight={node.node_type === "root" ? 600 : undefined}
               >
-                {shown}
+                {drawn}
               </text>
               <line
                 x1={pos.x}
@@ -615,7 +660,7 @@ export function MindMap({
                   role="button"
                   // Named for the node, because a map of forty nodes read aloud
                   // as forty identical "展开笔记" buttons names nothing.
-                  aria-label={`${notedId === node.id ? "收起" : "展开"}${carriedLabel(node)}：${shown}`}
+                  aria-label={`${notedId === node.id ? "收起" : "展开"}${carriedLabel(node)}：${spoken}`}
                   aria-expanded={notedId === node.id}
                   tabIndex={0}
                   style={{ cursor: "pointer" }}
@@ -662,7 +707,7 @@ export function MindMap({
                   role="button"
                   // Named for the node, like the note marker: forty identical
                   // "重命名" buttons name nothing to anyone reading the map aloud.
-                  aria-label={`重命名：${shown}`}
+                  aria-label={`重命名：${spoken}`}
                   tabIndex={0}
                   style={{ cursor: "text" }}
                   onClick={(event) => {

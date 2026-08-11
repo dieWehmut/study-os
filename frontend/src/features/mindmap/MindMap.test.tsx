@@ -643,6 +643,57 @@ describe("MindMap", () => {
     expect(screen.getByRole("textbox", { name: "节点标题" })).toHaveValue("**内核**")
   })
 
+  const runOn = "满幅橙红底色四周留出约三到四个百分点宽的边让中央白卡像贴在红纸上的卡片一样"
+
+  it("clips a label too long to draw, and says so with an ellipsis", () => {
+    // The widest label in sample/distill draws 2280px wide. Every descendant
+    // column starts from the widest node in the one before, so one run-on bullet
+    // pushes its entire branch off the canvas. The ellipsis is the honest part:
+    // it marks that words were withheld rather than that the author stopped.
+    render(<MindMap data={{ title: "T", nodes: [{ id: "n0", label: runOn }] }} />)
+
+    expect(screen.queryByText(runOn)).not.toBeInTheDocument()
+    expect(screen.getByText(/…$/)).toBeInTheDocument()
+  })
+
+  it("still reads the whole label out, because clipping is visual and not semantic", () => {
+    // A screen reader has no canvas to run out of. Putting the clipped words in
+    // the accessible name would hide from it what a sighted reader recovers by
+    // opening the note.
+    render(<MindMap data={{ title: "T", nodes: [{ id: "n0", label: runOn }] }} />)
+
+    expect(screen.getByRole("treeitem", { name: runOn })).toBeInTheDocument()
+  })
+
+  it("bounds a clipped label's column instead of letting it push the branch out", () => {
+    const once = render(<MindMap data={{ title: "T", nodes: [{ id: "n0", label: runOn }] }} />)
+    const clipped = right(runOn)
+    once.unmount()
+
+    const twice = `${runOn}${runOn}`
+    render(<MindMap data={{ title: "T", nodes: [{ id: "n0", label: twice }] }} />)
+
+    expect(right(twice)).toBe(clipped)
+  })
+
+  it("seeds a rename from the full label, not from the clipped drawing", () => {
+    // Same rule the emphasis case follows: the editor writes its contents back to
+    // the markdown line, so seeding it with the clipped words would truncate the
+    // author's sentence in the document on the first save.
+    const long = {
+      title: "T",
+      nodes: [
+        { id: "n0", label: "T", line: 0 },
+        { id: "n1", label: runOn, parent_id: "n0", line: 1 },
+      ],
+    }
+    render(<MindMap data={long} onRename={() => {}} />)
+
+    fireEvent.click(screen.getByRole("button", { name: `重命名：${runOn}` }))
+
+    expect(screen.getByRole("textbox", { name: "节点标题" })).toHaveValue(runOn)
+  })
+
   it("exports mermaid text with edges", () => {
     const mermaid = toMermaid({
       title: "运动学",

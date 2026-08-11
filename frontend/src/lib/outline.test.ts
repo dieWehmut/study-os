@@ -302,6 +302,24 @@ describe("markdown outline parser", () => {
       const root = parseOutline(`- ${long}`)
 
       expect(root.children[0].title).toBe(long)
+    })
+
+    it("carries an unsplittable long item as prose too, so all of it stays readable", () => {
+      // The title keeps every word because a rename writes it back, but 2280px of
+      // it cannot be drawn -- one such label pushes its whole branch off the
+      // canvas. The map clips what it draws, so the body is what makes the rest
+      // reachable: the sentence it was abbreviated from is one click away.
+      const long = "满幅橙红底色四周留出约三到四个百分点宽的边让中央白卡像贴在红纸上的卡片一样"
+      const root = parseOutline(`- ${long}`)
+
+      expect(root.children[0].body).toEqual([long])
+    })
+
+    it("leaves a short item with no note to open", () => {
+      // The clip never bites here, so a note would only repeat the label and put
+      // a 笔记 marker on every bullet in the document.
+      const root = parseOutline("- 序列必须有序")
+
       expect(root.children[0].body).toEqual([])
     })
 
@@ -337,6 +355,27 @@ describe("markdown outline parser", () => {
 
       expect(root.children[0].title).toBe("梳子形")
       expect(root.children[0].children.map((child) => child.title)).toEqual(["公式行"])
+    })
+  })
+
+  describe("long headings", () => {
+    it("carries an over-long heading as prose, so the clipped tail stays reachable", () => {
+      // 88 headings in sample/distill outrun what the map can draw, and a heading
+      // is the one node whose words the reader needs most -- it names everything
+      // indented under it. The note fallback list items already have has to cover
+      // headings too, or the map clips a section title into nonsense with nothing
+      // to open.
+      const long = "一、P01（卡片25）方法页：组合卡：4个步骤实现文转图 —— 核心算法源头"
+      const root = parseOutline(`## ${long}`)
+
+      expect(root.children[0].title).toBe(long)
+      expect(root.children[0].body).toEqual([long])
+    })
+
+    it("leaves a heading that fits with no note to open", () => {
+      const root = parseOutline("## 结构")
+
+      expect(root.children[0].body).toEqual([])
     })
   })
 })

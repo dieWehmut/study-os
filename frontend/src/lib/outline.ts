@@ -180,6 +180,22 @@ function emptyNode(title: string, depth: number, kind: OutlineKind, line: number
 }
 
 /**
+ * Keep the whole line reachable on a node whose label will be clipped.
+ *
+ * The title always holds every word -- a rename writes it back to the document,
+ * so shortening it there would delete the author's sentence. But the map draws
+ * one line and cannot render 2280px of it, so for anything past the budget the
+ * body is what makes the withheld tail readable: the 笔记 marker appears and the
+ * full text is one click away.
+ *
+ * Only past the budget. Below it nothing is clipped, and a note repeating the
+ * label would put a marker on every node in the document, marking nothing.
+ */
+function carryFullText(node: OutlineNode, text: string): void {
+  if ([...text].length > nameBudget) node.body.push(text)
+}
+
+/**
  * Re-parents to the nearest still-open ancestor rather than the exact parent
  * level. Hand-written study material skips levels constantly (h1 straight to
  * h3); treating that as malformed would drop whole sections.
@@ -254,7 +270,12 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
         headingDepth = depth
         continue
       }
-      appendAt(stack, emptyNode(title, depth, "heading", index))
+      const section = emptyNode(title, depth, "heading", index)
+      // A heading is the node whose words the reader needs most -- it names
+      // everything indented under it -- and unlike a list item it is never split
+      // on its colon, because a section's name is authored, not derived.
+      carryFullText(section, title)
+      appendAt(stack, section)
       headingDepth = depth
       continue
     }
@@ -267,9 +288,13 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
       // goes in the body, where the note panel draws it, rather than into the
       // label -- 2449 items in the sample corpus run past 40 characters, and a
       // map carrying whole paragraphs is the document again in a worse shape.
-      const { title, note } = splitLongItem(item[3].trim())
+      const source = item[3].trim()
+      const { title, note } = splitLongItem(source)
       const node = emptyNode(title, itemDepth, "item", index)
+      // With a subject, the note is the explanation after it. Without one there
+      // is nothing to split on, so the whole line is what gets carried.
       if (note) node.body.push(note)
+      else carryFullText(node, source)
       appendAt(stack, node)
       continue
     }
