@@ -1,4 +1,4 @@
-import { headingPattern, isTableDelimiter, listPattern, splitTableRow } from "./outline"
+import { headingPattern, isTableDelimiter, listPattern, splitLongItem, splitTableRow } from "./outline"
 
 /**
  * Editing a mindmap, by editing the markdown it was drawn from.
@@ -46,7 +46,13 @@ export function renameOutlineLine(markdown: string, line: number, title: string)
     // parser reads depth from, so losing it reparents the node being renamed,
     // and an ordered list rewritten as `-` renumbers nothing but loses its
     // ordering.
-    lines[line] = `${item[1]}${item[2]} ${trimmed}`
+    const { note } = splitLongItem(item[3].trim())
+    // What the reader edited was the label, not the line. A long item's
+    // explanation rides in the note and never entered the editor, so writing
+    // the new label over the whole line would delete a sentence the reader
+    // never saw -- the rename keeps the tail and lands beside it.
+    const tail = note ? `：${note}` : ""
+    lines[line] = `${item[1]}${item[2]} ${trimmed}${tail}`
     return lines.join("\n")
   }
 

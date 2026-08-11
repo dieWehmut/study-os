@@ -125,6 +125,56 @@ interface OpenNode {
   depth: number
 }
 
+/**
+ * How many characters still read as a name rather than as a sentence.
+ *
+ * A label is drawn on one line and every descendant column is pushed right by
+ * its full width, so a paragraph in a box does not merely look wrong -- it
+ * shoves the rest of the branch off the canvas. 24 is about a headline.
+ */
+const nameBudget = 24
+
+/**
+ * A colon inside running prose, told apart from a field name before one.
+ *
+ * A subject is a fragment. Something that ends a sentence appearing before the
+ * colon means the colon belongs to the prose -- 「…写完了一整句话。然后它继续解释：」
+ * is one thought, not a label. ASCII `.` `!` `?` are deliberately absent: here
+ * they are decimals, version numbers and `render(shell?)` far more often than
+ * they are punctuation.
+ */
+const sentenceEnd = /[。！？；;]/
+
+/**
+ * Split `主题：说明` into the name and what is said under it.
+ *
+ * 1688 of the 3657 list items in sample/distill are written this way, so the
+ * colon is the author's own mark for where the name ends -- read, not guessed.
+ * It is the same reading `parseOutline` already gives a table row, whose first
+ * cell names the node and whose remaining cells become its prose.
+ *
+ * Only when the item is over budget. Splitting a label that already fits hides
+ * half of it behind a click and buys nothing: 「接口：render(kernel)」 is one thing
+ * to read, not a heading with a note. And only when a subject is actually there
+ * -- with no colon, cutting at a character count would invent a heading the
+ * document never had, so a long label is left long. Better long than wrong.
+ */
+export function splitLongItem(text: string): { title: string; note?: string } {
+  if ([...text].length <= nameBudget) return { title: text }
+
+  const mark = text.search(/[：:]/)
+  if (mark <= 0) return { title: text }
+
+  const subject = text.slice(0, mark).trim()
+  const rest = text.slice(mark + 1).trim()
+  // A URL's scheme is not a field name. `//` is what tells `https://x` apart
+  // from 「见：x」, and nothing else puts it right after the colon.
+  if (!subject || !rest || rest.startsWith("//")) return { title: text }
+  if ([...subject].length > nameBudget || sentenceEnd.test(subject)) return { title: text }
+
+  return { title: subject, note: rest }
+}
+
 function emptyNode(title: string, depth: number, kind: OutlineKind, line: number): OutlineNode {
   return { id: "", title, kind, depth, line, body: [], children: [] }
 }
@@ -213,7 +263,14 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
     if (item) {
       const indent = item[1].replace(/\t/g, " ".repeat(indentWidth)).length
       const itemDepth = headingDepth + 1 + Math.floor(indent / indentWidth)
-      appendAt(stack, emptyNode(item[3].trim(), itemDepth, "item", index))
+      // A long item is a name and an explanation on one line. The explanation
+      // goes in the body, where the note panel draws it, rather than into the
+      // label -- 2449 items in the sample corpus run past 40 characters, and a
+      // map carrying whole paragraphs is the document again in a worse shape.
+      const { title, note } = splitLongItem(item[3].trim())
+      const node = emptyNode(title, itemDepth, "item", index)
+      if (note) node.body.push(note)
+      appendAt(stack, node)
       continue
     }
 

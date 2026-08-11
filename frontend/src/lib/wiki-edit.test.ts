@@ -39,6 +39,26 @@ describe("renameOutlineLine", () => {
     )
   })
 
+  it("renames a split item's subject and keeps the explanation it carries", () => {
+    // A long 「主题：说明」 item draws as the subject alone, with the explanation in
+    // the note. So the rename is handed only the subject, and the words after the
+    // colon are the author's prose -- writing the label over the whole line would
+    // silently delete a sentence the reader never saw in the editor.
+    const source = ["## 结构", "- 轨道式：多实体加强弱排序与动态反馈，主体横行居中关系弧上下环绕"].join("\n")
+
+    expect(renameOutlineLine(source, 1, "环绕式")).toBe(
+      ["## 结构", "- 环绕式：多实体加强弱排序与动态反馈，主体横行居中关系弧上下环绕"].join("\n"),
+    )
+  })
+
+  it("rewrites a short item whole, since that is all the map drew", () => {
+    // The mirror case. 「接口：render()」 fits, so the map drew the colon too and
+    // the reader edited the whole thing -- keeping the old tail would append it.
+    const source = ["- 接口：render(kernel)"].join("\n")
+
+    expect(renameOutlineLine(source, 0, "入口：main()")).toBe("- 入口：main()")
+  })
+
   it("refuses a line that is not a heading or a list item", () => {
     // Prose carries no title, so there is nothing on it a rename could mean.
     // Rewriting it anyway would replace a whole sentence with a node label.

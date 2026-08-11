@@ -268,4 +268,75 @@ describe("markdown outline parser", () => {
       expect(root.children[1].line).toBe(4)
     })
   })
+
+  describe("long list items", () => {
+    it("names a node by the item's subject and carries the rest as prose", () => {
+      // 1688 of the 3657 list items in sample/distill are written this way, and
+      // 2449 run past 40 characters. Drawn whole they are paragraphs in boxes --
+      // the one thing mindmap.ts:63 says the map must not become.
+      const root = parseOutline(
+        "- 轨道式：多实体加强弱排序与动态反馈，主体横行居中，关系弧上下环绕共享节点",
+      )
+
+      expect(root.children[0].title).toBe("轨道式")
+      expect(root.children[0].body).toEqual([
+        "多实体加强弱排序与动态反馈，主体横行居中，关系弧上下环绕共享节点",
+      ])
+    })
+
+    it("leaves a short item whole, colon and all", () => {
+      // A label is not improved by being shortened -- it is improved by fitting.
+      // 「接口：render()」 already reads as one thing, and splitting it would hide
+      // half of a label that was never too long behind a click.
+      const root = parseOutline("- 接口：render(kernel)")
+
+      expect(root.children[0].title).toBe("接口：render(kernel)")
+      expect(root.children[0].body).toEqual([])
+    })
+
+    it("does not split a long item that has no subject to name it by", () => {
+      // Better a long label than a wrong one. With no colon there is no author's
+      // mark saying where the name ends, and cutting at a character count would
+      // invent a heading the document does not have.
+      const long = "满幅橙红底色四周留出约三到四个百分点宽的边让中央白卡像贴在红纸上的卡片一样"
+      const root = parseOutline(`- ${long}`)
+
+      expect(root.children[0].title).toBe(long)
+      expect(root.children[0].body).toEqual([])
+    })
+
+    it("keeps a sentence's own punctuation out of the subject", () => {
+      // A colon inside running prose is punctuation, not a field name. The clue
+      // is a full stop before it: a subject is a fragment, never two sentences.
+      const line = "这条很长的说明写完了一整句话。然后它继续解释：后面还有更多的内容要说明清楚"
+      const root = parseOutline(`- ${line}`)
+
+      expect(root.children[0].title).toBe(line)
+    })
+
+    it("renames on the source line, which still holds the whole item", () => {
+      // The split is a reading of the line, not a rewrite of it. The node still
+      // points at the one line both halves were written on, so the editor keeps
+      // addressing real source.
+      const root = parseOutline(
+        ["## 结构", "- 沙漏式：原料到转化再到产物，中轴自上而下，上宽中窄下分叉"].join("\n"),
+      )
+
+      expect(root.children[0].children[0].line).toBe(1)
+    })
+
+    it("nests children under the subject, not under the prose", () => {
+      // The elaboration rides on the node (0807:15); it must not come between a
+      // node and what the author indented beneath it.
+      const root = parseOutline(
+        [
+          "- 梳子形：方法等于多个并列要件各有定义与案例，一横多纵，列头共享节点",
+          "  - 公式行",
+        ].join("\n"),
+      )
+
+      expect(root.children[0].title).toBe("梳子形")
+      expect(root.children[0].children.map((child) => child.title)).toEqual(["公式行"])
+    })
+  })
 })
