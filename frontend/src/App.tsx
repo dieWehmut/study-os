@@ -12,6 +12,9 @@ import Integrate from "@/pages/Integrate"
 import Practice from "@/pages/Practice"
 import Reading from "@/pages/Reading"
 import Settings from "@/pages/Settings"
+import EnglishArticleNew from "@/pages/EnglishArticleNew"
+import EnglishArticles from "@/pages/EnglishArticles"
+import EnglishArticleDetail from "@/pages/EnglishArticleDetail"
 
 export default function App() {
   useEffect(() => {
@@ -31,6 +34,9 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/knowledge" element={<Knowledge />} />
         <Route path="/reading" element={<Reading />} />
+        <Route path="/reading/articles" element={<EnglishArticles />} />
+        <Route path="/reading/articles/new" element={<EnglishArticleNew />} />
+        <Route path="/reading/articles/:id" element={<EnglishArticleDetail />} />
         <Route path="/import" element={<Import />} />
         <Route path="/memory" element={<Memory />} />
         <Route path="/integrate" element={<Integrate />} />

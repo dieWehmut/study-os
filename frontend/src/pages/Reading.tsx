@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { Archive, CircleHelp, Library, MessagesSquare, Network, ScanText, Shapes, Trash2 } from "lucide-react"
+import { Archive, BookOpenText, CircleHelp, Library, MessagesSquare, Network, ScanText, Shapes, Trash2 } from "lucide-react"
 
 import { dumpThought } from "@/api/chat"
 import { scheduleKnowledge } from "@/api/knowledge"
@@ -186,6 +186,22 @@ export default function Reading() {
         <ScanText aria-hidden="true" className="size-4 text-primary" />
         <h1 className="font-heading text-2xl font-semibold tracking-tight">阅读</h1>
       </div>
+
+      <nav aria-label="reading modes" className="flex flex-wrap gap-2 border-b border-border pb-3">
+        <Link
+          to="/reading"
+          aria-current="page"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
+        >
+          <ScanText aria-hidden="true" className="size-4" />逐节阅读
+        </Link>
+        <Link
+          to="/reading/articles"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted"
+        >
+          <BookOpenText aria-hidden="true" className="size-4 text-primary" />英语时文
+        </Link>
+      </nav>
 
       <Card>
         <CardHeader className="gap-1.5">
