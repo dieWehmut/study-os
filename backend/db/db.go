@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 10
+const currentSchemaVersion = 11
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -321,6 +321,30 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 			CREATE INDEX IF NOT EXISTS voice_roles_order_idx ON voice_roles(sort_order, created_at)`); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", version, err)
 		}
+	case 11:
+		if _, err := tx.ExecContext(ctx, `
+			CREATE TABLE IF NOT EXISTS english_articles (
+				id TEXT PRIMARY KEY,
+				title TEXT NOT NULL,
+				original_title TEXT NOT NULL DEFAULT '',
+				author TEXT NOT NULL DEFAULT '',
+				source_name TEXT NOT NULL DEFAULT '',
+				source_url TEXT NOT NULL DEFAULT '',
+				published_at TEXT NOT NULL DEFAULT '',
+				original_text TEXT NOT NULL,
+				content_json TEXT NOT NULL DEFAULT '{}',
+				markdown TEXT NOT NULL,
+				provider TEXT NOT NULL DEFAULT '',
+				model TEXT NOT NULL DEFAULT '',
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			CREATE INDEX IF NOT EXISTS english_articles_updated_idx ON english_articles(updated_at DESC)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -367,6 +391,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 	case 10:
 		if !hasTable(ctx, tx, "voice_roles") {
 			return errors.New("schema version 10 is recorded but voice_roles is missing")
+		}
+	case 11:
+		if !hasTable(ctx, tx, "english_articles") {
+			return errors.New("schema version 11 is recorded but english_articles is missing")
 		}
 	}
 	return nil

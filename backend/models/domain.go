@@ -164,6 +164,26 @@ type IntegratedNote struct {
 	CreatedAt   time.Time       `json:"created_at"`
 }
 
+// EnglishArticle is a generated bilingual reading article. The list endpoint
+// returns the same type with the large content fields left empty so callers
+// can render a compact library without loading every article body.
+type EnglishArticle struct {
+	ID            string          `json:"id"`
+	Title         string          `json:"title"`
+	OriginalTitle string          `json:"original_title,omitempty"`
+	Author        string          `json:"author,omitempty"`
+	SourceName    string          `json:"source_name,omitempty"`
+	SourceURL     string          `json:"source_url,omitempty"`
+	PublishedAt   string          `json:"published_at,omitempty"`
+	OriginalText  string          `json:"original_text,omitempty"`
+	ContentJSON   json.RawMessage `json:"content,omitempty"`
+	Markdown      string          `json:"markdown,omitempty"`
+	Provider      string          `json:"provider,omitempty"`
+	Model         string          `json:"model,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
 type ChatAttachment struct {
 	ID         string    `json:"id"`
 	SessionID  string    `json:"session_id,omitempty"`

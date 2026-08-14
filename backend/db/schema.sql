@@ -239,3 +239,21 @@ CREATE TABLE voice_roles (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX voice_roles_order_idx ON voice_roles(sort_order, created_at);
+
+CREATE TABLE english_articles (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    original_title TEXT NOT NULL DEFAULT '',
+    author TEXT NOT NULL DEFAULT '',
+    source_name TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    published_at TEXT NOT NULL DEFAULT '',
+    original_text TEXT NOT NULL,
+    content_json TEXT NOT NULL DEFAULT '{}',
+    markdown TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX english_articles_updated_idx ON english_articles(updated_at DESC);
