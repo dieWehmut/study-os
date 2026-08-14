@@ -41,7 +41,9 @@ describe("EnglishArticleBody", () => {
 
     expect(screen.getByRole("heading", { name: /Opening/ })).toBeInTheDocument()
     expect(screen.getByText("市场迅速变化。")).toBeInTheDocument()
-    expect(screen.getByText("shifted quickly").tagName).toBe("U")
+    const emphasized = screen.getByText("shifted quickly")
+    expect(emphasized.tagName).toBe("U")
+    expect(emphasized.closest("strong")).not.toBeNull()
   })
 
   it("renders vocabulary with PDF data attributes and pronunciation controls", () => {
@@ -51,7 +53,12 @@ describe("EnglishArticleBody", () => {
     const entry = screen.getByTestId("vocabulary-entry-shifted")
     expect(entry).toHaveAttribute("data-vocabulary-entry")
     expect(entry.querySelector("[data-vocabulary-term]")).toHaveTextContent("shifted")
-    expect(entry.querySelector("[data-vocabulary-pronunciation]")).toHaveTextContent("[ʃɪft]")
+    const pronunciationLines = entry.querySelectorAll("[data-vocabulary-pronunciation]")
+    expect(pronunciationLines).toHaveLength(2)
+    expect(pronunciationLines[0]).toHaveTextContent(/^英 /)
+    expect(pronunciationLines[0]).toHaveTextContent("[ʃɪft]")
+    expect(pronunciationLines[1]).toHaveTextContent(/^美 /)
+    expect(pronunciationLines[1]).toHaveTextContent("[ʃɪft]")
     fireEvent.click(screen.getByRole("button", { name: /朗读 shifted/ }))
     expect(onSpeak).toHaveBeenCalledWith("shifted")
   })

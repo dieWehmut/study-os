@@ -9,9 +9,11 @@ interface EnglishArticleBodyProps {
   onSpeak?: (text: string) => void
 }
 
-function pronunciation(entry: EnglishArticleVocabulary): string {
-  const values = [entry.british_phonetic, entry.american_phonetic].filter(Boolean)
-  return values.length > 1 ? `英 ${values[0]} / 美 ${values[1]}` : values[0] ?? ""
+function pronunciations(entry: EnglishArticleVocabulary): Array<{ label: string; value: string }> {
+  return [
+    entry.british_phonetic ? { label: "英", value: entry.british_phonetic } : null,
+    entry.american_phonetic ? { label: "美", value: entry.american_phonetic } : null,
+  ].filter((value): value is { label: string; value: string } => value !== null)
 }
 
 function EnglishParagraph({
@@ -25,9 +27,11 @@ function EnglishParagraph({
     <div className="grid gap-2">
       <blockquote className="border-l-2 border-primary/45 bg-primary/5 px-4 py-3 leading-8 text-foreground">
         {segments.map((segment, index) => segment.emphasized ? (
-          <u key={index} className="decoration-2 underline decoration-foreground underline-offset-4">
-            {segment.text}
-          </u>
+          <strong key={index}>
+            <u className="decoration-2 underline decoration-foreground underline-offset-4">
+              {segment.text}
+            </u>
+          </strong>
         ) : <span key={index}>{segment.text}</span>)}
       </blockquote>
       <blockquote className="border-l-2 border-border px-4 py-2 leading-7 text-muted-foreground">
@@ -38,7 +42,7 @@ function EnglishParagraph({
 }
 
 function VocabularyEntry({ entry, onSpeak }: { entry: EnglishArticleVocabulary; onSpeak?: (text: string) => void }) {
-  const phonetic = pronunciation(entry)
+  const phonetic = pronunciations(entry)
   return (
     <div
       data-vocabulary-entry="true"
@@ -50,7 +54,13 @@ function VocabularyEntry({ entry, onSpeak }: { entry: EnglishArticleVocabulary; 
           <p data-vocabulary-term className="break-words font-heading text-base font-semibold text-accent-foreground">
             {entry.term}
           </p>
-          {phonetic ? <p data-vocabulary-pronunciation className="break-words text-xs text-muted-foreground">{phonetic}</p> : null}
+          {phonetic.length > 0 ? (
+            <div className="grid gap-0.5 text-xs text-muted-foreground">
+              {phonetic.map(({ label, value }) => (
+                <p key={label} data-vocabulary-pronunciation className="break-words">{label} {value}</p>
+              ))}
+            </div>
+          ) : null}
         </div>
         {onSpeak ? (
           <Button

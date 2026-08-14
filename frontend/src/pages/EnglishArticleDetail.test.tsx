@@ -109,6 +109,20 @@ describe("EnglishArticleDetail", () => {
     expect(screen.getByRole("toolbar")).toHaveAttribute("data-pdf-ignore")
   })
 
+  it("re-enables PDF export after a failed attempt so it can be retried", async () => {
+    mocks.exportArticlePdf
+      .mockRejectedValueOnce(new Error("download failed"))
+      .mockResolvedValueOnce(undefined)
+    renderDetail()
+    await screen.findByRole("heading", { name: "市场变化" })
+
+    fireEvent.click(screen.getByRole("button", { name: /导出 PDF/ }))
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/PDF 导出失败/))
+
+    fireEvent.click(screen.getByRole("button", { name: /导出 PDF/ }))
+    await waitFor(() => expect(mocks.exportArticlePdf).toHaveBeenCalledTimes(2))
+  })
+
   it("keeps the old article visible when regeneration fails", async () => {
     mocks.regenerateEnglishArticle.mockRejectedValue(new Error("offline"))
     renderDetail()

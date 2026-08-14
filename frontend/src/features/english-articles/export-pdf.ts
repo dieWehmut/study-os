@@ -18,6 +18,15 @@ type PdfMakeApi = {
 
 type PdfMakeModule = PdfMakeApi & { default?: PdfMakeApi }
 
+interface ArticleSectionReference {
+  id: string
+  title: string
+}
+
+interface PdfBuildContext {
+  sections: ArticleSectionReference[]
+}
+
 let pdfMakeReady: Promise<PdfMakeApi> | null = null
 
 export function sanitizeFilename(name: string): string {
@@ -142,7 +151,7 @@ function vocabularyToContent(element: Element): Content {
     "data-vocabulary-term",
     "data-vocabulary-word",
   )
-  const pronunciation = firstDataText(
+  const pronunciations = allDataTexts(
     element,
     "data-vocabulary-pronunciation",
     "data-vocabulary-phonetic",
@@ -165,10 +174,13 @@ function vocabularyToContent(element: Element): Content {
   const stack: Content[] = []
   const fallback = cleanText(element.textContent || "")
   if (term) stack.push({ text: term, bold: true, color: HEADING_COLOR })
-  if (pronunciation || definition) {
+  if (pronunciations.length > 0 || definition) {
     stack.push({
       columns: [
-        pronunciation ? { text: pronunciation, width: "auto", color: MUTED_COLOR } : "",
+        pronunciations.length > 0 ? {
+          stack: pronunciations.map((pronunciation) => ({ text: pronunciation, color: MUTED_COLOR })),
+          width: "auto",
+        } : "",
         definition ? { text: definition, width: "*", margin: [10, 0, 0, 0] } : "",
       ].filter(Boolean),
       columnGap: 6,
@@ -183,13 +195,13 @@ function vocabularyToContent(element: Element): Content {
   return { stack, style: "vocabulary" } as Content
 }
 
-function blockquoteToContent(element: Element): Content {
+function blockquoteToContent(element: Element, context: PdfBuildContext): Content {
   const blockTags = new Set(["article", "blockquote", "div", "h1", "h2", "h3", "ol", "p", "section", "ul"])
   const hasBlockChildren = Array.from(element.children).some((child) =>
     blockTags.has(child.tagName.toLowerCase()),
   )
   const blocks = hasBlockChildren
-    ? Array.from(element.children).flatMap(elementToBlocks)
+    ? Array.from(element.children).flatMap((child) => elementToBlocks(child, context))
     : [{ text: directInlineContent(element) } as Content]
   const fallback = cleanText(element.textContent || "")
   const stack = blocks.length ? blocks : fallback ? [{ text: fallback }] : []
@@ -208,7 +220,28 @@ function blockquoteToContent(element: Element): Content {
   } as Content
 }
 
-function elementToBlocks(element: Element): Content[] {
+function metadataToContent(element: Element): Content {
+  const values = Array.from(element.children)
+    .map(inlineContent)
+    .filter((value) => value !== "")
+  const text = values.length > 0
+    ? values.flatMap((value, index) => index === 0 ? [value] : [" · ", value])
+    : directInlineContent(element)
+  return { text, style: "metadata" } as Content
+}
+
+function articleHeaderToContent(element: Element, context: PdfBuildContext): Content {
+  const stack = Array.from(element.children).flatMap((child) => {
+    const tag = child.tagName.toLowerCase()
+    if (tag === "h1") return [{ text: directInlineContent(child), style: "h1" } as Content]
+    if (tag === "p") return [{ text: directInlineContent(child), style: "articleSubtitle" } as Content]
+    if (tag === "div") return [metadataToContent(child)]
+    return elementToBlocks(child, context)
+  })
+  return { stack, style: "articleHeader" } as Content
+}
+
+function elementToBlocks(element: Element, context: PdfBuildContext): Content[] {
   const tag = element.tagName.toLowerCase()
 
   if (element.matches("[data-vocabulary-entry]")) {
@@ -217,13 +250,23 @@ function elementToBlocks(element: Element): Content[] {
 
   switch (tag) {
     case "h1":
-    case "h2":
     case "h3":
       return [{ text: directInlineContent(element), style: tag }]
+    case "h2": {
+      const title = cleanText(element.textContent || "")
+      const id = `article-section-${context.sections.length + 1}`
+      context.sections.push({ id, title })
+      return [{
+        text: directInlineContent(element),
+        style: tag,
+        id,
+        tocItem: "article-toc",
+      } as Content]
+    }
     case "p":
       return [{ text: directInlineContent(element), style: "paragraph" }]
     case "blockquote":
-      return [blockquoteToContent(element)]
+      return [blockquoteToContent(element, context)]
     case "ul":
       return [{ ul: listItems(element), style: "list" }]
     case "ol":
@@ -246,10 +289,11 @@ function elementToBlocks(element: Element): Content[] {
         },
       ]
     case "div":
-    case "header":
     case "section":
     case "article":
-      return Array.from(element.children).flatMap(elementToBlocks)
+      return Array.from(element.children).flatMap((child) => elementToBlocks(child, context))
+    case "header":
+      return [articleHeaderToContent(element, context)]
     case "br":
       return []
     default: {
@@ -259,6 +303,25 @@ function elementToBlocks(element: Element): Content[] {
         : [{ text: content, style: "paragraph" }]
     }
   }
+}
+
+function tableOfContentsToContent(sections: ArticleSectionReference[]): Content | null {
+  if (sections.length === 0) return null
+  return {
+    stack: [
+      { text: "章节目录", style: "tocTitle" },
+      ...sections.map(({ id, title }) => ({
+        columns: [
+          { text: title, linkToDestination: id, width: "*" },
+          { pageReference: id, alignment: "right", width: "auto", color: MUTED_COLOR },
+        ],
+        columnGap: 12,
+        style: "tocEntry",
+      } as Content)),
+    ],
+    pageBreak: "before",
+    style: "tocDirectory",
+  } as Content
 }
 
 function cloneArticleRoot(root: HTMLElement): HTMLElement {
@@ -276,7 +339,10 @@ export function buildArticlePdfDefinition(
   title: string,
 ): TDocumentDefinitions {
   const clone = cloneArticleRoot(root)
-  const content = Array.from(clone.children).flatMap(elementToBlocks)
+  const context: PdfBuildContext = { sections: [] }
+  const content = Array.from(clone.children).flatMap((child) => elementToBlocks(child, context))
+  const tableOfContents = tableOfContentsToContent(context.sections)
+  if (tableOfContents) content.push(tableOfContents)
   const safeTitle = cleanText(title) || "English article"
 
   return {
@@ -294,6 +360,9 @@ export function buildArticlePdfDefinition(
       h1: { fontSize: 22, bold: true, color: HEADING_COLOR, margin: [0, 0, 0, 12] },
       h2: { fontSize: 16, bold: true, color: HEADING_COLOR, margin: [0, 18, 0, 8] },
       h3: { fontSize: 13, bold: true, color: HEADING_COLOR, margin: [0, 14, 0, 6] },
+      articleHeader: { margin: [0, 0, 0, 18] },
+      articleSubtitle: { fontSize: 13, color: MUTED_COLOR, margin: [0, 0, 0, 8] },
+      metadata: { fontSize: 9.5, color: MUTED_COLOR, margin: [0, 0, 0, 4] },
       paragraph: { fontSize: 10.8, lineHeight: 1.55, margin: [0, 4, 0, 5] },
       list: { fontSize: 10.8, lineHeight: 1.5, margin: [0, 4, 0, 8] },
       blockquote: { fontSize: 10.6, color: "#475569", margin: [0, 6, 0, 10] },
@@ -303,6 +372,9 @@ export function buildArticlePdfDefinition(
         background: "#f0fdfa",
         margin: [0, 5, 0, 8],
       },
+      tocDirectory: { margin: [0, 0, 0, 0] },
+      tocTitle: { fontSize: 18, bold: true, color: HEADING_COLOR, margin: [0, 0, 0, 14] },
+      tocEntry: { fontSize: 10.8, margin: [0, 4, 0, 4] },
     },
     header: () => ({
       columns: [

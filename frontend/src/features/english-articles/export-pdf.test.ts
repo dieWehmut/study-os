@@ -95,8 +95,31 @@ describe("buildArticlePdfDefinition", () => {
     const serialized = JSON.stringify(buildArticlePdfDefinition(root, "Improved reading"))
 
     expect(serialized).toContain('"text":"Improved reading","style":"h1"')
-    expect(serialized).toContain('"text":"Original reading","style":"paragraph"')
+    expect(serialized).toContain('"style":"articleHeader"')
+    expect(serialized).toContain('"style":"metadata"')
+    expect(serialized).toContain('"text":["A. Writer",')
     expect(serialized).toContain('"link":"https://example.test/article"')
+  })
+
+  it("adds a trailing h2-only directory with page references", () => {
+    const root = createArticle(`
+      <h1>Improved reading</h1>
+      <h2>Opening</h2>
+      <h3>Not in directory</h3>
+      <p>First section.</p>
+      <h2>Closing</h2>
+    `)
+
+    const definition = buildArticlePdfDefinition(root, "Improved reading")
+    const content = definition.content as unknown as Array<Record<string, unknown>>
+    const serialized = JSON.stringify(definition)
+
+    expect(content.at(-1)).toMatchObject({ pageBreak: "before" })
+    expect(serialized).toContain('"style":"tocDirectory"')
+    expect(serialized).toContain('"tocItem":"article-toc"')
+    expect(serialized).toContain('"pageReference":"article-section-1"')
+    expect(serialized).toContain('"pageReference":"article-section-2"')
+    expect(serialized).not.toContain('"pageReference":"article-section-3"')
   })
 
   it("renders vocabulary data attributes as a readable entry", () => {
@@ -137,6 +160,8 @@ describe("buildArticlePdfDefinition", () => {
             }],
             vocabulary: [{
               term: "closely",
+              british_phonetic: "/ˈkləʊsli/",
+              american_phonetic: "/ˈkloʊsli/",
               definition: "仔细地",
               usage: "修饰阅读动作",
               examples: ["Read closely.", "Listen closely."],
@@ -151,9 +176,12 @@ describe("buildArticlePdfDefinition", () => {
     const serialized = JSON.stringify(definition)
 
     expect(serialized).toContain('"text":["Read ",{"text":"closely","decoration":"underline"')
+    expect(serialized).toContain('"text":["Read ",{"text":"closely","decoration":"underline","decorationColor":"#1f2937","bold":true}')
     expect(serialized).toContain("修饰阅读动作")
     expect(serialized).toContain("Read closely.")
     expect(serialized).toContain("Listen closely.")
+    expect(serialized).toContain("英 ")
+    expect(serialized).toContain("美 ")
   })
 
   it("retries PDF initialization after a transient font load failure", async () => {
