@@ -105,6 +105,25 @@ func TestNormalizeArticleRejectsContentThatDoesNotMatchTheSource(t *testing.T) {
 	}
 }
 
+func TestNormalizeArticlePreservesWordBoundaries(t *testing.T) {
+	_, err := english.NormalizeArticle(
+		agent.EnglishArticleInput{OriginalText: "The data base is stable."},
+		agent.EnglishArticleOutput{
+			Title: "Reading",
+			Sections: []agent.EnglishArticleSection{{
+				Title: "Opening",
+				Paragraphs: []agent.EnglishArticleParagraph{{
+					Segments:    []agent.EnglishArticleSegment{{Text: "The database is stable."}},
+					Translation: "涓€涓湁鏁堢殑缈昏銆?",
+				}},
+			}},
+		},
+	)
+	if err == nil {
+		t.Fatal("normalization accepted a changed word boundary")
+	}
+}
+
 func TestNormalizeArticleRejectsUnsafeSourceURLs(t *testing.T) {
 	_, err := english.NormalizeArticle(
 		agent.EnglishArticleInput{OriginalText: "Read closely.", SourceURL: "javascript:alert(1)"},

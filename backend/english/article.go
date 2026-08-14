@@ -6,7 +6,6 @@ import (
 	"html"
 	"net/url"
 	"strings"
-	"unicode"
 
 	"study-os/backend/agent"
 )
@@ -98,7 +97,7 @@ func NormalizeArticle(input agent.EnglishArticleInput, output agent.EnglishArtic
 		}
 		content.Sections = append(content.Sections, normalized)
 	}
-	if sourceArticleText(content) != stripWhitespace(input.OriginalText) {
+	if cleanSpace(sourceArticleText(content)) != cleanSpace(input.OriginalText) {
 		return ArticleContent{}, articleError("English article paragraphs must preserve the complete original text")
 	}
 	if content.Metadata.SourceURL != "" {
@@ -112,23 +111,19 @@ func NormalizeArticle(input agent.EnglishArticleInput, output agent.EnglishArtic
 
 func sourceArticleText(content ArticleContent) string {
 	var builder strings.Builder
+	paragraphCount := 0
 	for _, section := range content.Sections {
 		for _, paragraph := range section.Paragraphs {
+			if paragraphCount > 0 {
+				builder.WriteByte(' ')
+			}
 			for _, segment := range paragraph.Segments {
 				builder.WriteString(segment.Text)
 			}
+			paragraphCount++
 		}
 	}
-	return stripWhitespace(builder.String())
-}
-
-func stripWhitespace(value string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, value)
+	return builder.String()
 }
 
 func normalizeMetadata(input agent.EnglishArticleInput, generated agent.EnglishArticleMetadata) agent.EnglishArticleMetadata {
