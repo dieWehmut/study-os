@@ -133,6 +133,24 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/english/wiki", func(response http.ResponseWriter, request *http.Request) {
 			handleEnglishWiki(response, request, application)
 		})
+		api.Get("/english/articles", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishArticleList(response, request, application)
+		})
+		api.Post("/english/articles/generate", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishArticleGenerate(response, request, application)
+		})
+		api.Post("/english/articles", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishArticleCreate(response, request, application)
+		})
+		api.Get("/english/articles/{articleID}", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishArticleGet(response, request, application)
+		})
+		api.Post("/english/articles/{articleID}/regenerate", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishArticleRegenerate(response, request, application)
+		})
+		api.Delete("/english/articles/{articleID}", func(response http.ResponseWriter, request *http.Request) {
+			handleEnglishArticleDelete(response, request, application)
+		})
 		api.Post("/demo/seed", func(response http.ResponseWriter, request *http.Request) {
 			handleDemoSeed(response, request, application)
 		})

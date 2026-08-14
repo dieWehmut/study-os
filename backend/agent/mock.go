@@ -48,6 +48,8 @@ func (p *MockProvider) Generate(ctx context.Context, request Request) (Response,
 		return p.compare(*request.Compare), nil
 	case KindIntegrate:
 		return p.integrate(*request.Integrate), nil
+	case KindEnglishArticle:
+		return p.englishArticle(*request.EnglishArticle), nil
 	default:
 		// Validate currently makes this unreachable; retaining a classified error
 		// protects callers if new kinds are added without an implementation.
@@ -409,6 +411,75 @@ func (p *MockProvider) integrate(input IntegrateInput) Response {
 			Cards: cards,
 		},
 	}
+}
+
+func (p *MockProvider) englishArticle(input EnglishArticleInput) Response {
+	paragraphs := sentences(strings.TrimSpace(input.OriginalText))
+	if len(paragraphs) == 0 {
+		paragraphs = []string{strings.TrimSpace(input.OriginalText)}
+	}
+	title := strings.TrimSpace(input.OriginalTitle)
+	if strings.TrimSpace(input.Title) != "" {
+		title = strings.TrimSpace(input.Title)
+	}
+	if title == "" {
+		title = "English Reading Notes"
+	}
+	sectionCount := min(2, len(paragraphs))
+	sections := make([]EnglishArticleSection, 0, sectionCount)
+	for index := 0; index < sectionCount; index++ {
+		start := index * len(paragraphs) / sectionCount
+		end := (index + 1) * len(paragraphs) / sectionCount
+		sectionParagraphs := make([]EnglishArticleParagraph, 0, end-start)
+		vocabulary := []EnglishArticleVocabulary{}
+		for _, sourceParagraph := range paragraphs[start:end] {
+			text := strings.TrimSpace(sourceParagraph)
+			sectionParagraphs = append(sectionParagraphs, EnglishArticleParagraph{
+				Segments: mockArticleSegments(text), Translation: "这是对应英文段落的离线示例翻译。",
+			})
+			if term := firstLearningWord(text); term != "" {
+				vocabulary = append(vocabulary, EnglishArticleVocabulary{
+					Term: term, PartOfSpeech: "word", Definition: "离线示例释义",
+					Usage: "在上下文中理解并复述这个词。", Examples: []string{text},
+				})
+			}
+		}
+		sections = append(sections, EnglishArticleSection{
+			Title:      fmt.Sprintf("%d. Reading focus", index+1),
+			Paragraphs: sectionParagraphs,
+			Vocabulary: vocabulary,
+		})
+	}
+	return Response{Kind: KindEnglishArticle, EnglishArticle: &EnglishArticleOutput{
+		Title: title,
+		Metadata: EnglishArticleMetadata{
+			OriginalTitle: strings.TrimSpace(input.OriginalTitle), Author: strings.TrimSpace(input.Author),
+			SourceName: strings.TrimSpace(input.SourceName), SourceURL: strings.TrimSpace(input.SourceURL), PublishedAt: strings.TrimSpace(input.PublishedAt),
+		},
+		Sections: sections,
+	}}
+}
+
+func mockArticleSegments(text string) []EnglishArticleSegment {
+	fields := strings.Fields(text)
+	if len(fields) < 2 {
+		return []EnglishArticleSegment{{Text: text, Emphasized: true}}
+	}
+	first := fields[0]
+	remainderIndex := strings.Index(text, first) + len(first)
+	return []EnglishArticleSegment{
+		{Text: text[:remainderIndex] + " ", Emphasized: true},
+		{Text: strings.TrimLeft(text[remainderIndex:], " ")},
+	}
+}
+
+func firstLearningWord(text string) string {
+	for _, field := range strings.FieldsFunc(text, func(r rune) bool { return !unicode.IsLetter(r) && r != '\'' }) {
+		if len([]rune(field)) >= 5 {
+			return strings.ToLower(field)
+		}
+	}
+	return ""
 }
 
 func truncateRunes(value string, limit int) string {

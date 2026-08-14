@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -90,9 +91,31 @@ func decodeProviderOutput(kind Kind, content string) (Response, error) {
 			return Response{}, fmt.Errorf("model returned an invalid integration")
 		}
 		return Response{Kind: kind, Integrate: &output}, nil
+	case KindEnglishArticle:
+		var output EnglishArticleOutput
+		if err := decodeStrictJSON(content, &output); err != nil || strings.TrimSpace(output.Title) == "" || len(output.Sections) == 0 {
+			return Response{}, fmt.Errorf("model returned an invalid English article")
+		}
+		return Response{Kind: kind, EnglishArticle: &output}, nil
 	default:
 		return Response{}, NewProviderError(ErrorPermanent, "unsupported provider request kind")
 	}
+}
+
+func decodeStrictJSON(content string, target any) error {
+	decoder := json.NewDecoder(strings.NewReader(content))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("JSON must contain one value")
+		}
+		return err
+	}
+	return nil
 }
 
 func systemPromptFor(kind Kind) string {
@@ -132,6 +155,11 @@ func systemPromptFor(kind Kind) string {
 	case KindIntegrate:
 		return base + " 你负责把资料整理成「导图 + 卡片」。输出字段：mindmap（{title, nodes:[{id,label,parent_id,node_type}]}）、cards（数组，每项 {id,card_type,title,body,tags}）。" +
 			"质量规则：每个节点 label 不超过 20 字；一张卡片只讲一个主题，body 用 2-4 个短句；层级不超过 3 层；node_type 取值 root/branch/leaf/conclusion/trap（二级结论用 conclusion，易错信号用 trap）。"
+	case KindEnglishArticle:
+		return "You create a faithful bilingual English-study article for Study OS. Return exactly one JSON object with fields title, metadata, and sections. " +
+			"metadata contains original_title, author, source_name, source_url, and published_at. Each section contains title, paragraphs, and vocabulary. " +
+			"Each paragraph contains segments (objects with text and emphasized) and translation. Each vocabulary item contains term, british_phonetic, american_phonetic, part_of_speech, definition, usage, and examples. " +
+			"Preserve source facts, argument order, and complete English meaning. Every translation must be faithful natural Chinese. Emphasize only useful learning phrases, and every emphasized segment must be copied verbatim from its English paragraph. Output strict JSON only, with no Markdown fences, HTML, commentary, or extra text."
 	default:
 		return base
 	}
@@ -180,6 +208,10 @@ func userPromptFor(request Request) string {
 	case KindIntegrate:
 		input := request.Integrate
 		return fmt.Sprintf("subject=%q\ntitle=%q\nmax_cards=%d\ntext=%q", input.Subject, input.Title, input.MaxCards, input.Text)
+	case KindEnglishArticle:
+		input := request.EnglishArticle
+		encoded, _ := json.Marshal(input)
+		return "User-supplied source and metadata (explicit metadata must take precedence over inferred values):\n" + string(encoded)
 	default:
 		return "unknown request"
 	}

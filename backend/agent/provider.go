@@ -38,6 +38,7 @@ const (
 	KindChat                Kind = "chat"
 	KindCompare             Kind = "compare"
 	KindIntegrate           Kind = "integrate"
+	KindEnglishArticle      Kind = "english_article"
 )
 
 // Options carries per-request provider hints. Empty values mean the provider
@@ -52,19 +53,20 @@ type Options struct {
 // This keeps persisted jobs inspectable and gives a future provider a stable
 // compatibility contract.
 type Request struct {
-	Kind      Kind            `json:"kind"`
-	Options   Options         `json:"options,omitempty"`
-	Knowledge *KnowledgeInput `json:"knowledge,omitempty"`
-	Feedback  *FeedbackInput  `json:"feedback,omitempty"`
-	Summary   *SummaryInput   `json:"summary,omitempty"`
-	WordWiki  *WordWikiInput  `json:"word_wiki,omitempty"`
-	Sentence  *SentenceInput  `json:"sentence,omitempty"`
-	FreeText  *FreeTextInput  `json:"free_text,omitempty"`
-	Extract   *ExtractInput   `json:"extract,omitempty"`
-	Compress  *CompressInput  `json:"compress,omitempty"`
-	Chat      *ChatInput      `json:"chat,omitempty"`
-	Compare   *CompareInput   `json:"compare,omitempty"`
-	Integrate *IntegrateInput `json:"integrate,omitempty"`
+	Kind           Kind                 `json:"kind"`
+	Options        Options              `json:"options,omitempty"`
+	Knowledge      *KnowledgeInput      `json:"knowledge,omitempty"`
+	Feedback       *FeedbackInput       `json:"feedback,omitempty"`
+	Summary        *SummaryInput        `json:"summary,omitempty"`
+	WordWiki       *WordWikiInput       `json:"word_wiki,omitempty"`
+	Sentence       *SentenceInput       `json:"sentence,omitempty"`
+	FreeText       *FreeTextInput       `json:"free_text,omitempty"`
+	Extract        *ExtractInput        `json:"extract,omitempty"`
+	Compress       *CompressInput       `json:"compress,omitempty"`
+	Chat           *ChatInput           `json:"chat,omitempty"`
+	Compare        *CompareInput        `json:"compare,omitempty"`
+	Integrate      *IntegrateInput      `json:"integrate,omitempty"`
+	EnglishArticle *EnglishArticleInput `json:"english_article,omitempty"`
 }
 
 type KnowledgeInput struct {
@@ -155,6 +157,19 @@ type IntegrateInput struct {
 	MaxCards int    `json:"max_cards,omitempty"`
 }
 
+// EnglishArticleInput contains the user-authored source and optional factual
+// metadata. Providers may improve the presentation, but must not overwrite
+// metadata that the user supplied.
+type EnglishArticleInput struct {
+	OriginalText  string `json:"original_text"`
+	Title         string `json:"title,omitempty"`
+	OriginalTitle string `json:"original_title,omitempty"`
+	Author        string `json:"author,omitempty"`
+	SourceName    string `json:"source_name,omitempty"`
+	SourceURL     string `json:"source_url,omitempty"`
+	PublishedAt   string `json:"published_at,omitempty"`
+}
+
 // Response contains exactly one operation-specific output for a successful
 // request. The pointers make malformed mixed responses detectable by callers.
 type Response struct {
@@ -169,6 +184,7 @@ type Response struct {
 	Chat           *ChatOutput           `json:"chat,omitempty"`
 	Compare        *CompareOutput        `json:"compare,omitempty"`
 	Integrate      *IntegrateOutput      `json:"integrate,omitempty"`
+	EnglishArticle *EnglishArticleOutput `json:"english_article,omitempty"`
 }
 
 type MemoryQuestionOutput struct {
@@ -306,6 +322,52 @@ type IntegrateOutput struct {
 	Cards []CardOutput  `json:"cards"`
 }
 
+// EnglishArticleOutput is the provider's structured bilingual reading
+// article. The service layer validates and turns it into canonical Markdown.
+type EnglishArticleOutput struct {
+	Title    string                  `json:"title"`
+	Metadata EnglishArticleMetadata  `json:"metadata"`
+	Sections []EnglishArticleSection `json:"sections"`
+}
+
+// EnglishArticleContent is kept as a semantic alias for callers that treat
+// the provider result as the article content persisted by the service.
+type EnglishArticleContent = EnglishArticleOutput
+
+type EnglishArticleMetadata struct {
+	OriginalTitle string `json:"original_title,omitempty"`
+	Author        string `json:"author,omitempty"`
+	SourceName    string `json:"source_name,omitempty"`
+	SourceURL     string `json:"source_url,omitempty"`
+	PublishedAt   string `json:"published_at,omitempty"`
+}
+
+type EnglishArticleSection struct {
+	Title      string                     `json:"title"`
+	Paragraphs []EnglishArticleParagraph  `json:"paragraphs"`
+	Vocabulary []EnglishArticleVocabulary `json:"vocabulary,omitempty"`
+}
+
+type EnglishArticleParagraph struct {
+	Segments    []EnglishArticleSegment `json:"segments"`
+	Translation string                  `json:"translation"`
+}
+
+type EnglishArticleSegment struct {
+	Text       string `json:"text"`
+	Emphasized bool   `json:"emphasized,omitempty"`
+}
+
+type EnglishArticleVocabulary struct {
+	Term             string   `json:"term"`
+	BritishPhonetic  string   `json:"british_phonetic,omitempty"`
+	AmericanPhonetic string   `json:"american_phonetic,omitempty"`
+	PartOfSpeech     string   `json:"part_of_speech,omitempty"`
+	Definition       string   `json:"definition"`
+	Usage            string   `json:"usage,omitempty"`
+	Examples         []string `json:"examples,omitempty"`
+}
+
 // Validate checks the operation/payload pairing before a provider is called.
 // Invalid user data is permanent: retrying it cannot make it valid.
 func (r Request) Validate() error {
@@ -353,6 +415,10 @@ func (r Request) Validate() error {
 	case KindIntegrate:
 		if r.Integrate == nil || strings.TrimSpace(r.Integrate.Text) == "" {
 			return NewProviderError(ErrorPermanent, "integrate requires text")
+		}
+	case KindEnglishArticle:
+		if r.EnglishArticle == nil || strings.TrimSpace(r.EnglishArticle.OriginalText) == "" {
+			return NewProviderError(ErrorPermanent, "English article generation requires original text")
 		}
 	default:
 		return NewProviderError(ErrorPermanent, "unsupported provider request kind")
