@@ -16,6 +16,7 @@ dist-ssr
 *.db-shm
 *.db-wal
 data/
+*.png
 docs/
 backend.exe
 *.exe~
