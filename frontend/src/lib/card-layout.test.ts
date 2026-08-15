@@ -42,6 +42,16 @@ const radialWide = [
   "- 暗反应：在叶绿体基质中进行",
   "- 产物：糖类和氧气",
 ].join("\n")
+/** Three levels below the fork, which is what a grid cannot draw. */
+const tree = [
+  "## 词类",
+  "- 实词",
+  "  - 名词",
+  "    - 专有名词",
+  "  - 动词",
+  "- 虚词",
+  "  - 介词",
+].join("\n")
 
 describe("card layout", () => {
   it("draws one shape per block", () => {
@@ -49,13 +59,13 @@ describe("card layout", () => {
   })
 
   it("keeps every shape inside the frame", () => {
-    for (const source of [list, steps, cycle, radial]) {
+    for (const source of [list, steps, cycle, radial, tree]) {
       expect(inside(frameOf(source))).toBe(true)
     }
   })
 
   it("never overlaps two shapes", () => {
-    for (const source of [list, steps, cycle, radial]) {
+    for (const source of [list, steps, cycle, radial, tree]) {
       const { shapes } = frameOf(source)
       for (let a = 0; a < shapes.length; a += 1) {
         for (let b = a + 1; b < shapes.length; b += 1) {
@@ -119,7 +129,7 @@ describe("card layout", () => {
     // 盒子画在线之上（图里本该如此），所以连到盒心的线，箭头尖就埋在
     // 目标盒子底下。循环的箭头正是它跟一圈普通连线的唯一区别 ——
     // 埋掉了，方向那一半信息就没了，而画面上看不出少了什么。
-    for (const source of [list, steps, cycle, radial]) {
+    for (const source of [list, steps, cycle, radial, tree]) {
       const { shapes, links } = frameOf(source)
       for (const link of links) {
         for (const shape of shapes) {
@@ -146,6 +156,47 @@ describe("card layout", () => {
     expect(frame.shapes).toHaveLength(4)
     expect(frame.links).toHaveLength(3)
     expect(frame.links.every((link) => !link.arrow)).toBe(true)
+  })
+
+  it("gives a 层级 grandchild a box of its own", () => {
+    // 网格把子节点画成 `· 名词` 一行，把孙节点画成什么都没有 —— 语料 72 篇里
+    // 62 篇嵌到这么深，23716 行字从没上过图，而画面看起来是完整的。
+    // 两个一级 + 三个二级 + 一个三级 = 六个盒子。
+    expect(frameOf(tree).shapes).toHaveLength(6)
+  })
+
+  it("draws no arrows for 层级", () => {
+    // structures.md §1.3：层级不加箭头 —— 加了会被读成步骤。等级靠位置和
+    // 嵌套深度编码，那是它跟流程的全部区别。
+    expect(frameOf(tree).links.filter((link) => link.arrow)).toHaveLength(0)
+  })
+
+  it("joins every parent to its children, leftward to rightward", () => {
+    // 树的几何就是这一条：子节点在父节点右边一列。四条边 ——
+    // 实词→名词、实词→动词、名词→专有名词、虚词→介词。
+    const { links } = frameOf(tree)
+
+    expect(links).toHaveLength(4)
+    expect(links.every((link) => link.x1 < link.x2)).toBe(true)
+  })
+
+  it("folds a fourth level into bullets rather than drawing a column too narrow to read", () => {
+    // 子层框宽约父层一半（structures.md §2-16 树状），三级之后就是 85px ——
+    // 14px 的正文放得下六个字。深度必须有上限，而落回的正是网格一直在做的
+    // 那件事：写成 `· 标题`。丢的是一层，不是一整棵树。
+    const deeper = [
+      "## 词类",
+      "- 实词",
+      "  - 名词",
+      "    - 专有名词",
+      "      - 人名",
+      "  - 动词",
+      "- 虚词",
+      "  - 介词",
+    ].join("\n")
+
+    expect(frameOf(deeper).shapes).toHaveLength(6)
+    expect(frameOf(deeper).texts.some((text) => text.text.includes("人名"))).toBe(true)
   })
 
   it("is at least as wide as two columns need", () => {

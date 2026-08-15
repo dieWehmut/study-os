@@ -94,6 +94,39 @@ const maxColumnWidth = maxLineCharacters * bodySize + boxPad * 2
  *  other box outward for no gain in readability. */
 const maxRingBoxWidth = 260
 
+/**
+ * How many levels of a hierarchy get boxes of their own.
+ *
+ * Three, which is §2-16 树状's 三级钻取, and the shrink is why it cannot be more:
+ * it caps each column at about half the one before (「子层框宽约父层 0.5」), so the
+ * ceilings run 504 / 277 / 152px and a fourth would be 84 -- six CJK characters
+ * at 14px, before the 28px of padding. Past that the column is narrower than the
+ * words in it.
+ *
+ * A **ceiling**, not a width: a column is sized to what it holds, and takes the
+ * cap only when its content would overrun it. So the ladder usually does not
+ * fire, and the columns can even widen going right -- the 词类 card in the
+ * browser draws 62px of 实词/虚词 beside 210px of children, because a two
+ * character title next to a definition is genuinely the smaller thing. Do not
+ * inflate the parent to restore the ratio; that draws a 385px box around two
+ * characters and reads as a bug. Rank is carried by which column a box is in and
+ * by the links fanning rightward out of it, both of which stay right when the
+ * areas inverted.
+ *
+ * The bound here is on depth; the bound on *how many* boxes a tree may stack
+ * lives in `card-structure.fitsInATree`, because it decides whether to draw a
+ * tree at all. Two bounds rather than one because they answer different
+ * failures: too deep is a column narrower than its words, too many is a card
+ * 10575px tall. Neither implies the other -- 23 boxes three levels deep hits the
+ * second without coming near the first.
+ *
+ * Anything below the third level folds into bullets, which is exactly what the
+ * grid does with every child today. So the fallback is a known quantity: one
+ * level drawn as names instead of boxes, not a tree that gives up.
+ */
+const treeLevels = 3
+const treeShrink = 0.55
+
 function lineHeight(size: number): number {
   return size + lineGap
 }
@@ -374,6 +407,155 @@ function layoutRing(blocks: Block[], centre: Block | null, arrows: boolean): Fra
 }
 
 /**
+ * The same block with its children taken off.
+ *
+ * `blockLines` writes a child in as a `· 标题` bullet, which is right when the
+ * child has nowhere else to be. In a tree it has a box, so measuring and
+ * painting the parent from the whole block would print every child twice -- once
+ * as a bullet and once beside it. Handing the shared helpers a childless copy
+ * keeps them unaware there are two ways to draw a child, which is what lets the
+ * fold at the deepest level be the ordinary path rather than a special case.
+ */
+function trunk(block: Block): Block {
+  return { ...block, children: [] }
+}
+
+/** One column width per drawn level, narrowing as the levels get finer. */
+function treeColumns(blocks: Block[]): number[] {
+  const widths: number[] = []
+  let level = blocks
+  for (let depth = 0; depth < treeLevels && level.length > 0; depth += 1) {
+    const folded = depth + 1 === treeLevels
+    const natural = Math.max(...level.map((block) => naturalWidth(folded ? block : trunk(block))))
+    widths.push(Math.min(natural, maxColumnWidth * treeShrink ** depth))
+    level = level.flatMap((block) => block.children)
+  }
+  return widths
+}
+
+interface Placed {
+  shapes: Shape[]
+  texts: CardText[]
+  links: Link[]
+  /** The subtree's own box, which its parent links to. */
+  root: Shape
+  /** How much vertical room the subtree took, starting from the top it was given. */
+  height: number
+}
+
+function shiftDown(placed: Placed, dy: number): void {
+  for (const shape of placed.shapes) shape.y += dy
+  for (const text of placed.texts) text.y += dy
+  for (const link of placed.links) {
+    link.y1 += dy
+    link.y2 += dy
+  }
+}
+
+/**
+ * One block and everything under it, laid out in the columns to its right.
+ *
+ * Children are placed before the parent, because the parent's y depends on where
+ * they ended up: a node sits centred against its children's span, which is what
+ * makes a tree read as a tree rather than as a staircase. When the parent is the
+ * taller of the two the centring runs the other way and the children move down
+ * -- hence `shiftDown` rather than a y computed in one pass.
+ */
+function placeTree(block: Block, level: number, xs: number[], widths: number[], top: number): Placed {
+  const width = widths[level]
+  const drawChildren = level + 1 < widths.length && block.children.length > 0
+  // Below the last drawn column the children have no box, so they stay in the
+  // text as bullets -- the grid's behaviour, kept as the bounded fallback.
+  const body = drawChildren ? trunk(block) : block
+  const ownHeight = blockHeight(body, width)
+
+  if (!drawChildren) {
+    const shape: Shape = { id: block.id, x: xs[level], y: top, w: width, h: ownHeight, role: "block" }
+    const texts: CardText[] = []
+    paint(body, shape, texts)
+    return { shapes: [shape], texts, links: [], root: shape, height: ownHeight }
+  }
+
+  const kids: Placed[] = []
+  let cursor = top
+  for (const child of block.children) {
+    const placed = placeTree(child, level + 1, xs, widths, cursor)
+    kids.push(placed)
+    cursor += placed.height + gap
+  }
+  const span = cursor - gap - top
+  const height = Math.max(ownHeight, span)
+
+  const shapes: Shape[] = []
+  const texts: CardText[] = []
+  const links: Link[] = []
+  const shape: Shape = {
+    id: block.id,
+    x: xs[level],
+    y: top + (height - ownHeight) / 2,
+    w: width,
+    h: ownHeight,
+    role: "block",
+  }
+  shapes.push(shape)
+  paint(body, shape, texts)
+  for (const kid of kids) {
+    shiftDown(kid, (height - span) / 2)
+    shapes.push(...kid.shapes)
+    texts.push(...kid.texts)
+    links.push(...kid.links)
+    // Joined after the shift, so the link is drawn from where the box landed.
+    links.push(join(shape, kid.root, false))
+  }
+  return { shapes, texts, links, root: shape, height }
+}
+
+/**
+ * 层级: a left-to-right tree, and no arrows anywhere.
+ *
+ * The no-arrows part is the whole distinction from 流程 (`structures.md` §1.3:
+ * 层级 encodes rank by 位置 and 嵌套深度, and 「层级加箭头会被读成步骤」). So rank
+ * here is carried entirely by which column a box is in, which is why the columns
+ * narrow: a reader has to be able to tell level 2 from level 1 without reading
+ * either of them.
+ */
+function layoutTree(blocks: Block[]): Frame {
+  const widths = treeColumns(blocks)
+  const xs: number[] = []
+  let right = pad
+  for (const width of widths) {
+    xs.push(right)
+    right += width + gap
+  }
+
+  const shapes: Shape[] = []
+  const texts: CardText[] = []
+  const links: Link[] = []
+  let top = pad
+  for (const block of blocks) {
+    const placed = placeTree(block, 0, xs, widths, top)
+    shapes.push(...placed.shapes)
+    texts.push(...placed.texts)
+    links.push(...placed.links)
+    top += placed.height + gap
+  }
+
+  const drawnRight = Math.max(...shapes.map((shape) => shape.x + shape.w))
+  const w = Math.max(minWidth, drawnRight + pad)
+  // Centred when `minWidth` wins, for the same reason the ring is: slack piled
+  // on one side reads as a drawing pushed off to the left, not as a floor.
+  const dx = (w - (drawnRight - pad)) / 2 - pad
+  for (const shape of shapes) shape.x += dx
+  for (const text of texts) text.x += dx
+  for (const link of links) {
+    link.x1 += dx
+    link.x2 += dx
+  }
+
+  return { w, h: top - gap + pad, shapes, texts, links }
+}
+
+/**
  * @param blocks the card's top-level units
  * @param structure what `classify` read them as
  * @param centre the prose written above them -- becomes 发散's hub
@@ -381,6 +563,7 @@ function layoutRing(blocks: Block[], centre: Block | null, arrows: boolean): Fra
 export function layoutCard(blocks: Block[], structure: Structure, centre: string[]): Frame {
   if (blocks.length === 0) return { w: minWidth, h: 0, shapes: [], texts: [], links: [] }
 
+  if (structure === "层级") return layoutTree(blocks)
   if (structure === "循环") return layoutRing(blocks, null, true)
   if (structure === "发散") {
     const hub: Block = {
