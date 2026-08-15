@@ -44,7 +44,7 @@ export default defineConfig({
       env: {
         STUDY_OS_DATA_DIR: e2eDataDir,
         STUDY_OS_LISTEN_ADDRESS: `127.0.0.1:${backendPort}`,
-        AI_PROVIDER: "mock",
+        AI_ACTIVE_PROVIDER: "mock",
       },
     },
     {
