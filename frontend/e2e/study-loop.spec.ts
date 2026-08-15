@@ -46,7 +46,13 @@ async function questionText(page: Page): Promise<string> {
 }
 
 async function currentProgress(page: Page): Promise<number> {
-  const progress = page.locator("main").getByText(/^1 \/ \d+$/)
+  // The page also shows today's aggregate progress. Scope this assertion to
+  // the active review session, whose question heading is the stable anchor.
+  const session = page
+    .locator("main section")
+    .filter({ has: page.getByRole("heading", { level: 2 }) })
+    .last()
+  const progress = session.getByText(/^1 \/ \d+$/)
   await expect(progress).toBeVisible()
   const count = Number((await progress.textContent())?.split("/")[1]?.trim())
   expect(Number.isFinite(count)).toBe(true)
