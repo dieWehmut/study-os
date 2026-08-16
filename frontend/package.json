@@ -9,6 +9,7 @@
     "e2e": "playwright test",
     "lint": "eslint .",
     "test": "vitest",
+    "vocabulary:build": "node ../scripts/build-vocabulary-lexicon.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
