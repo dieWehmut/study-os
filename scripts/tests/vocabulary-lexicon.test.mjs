@@ -23,6 +23,8 @@ test("extracts word wiki-link aliases and ignores navigation links", () => {
     "[[thesaurus-group/00-index|Browse groups]]",
     "[[word-wiki/Last|  LAST  ]] \u00b7 [[word-wiki/at]]",
     "[[word-wiki/empty|   ]]",
+    "[[word-wiki/code|`code`]]",
+    "[[word-wiki/url|https://example.test/at]]",
   ].join(" ")
 
   assert.deepEqual(extractEntries(markdown, "word"), [
@@ -57,6 +59,7 @@ test("deduplicates terms and gives expressions priority over words", () => {
     { normalized: "at last", display: "At Last", kind: "expression" },
     { normalized: "AT", display: "at", kind: "word" },
     { normalized: "at", display: "at", kind: "expression" },
+    { normalized: "", display: "fallback", kind: "word" },
   ])
 
   assert.equal((output.match(/normalized: "at"/g) ?? []).length, 1)

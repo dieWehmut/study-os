@@ -48,7 +48,7 @@ function normalizeDisplay(value) {
 export function isValidTerm(value) {
   const normalized = normalizeTerm(value)
   if (!normalized || normalized.length > 240) return false
-  if (/[[\]{}<>\r\n]/u.test(normalized)) return false
+  if (/[[\]{}<>`*_\\\r\n]/u.test(normalized)) return false
   if ([...normalized].some((character) => /\p{C}/u.test(character))) return false
 
   const letters = [...normalized].filter((character) => LETTER.test(character))

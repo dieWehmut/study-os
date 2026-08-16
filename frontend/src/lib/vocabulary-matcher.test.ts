@@ -54,7 +54,7 @@ describe("createVocabularyMatcher", () => {
       { normalized: "caf", display: "caf", kind: "word" as const },
     ])
 
-    expect(match("café").every((token) => token.term === null)).toBe(true)
+    expect(match("caf\u00e9").every((token) => token.term === null)).toBe(true)
   })
 
   it("matches case-insensitively after NFKC normalization while preserving source text", () => {
