@@ -113,3 +113,21 @@ export function saveKnowledgeWiki(id: string, markdown: string): Promise<Knowled
     body: JSON.stringify({ detailed_markdown: markdown }),
   })
 }
+
+export interface VocabularyLookupInput {
+  term: string
+  context: string
+  kind: "word" | "expression"
+}
+
+export interface VocabularyLookupResponse {
+  source: "existing" | "generated"
+  item: KnowledgeItem
+}
+
+export function lookupVocabulary(input: VocabularyLookupInput): Promise<VocabularyLookupResponse> {
+  return apiRequest<VocabularyLookupResponse>("/knowledge/lookup", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
