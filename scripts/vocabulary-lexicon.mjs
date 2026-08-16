@@ -37,6 +37,10 @@ function normalizeDisplay(value) {
   return value.normalize("NFKC").trim().replace(/\s+/gu, " ")
 }
 
+function isLinkDestination(value) {
+  return /^[A-Za-z][A-Za-z\d+.-]*:\/\//u.test(value)
+}
+
 /**
  * English entries may contain punctuation used by the source notes (for
  * example `a.m.`, `one's`, or `(great/large)`), but must not contain CJK or
@@ -221,6 +225,7 @@ export function extractEntries(markdown, kind, options = {}) {
   for (const link of candidates) {
     const { target, label, hasAlias } = splitWikiLink(link.body)
     if (!target) continue
+    if (isLinkDestination(target)) continue
 
     let display = normalizeDisplay(hasAlias ? label : target)
     if (kind === "word") {
@@ -228,7 +233,7 @@ export function extractEntries(markdown, kind, options = {}) {
       if (!hasAlias) display = normalizeDisplay(target.slice(WORD_LINK_PREFIX.length).split("/").pop())
       if (hasAlias && !display) continue
     }
-    if (!display || !isValidTerm(display)) continue
+    if (!display || isLinkDestination(display) || !isValidTerm(display)) continue
 
     const normalized = normalizeTerm(display)
     if (!normalized || !isValidTerm(normalized)) continue
@@ -268,7 +273,8 @@ export function dedupeEntries(entries) {
     const kind = value.kind === "expression" ? "expression" : value.kind === "word" ? "word" : null
     if (!kind) continue
     const display = normalizeDisplay(value.display ?? value.normalized)
-    const normalized = normalizeTerm(value.normalized ?? display)
+    const normalizedSource = normalizeDisplay(value.normalized) || display
+    const normalized = normalizeTerm(normalizedSource)
     if (!display || !normalized || !isValidTerm(normalized)) continue
 
     const candidate = {

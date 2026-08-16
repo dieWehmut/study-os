@@ -63,6 +63,7 @@ test("deduplicates terms and gives expressions priority over words", () => {
   ])
 
   assert.equal((output.match(/normalized: "at"/g) ?? []).length, 1)
+  assert.match(output, /normalized: "fallback"/)
   assert.ok(output.indexOf('normalized: "at last"') < output.indexOf('normalized: "at"'))
   assert.match(output, /kind: "expression"/)
 })
