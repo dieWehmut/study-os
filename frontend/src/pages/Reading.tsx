@@ -6,10 +6,10 @@ import { dumpThought } from "@/api/chat"
 import { scheduleKnowledge } from "@/api/knowledge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
 import { VisualCard } from "@/features/card/VisualCard"
 import { MindMap } from "@/features/mindmap/MindMap"
 import { FocusReader } from "@/features/reading/FocusReader"
+import { MarkdownWorkspace } from "@/features/reading/MarkdownWorkspace"
 import { StructurePreview } from "@/features/reading/StructurePreview"
 import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
 import { chunkMarkdown } from "@/lib/chunk"
@@ -211,17 +211,14 @@ export default function Reading() {
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Textarea
-            aria-label="原文"
-            value={markdown}
-            onChange={(event) => {
+          <MarkdownWorkspace
+            markdown={markdown}
+            onMarkdownChange={(value) => {
               // A new document has a new set of stops; keeping the old position
               // would drop the reader somewhere arbitrary in it, and the old
               // marks would attach to stops nobody has read.
-              save({ ...emptyReadingSession, markdown: event.target.value })
+              save({ ...emptyReadingSession, markdown: value })
             }}
-            placeholder={"# 标题\n## 小节\n正文…"}
-            className="min-h-40 font-mono text-xs"
           />
           {map.nodes.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -339,7 +336,7 @@ export default function Reading() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,19rem)_1fr]">
         <Card>
           <CardHeader className="gap-1.5">
-            <CardTitle>结构</CardTitle>
+            <CardTitle><h2>结构</h2></CardTitle>
             <p className="text-sm text-muted-foreground">
               先看这一栏：有几站、多深、多重。
             </p>
@@ -359,7 +356,7 @@ export default function Reading() {
 
         <Card>
           <CardHeader className="gap-1.5">
-            <CardTitle>正文</CardTitle>
+            <CardTitle><h2>正文</h2></CardTitle>
             <p className="text-sm text-muted-foreground">
               一次只放一节，方向键翻页。看懂的可以收进知识库，之后会安排复习。
             </p>

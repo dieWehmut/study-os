@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import type { ReactElement } from "react"
+import { fireEvent, render as renderUI, screen, waitFor, within } from "@testing-library/react"
+import { MemoryRouter, useLocation } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Knowledge from "./Knowledge"
@@ -19,6 +21,20 @@ vi.mock("@/api/chat", () => ({
   compareKnowledge: mocks.compareKnowledge,
   updateKnowledgeTag: mocks.updateKnowledgeTag,
 }))
+
+function render(ui: ReactElement, initialEntries = ["/knowledge"]) {
+  return renderUI(
+    <MemoryRouter initialEntries={initialEntries}>
+      {ui}
+      <LocationProbe />
+    </MemoryRouter>,
+  )
+}
+
+function LocationProbe() {
+  const location = useLocation()
+  return <output aria-label="current location">{location.pathname}{location.search}</output>
+}
 
 describe("Knowledge page", () => {
   beforeEach(() => {
@@ -75,6 +91,72 @@ describe("Knowledge page", () => {
     fireEvent.click(screen.getByRole("tab", { name: "详细百科" }))
 
     expect(await screen.findByText("To leave something behind.")).toBeInTheDocument()
+  })
+
+  it("opens an item requested by the query even when the current list omits it", async () => {
+    mocks.listKnowledge.mockResolvedValueOnce({ count: 0, items: [] })
+    mocks.getKnowledge.mockResolvedValueOnce({
+      id: "k-complicated",
+      item_type: "word_wiki",
+      term: "complicated",
+      concise_definition: "complex",
+      detailed_markdown: "## Usage\n\nA complicated question.",
+    })
+
+    render(<Knowledge />, ["/knowledge?item=k-complicated"])
+
+    await waitFor(() => expect(mocks.getKnowledge).toHaveBeenCalledWith("k-complicated"))
+    expect(await screen.findByRole("heading", { name: "complicated" })).toBeInTheDocument()
+  })
+
+  it("reports a failed query-selected detail and retries it", async () => {
+    mocks.listKnowledge.mockResolvedValue({ count: 0, items: [] })
+    mocks.getKnowledge
+      .mockRejectedValueOnce(new Error("detail unavailable"))
+      .mockResolvedValueOnce({
+        id: "k-complicated",
+        item_type: "word_wiki",
+        term: "complicated",
+        concise_definition: "complex",
+      })
+
+    render(<Knowledge />, ["/knowledge?item=k-complicated"])
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("detail unavailable")
+    fireEvent.click(screen.getByRole("button", { name: "重试" }))
+    expect(await screen.findByRole("heading", { name: "complicated" })).toBeInTheDocument()
+    expect(mocks.getKnowledge).toHaveBeenCalledTimes(2)
+  })
+
+  it("keeps a query-selected detail visible when the surrounding list fails", async () => {
+    mocks.listKnowledge.mockRejectedValueOnce(new Error("list unavailable"))
+    mocks.getKnowledge.mockResolvedValueOnce({
+      id: "k-complicated",
+      item_type: "word_wiki",
+      term: "complicated",
+      concise_definition: "complex",
+    })
+
+    render(<Knowledge />, ["/knowledge?item=k-complicated"])
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("list unavailable")
+    expect(await screen.findByRole("heading", { name: "complicated" })).toBeInTheDocument()
+  })
+
+  it("updates the query when another knowledge item is selected", async () => {
+    mocks.listKnowledge.mockResolvedValueOnce({
+      count: 2,
+      items: [
+        { id: "k1", item_type: "word_sense", term: "alpha", concise_definition: "first" },
+        { id: "k2", item_type: "word_sense", term: "beta", concise_definition: "second" },
+      ],
+    })
+
+    render(<Knowledge />)
+    fireEvent.click(await screen.findByRole("button", { name: /beta/ }))
+
+    expect(await screen.findByLabelText("current location")).toHaveTextContent("/knowledge?item=k2")
+    expect(await screen.findByRole("heading", { name: "beta" })).toBeInTheDocument()
   })
 
   it("does not render raw HTML or unsafe Markdown links", async () => {

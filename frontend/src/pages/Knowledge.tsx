@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { GitCompareArrows, LibraryBig, RotateCcw, Search } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
 
 import { compareKnowledge } from "@/api/chat"
 import { getKnowledge, listGroups, listKnowledge, type KnowledgeGroup } from "@/api/knowledge"
@@ -16,6 +17,21 @@ import { insightTagsFor } from "@/lib/insights"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 export default function Knowledge() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedId = searchParams.get("item")
+  return (
+    <KnowledgePage
+      requestedId={requestedId}
+      onSelectId={(id) => {
+        const next = new URLSearchParams(searchParams)
+        next.set("item", id)
+        setSearchParams(next)
+      }}
+    />
+  )
+}
+
+function KnowledgePage({ requestedId, onSelectId }: { requestedId: string | null; onSelectId(id: string): void }) {
   const [query, setQuery] = useState("")
   const [groups, setGroups] = useState<KnowledgeGroup[]>([])
   const [group, setGroup] = useState("")
@@ -24,7 +40,7 @@ export default function Knowledge() {
   // on first paint instead of only after being pressed.
   const [scheduledIds, setScheduledIds] = useState<ReadonlySet<string>>(new Set())
   const [count, setCount] = useState(0)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [fallbackSelectedId, setFallbackSelectedId] = useState<string | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<KnowledgeItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -39,6 +55,7 @@ export default function Knowledge() {
   const [comparing, setComparing] = useState(false)
   const subject = useSubjectStore((state) => state.subject)
   const setSubject = useSubjectStore((state) => state.setSubject)
+  const selectedId = requestedId ?? fallbackSelectedId
 
   useEffect(() => {
     const controller = new AbortController()
@@ -57,7 +74,7 @@ export default function Knowledge() {
         setItems(result.items)
         setCount(result.count)
         setScheduledIds(new Set(result.scheduled_ids ?? []))
-        setSelectedId((current) =>
+        setFallbackSelectedId((current) =>
           current && result.items.some((item) => item.id === current) ? current : result.items[0]?.id ?? null,
         )
       })
@@ -104,18 +121,24 @@ export default function Knowledge() {
       .then((item) => {
         if (active) setSelectedDetail(item)
       })
-      .catch(() => {
-        // The summary remains usable when detail retrieval is unavailable.
+      .catch((reason: unknown) => {
+        if (!active || selectedSummary) return
+        setError(reason instanceof Error ? reason.message : "知识点详情暂时无法读取，请重试。")
       })
     return () => {
       active = false
     }
-  }, [selectedId, selectedSummary, selectedDetail])
+  }, [selectedId, selectedSummary, selectedDetail, requestVersion])
 
   function retry() {
     setLoading(true)
     setError("")
     setRequestVersion((value) => value + 1)
+  }
+
+  function selectItem(id: string) {
+    setError("")
+    onSelectId(id)
   }
 
   // Each subject sorts insights by its own three words, so a tag chosen under
@@ -289,21 +312,20 @@ export default function Knowledge() {
               <span>{error}</span>
               <Button variant="outline" size="sm" onClick={retry}><RotateCcw data-icon="inline-start" />重试</Button>
             </div>
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
-              <KnowledgeList items={items} selectedId={selectedId ?? undefined} loading={loading} onSelect={(item) => setSelectedId(item.id)} />
-              <WikiPanel
-                key={selected?.id ?? "none"}
-                item={selected}
-                scheduled={selected ? scheduledIds.has(selected.id) : false}
-                onUpdated={(updated) => {
-                  setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)))
-                  setSelectedDetail(updated)
-                }}
-                onSelectRelated={setSelectedId}
-              />
-            </div>
-          )}
+          ) : null}
+          <div className="grid gap-4 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
+            <KnowledgeList items={items} selectedId={selectedId ?? undefined} loading={loading} onSelect={(item) => selectItem(item.id)} />
+            <WikiPanel
+              key={selected?.id ?? "none"}
+              item={selected}
+              scheduled={selected ? scheduledIds.has(selected.id) : false}
+              onUpdated={(updated) => {
+                setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)))
+                setSelectedDetail(updated)
+              }}
+              onSelectRelated={selectItem}
+            />
+          </div>
         </CardContent>
       </Card>
     </section>

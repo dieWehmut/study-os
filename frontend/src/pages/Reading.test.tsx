@@ -31,6 +31,16 @@ describe("Reading page", () => {
     localStorage.clear()
   })
 
+  it("keeps one source editor beside a live preview and preserves the lower reader", () => {
+    renderReading()
+    paste("# Photosynthesis\n\nA complicated process.")
+
+    expect(screen.getByRole("region", { name: "Markdown \u5b9e\u65f6\u9884\u89c8" })).toHaveTextContent("A complicated process.")
+    expect(screen.getAllByLabelText("\u539f\u6587")).toHaveLength(1)
+    expect(screen.getByRole("heading", { name: "\u7ed3\u6784" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "\u6b63\u6587" })).toBeInTheDocument()
+  })
+
   it("moves you on once a stop is done, so the mark doubles as a page turn", () => {
     // Marking and then reaching for 下一节 is two actions for one intent.
     renderReading()

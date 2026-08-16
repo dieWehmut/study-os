@@ -16,8 +16,10 @@ describe("MarkdownWorkspace", () => {
 
   it("opens a vocabulary popover from the preview without replacing the source", async () => {
     render(<MarkdownWorkspace markdown="A complicated man." onMarkdownChange={vi.fn()} />)
-    fireEvent.click(await screen.findByRole("button", { name: "\u67e5\u8bcd complicated" }))
+    const termButton = await screen.findByRole("button", { name: "\u67e5\u8bcd complicated" })
+    fireEvent.click(termButton)
     expect(screen.getByRole("dialog")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "\u67e5\u8bcd complicated" })).toBe(termButton)
     expect(screen.getByLabelText("\u539f\u6587")).toHaveValue("A complicated man.")
   })
 })

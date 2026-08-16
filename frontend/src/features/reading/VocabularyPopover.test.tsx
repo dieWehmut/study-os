@@ -100,4 +100,27 @@ describe("VocabularyPopover", () => {
     fireEvent.keyDown(dialog, { key: "Escape" })
     expect(onClose).toHaveBeenCalled()
   })
+
+  it("grows upward within the viewport when the anchor is near the bottom", () => {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 400 })
+    const anchor = document.createElement("button")
+    vi.spyOn(anchor, "getBoundingClientRect").mockReturnValue({
+      x: 100,
+      y: 350,
+      top: 350,
+      right: 180,
+      bottom: 370,
+      left: 100,
+      width: 80,
+      height: 20,
+      toJSON: () => ({}),
+    })
+    lookup.mockReturnValue(new Promise(() => {}))
+
+    render(<VocabularyPopover selection={selection("bounded", anchor)} onClose={vi.fn()} />)
+
+    const dialog = screen.getByRole("dialog")
+    expect(dialog.style.bottom).toBe("62px")
+    expect((dialog.firstElementChild as HTMLElement).style.maxHeight).toBe("326px")
+  })
 })

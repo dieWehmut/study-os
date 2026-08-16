@@ -18,9 +18,13 @@ describe("MarkdownPreview", () => {
         onVocabularySelect={onSelect}
       />,
     )
-    expect(screen.getByRole("table")).toBeInTheDocument()
+    const table = screen.getByRole("table")
+    expect(table).toBeInTheDocument()
+    expect(table.parentElement).toHaveClass("max-w-full", "overflow-x-auto")
+    expect(screen.getByRole("heading", { level: 1, name: "Title" })).toHaveClass("text-2xl")
     const button = screen.getAllByRole("button", { name: "\u67e5\u8bcd complicated" }).at(-1)
     expect(button).toBeDefined()
+    expect(button).toHaveClass("underline")
     fireEvent.click(button!)
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
       term: "complicated",

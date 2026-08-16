@@ -35,19 +35,34 @@ function useNarrowViewport(): boolean {
   return narrow
 }
 
-function panelPosition(anchor: HTMLElement): { top: number; left: number } {
+interface PanelPosition {
+  left: number
+  top?: number
+  bottom?: number
+  maxHeight: number
+}
+
+function panelPosition(anchor: HTMLElement): PanelPosition {
   const rect = anchor.getBoundingClientRect()
   const gutter = 12
   const width = 360
   const viewportWidth = typeof window === "undefined" ? width + gutter * 2 : window.innerWidth
   const viewportHeight = typeof window === "undefined" ? 640 : window.innerHeight
   const left = Math.min(Math.max(gutter, rect.left), Math.max(gutter, viewportWidth - width - gutter))
-  const below = rect.bottom + gutter
-  const estimatedHeight = 300
-  const top = below + estimatedHeight <= viewportHeight - gutter
-    ? below
-    : Math.max(gutter, rect.top - estimatedHeight - gutter)
-  return { top, left }
+  const viewportBottom = Math.max(gutter, viewportHeight - gutter)
+  const belowTop = Math.min(Math.max(gutter, rect.bottom + gutter), viewportBottom)
+  const aboveBottom = Math.min(Math.max(gutter, rect.top - gutter), viewportBottom)
+  const belowHeight = Math.max(0, viewportBottom - belowTop)
+  const aboveHeight = Math.max(0, aboveBottom - gutter)
+
+  if (belowHeight >= 300 || belowHeight >= aboveHeight) {
+    return { top: belowTop, left, maxHeight: belowHeight }
+  }
+  return {
+    bottom: viewportHeight - aboveBottom,
+    left,
+    maxHeight: aboveHeight,
+  }
 }
 
 export interface VocabularyPopoverProps {
@@ -131,10 +146,11 @@ function VocabularyPopoverPanel({ selection, onClose }: VocabularyPopoverPanelPr
     }
   }, [narrow, onClose, selection.anchor])
 
-  const content = (
+  const content = (maxHeight?: number) => (
     <div
       tabIndex={-1}
       className="flex max-h-[min(32rem,calc(100vh-1.5rem))] flex-col gap-3 overflow-auto p-4"
+      style={maxHeight === undefined ? undefined : { maxHeight }}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose()
       }}
@@ -200,7 +216,7 @@ function VocabularyPopoverPanel({ selection, onClose }: VocabularyPopoverPanelPr
           className="inset-x-0 bottom-0 top-auto left-0 w-full max-w-none translate-x-0 translate-y-0 rounded-t-2xl rounded-b-none p-0"
           onKeyDown={(event) => { if (event.key === "Escape") onClose() }}
         >
-          {content}
+          {content()}
         </DialogContent>
       </Dialog>
     )
@@ -213,10 +229,10 @@ function VocabularyPopoverPanel({ selection, onClose }: VocabularyPopoverPanelPr
       aria-label={`\u67e5\u8bcd ${selection.display}`}
       tabIndex={-1}
       className="fixed z-50 w-[min(22.5rem,calc(100vw-1.5rem))] rounded-xl bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/10"
-      style={{ top: position.top, left: position.left }}
+      style={{ top: position.top, bottom: position.bottom, left: position.left }}
       onKeyDown={(event) => { if (event.key === "Escape") onClose() }}
     >
-      {content}
+      {content(position.maxHeight)}
     </div>
   )
 }
