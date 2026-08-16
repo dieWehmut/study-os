@@ -201,6 +201,33 @@ func TestRequestValidateCoversNewKinds(t *testing.T) {
 	}
 }
 
+func TestMockWordWikiAcceptsContextWithoutDefinition(t *testing.T) {
+	provider := agent.NewMockProvider()
+	request := agent.Request{Kind: agent.KindWordWiki, WordWiki: &agent.WordWikiInput{
+		Term: "complicated", Context: "Tell me about a complicated man.",
+	}}
+	if err := request.Validate(); err != nil {
+		t.Fatalf("context-only request should validate: %v", err)
+	}
+	response, err := provider.Generate(context.Background(), request)
+	if err != nil {
+		t.Fatalf("generate context-only wiki: %v", err)
+	}
+	if response.WordWiki == nil {
+		t.Fatalf("word wiki output = %#v", response)
+	}
+	if response.WordWiki.ConciseDefinition == "" || response.WordWiki.PartOfSpeech == "" || response.WordWiki.Example == "" {
+		t.Fatalf("contextual output lacks metadata: %#v", response.WordWiki)
+	}
+}
+
+func TestWordWikiStillRequiresDefinitionOrContext(t *testing.T) {
+	request := agent.Request{Kind: agent.KindWordWiki, WordWiki: &agent.WordWikiInput{Term: "complicated"}}
+	if err := request.Validate(); err == nil {
+		t.Fatal("empty definition and context should be rejected")
+	}
+}
+
 func containsTag(tags []string, wanted string) bool {
 	for _, tag := range tags {
 		if tag == wanted {

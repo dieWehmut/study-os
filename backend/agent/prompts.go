@@ -179,8 +179,8 @@ func userPromptFor(request Request) string {
 		return fmt.Sprintf("title=%q\nmax_key_points=%d\ntext=%q", input.Title, input.MaxKeyPoints, input.Text)
 	case KindWordWiki:
 		input := request.WordWiki
-		return fmt.Sprintf("term=%q\npart_of_speech=%q\ndefinition=%q\nexample=%q\nlevel=%q\ntags=%v\nsense_group=%q",
-			input.Term, input.PartOfSpeech, input.Definition, input.Example, input.Level, input.Tags, input.SenseGroup)
+		return fmt.Sprintf("term=%q\ncontext=%q\npart_of_speech=%q\ndefinition=%q\nexample=%q\nlevel=%q\ntags=%v\nsense_group=%q",
+			input.Term, input.Context, input.PartOfSpeech, input.Definition, input.Example, input.Level, input.Tags, input.SenseGroup)
 	case KindMakeSentence:
 		input := request.Sentence
 		return fmt.Sprintf("term=%q\ndefinition=%q\nexample=%q\nlevel=%q", input.Term, input.Definition, input.Example, input.Level)

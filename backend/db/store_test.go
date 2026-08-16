@@ -393,6 +393,34 @@ func TestUpdateKnowledgeItemPersistsWikiFields(t *testing.T) {
 	}
 }
 
+func TestFindKnowledgeItemByExactTermNormalizesCaseAndWhitespace(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	now := time.Now().UTC()
+	for _, item := range []models.KnowledgeItem{
+		{ID: "exact-abandon", ItemType: "word_wiki", Term: "abandon", Subject: "english", ConciseDefinition: "leave", CreatedAt: now, UpdatedAt: now},
+		{ID: "exact-abandoned", ItemType: "word_wiki", Term: "abandoned", Subject: "english", ConciseDefinition: "left", CreatedAt: now, UpdatedAt: now},
+	} {
+		if err := store.CreateKnowledgeItem(ctx, item); err != nil {
+			t.Fatalf("create %s: %v", item.ID, err)
+		}
+	}
+	found, err := store.FindKnowledgeItemByExactTerm(ctx, "  ABANDON  ", " ENGLISH ")
+	if err != nil {
+		t.Fatalf("find exact term: %v", err)
+	}
+	if found.ID != "exact-abandon" {
+		t.Fatalf("found = %#v", found)
+	}
+	if _, err := store.FindKnowledgeItemByExactTerm(ctx, "missing", "english"); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("missing error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestReconcileBackupRecordsCountsAllLiveFilesAndRemovesStaleMetadata(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()

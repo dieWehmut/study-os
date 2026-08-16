@@ -132,6 +132,21 @@ func (s *Store) GetKnowledgeItem(ctx context.Context, id string) (models.Knowled
 	return item, nil
 }
 
+// FindKnowledgeItemByExactTerm returns the most recently updated English item
+// whose normalized term matches exactly. The query deliberately avoids LIKE so
+// a lookup for "art" cannot accidentally return "article".
+func (s *Store) FindKnowledgeItemByExactTerm(ctx context.Context, term, subject string) (models.KnowledgeItem, error) {
+	row := s.db.QueryRowContext(ctx, knowledgeSelect+`
+		WHERE lower(trim(term)) = lower(trim(?))
+		  AND lower(trim(subject)) = lower(trim(?))
+		ORDER BY updated_at DESC, id ASC LIMIT 1`, term, subject)
+	item, err := scanKnowledgeItem(row)
+	if err != nil {
+		return models.KnowledgeItem{}, mapNotFound(err, "knowledge item")
+	}
+	return item, nil
+}
+
 func (s *Store) UpdateKnowledgeItem(ctx context.Context, item models.KnowledgeItem) error {
 	return updateKnowledgeItem(ctx, s.db, item)
 }

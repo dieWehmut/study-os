@@ -92,8 +92,9 @@ type SummaryInput struct {
 type WordWikiInput struct {
 	ID           string   `json:"id,omitempty"`
 	Term         string   `json:"term"`
+	Context      string   `json:"context,omitempty"`
 	PartOfSpeech string   `json:"part_of_speech,omitempty"`
-	Definition   string   `json:"definition"`
+	Definition   string   `json:"definition,omitempty"`
 	Example      string   `json:"example,omitempty"`
 	Level        string   `json:"level,omitempty"`
 	Tags         []string `json:"tags,omitempty"`
@@ -211,6 +212,9 @@ type SummaryOutput struct {
 type WordWikiOutput struct {
 	DetailedMarkdown  string     `json:"detailed_markdown"`
 	ConciseDefinition string     `json:"concise_definition,omitempty"`
+	PartOfSpeech      string     `json:"part_of_speech,omitempty"`
+	Pronunciation     string     `json:"pronunciation,omitempty"`
+	Example           string     `json:"example,omitempty"`
 	MemoryTips        stringList `json:"memory_tips,omitempty"`
 	Collocations      stringList `json:"collocations,omitempty"`
 	WordFamily        stringList `json:"word_family,omitempty"`
@@ -385,8 +389,11 @@ func (r Request) Validate() error {
 			return NewProviderError(ErrorPermanent, "summary requires text")
 		}
 	case KindWordWiki:
-		if r.WordWiki == nil || strings.TrimSpace(r.WordWiki.Term) == "" || strings.TrimSpace(r.WordWiki.Definition) == "" {
-			return NewProviderError(ErrorPermanent, "word wiki requires a term and definition")
+		if r.WordWiki == nil || strings.TrimSpace(r.WordWiki.Term) == "" {
+			return NewProviderError(ErrorPermanent, "word wiki requires a term")
+		}
+		if strings.TrimSpace(r.WordWiki.Definition) == "" && strings.TrimSpace(r.WordWiki.Context) == "" {
+			return NewProviderError(ErrorPermanent, "word wiki requires a definition or context")
 		}
 	case KindMakeSentence:
 		if r.Sentence == nil || strings.TrimSpace(r.Sentence.Term) == "" {

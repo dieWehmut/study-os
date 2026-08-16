@@ -137,6 +137,19 @@ func (p *MockProvider) summary(input SummaryInput) Response {
 }
 
 func (p *MockProvider) wordWiki(input WordWikiInput) Response {
+	input.Term = strings.TrimSpace(input.Term)
+	input.Definition = strings.TrimSpace(input.Definition)
+	input.Example = strings.TrimSpace(input.Example)
+	input.PartOfSpeech = strings.TrimSpace(input.PartOfSpeech)
+	if input.Definition == "" {
+		input.Definition = contextualDefinition(input.Context)
+	}
+	if input.Example == "" {
+		input.Example = contextualExample(input.Term, input.Context)
+	}
+	if input.PartOfSpeech == "" {
+		input.PartOfSpeech = "adjective"
+	}
 	markdown := "## " + strings.TrimSpace(input.Term) + "\n\n"
 	markdown += "**释义**：" + strings.TrimSpace(input.Definition) + "\n"
 	if strings.TrimSpace(input.PartOfSpeech) != "" {
@@ -152,11 +165,33 @@ func (p *MockProvider) wordWiki(input WordWikiInput) Response {
 		WordWiki: &WordWikiOutput{
 			DetailedMarkdown:  markdown,
 			ConciseDefinition: strings.TrimSpace(input.Definition),
+			PartOfSpeech:      strings.TrimSpace(input.PartOfSpeech),
+			Pronunciation:     "",
+			Example:           strings.TrimSpace(input.Example),
 			MemoryTips:        []string{"把词义和语境例句一起记，比孤立记更牢。"},
 			Collocations:      []string{},
 			WordFamily:        []string{strings.TrimSpace(input.Term)},
 		},
 	}
+}
+
+func contextualDefinition(contextText string) string {
+	contextText = strings.TrimSpace(contextText)
+	if contextText == "" {
+		return "meaning inferred from the supplied context"
+	}
+	if sentence := sentences(contextText); len(sentence) > 0 {
+		return "meaning inferred from context: " + sentence[0]
+	}
+	return "meaning inferred from context: " + contextText
+}
+
+func contextualExample(term, contextText string) string {
+	contextText = strings.TrimSpace(contextText)
+	if contextText != "" {
+		return contextText
+	}
+	return strings.TrimSpace(term) + " appears in this example sentence."
 }
 
 func (p *MockProvider) makeSentence(input SentenceInput) Response {
