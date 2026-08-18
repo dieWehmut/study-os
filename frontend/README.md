@@ -43,6 +43,26 @@ The backend-free browser smoke test uses its own Vite server and config:
 pnpm exec playwright test --config=playwright.pages.config.ts
 ```
 
+### Giscus comments
+
+The Pages build renders one Giscus discussion at the bottom of every hash
+route. Complete this one-time repository setup before deploying the widget:
+
+1. Enable Discussions in repository **Settings > General > Features**.
+2. Install the [Giscus GitHub App](https://github.com/apps/giscus) for
+   `dieWehmut/study-os`.
+3. Create or select an `Announcements` discussion category.
+4. Open [giscus.app](https://giscus.app/zh-CN), select the repository and
+   category, then copy the generated repository and category IDs.
+5. Add repository variables named `GISCUS_REPO`, `GISCUS_REPO_ID`,
+   `GISCUS_CATEGORY`, and `GISCUS_CATEGORY_ID`.
+6. Push `main` or dispatch the `Deploy GitHub Pages` workflow again.
+
+These values are public identifiers embedded in the frontend bundle. Never
+put an OAuth token, personal access token, GitHub secret, or API key in a
+`VITE_*` variable. Until all four variables are configured, the comments
+component stays hidden and the rest of the static site continues to work.
+
 ## Structure
 
 - `src/api` — typed REST clients and the runtime API resolver (browser-relative vs. Wails bridge).

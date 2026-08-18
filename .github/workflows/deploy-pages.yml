@@ -71,6 +71,10 @@ jobs:
         env:
           VITE_STATIC_DEMO: "true"
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          VITE_GISCUS_REPO: ${{ vars.GISCUS_REPO }}
+          VITE_GISCUS_REPO_ID: ${{ vars.GISCUS_REPO_ID }}
+          VITE_GISCUS_CATEGORY: ${{ vars.GISCUS_CATEGORY }}
+          VITE_GISCUS_CATEGORY_ID: ${{ vars.GISCUS_CATEGORY_ID }}
         run: pnpm build
 
       - name: Verify Pages artifact
@@ -89,6 +93,10 @@ jobs:
           PAGES_PREVIEW: "true"
           VITE_STATIC_DEMO: "true"
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          VITE_GISCUS_REPO: ${{ vars.GISCUS_REPO }}
+          VITE_GISCUS_REPO_ID: ${{ vars.GISCUS_REPO_ID }}
+          VITE_GISCUS_CATEGORY: ${{ vars.GISCUS_CATEGORY }}
+          VITE_GISCUS_CATEGORY_ID: ${{ vars.GISCUS_CATEGORY_ID }}
         run: pnpm exec playwright test --config=playwright.pages.config.ts
 
       - name: Upload Pages artifact

@@ -10,6 +10,16 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8")
 }
 
+function workflowStep(workflow, name) {
+  const marker = `- name: ${name}`
+  const start = workflow.indexOf(marker)
+  assert.notEqual(start, -1, `missing workflow step: ${name}`)
+
+  const remainder = workflow.slice(start + marker.length)
+  const nextStep = remainder.search(/\n      - name:/)
+  return nextStep === -1 ? remainder : remainder.slice(0, nextStep)
+}
+
 test("Pages workflow builds and publishes only the static frontend", () => {
   const workflow = read(".github/workflows/deploy-pages.yml")
 
@@ -25,6 +35,20 @@ test("Pages workflow builds and publishes only the static frontend", () => {
   assert.match(workflow, /vitest run/)
   assert.match(workflow, /pnpm lint/)
   assert.doesNotMatch(workflow, /actions\/setup-go|go build|go run/)
+
+  const giscusVariables = [
+    "VITE_GISCUS_REPO: ${{ vars.GISCUS_REPO }}",
+    "VITE_GISCUS_REPO_ID: ${{ vars.GISCUS_REPO_ID }}",
+    "VITE_GISCUS_CATEGORY: ${{ vars.GISCUS_CATEGORY }}",
+    "VITE_GISCUS_CATEGORY_ID: ${{ vars.GISCUS_CATEGORY_ID }}",
+  ]
+  const buildStep = workflowStep(workflow, "Build frontend showcase")
+  const smokeStep = workflowStep(workflow, "Smoke test built Pages artifact")
+
+  for (const variable of giscusVariables) {
+    assert.ok(buildStep.includes(variable), `build step missing ${variable}`)
+    assert.ok(smokeStep.includes(variable), `smoke step missing ${variable}`)
+  }
 })
 
 test("frontend assets and routing are repository-subpath safe", () => {
