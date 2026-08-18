@@ -26,6 +26,7 @@ interface StaticMistakePair {
 interface StaticImportJob {
   jobId: string
   previewed: boolean
+  committed: boolean
 }
 
 interface StaticState {
@@ -61,7 +62,7 @@ function makeKnowledge(): KnowledgeItem[] {
       example: "The lesson should last forty minutes.",
       level: "B1",
       subject: "english",
-      tags: ["core", "duration"],
+      tags: ["core", "english-core", "duration"],
     },
     {
       id: "knowledge-spaced-repetition",
@@ -73,7 +74,7 @@ function makeKnowledge(): KnowledgeItem[] {
       example: "Spaced repetition turns short reviews into durable memory.",
       level: "B2",
       subject: "english",
-      tags: ["core", "memory"],
+      tags: ["core", "english-core", "memory"],
     },
     {
       id: "knowledge-newton",
@@ -101,15 +102,16 @@ function makeKnowledge(): KnowledgeItem[] {
 }
 
 function makeDue(knowledge: KnowledgeItem, index: number): DueReview {
+  const recognition = index % 2 === 0
   return {
     prompt: {
       id: `prompt-${knowledge.id}`,
       knowledge_item_id: knowledge.id,
-      prompt_type: index % 2 === 0 ? "recognition" : "production",
+      prompt_type: recognition ? "en_to_zh" : "context_cloze",
       question: index % 2 === 0
         ? `What does “${knowledge.term}” mean?`
         : `Use “${knowledge.term}” in a sentence.`,
-      options: index % 2 === 0 ? [knowledge.concise_definition, "a kind of container", "a location"] : undefined,
+      options: recognition ? undefined : [knowledge.concise_definition, "a kind of container", "a location"],
     },
     knowledge: {
       id: knowledge.id,
@@ -301,6 +303,25 @@ function bodyRecord(init?: RequestInit): Record<string, unknown> {
   }
 }
 
+function hasField(record: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, field)
+}
+
+function stringField(record: Record<string, unknown>, field: string): string | undefined {
+  if (!hasField(record, field)) return undefined
+  return String(record[field] ?? "").trim()
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : []
+}
+
+function withoutSecret(record: Record<string, unknown>): Record<string, unknown> {
+  const safe = { ...record }
+  delete safe.api_key
+  return safe
+}
+
 function newID(prefix: string): string {
   const id = `${prefix}-${state.sequence}`
   state.sequence += 1
@@ -448,8 +469,17 @@ function mistakeList(subject: string | undefined) {
 }
 
 function statusPayload() {
+  const activeVendor = state.vendors.find((vendor) => vendor.id === state.activeProvider)
+  const models = stringList(activeVendor?.models)
   return {
-    provider: { name: state.activeProvider, mode: "local", configured: true, available: true, key_configured: false, model: "static-demo" },
+    provider: {
+      name: state.activeProvider,
+      mode: "local",
+      configured: true,
+      available: true,
+      key_configured: Boolean(activeVendor?.key_configured),
+      model: String(activeVendor?.model ?? models[0] ?? "static-demo"),
+    },
     data: { directory: "browser memory", database_path: "Pages demo (not persisted)" },
     review: { daily_limit: state.dailyLimit },
     backup: { directory: "browser memory", count: state.backups.length, last_created_at: state.backups[0]?.created_at },
@@ -496,8 +526,20 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   }
   if (method === "POST" && root === "dump") {
     const text = String(body.text ?? "").trim()
-    const item = state.knowledge[0]
-    return responseFor({ id: newID("dump"), term: text || item?.term || "demo" }) as T
+    const firstLine = text.split(/\r?\n/).map((line) => line.replace(/^#+\s*/, "").trim()).find(Boolean)
+    const term = (firstLine || "Pages demo note").slice(0, 120)
+    const item: KnowledgeItem = {
+      id: newID("knowledge"),
+      item_type: "brain_dump",
+      term,
+      concise_definition: text.slice(0, 240) || "A note saved in the Pages demo.",
+      detailed_markdown: text || `## ${term}`,
+      level: "demo",
+      subject: "english",
+      tags: ["english-core", "reading"],
+    }
+    state.knowledge.unshift(item)
+    return responseFor({ id: item.id, term: item.term }) as T
   }
 
   if (root === "groups" && method === "GET") return responseFor({ items: state.groups, count: state.groups.length }) as T
@@ -528,13 +570,14 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor({ items, groups: state.groups.filter((group) => tags.has(group.id) || tags.has(group.name.toLowerCase())) }) as T
   }
   if (root === "knowledge" && id && action === "schedule" && method === "POST") {
+    const item = state.knowledge.find((entry) => entry.id === id)
+    if (!item) throw new StaticDemoError("Static demo knowledge item not found")
     const already = state.scheduled.has(id)
     state.scheduled.add(id)
     if (!state.due.some((entry) => entry.knowledge.id === id)) {
-      const item = state.knowledge.find((entry) => entry.id === id)
-      if (item) state.due.push(makeDue(item, state.due.length))
+      state.due.push(makeDue(item, state.due.length))
     }
-    return responseFor({ status: already ? "already_scheduled" : "scheduled", knowledge_id: id, prompt_count: 3 }) as T
+    return responseFor({ status: already ? "already_scheduled" : "scheduled", knowledge_id: id, prompt_count: 1 }) as T
   }
   if (root === "knowledge" && id && action === "wiki" && method === "PUT") {
     const item = state.knowledge.find((entry) => entry.id === id)
@@ -567,11 +610,15 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   }
   if (root === "reviews" && id === "forecast" && method === "GET") {
     const days = Math.max(1, Number(url.searchParams.get("days") ?? 7) || 7)
+    const subject = subjectFrom(url.searchParams.get("subject"))
+    const dueCount = subject
+      ? state.due.filter((entry) => state.knowledge.find((item) => item.id === entry.knowledge.id)?.subject === subject).length
+      : state.due.length
     const first = new Date(DEMO_NOW)
     const result = Array.from({ length: days }, (_, index) => {
       const date = new Date(first)
       date.setUTCDate(date.getUTCDate() + index)
-      return { date: date.toISOString().slice(0, 10), count: Math.max(0, state.due.length - index) }
+      return { date: date.toISOString().slice(0, 10), count: Math.max(0, dueCount - index) }
     })
     return responseFor({ days: result, horizon: days }) as T
   }
@@ -579,13 +626,15 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     const due = state.due.find((entry) => entry.prompt.id === id)
     if (!due) throw new StaticDemoError("Static demo review prompt not found")
     state.due = state.due.filter((entry) => entry.prompt.id !== id)
+    const knowledge = state.knowledge.find((entry) => entry.id === due.knowledge.id)
+    const expectedAnswer = knowledge?.concise_definition ?? due.prompt.options?.[0] ?? ""
     const evaluation: ReviewEvaluation = {
       attempt_id: newID("attempt"),
       outcome: "correct",
       rating: 3,
       feedback: "Good retrieval. The next interval is longer.",
       due_at: DEMO_NOW,
-      expected_answers: [due.knowledge.id],
+      expected_answers: expectedAnswer ? [expectedAnswer] : [],
     }
     return responseFor(evaluation) as T
   }
@@ -696,13 +745,48 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor({ active_provider: state.activeProvider }) as T
   }
   if (root === "agent" && id === "test" && method === "POST") return responseFor({ ok: true, provider: String(body.provider ?? state.activeProvider), latency_ms: 12 }) as T
-  if (root === "agent" && id === "config" && method === "PATCH") return responseFor({ provider: String(body.provider ?? state.activeProvider), key_configured: Boolean(body.api_key), base_url: String(body.base_url ?? ""), model: String(body.model ?? "static-demo"), reasoning_model: String(body.reasoning_model ?? "") }) as T
+  if (root === "agent" && id === "config" && method === "PATCH") {
+    const provider = String(body.provider ?? state.activeProvider)
+    const vendor = state.vendors.find((entry) => entry.id === provider)
+    if (!vendor) throw new StaticDemoError("Static demo provider not found")
 
-  if (root === "speech" && !id && method === "GET") return responseFor({ speech: state.speech, roles: state.roles, active_role_id: state.activeRoleId }) as T
+    const apiKey = stringField(body, "api_key")
+    const model = stringField(body, "model")
+    const reasoningModel = stringField(body, "reasoning_model")
+    const baseURL = stringField(body, "base_url")
+    const models = [...stringList(vendor.models)]
+    for (const candidate of [model, reasoningModel]) {
+      if (candidate && !models.includes(candidate)) models.push(candidate)
+    }
+    const updatedVendor = {
+      ...vendor,
+      ...(hasField(body, "api_key") ? { key_configured: Boolean(apiKey) } : {}),
+      ...(hasField(body, "base_url") ? { base_url: baseURL ?? "" } : {}),
+      ...(hasField(body, "model") ? { model: model ?? "" } : {}),
+      ...(hasField(body, "reasoning_model") ? { reasoning_model: reasoningModel ?? "" } : {}),
+      models,
+    }
+    state.vendors = state.vendors.map((entry) => entry.id === provider ? updatedVendor : entry)
+    return responseFor({
+      provider,
+      key_configured: Boolean(updatedVendor.key_configured),
+      base_url: String(updatedVendor.base_url ?? ""),
+      model: String(updatedVendor.model ?? model ?? models[0] ?? "static-demo"),
+      reasoning_model: String(updatedVendor.reasoning_model ?? reasoningModel ?? ""),
+    }) as T
+  }
+
+  if (root === "speech" && !id && method === "GET") return responseFor({ speech: withoutSecret(state.speech), roles: state.roles, active_role_id: state.activeRoleId }) as T
   if (root === "speech" && id === "roles" && !action && method === "GET") return responseFor({ items: state.roles, count: state.roles.length, active_role_id: state.activeRoleId }) as T
   if (root === "speech" && id === "config" && method === "PATCH") {
-    state.speech = { ...state.speech, ...body, configured: true }
-    return responseFor({ speech: state.speech }) as T
+    const nextSpeech = { ...state.speech }
+    for (const field of ["provider", "base_url", "model", "voice", "format"]) {
+      if (hasField(body, field)) nextSpeech[field] = String(body[field] ?? "").trim()
+    }
+    if (hasField(body, "api_key")) nextSpeech.key_configured = Boolean(stringField(body, "api_key"))
+    nextSpeech.configured = true
+    state.speech = withoutSecret(nextSpeech)
+    return responseFor({ speech: withoutSecret(state.speech) }) as T
   }
   if (root === "speech" && id === "roles" && action === "active" && method === "PATCH") {
     state.activeRoleId = String(body.role_id ?? "")
@@ -737,7 +821,7 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
 
   if (root === "imports" && !id && method === "POST") {
     const jobId = newID("import")
-    state.imports.set(jobId, { jobId, previewed: false })
+    state.imports.set(jobId, { jobId, previewed: false, committed: false })
     return responseFor({ job_id: jobId, inspection: { format: "csv", tables: ["words"], selected_table: "words", columns: ["term", "definition"], sample_rows: [{ term: "resilient", definition: "able to recover" }], row_count: 1 } }) as T
   }
   if (root === "imports" && id && action === "preview" && method === "POST") {
@@ -746,6 +830,28 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor({ job_id: id, state: "previewed", mapping: body.mapping ?? {}, summary: { rows: 1, insert: 1, exact_duplicate: 0, review: 0, new_sense: 0, invalid: 0 }, rows: [{ row_id: "row-1", row_number: 1, raw: { term: "resilient", definition: "able to recover" }, normalized: { term: "resilient", definition: "able to recover" }, disposition: "insert" }] }) as T
   }
   if (root === "imports" && id && action === "commit" && method === "POST") {
+    const job = state.imports.get(id)
+    if (!job) throw new StaticDemoError("Static demo import job not found")
+    if (!job.committed) {
+      const existing = state.knowledge.find((item) => item.term.toLowerCase() === "resilient")
+      if (!existing) {
+        const item: KnowledgeItem = {
+          id: newID("knowledge"),
+          item_type: "word_wiki",
+          term: "resilient",
+          concise_definition: "able to recover quickly after difficulty",
+          detailed_markdown: "## resilient\n\nAble to recover quickly after difficulty.",
+          example: "A resilient learner returns to a hard idea.",
+          level: "demo",
+          subject: "english",
+          tags: ["english-core", "imported"],
+        }
+        state.knowledge.unshift(item)
+        state.scheduled.add(item.id)
+        state.due.push(makeDue(item, state.due.length))
+      }
+      job.committed = true
+    }
     return responseFor({ job_id: id, state: "committed", summary: { inserted: 1, exact_duplicates: 0, merged: 0, pending_reviews: 1, rejected: 0, prompts_created: 1 } }) as T
   }
 

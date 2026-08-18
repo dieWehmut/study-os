@@ -121,6 +121,7 @@ export default function SettingsPanel() {
   // 定义在这里而不是跟其它处理函数放一起，是因为下面有提前 return，
   // hook 必须每次渲染都按同样顺序执行。
   const stopPreview = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel()
     if (previewAudioRef.current) {
       previewAudioRef.current.pause()
       previewAudioRef.current = null
@@ -253,7 +254,12 @@ export default function SettingsPanel() {
     setPreviewRoleId(role.id)
     setPreviewPhase("loading")
     try {
-      const objectURL = URL.createObjectURL(await synthesizeVoiceRolePreview(role.id, text))
+      const previewBlob = await synthesizeVoiceRolePreview(role.id, text)
+      if (!previewBlob) {
+        setPreviewPhase("playing")
+        return
+      }
+      const objectURL = URL.createObjectURL(previewBlob)
       previewURLRef.current = objectURL
       const audio = new Audio(objectURL)
       previewAudioRef.current = audio
