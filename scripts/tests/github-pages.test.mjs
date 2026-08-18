@@ -14,7 +14,10 @@ test("Pages workflow builds and publishes only the static frontend", () => {
   const workflow = read(".github/workflows/deploy-pages.yml")
 
   assert.match(workflow, /VITE_STATIC_DEMO:\s*["']?true/)
-  assert.ok(workflow.includes("VITE_BASE_PATH: /${{ github.event.repository.name }}/"))
+  assert.match(workflow, /Configure Pages[\s\S]*?id:\s*pages[\s\S]*?actions\/configure-pages@v5/)
+  assert.ok(workflow.includes("VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}"))
+  assert.ok(workflow.includes("PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}"))
+  assert.doesNotMatch(workflow, /github\.event\.repository\.name/)
   assert.match(workflow, /path:\s*frontend\/dist/)
   assert.match(workflow, /actions\/upload-pages-artifact@v3/)
   assert.match(workflow, /actions\/deploy-pages@v4/)

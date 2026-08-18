@@ -36,6 +36,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Configure Pages
+        id: pages
         uses: actions/configure-pages@v5
 
       - name: Verify static Pages contract
@@ -65,12 +66,12 @@ jobs:
         working-directory: frontend
         env:
           VITE_STATIC_DEMO: "true"
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: pnpm build
 
       - name: Verify Pages artifact
         env:
-          PAGES_BASE_PATH: /${{ github.event.repository.name }}/
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           PAGES_DIST: frontend/dist
         run: node scripts/tests/github-pages-artifact.test.mjs
 

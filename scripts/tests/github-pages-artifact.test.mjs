@@ -6,7 +6,15 @@ import { fileURLToPath } from "node:url"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const dist = path.resolve(repositoryRoot, process.env.PAGES_DIST || "frontend/dist")
-const expectedBase = process.env.PAGES_BASE_PATH || "/study-os/"
+
+function normalizeBasePath(value) {
+  const configured = value.trim()
+  if (!configured || configured === "/") return "/"
+  const leading = configured.startsWith("/") ? configured : `/${configured}`
+  return leading.endsWith("/") ? leading : `${leading}/`
+}
+
+const expectedBase = normalizeBasePath(process.env.PAGES_BASE_PATH ?? "/study-os/")
 
 function read(relativePath) {
   return fs.readFileSync(path.join(dist, relativePath), "utf8")
