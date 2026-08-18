@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react"
 
+import { GiscusComments } from "@/features/comments/GiscusComments"
 import { cn } from "@/lib/utils"
 import { isStaticDemo } from "@/lib/runtime"
 import { Header } from "./Header"
@@ -67,6 +68,7 @@ export function AppShell({ children }: AppShellProps) {
         ) : null}
         <main className="mx-auto w-full max-w-7xl px-4 pb-10 pt-6 sm:px-6 md:pb-10 lg:px-8 lg:pt-8">
           {children}
+          <GiscusComments />
         </main>
       </div>
     </div>
