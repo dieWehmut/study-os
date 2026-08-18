@@ -15,7 +15,7 @@ test("Pages workflow builds and publishes only the static frontend", () => {
 
   assert.match(workflow, /VITE_STATIC_DEMO:\s*["']?true/)
   assert.match(workflow, /Configure Pages[\s\S]*?id:\s*pages[\s\S]*?actions\/configure-pages@v5/)
-  assert.match(workflow, /actions\/configure-pages@v5[\s\S]*?enablement:\s*true/)
+  assert.match(workflow, /actions\/configure-pages@v5[\s\S]*?enablement:\s*false/)
   assert.ok(workflow.includes("VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}"))
   assert.ok(workflow.includes("PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}"))
   assert.doesNotMatch(workflow, /github\.event\.repository\.name/)
