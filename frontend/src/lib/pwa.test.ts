@@ -45,4 +45,13 @@ describe("PWA registration", () => {
     await expect(registerServiceWorker()).resolves.toBeUndefined()
     expect(register).not.toHaveBeenCalled()
   })
+
+  it("does not register a root-scoped worker for the Pages static demo", async () => {
+    const register = vi.fn().mockResolvedValue({ scope: "/study-os/" })
+    vi.stubGlobal("navigator", { serviceWorker: { register } })
+    vi.stubGlobal("location", { protocol: "https:", hostname: "diewehmut.github.io" })
+
+    await expect(registerServiceWorker({ enabled: true, staticDemo: true })).resolves.toBeUndefined()
+    expect(register).not.toHaveBeenCalled()
+  })
 })
