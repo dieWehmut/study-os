@@ -35,6 +35,12 @@ refresh does not need a server-side SPA rewrite. API responses come from a
 deterministic in-memory fixture and mutations last only for the current tab;
 the site never sends requests to `/api` and does not persist backend data.
 
+The backend-free browser smoke test uses its own Vite server and config:
+
+```powershell
+pnpm exec playwright test --config=playwright.pages.config.ts
+```
+
 ## Structure
 
 - `src/api` — typed REST clients and the runtime API resolver (browser-relative vs. Wails bridge).
