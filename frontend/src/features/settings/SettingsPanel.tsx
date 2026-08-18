@@ -175,10 +175,12 @@ export default function SettingsPanel() {
 
   async function saveVendorSettings(vendorID: string) {
     const values: VendorConfigInput = { provider: vendorID }
+    const model = modelDraft.trim()
+    const reasoningModel = reasoningModelDraft.trim()
     if (apiKeyDraft.trim()) values.api_key = apiKeyDraft.trim()
     if (baseURLDraft.trim()) values.base_url = baseURLDraft.trim()
-    if (modelDraft) values.model = modelDraft
-    if (reasoningModelDraft) values.reasoning_model = reasoningModelDraft
+    if (model) values.model = model
+    if (reasoningModel) values.reasoning_model = reasoningModel
     await saveConfig(vendorID, values)
     setApiKeyDraft("")
     setOpenConfig(null)
@@ -716,9 +718,9 @@ export default function SettingsPanel() {
           <CardContent className="grid gap-3">
             {vendors.map((vendor) => {
               // The backend already reports each vendor's [chat, reasoning] models,
-              // so the option list is derived rather than hardcoded per vendor.
-              const models = vendor.models ?? []
-              const modelOptions = models.map((model) => ({ value: model, label: model }))
+              // so the suggestion list is derived rather than hardcoded per vendor.
+              const models = Array.from(new Set(vendor.models ?? []))
+              const modelSuggestionsID = `${vendor.id}-model-options`
               const defaultModel = models[0] ?? ""
               const defaultReasoningModel = models[1] ?? defaultModel
               return (
@@ -760,10 +762,10 @@ export default function SettingsPanel() {
                   </div>
                 ) : null}
                 {vendor.base_url ? <code className="break-all text-xs text-muted-foreground">{vendor.base_url}</code> : null}
-                {vendor.models && vendor.models.length > 0 ? (
+                {models.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">模型：</span>
-                    {vendor.models.map((model) => (
+                    {models.map((model) => (
                       <span key={model} className="rounded-md border border-border bg-background/70 px-1.5 py-0.5 font-mono text-[0.68rem] text-muted-foreground">{model}</span>
                     ))}
                   </div>
@@ -782,34 +784,37 @@ export default function SettingsPanel() {
                         className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     </label>
-                    {modelOptions.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-model`}>
-                          模型
-                          <Select
-                            id={`${vendor.id}-model`}
-                            ariaLabel="模型"
-                            value={modelDraft}
-                            onValueChange={setModelDraft}
-                            placeholder={`默认（${defaultModel}）`}
-                            options={modelOptions}
-                            className="w-full min-w-0"
-                          />
-                        </label>
-                        <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-reasoning-model`}>
-                          推理模型
-                          <Select
-                            id={`${vendor.id}-reasoning-model`}
-                            ariaLabel="推理模型"
-                            value={reasoningModelDraft}
-                            onValueChange={setReasoningModelDraft}
-                            placeholder={`默认（${defaultReasoningModel}）`}
-                            options={modelOptions}
-                            className="w-full min-w-0"
-                          />
-                        </label>
-                      </div>
-                    ) : null}
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-model`}>
+                        模型
+                        <Input
+                          id={`${vendor.id}-model`}
+                          type="text"
+                          aria-label="模型"
+                          list={modelSuggestionsID}
+                          value={modelDraft}
+                          onChange={(event) => setModelDraft(event.target.value)}
+                          placeholder={defaultModel ? `默认（${defaultModel}）` : "输入模型名称"}
+                          className="font-mono text-xs"
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-reasoning-model`}>
+                        推理模型
+                        <Input
+                          id={`${vendor.id}-reasoning-model`}
+                          type="text"
+                          aria-label="推理模型"
+                          list={modelSuggestionsID}
+                          value={reasoningModelDraft}
+                          onChange={(event) => setReasoningModelDraft(event.target.value)}
+                          placeholder={defaultReasoningModel ? `默认（${defaultReasoningModel}）` : "输入推理模型名称"}
+                          className="font-mono text-xs"
+                        />
+                      </label>
+                      <datalist id={modelSuggestionsID}>
+                        {models.map((model) => <option key={model} value={model} />)}
+                      </datalist>
+                    </div>
                     <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-base-url`}>
                       接口地址
                       <input
