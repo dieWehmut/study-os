@@ -57,6 +57,7 @@ export function AppShell({ children }: AppShellProps) {
         {isStaticDemo() ? (
           <div
             role="status"
+            data-static-demo="true"
             className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8"
           >
             <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
