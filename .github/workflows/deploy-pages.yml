@@ -52,6 +52,12 @@ jobs:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
         run: pnpm build
 
+      - name: Verify Pages artifact
+        env:
+          PAGES_BASE_PATH: /${{ github.event.repository.name }}/
+          PAGES_DIST: frontend/dist
+        run: node scripts/tests/github-pages-artifact.test.mjs
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
