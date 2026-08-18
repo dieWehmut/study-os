@@ -100,7 +100,7 @@ describe("application shell", () => {
     expect(sidebar?.getAttribute("style") ?? "").not.toContain("width")
   })
 
-  it("heads both rails with the same avatar and name", () => {
+  it("heads both rails with the same local brand", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
@@ -108,13 +108,16 @@ describe("application shell", () => {
     )
 
     // 抽屉关着时是 aria-hidden 的，所以走 DOM 而不是 role 查询。两条栏必须共用
-    // 同一个身份区——只在桌面端加，手机上翻开抽屉就会看见一条秃头的导航。
-    const avatars = document.querySelectorAll("aside img[alt$='头像']")
-    expect(avatars).toHaveLength(2)
-    for (const avatar of avatars) {
+    // 同一个本地品牌区——只在桌面端加，手机上翻开抽屉也不能缺少品牌。
+    const brandLinks = document.querySelectorAll("aside a[aria-label='回到首页']")
+    expect(brandLinks).toHaveLength(2)
+    expect(document.querySelectorAll("aside")).toHaveLength(2)
+    expect(document.querySelectorAll("aside svg.lucide-book-open")).toHaveLength(2)
+    expect(screen.getAllByText("学习系统")).toHaveLength(2)
+    for (const brandLink of brandLinks) {
       // 身份区必须排在导航前面：它是栏首，不是脚注。
-      const nav = avatar.closest("aside")?.querySelector("nav")
-      expect(avatar.compareDocumentPosition(nav!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      const nav = brandLink.closest("aside")?.querySelector("nav")
+      expect(brandLink.compareDocumentPosition(nav!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     }
   })
 
