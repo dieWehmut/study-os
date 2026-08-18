@@ -17,7 +17,7 @@ describe("resolvePagesHarness", () => {
       basePath: "/docs/demo/",
       host: "localhost",
       port: "4199",
-      server: "preview",
+      preview: "true",
     })).toEqual({
       basePath: "/docs/demo/",
       baseURL: "http://localhost:4199/docs/demo/",

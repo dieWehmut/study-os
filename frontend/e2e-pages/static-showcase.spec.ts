@@ -5,7 +5,7 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   const runtimeErrors: string[] = []
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname
-    if (pathname.startsWith("/api/") || pathname.startsWith("/study-os/api/")) apiRequests.push(request.url())
+    if (/\/api(?:\/|$)/.test(pathname)) apiRequests.push(request.url())
   })
   page.on("pageerror", (error) => runtimeErrors.push(error.message))
 
