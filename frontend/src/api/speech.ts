@@ -1,5 +1,5 @@
 import { apiRequest, resolveApiBase } from "./client"
-import { isStaticDemo } from "@/lib/runtime"
+import { isStaticDemo, publicBasePath } from "@/lib/runtime"
 
 // 一个预设服务商：只提供默认值，真正跑合成时仍以用户填写的字段为准。
 export interface SpeechProviderSpec {
@@ -145,6 +145,7 @@ export function uploadVoiceRoleAvatar(id: string, file: File): Promise<VoiceRole
 // 头像要的是一个能直接喂给 <img src> 的绝对地址，所以走 resolveApiBase 而不是
 // apiRequest。version 是缓存击穿参数：重传后同名文件会被浏览器认成旧图。
 export function voiceRoleAvatarURL(id: string, version?: string | number): string {
+  if (isStaticDemo()) return `${publicBasePath()}icon-192.svg`
   const url = `${resolveApiBase()}/speech/roles/${encodeURIComponent(id)}/avatar`
   return version === undefined ? url : `${url}?v=${encodeURIComponent(String(version))}`
 }

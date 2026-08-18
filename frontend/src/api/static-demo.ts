@@ -655,9 +655,9 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return undefined as T
   }
 
-  if (root === "english" && id === "articles" && method === "GET") return responseFor({ items: state.articles, count: state.articles.length }) as T
+  if (root === "english" && id === "articles" && !action && method === "GET") return responseFor({ items: state.articles, count: state.articles.length }) as T
   if (root === "english" && id === "articles" && action === "generate" && method === "POST") return responseFor(articleFrom(body)) as T
-  if (root === "english" && id === "articles" && method === "POST") {
+  if (root === "english" && id === "articles" && !action && method === "POST") {
     const article = articleFrom(body, typeof body.id === "string" ? body.id : newID("article"))
     state.articles = [article, ...state.articles.filter((entry) => entry.id !== article.id)]
     return responseFor(article) as T
