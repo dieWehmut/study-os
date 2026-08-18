@@ -187,7 +187,9 @@ const defaultModel = models[0] ?? ""
 const defaultReasoningModel = models[1] ?? defaultModel
 ```
 
-Update the nearby comment to describe suggestions rather than select options.
+Update the nearby comment to describe suggestions rather than select options. Use
+the same deduplicated `models` collection for the visible model badges so repeated
+backend slots cannot create duplicate React keys.
 
 - [ ] **Step 3: Replace both model Select controls with editable inputs and a datalist**
 
