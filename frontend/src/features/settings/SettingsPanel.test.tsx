@@ -476,6 +476,18 @@ describe("SettingsPanel", () => {
     await waitFor(() => expect(mocks.synthesizeVoiceRolePreview).toHaveBeenCalledWith("voice-2", "Nova"))
   })
 
+  it("treats the browser speech fallback as a successful preview", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:unexpected")
+    mocks.synthesizeVoiceRolePreview.mockResolvedValue(null)
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "试听 Nova" }))
+
+    await waitFor(() => expect(mocks.synthesizeVoiceRolePreview).toHaveBeenCalledWith("voice-2", "英文例句朗读"))
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
   it("试听失败时说明原因，而不是静静地什么都不发生", async () => {
     stubAudioPlayback()
     mocks.synthesizeVoiceRolePreview.mockRejectedValue(new Error("语音服务没有响应"))
