@@ -45,6 +45,22 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Test static frontend runtime
+        working-directory: frontend
+        run: >-
+          pnpm exec vitest run
+          src/lib/runtime.test.ts
+          src/lib/routing.test.ts
+          src/lib/pwa.test.ts
+          src/api/client.test.ts
+          src/api/static-demo.test.ts
+          --pool=threads
+          --maxWorkers=1
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: pnpm lint
+
       - name: Build frontend showcase
         working-directory: frontend
         env:

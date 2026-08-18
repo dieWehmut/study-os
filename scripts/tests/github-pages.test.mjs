@@ -18,6 +18,8 @@ test("Pages workflow builds and publishes only the static frontend", () => {
   assert.match(workflow, /path:\s*frontend\/dist/)
   assert.match(workflow, /actions\/upload-pages-artifact@v3/)
   assert.match(workflow, /actions\/deploy-pages@v4/)
+  assert.match(workflow, /vitest run/)
+  assert.match(workflow, /pnpm lint/)
   assert.doesNotMatch(workflow, /actions\/setup-go|go build|go run/)
 })
 
