@@ -35,11 +35,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
+      # The repository owner must select "GitHub Actions" once in Settings > Pages.
+      # The default GITHUB_TOKEN cannot create a Pages site on a first run.
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
         with:
-          enablement: true
+          enablement: false
 
       - name: Verify static Pages contract
         run: node scripts/tests/github-pages.test.mjs
