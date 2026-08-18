@@ -18,8 +18,10 @@ The e2e suite (`e2e/study-loop.spec.ts`) starts its own backend (`go build ./bac
 ## GitHub Pages
 
 The Pages deployment is a frontend-only showcase. It does not build or start
-the Go service. The workflow sets `VITE_STATIC_DEMO=true` and derives
-`VITE_BASE_PATH` from the repository name before uploading `frontend/dist`.
+the Go service. The workflow sets `VITE_STATIC_DEMO=true` and takes
+`VITE_BASE_PATH` from `actions/configure-pages`, so project sites, user sites,
+and custom domains all receive the correct asset base before `frontend/dist`
+is uploaded.
 
 To build the same artifact locally for this repository:
 
