@@ -96,7 +96,7 @@ describe("SettingsPanel", () => {
       items: [
         { id: "mock", display_name: "本地离线", implemented: true, active: false },
         { id: "deepseek", display_name: "DeepSeek", implemented: true, key_configured: true, base_url: "https://api.deepseek.com/v1", models: ["deepseek-v4-flash", "deepseek-v4-pro"], active: true },
-        { id: "claude", display_name: "Claude（Anthropic）", implemented: true, key_configured: false, base_url: "https://api.anthropic.com/v1", models: ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-6"], active: false },
+        { id: "claude", display_name: "Claude（Anthropic）", implemented: true, key_configured: false, base_url: "https://api.anthropic.com/v1", models: ["claude-sonnet-4-6", "claude-opus-4-6"], active: false },
         { id: "openai", display_name: "OpenAI", implemented: true, key_configured: false, base_url: "https://api.openai.com/v1", models: ["gpt-4.1-mini", "gpt-4.1"], active: false },
         { id: "qwen", display_name: "通义千问（百炼）", implemented: true, key_configured: false, base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1", models: ["qwen-plus", "qwen-max"], active: false },
         { id: "glm", display_name: "智谱 GLM", implemented: true, key_configured: false, base_url: "https://open.bigmodel.cn/api/paas/v4", models: ["glm-4-flash", "glm-4-plus"], active: false },
@@ -204,6 +204,13 @@ describe("SettingsPanel", () => {
   })
 
   it("configures Claude with its own models rather than the active vendor's", async () => {
+    mocks.getVendors.mockResolvedValueOnce({
+      active_provider: "deepseek",
+      items: [
+        { id: "deepseek", display_name: "DeepSeek", implemented: true, key_configured: true, base_url: "https://api.deepseek.com/v1", models: ["deepseek-v4-flash", "deepseek-v4-pro"], active: true },
+        { id: "claude", display_name: "Claude（Anthropic）", implemented: true, key_configured: false, base_url: "https://api.anthropic.com/v1", models: ["claude-sonnet-4-6", "claude-sonnet-4-6"], active: false },
+      ],
+    })
     render(<SettingsPanel />)
 
     fireEvent.click(await screen.findByRole("button", { name: "编辑 Claude（Anthropic） 配置" }))
@@ -211,15 +218,15 @@ describe("SettingsPanel", () => {
     const modelInput = screen.getByLabelText("模型", { selector: "#claude-model" })
     expect(modelInput).toHaveAttribute("list", "claude-model-options")
     const modelValues = Array.from(document.querySelectorAll<HTMLOptionElement>("#claude-model-options option")).map((option) => option.value)
-    expect(modelValues).toEqual(["claude-sonnet-4-6", "claude-opus-4-6"])
+    expect(modelValues).toEqual(["claude-sonnet-4-6"])
     expect(modelValues).not.toContain("deepseek-v4-flash")
-    fireEvent.change(modelInput, { target: { value: "claude-opus-4-6" } })
+    fireEvent.change(modelInput, { target: { value: "claude-sonnet-4-6" } })
     fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
 
     await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
       provider: "claude",
       api_key: "sk-ant-secret",
-      model: "claude-opus-4-6",
+      model: "claude-sonnet-4-6",
     }))
   })
 
