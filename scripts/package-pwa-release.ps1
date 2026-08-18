@@ -61,7 +61,7 @@ defaultAddress = "127.0.0.1:8422"
 Function ServesApp(address)
   ServesApp = False
   If address = "" Then Exit Function
-  Set http = CreateObject("MSXML2.XMLHTTP")
+  Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
   On Error Resume Next
   http.open "GET", "http://" & address & "/", False
   http.setTimeouts 1500, 1500, 1500, 1500
