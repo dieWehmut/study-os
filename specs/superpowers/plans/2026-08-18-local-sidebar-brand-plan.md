@@ -13,6 +13,7 @@
 ## File Structure
 
 - Modify `frontend/src/components/layout/SidebarProfile.test.tsx`: specify local branding, absence of remote image/profile content, and preserved navigation behavior.
+- Modify `frontend/src/components/layout/AppShell.test.tsx`: update the two-rail header assertion to the local brand while preserving rail ordering.
 - Modify `frontend/src/components/layout/SidebarProfile.tsx`: render the local brand mark and text.
 - Delete `frontend/src/lib/profile.ts`: remove the GitHub username, avatar URL builder, size constant, and fallback initial helper once no callers remain.
 
