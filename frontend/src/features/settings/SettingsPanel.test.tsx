@@ -96,7 +96,7 @@ describe("SettingsPanel", () => {
       items: [
         { id: "mock", display_name: "本地离线", implemented: true, active: false },
         { id: "deepseek", display_name: "DeepSeek", implemented: true, key_configured: true, base_url: "https://api.deepseek.com/v1", models: ["deepseek-v4-flash", "deepseek-v4-pro"], active: true },
-        { id: "claude", display_name: "Claude（Anthropic）", implemented: true, key_configured: false, base_url: "https://api.anthropic.com/v1", models: ["claude-sonnet-4-6", "claude-opus-4-6"], active: false },
+        { id: "claude", display_name: "Claude（Anthropic）", implemented: true, key_configured: false, base_url: "https://api.anthropic.com/v1", models: ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-6"], active: false },
         { id: "openai", display_name: "OpenAI", implemented: true, key_configured: false, base_url: "https://api.openai.com/v1", models: ["gpt-4.1-mini", "gpt-4.1"], active: false },
         { id: "qwen", display_name: "通义千问（百炼）", implemented: true, key_configured: false, base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1", models: ["qwen-plus", "qwen-max"], active: false },
         { id: "glm", display_name: "智谱 GLM", implemented: true, key_configured: false, base_url: "https://open.bigmodel.cn/api/paas/v4", models: ["glm-4-flash", "glm-4-plus"], active: false },
@@ -189,10 +189,9 @@ describe("SettingsPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "编辑 DeepSeek 配置" }))
     const keyInput = screen.getByLabelText("API Key")
     fireEvent.change(keyInput, { target: { value: "sk-live-secret" } })
-    fireEvent.click(screen.getByRole("combobox", { name: "推理模型" }))
-    const option = await screen.findByRole("option", { name: "deepseek-v4-pro" })
-    fireEvent.pointerDown(option)
-    fireEvent.click(option)
+    const reasoningModelInput = screen.getByLabelText("推理模型")
+    expect(reasoningModelInput).toHaveAttribute("list", "deepseek-model-options")
+    fireEvent.change(reasoningModelInput, { target: { value: "deepseek-v4-pro" } })
     fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
 
     await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
@@ -209,19 +208,95 @@ describe("SettingsPanel", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "编辑 Claude（Anthropic） 配置" }))
     fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "sk-ant-secret" } })
-    fireEvent.click(screen.getByRole("combobox", { name: "模型" }))
-    // The option list is derived from the vendor's own model pair, so DeepSeek's
-    // models must not be reachable while Claude's editor is open.
-    expect(screen.queryByRole("option", { name: "deepseek-v4-flash" })).not.toBeInTheDocument()
-    const option = await screen.findByRole("option", { name: "claude-opus-4-6" })
-    fireEvent.pointerDown(option)
-    fireEvent.click(option)
+    const modelInput = screen.getByLabelText("模型", { selector: "#claude-model" })
+    expect(modelInput).toHaveAttribute("list", "claude-model-options")
+    const modelValues = Array.from(document.querySelectorAll<HTMLOptionElement>("#claude-model-options option")).map((option) => option.value)
+    expect(modelValues).toEqual(["claude-sonnet-4-6", "claude-opus-4-6"])
+    expect(modelValues).not.toContain("deepseek-v4-flash")
+    fireEvent.change(modelInput, { target: { value: "claude-opus-4-6" } })
     fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
 
     await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
       provider: "claude",
       api_key: "sk-ant-secret",
       model: "claude-opus-4-6",
+    }))
+  })
+
+  it("saves custom chat and reasoning model names outside the vendor suggestions", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑 DeepSeek 配置" }))
+    const modelInput = screen.getByLabelText("模型", { selector: "#deepseek-model" })
+    const reasoningModelInput = screen.getByLabelText("推理模型")
+    expect(modelInput).toHaveAttribute("list", "deepseek-model-options")
+    expect(reasoningModelInput).toHaveAttribute("list", "deepseek-model-options")
+    fireEvent.change(modelInput, { target: { value: "  openrouter/custom-chat:v3  " } })
+    fireEvent.change(reasoningModelInput, { target: { value: "  private/reasoner:latest  " } })
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
+
+    await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
+      provider: "deepseek",
+      model: "openrouter/custom-chat:v3",
+      reasoning_model: "private/reasoner:latest",
+    }))
+  })
+
+  it("omits model fields that contain only whitespace", async () => {
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑 DeepSeek 配置" }))
+    const modelInput = screen.getByLabelText("模型", { selector: "#deepseek-model" })
+    const reasoningModelInput = screen.getByLabelText("推理模型")
+    expect(modelInput).toHaveAttribute("list", "deepseek-model-options")
+    expect(reasoningModelInput).toHaveAttribute("list", "deepseek-model-options")
+    fireEvent.change(modelInput, { target: { value: "   " } })
+    fireEvent.change(reasoningModelInput, { target: { value: "  " } })
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
+
+    await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({ provider: "deepseek" }))
+  })
+
+  it("keeps model inputs editable when a vendor reports no suggestions", async () => {
+    mocks.getVendors.mockResolvedValueOnce({
+      active_provider: "custom",
+      items: [
+        {
+          id: "custom",
+          display_name: "自定义服务",
+          implemented: true,
+          key_configured: true,
+          base_url: "http://127.0.0.1:9000/v1",
+          active: true,
+        },
+      ],
+    })
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑 自定义服务 配置" }))
+    const modelInput = document.querySelector<HTMLInputElement>("#custom-model")
+    const reasoningModelInput = document.querySelector<HTMLInputElement>("#custom-reasoning-model")
+    const modelSuggestions = document.querySelector<HTMLDataListElement>("#custom-model-options")
+
+    expect(modelInput).toBeInTheDocument()
+    expect(modelInput).toHaveAttribute("type", "text")
+    expect(modelInput).toBeEnabled()
+    expect(modelInput).toHaveAttribute("list", "custom-model-options")
+    expect(reasoningModelInput).toBeInTheDocument()
+    expect(reasoningModelInput).toHaveAttribute("type", "text")
+    expect(reasoningModelInput).toBeEnabled()
+    expect(reasoningModelInput).toHaveAttribute("list", "custom-model-options")
+    expect(modelSuggestions).toBeInTheDocument()
+    expect(modelSuggestions?.querySelectorAll("option")).toHaveLength(0)
+
+    fireEvent.change(modelInput!, { target: { value: "custom/chat:latest" } })
+    fireEvent.change(reasoningModelInput!, { target: { value: "custom/reasoner:latest" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }))
+
+    await waitFor(() => expect(mocks.saveVendorConfig).toHaveBeenCalledWith({
+      provider: "custom",
+      model: "custom/chat:latest",
+      reasoning_model: "custom/reasoner:latest",
     }))
   })
 
