@@ -5,8 +5,18 @@ import { defaultExclude, defineConfig } from "vitest/config"
 
 import { backendServer } from "./vite-plugin-backend.ts"
 
+function normalizeBasePath(value: string | undefined): string {
+  const configured = value?.trim() ?? ""
+  if (!configured || configured === "/") return "/"
+  const leading = configured.startsWith("/") ? configured : `/${configured}`
+  return leading.endsWith("/") ? leading : `${leading}/`
+}
+
+const staticDemo = process.env.VITE_STATIC_DEMO === "true"
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), backendServer()],
+  base: normalizeBasePath(process.env.VITE_BASE_PATH),
+  plugins: [react(), tailwindcss(), ...(staticDemo ? [] : [backendServer()])],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

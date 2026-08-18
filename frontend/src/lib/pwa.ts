@@ -17,11 +17,13 @@ export function shouldRegisterServiceWorker(
 }
 
 export async function registerServiceWorker(
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; staticDemo?: boolean; basePath?: string } = {},
 ): Promise<ServiceWorkerRegistration | undefined> {
   const enabled = options.enabled ?? import.meta.env.PROD
+  const staticDemo = options.staticDemo ?? isStaticDemo()
   if (
     !enabled ||
+    staticDemo ||
     typeof window === "undefined" ||
     typeof navigator === "undefined" ||
     !("serviceWorker" in navigator) ||
@@ -29,9 +31,11 @@ export async function registerServiceWorker(
   ) return undefined
 
   try {
-    return await navigator.serviceWorker.register("/sw.js", { scope: "/" })
+    const basePath = options.basePath ?? publicBasePath()
+    return await navigator.serviceWorker.register(`${basePath}sw.js`, { scope: basePath })
   } catch {
     // Offline/PWA support is optional; the app remains usable when registration fails.
     return undefined
   }
 }
+import { isStaticDemo, publicBasePath } from "./runtime"

@@ -1,20 +1,23 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import { BrowserRouter } from "react-router-dom"
+import { BrowserRouter, HashRouter } from "react-router-dom"
 import "katex/dist/katex.min.css"
 
 import App from "./App"
 import "./index.css"
 import { registerServiceWorker } from "./lib/pwa"
+import { isStaticDemo, routerMode } from "./lib/runtime"
 import { initializeTheme } from "./lib/theme"
 
 initializeTheme()
-void registerServiceWorker({ enabled: import.meta.env.PROD })
+const staticDemo = isStaticDemo()
+const Router = routerMode() === "hash" ? HashRouter : BrowserRouter
+void registerServiceWorker({ enabled: import.meta.env.PROD, staticDemo })
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
+    <Router>
       <App />
-    </BrowserRouter>
+    </Router>
   </StrictMode>,
 )
