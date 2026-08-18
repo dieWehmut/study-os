@@ -75,6 +75,18 @@ jobs:
           PAGES_DIST: frontend/dist
         run: node scripts/tests/github-pages-artifact.test.mjs
 
+      - name: Install Chromium for Pages smoke
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Smoke test built Pages artifact
+        working-directory: frontend
+        env:
+          PAGES_PREVIEW: "true"
+          VITE_STATIC_DEMO: "true"
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: pnpm exec playwright test --config=playwright.pages.config.ts
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
