@@ -111,4 +111,14 @@ describe("resolveApiBase", () => {
       message: "term and definition are required",
     })
   })
+
+  it("uses in-memory fixtures and never fetches in static demo mode", async () => {
+    vi.stubEnv("VITE_STATIC_DEMO", "true")
+    const fetchSpy = vi.spyOn(window, "fetch")
+
+    await expect(apiRequest<{ knowledge_count: number }>("/dashboard")).resolves.toMatchObject({
+      knowledge_count: expect.any(Number),
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })

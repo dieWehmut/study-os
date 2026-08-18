@@ -1,4 +1,5 @@
 import { apiRequest, resolveApiBase } from "./client"
+import { isStaticDemo } from "@/lib/runtime"
 
 // 一个预设服务商：只提供默认值，真正跑合成时仍以用户填写的字段为准。
 export interface SpeechProviderSpec {
@@ -154,6 +155,16 @@ const generationHeader = "X-Study-OS-Request"
 // 试听拿的是音频字节而不是 JSON，所以绕开 apiRequest 直接 fetch。调用方负责
 // 播放和 revokeObjectURL——这里只管把 blob 交出去。
 export async function synthesizeVoiceRolePreview(id: string, text: string): Promise<Blob> {
+  if (isStaticDemo()) {
+    if (typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = "en-US"
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(utterance)
+    }
+    throw new Error("Static demo uses browser speech for previews")
+  }
+
   // 不写 format，让后端用设置里选的容器——试听要听的就是设置生效后的样子。
   const query = new URLSearchParams({ term: text, role: id })
   const response = await fetch(`${resolveApiBase()}/audio?${query.toString()}`, {

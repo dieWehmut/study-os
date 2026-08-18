@@ -61,6 +61,8 @@ export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  if (isStaticDemo()) return staticDemoRequest<T>(path, init)
+
   const { baseUrl, token } = await resolveApiConfig()
   const headers = new Headers(init?.headers)
   if (!headers.has("Accept")) headers.set("Accept", "application/json")
@@ -115,3 +117,5 @@ export async function apiRequest<T>(
   const text = await response.text()
   return (text ? JSON.parse(text) : undefined) as T
 }
+import { staticDemoRequest } from "./static-demo"
+import { isStaticDemo } from "@/lib/runtime"

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { MAX_DAILY_LIMIT, MIN_DAILY_LIMIT, normalizeDailyLimit } from "@/lib/settings"
 import { useSettingsStore } from "@/store/useSettingsStore"
+import { isStaticDemo } from "@/lib/runtime"
 
 function formatDate(value?: string): string {
   if (!value) return "尚无备份"
@@ -398,6 +399,10 @@ export default function SettingsPanel() {
   }
 
   async function installUpdate() {
+    if (isStaticDemo()) {
+      setUpdateError("GitHub Pages 展示模式不执行本地更新")
+      return
+    }
     setApplyingUpdate(true)
     setUpdateError("")
     try {

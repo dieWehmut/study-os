@@ -15,9 +15,12 @@ import Settings from "@/pages/Settings"
 import EnglishArticleNew from "@/pages/EnglishArticleNew"
 import EnglishArticles from "@/pages/EnglishArticles"
 import EnglishArticleDetail from "@/pages/EnglishArticleDetail"
+import { isStaticDemo } from "@/lib/runtime"
 
 export default function App() {
   useEffect(() => {
+    if (isStaticDemo()) return undefined
+
     function closeLauncher() {
       if (navigator.sendBeacon) {
         navigator.sendBeacon("/api/launcher/close", "1")

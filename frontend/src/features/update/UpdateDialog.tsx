@@ -3,6 +3,7 @@ import { DownloadCloud, RefreshCw } from "lucide-react"
 
 import { applyUpdate, getUpdateStatus, type UpdateStatus } from "@/api/update"
 import { Button } from "@/components/ui/button"
+import { isStaticDemo } from "@/lib/runtime"
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,10 @@ export function UpdateDialog() {
   }, [])
 
   async function startUpdate() {
+    if (isStaticDemo()) {
+      setOpen(false)
+      return
+    }
     setApplying(true)
     setError("")
     try {

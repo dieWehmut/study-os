@@ -11,13 +11,14 @@ import { initializeTheme } from "./lib/theme"
 
 initializeTheme()
 const staticDemo = isStaticDemo()
-const Router = routerMode() === "hash" ? HashRouter : BrowserRouter
 void registerServiceWorker({ enabled: import.meta.env.PROD, staticDemo })
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Router>
-      <App />
-    </Router>
+    {routerMode() === "hash" ? (
+      <HashRouter><App /></HashRouter>
+    ) : (
+      <BrowserRouter><App /></BrowserRouter>
+    )}
   </StrictMode>,
 )

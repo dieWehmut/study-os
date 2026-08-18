@@ -1,4 +1,5 @@
 import { resolveApiBase } from "./client"
+import { isStaticDemo } from "@/lib/runtime"
 
 export type PronunciationSource = "file" | "browser" | "unavailable"
 
@@ -72,6 +73,8 @@ export async function synthesizeSentence(
   text: string,
   options: { roleId?: string; format?: string; signal?: AbortSignal } = {},
 ): Promise<Blob> {
+  if (isStaticDemo()) throw new Error("Static demo audio is provided by browser speech")
+
   const query = new URLSearchParams({ term: text })
   if (options.roleId) query.set("role", options.roleId)
   if (options.format) query.set("format", options.format)
@@ -103,6 +106,7 @@ export async function playPronunciation(
   if (!normalizedTerm) return "unavailable"
 
   const locale = options.locale ?? "en-US"
+  if (isStaticDemo()) return speak(normalizedTerm, locale) ? "browser" : "unavailable"
   const url = audioURL(normalizedTerm, locale, options.format)
 
   // Cached or local audio first -- it is free and instant.
