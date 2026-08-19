@@ -190,4 +190,11 @@ describe("static Pages API fixtures", () => {
       body: JSON.stringify({ version: 1, title: "不可写入" }),
     })).rejects.toThrow(/static demo does not implement/i)
   })
+
+  it("rejects unknown lesson statuses like the backend route", async () => {
+    await expect(staticDemoRequest("/lessons?status=not-a-status")).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/invalid lesson status/i),
+    })
+  })
 })

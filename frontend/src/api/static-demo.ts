@@ -312,11 +312,12 @@ function makeInitialState(): StaticState {
 let state = makeInitialState()
 
 export class StaticDemoError extends Error {
-  readonly status = 501
+  readonly status: number
 
-  constructor(message: string) {
+  constructor(message: string, status = 501) {
     super(message)
     this.name = "StaticDemoError"
+    this.status = status
   }
 }
 
@@ -715,6 +716,9 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   if (root === "lessons" && !id && method === "GET") {
     const subject = subjectFrom(url.searchParams.get("subject"))
     const status = url.searchParams.get("status")
+    if (status && !["draft", "reviewed", "published", "archived"].includes(status)) {
+      throw new StaticDemoError("invalid lesson status", 400)
+    }
     const filtered = state.lessons.filter((lesson) => (!subject || lesson.subject === subject) && (!status || lesson.status === status))
     const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0)
     const requestedLimit = url.searchParams.get("limit")
