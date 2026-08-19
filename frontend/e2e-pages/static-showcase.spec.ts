@@ -9,13 +9,21 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   })
   page.on("pageerror", (error) => runtimeErrors.push(error.message))
 
-  for (const route of ["#", "#/knowledge", "#/memory", "#/chat", "#/integrate", "#/settings", "#/practice", "#/import", "#/reading/articles"]) {
+  for (const route of ["#", "#/knowledge", "#/memory", "#/chat", "#/integrate", "#/settings", "#/practice", "#/import", "#/reading/articles", "#/lessons", "#/lessons/lesson-newton"]) {
     await page.goto(route)
     await expect(page.locator("main")).toBeVisible()
   }
 
+  await page.goto("#/memory")
+  await expect(page.locator("main")).toContainText("记忆检测")
+
+  await page.goto("#/lessons")
+  await expect(page.locator("main")).toContainText("牛顿第二定律：从受力图开始")
+
+  await page.goto("#/lessons/lesson-newton")
+  await expect(page.locator("main")).toContainText("牛顿第二定律：从受力图开始")
+
   await expect(page.locator('[data-static-demo="true"]')).toBeVisible()
-  await expect(page.locator("main")).toContainText("Memory")
   expect(apiRequests).toEqual([])
   expect(runtimeErrors).toEqual([])
 })
