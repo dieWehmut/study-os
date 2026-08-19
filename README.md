@@ -65,6 +65,28 @@ pnpm --dir frontend dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 打开 http://127.0.0.1:5173 。
 
+## GitHub Pages 展示版与评论
+
+推送到 `main` 会由 `.github/workflows/deploy-pages.yml` 构建并发布纯前端展示版：
+它使用内存 fixture 和 Hash 路由，不启动 Go 后端，默认地址为
+`https://diewehmut.github.io/study-os/`。首次启用仓库的 Pages 设置时，选择
+`GitHub Actions` 作为发布来源。
+
+每个页面底部的评论区由 Giscus 提供。要启用它，需要先在仓库设置中打开
+Discussions，并安装 [Giscus GitHub App](https://github.com/apps/giscus)，然后在
+Giscus 配置器中创建一个 category。把下面四个非敏感的公开值保存为仓库 Variables
+（`Settings > Secrets and variables > Actions > Variables`），下一次 Pages 构建就会注入：
+
+```text
+GISCUS_REPO=dieWehmut/study-os
+GISCUS_REPO_ID=<repository id>
+GISCUS_CATEGORY=<category name>
+GISCUS_CATEGORY_ID=<category id>
+```
+
+评论按 Hash 路由隔离到各自页面；API Key 等秘密不会放进 Pages 构建变量。未配置完整
+Giscus Variables 时，展示版会隐藏评论区，但其它页面仍可正常浏览。
+
 ## AI 配置
 
 复制 `.env.sample` 为 `.env.local`，按厂商填写。`AI_ACTIVE_PROVIDER` 可选
