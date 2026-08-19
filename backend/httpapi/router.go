@@ -232,6 +232,18 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/integrate/{noteID}", func(response http.ResponseWriter, request *http.Request) {
 			handleIntegrateGet(response, request, application)
 		})
+		api.Get("/lessons", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonList(response, request, application)
+		})
+		api.Post("/lessons", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonCreate(response, request, application)
+		})
+		api.Get("/lessons/{lessonID}", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonGet(response, request, application)
+		})
+		api.Patch("/lessons/{lessonID}", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonUpdate(response, request, application)
+		})
 		api.Post("/mistakes", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeCreate(response, request, application)
 		})

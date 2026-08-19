@@ -257,3 +257,26 @@ CREATE TABLE english_articles (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX english_articles_updated_idx ON english_articles(updated_at DESC);
+
+CREATE TABLE lessons (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT '',
+    source_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    current_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX lessons_subject_status_idx ON lessons(subject, status, updated_at DESC);
+
+CREATE TABLE lesson_versions (
+    lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    document_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (lesson_id, version)
+);
+CREATE INDEX lesson_versions_created_idx ON lesson_versions(lesson_id, created_at DESC);

@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 11
+const currentSchemaVersion = 12
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -345,6 +345,35 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 			CREATE INDEX IF NOT EXISTS english_articles_updated_idx ON english_articles(updated_at DESC)`); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", version, err)
 		}
+	case 12:
+		statements := []string{
+			`CREATE TABLE IF NOT EXISTS lessons (
+				id TEXT PRIMARY KEY,
+				subject TEXT NOT NULL DEFAULT '',
+				title TEXT NOT NULL,
+				source_type TEXT NOT NULL DEFAULT '',
+				source_id TEXT NOT NULL DEFAULT '',
+				status TEXT NOT NULL DEFAULT 'draft',
+				current_version INTEGER NOT NULL DEFAULT 1,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`,
+			`CREATE INDEX IF NOT EXISTS lessons_subject_status_idx ON lessons(subject, status, updated_at DESC)`,
+			`CREATE TABLE IF NOT EXISTS lesson_versions (
+				lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+				version INTEGER NOT NULL,
+				schema_version INTEGER NOT NULL DEFAULT 1,
+				document_json TEXT NOT NULL,
+				created_at TEXT NOT NULL,
+				PRIMARY KEY (lesson_id, version)
+			)`,
+			`CREATE INDEX IF NOT EXISTS lesson_versions_created_idx ON lesson_versions(lesson_id, created_at DESC)`,
+		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -395,6 +424,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 	case 11:
 		if !hasTable(ctx, tx, "english_articles") {
 			return errors.New("schema version 11 is recorded but english_articles is missing")
+		}
+	case 12:
+		if !hasTable(ctx, tx, "lessons") || !hasTable(ctx, tx, "lesson_versions") {
+			return errors.New("schema version 12 is recorded but lesson tables are missing")
 		}
 	}
 	return nil

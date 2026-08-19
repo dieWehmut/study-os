@@ -2,6 +2,9 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -162,6 +165,192 @@ type IntegratedNote struct {
 	MindmapJSON json.RawMessage `json:"mindmap"`
 	CardsJSON   json.RawMessage `json:"cards"`
 	CreatedAt   time.Time       `json:"created_at"`
+}
+
+// Lesson is a source-backed, learner-facing course unit. A lesson keeps the
+// current document inline while lesson_versions stores the immutable history
+// used to explain and reproduce edits.
+type Lesson struct {
+	ID             string         `json:"id"`
+	Subject        string         `json:"subject,omitempty"`
+	Title          string         `json:"title"`
+	SourceType     string         `json:"source_type,omitempty"`
+	SourceID       string         `json:"source_id,omitempty"`
+	Status         string         `json:"status"`
+	CurrentVersion int            `json:"version"`
+	Document       LessonDocument `json:"document"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+// LessonSummary is returned by the collection endpoint so a library view does
+// not need to download every section body. Details are available from GET by
+// id (or by the version query parameter).
+type LessonSummary struct {
+	ID             string    `json:"id"`
+	Subject        string    `json:"subject,omitempty"`
+	Title          string    `json:"title"`
+	SourceType     string    `json:"source_type,omitempty"`
+	SourceID       string    `json:"source_id,omitempty"`
+	Status         string    `json:"status"`
+	CurrentVersion int       `json:"version"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// LessonVersion is an immutable document revision. The API exposes this shape
+// when a historical version is requested explicitly.
+type LessonVersion struct {
+	LessonID      string         `json:"lesson_id"`
+	Version       int            `json:"version"`
+	SchemaVersion int            `json:"schema_version"`
+	Document      LessonDocument `json:"document"`
+	CreatedAt     time.Time      `json:"created_at"`
+}
+
+// LessonDocument is deliberately data-oriented: section content is JSON so a
+// later course renderer can add charts, questions, or media without changing
+// the Lesson row. The section kinds and their order form the stable contract.
+type LessonDocument struct {
+	SchemaVersion int             `json:"schema_version"`
+	Sections      []LessonSection `json:"sections"`
+}
+
+type LessonSection struct {
+	ID       string          `json:"id"`
+	Type     string          `json:"type"`
+	Title    string          `json:"title"`
+	Position int             `json:"position"`
+	Required bool            `json:"required"`
+	Content  json.RawMessage `json:"content"`
+}
+
+type LessonListOptions struct {
+	Subject string
+	Status  string
+	Limit   int
+	Offset  int
+}
+
+const (
+	LessonStatusDraft     = "draft"
+	LessonStatusReviewed  = "reviewed"
+	LessonStatusPublished = "published"
+	LessonStatusArchived  = "archived"
+)
+
+const LessonDocumentSchemaVersion = 1
+
+var lessonSectionDefinitions = []struct {
+	Type     string
+	Title    string
+	Required bool
+}{
+	{Type: "diagnostic", Title: "诊断", Required: true},
+	{Type: "objectives", Title: "目标", Required: true},
+	{Type: "concept", Title: "核心概念", Required: true},
+	{Type: "examples", Title: "例题与示例", Required: true},
+	{Type: "visualization", Title: "可视化", Required: true},
+	{Type: "practice", Title: "即时练习", Required: true},
+	{Type: "feedback", Title: "反馈", Required: true},
+	{Type: "summary", Title: "总结", Required: true},
+	{Type: "memory", Title: "记忆确认", Required: true},
+	{Type: "follow_up", Title: "后续任务", Required: true},
+}
+
+var lessonStatuses = map[string]struct{}{
+	LessonStatusDraft: {}, LessonStatusReviewed: {},
+	LessonStatusPublished: {}, LessonStatusArchived: {},
+}
+
+// NewLessonDocument returns a complete, empty ten-section template.
+func NewLessonDocument() LessonDocument {
+	document := LessonDocument{SchemaVersion: LessonDocumentSchemaVersion, Sections: make([]LessonSection, 0, len(lessonSectionDefinitions))}
+	for position, definition := range lessonSectionDefinitions {
+		document.Sections = append(document.Sections, LessonSection{
+			ID:       definition.Type,
+			Type:     definition.Type,
+			Title:    definition.Title,
+			Position: position,
+			Required: definition.Required,
+			Content:  json.RawMessage(`{}`),
+		})
+	}
+	return document
+}
+
+// NormalizeLessonDocument fills omitted template sections and rejects unknown
+// or duplicate kinds. It keeps the persisted document deterministic, which is
+// important for version comparisons and future renderer migrations.
+func NormalizeLessonDocument(document LessonDocument) (LessonDocument, error) {
+	if document.SchemaVersion == 0 {
+		document.SchemaVersion = LessonDocumentSchemaVersion
+	}
+	if document.SchemaVersion != LessonDocumentSchemaVersion {
+		return LessonDocument{}, fmt.Errorf("lesson document schema_version must be %d", LessonDocumentSchemaVersion)
+	}
+	provided := make(map[string]LessonSection, len(document.Sections))
+	for _, section := range document.Sections {
+		section.Type = strings.TrimSpace(section.Type)
+		if section.Type == "" {
+			return LessonDocument{}, errors.New("lesson section type is required")
+		}
+		if _, ok := lessonSectionDefinition(section.Type); !ok {
+			return LessonDocument{}, fmt.Errorf("unknown lesson section type %q", section.Type)
+		}
+		if _, exists := provided[section.Type]; exists {
+			return LessonDocument{}, fmt.Errorf("duplicate lesson section type %q", section.Type)
+		}
+		if strings.TrimSpace(section.ID) == "" {
+			section.ID = section.Type
+		}
+		if len(section.Content) == 0 {
+			section.Content = json.RawMessage(`{}`)
+		} else if !json.Valid(section.Content) {
+			return LessonDocument{}, fmt.Errorf("lesson section %q content is not valid JSON", section.Type)
+		}
+		provided[section.Type] = section
+	}
+	// Canonical ordering also makes a partial update safe: omitted sections are
+	// retained as empty placeholders instead of silently changing the template.
+	normalized := NewLessonDocument()
+	for position := range normalized.Sections {
+		section := normalized.Sections[position]
+		if existing, ok := provided[section.Type]; ok {
+			section.ID = existing.ID
+			section.Title = strings.TrimSpace(existing.Title)
+			if section.Title == "" {
+				section.Title = normalized.Sections[position].Title
+			}
+			section.Content = append(json.RawMessage(nil), existing.Content...)
+		}
+		section.Position = position
+		section.Required = true
+		normalized.Sections[position] = section
+	}
+	return normalized, nil
+}
+
+func lessonSectionDefinition(sectionType string) (struct {
+	Type     string
+	Title    string
+	Required bool
+}, bool) {
+	for _, definition := range lessonSectionDefinitions {
+		if definition.Type == sectionType {
+			return definition, true
+		}
+	}
+	return struct {
+		Type     string
+		Title    string
+		Required bool
+	}{}, false
+}
+
+func IsLessonStatusValid(status string) bool {
+	_, ok := lessonStatuses[strings.TrimSpace(status)]
+	return ok
 }
 
 // EnglishArticle is a generated bilingual reading article. The list endpoint
