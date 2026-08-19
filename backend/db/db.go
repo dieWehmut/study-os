@@ -446,8 +446,8 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 			return errors.New("schema version 12 is recorded but lesson tables are missing")
 		}
 	case 13:
-		if !hasTable(ctx, tx, "lesson_links") {
-			return errors.New("schema version 13 is recorded but lesson_links is missing")
+		if !hasTable(ctx, tx, "lessons") || !hasTable(ctx, tx, "lesson_versions") || !hasTable(ctx, tx, "lesson_links") {
+			return errors.New("schema version 13 is recorded but lesson tables or lesson_links are missing")
 		}
 	}
 	return nil
