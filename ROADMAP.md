@@ -82,6 +82,8 @@
 `GET /api/lessons`/`GET /api/lessons/{lessonID}` 读取，
 `PATCH /api/lessons/{lessonID}` 必须携带 `version`，遇到并发旧版本返回版本冲突；
 文档版本不可变，便于后续解释和回滚。
+GitHub Pages 的 `VITE_STATIC_DEMO` 适配器只提供这门课程的 GET 预览 fixture，
+不模拟创建、编辑或历史版本；写入与版本管理必须连接本地后端。
 **不**先做 Agent 一次性生成整节课——0801 明确反对这种做法。
 
 下一步边界：与知识点/记忆项/题目的显式关联、即时测验提交与反馈，

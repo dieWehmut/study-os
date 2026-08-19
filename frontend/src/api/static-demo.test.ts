@@ -163,8 +163,9 @@ describe("static Pages API fixtures", () => {
     expect(lessonID).toBeTruthy()
     expect(list.items[0]?.sections_count).toBe(10)
 
-    const detail = await staticDemoRequest<{ sections: Array<{ type: string }> }>(`/lessons/${lessonID}`)
+    const detail = await staticDemoRequest<{ sections: Array<{ type: string; required?: boolean }> }>(`/lessons/${lessonID}`)
     expect(detail.sections).toHaveLength(10)
+    expect(detail.sections.every((section) => section.required === true)).toBe(true)
     expect(detail.sections.map((section) => section.type)).toEqual([
       "diagnostic",
       "objectives",
@@ -177,5 +178,16 @@ describe("static Pages API fixtures", () => {
       "memory",
       "follow_up",
     ])
+  })
+
+  it("keeps lesson writes backend-only in the static Pages adapter", async () => {
+    await expect(staticDemoRequest("/lessons", {
+      method: "POST",
+      body: JSON.stringify({ title: "不可写入" }),
+    })).rejects.toThrow(/static demo does not implement/i)
+    await expect(staticDemoRequest("/lessons/lesson-newton", {
+      method: "PATCH",
+      body: JSON.stringify({ version: 1, title: "不可写入" }),
+    })).rejects.toThrow(/static demo does not implement/i)
   })
 })
