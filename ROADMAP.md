@@ -10,19 +10,20 @@
 
 ## 一、对象盘点：0801 的 13 个底层对象，现在有几个
 
-schema 版本 7（`backend/db/db.go:19`），下表按 0801「三、首先要统一的底层对象」逐条对照。
+盘点基线：schema 版本 12（`backend/db/db.go:19`，2026-08-19）。下表按 0801「三、首先要统一的底层对象」逐条对照。
+新增迁移或底层对象时，必须同时更新本节；`scripts/tests/architecture-docs-consistency.test.mjs` 会检查这条基线和关键表名，避免路线图把已经落地的能力再次当成缺口。
 
 | # | 对象 | 现状 | 落点 |
 |---|---|---|---|
 | 1 | 学科 Subject | **列，不是表** | `knowledge_items.subject` 等多张表上的 TEXT 列 |
 | 2 | 原始材料 Source | ✅ | `sources` |
-| 3 | 课程 Lesson | ❌ **完全没有** | — |
+| 3 | 课程 Lesson | 🟡 首个只读骨架已落地 | `lessons` + `lesson_versions`；十段文档模板与来源字段，尚无创建/编辑 Agent 流水线 |
 | 4 | 知识点 Knowledge Point | ✅ 主体有，关系没有 | `knowledge_items`；缺前置/易混/掌握状态 |
 | 5 | 二级结论 Insight | 🟡 靠 `item_type` + tag 表达 | 知识库已有「二级结论/解题策略/易错信号」筛选 |
 | 6 | 记忆项 Memory Item | ✅ | `prompts` + `review_states` |
-| 7 | 题目 Question | ❌ **完全没有** | — |
-| 8 | 作答 Attempt | 🟡 只有记忆项的作答 | `attempts.prompt_id NOT NULL`，无法记题目作答 |
-| 9 | 错因 Error Cause | ❌ 只在浏览器里 | `frontend/src/lib/mistakes.ts` → `localStorage` |
+| 7 | 题目 Question | ✅ 基础记录已落地 | `questions`；含来源与可选 `knowledge_item_id` |
+| 8 | 作答 Attempt | 🟡 两条记录链并存 | 记忆项作答在 `attempts`；题目作答在 `question_attempts`，目前记录错因/备注/时间，尚未覆盖答案、耗时与评分 |
+| 9 | 错因 Error Cause | 🟡 已持久化，分类仍在前端 | `question_attempts.cause` + `/api/mistakes`；六类 taxonomy 在 `frontend/src/lib/mistakes.ts`，尚无独立的学科错因表 |
 | 10 | 任务 Task | ❌ | — |
 | 11 | 学习会话 Study Session | ✅ 表在，写得少 | `study_sessions` |
 | 12 | 答疑记录 Q&A | 🟡 存了对话，没存结构 | `chat_messages`；缺「原误解—正确模型—掌握证据」 |
@@ -31,44 +32,57 @@ schema 版本 7（`backend/db/db.go:19`），下表按 0801「三、首先要统
 另有一项 0801 列为「模块十」的基础设施**已经就位**：
 `domain_events`（`schema.sql:92`，读写在 `store.go:695/710`）。统一事件层不需要从头设计。
 
-## 二、最大的一处「假数据」
+0801 未列出的两个已落地对象也要纳入后续设计的事实来源：
+`voice_roles`（schema v10，保存可自定义的语音角色与模型配置）和
+`english_articles`（schema v11，保存双语阅读文章及生成来源）。它们不是 Lesson 的替代品，
+但会成为课程/阅读回流时可引用的 Source。schema v12 新增的 `lessons` 与 `lesson_versions`
+只提供可追溯的 draft 文档和只读预习入口；内容生成、编辑与交互式测验仍在后续阶段。
+
+## 二、错题存储：历史假数据已迁移，边界仍要写清
 
 0801 设计原则第 ② 条是「一个对象，多种视图」——底层只能有一条记录。
 
-做题工具（`frontend/src/pages/Practice.tsx`）违反了它：错题记录写进 `localStorage`，
-后端看不见、连不上、也没法据此排复习。`lib/mistakes.ts` 里那套六类错因分类
-（想不起来 / 看错题 / 算错 / 思路不对 / 没时间 / 还没想清楚）连同 `reviewFixes` 判定
-都是真业务逻辑，但它作用在一份系统其余部分无法访问的存储上。
+做题工具（`frontend/src/pages/Practice.tsx`）现在以 `/api/mistakes` 为主存储，
+服务端把一条错题拆成 `questions` + `question_attempts`，并支持按学科查询、删除、订正，
+以及把可修复错因排进记忆队列。早期写入浏览器 `localStorage` 的记录只作为一次性迁移来源，
+迁移成功后会清除旧键；这保留了历史数据，又不会让新记录重新分叉。
 
-这正是「不要 mock 数据」要消除的东西，也是把 7、8、9 三个缺失对象一次性补齐的入口。
+仍未完成的是错因 taxonomy 的后端化：`mistakes.ts` 里的六类（想不起来 / 看错题 / 算错 /
+思路不对 / 没时间 / 还没想清楚）目前是应用常量，尚未支持按学科扩展或由用户确认。因此，
+题目—作答—错因的持久化入口已经可用，但不能把它误称为完整的 Error Cause 对象。
 
 ## 三、执行序
 
 原则：**每一步都能独立使用**，不做「等下一步才有用」的中间层。
 
-### 第 1 阶段：题目—作答—错因 落地到后端
+### 第 1 阶段：题目—作答—错因 落地到后端（已完成基础链路）
 
-1. `questions` 表：题干、学科、题型、来源、关联知识点
-2. `question_attempts` 表：一题多做，记作答、用时、正误
-3. `error_causes`：错因从 `mistakes.ts` 的常量升级成带学科维度的数据
+1. `questions` 表：题干、学科、来源、可选关联知识点（题型字段仍待补）
+2. `question_attempts` 表：一题多做，当前保存错因、备注、发生时间（答案、用时、正误仍待补）
+3. `/api/mistakes`：错题创建、列表、删除、订正；`localStorage` 仅作为迁移来源
+4. `error_causes`：**尚未完成**，错因仍从 `mistakes.ts` 常量提供，下一步要升级成带学科维度的数据
    （0801：「以后你独立总结出的『地理六类错因』，就可以作为地理学科的专属分类体系」）
-4. Practice 页改读后端；localStorage 只作为迁移来源，读一次后写入库
 
-判据：错题能和知识点、记忆项 join 到一起；换设备后错题还在。
+判据（已满足基础部分）：错题能和知识点、记忆项 join 到一起；换设备后新错题还在。
+剩余判据：一题的完整作答证据（答案、耗时、正误）和可扩展的学科错因 taxonomy 能被查询。
 
-### 第 2 阶段：错因驱动复习
+### 第 2 阶段：错因驱动复习（基础入口已落地）
 
-`mistakes.ts` 已经区分了「复习能修的」和「复习修不了的」。目前这个判断只用来显示文字。
-接上后端后，`reviewFixes: true` 的错题应当能一键排进复习队列
-——复用 `POST /api/knowledge/{id}/schedule` 这条已经打通的桥。
+`mistakes.ts` 已经区分了「复习能修的」和「复习修不了的」，并由
+`POST /api/mistakes/{attemptID}/schedule` 执行排队；后端会复用知识库条目并避免重复排卡。
+当前仍缺按错因聚合的诊断视图，以及把“订正后证据”反馈给后续课程/题目选择的闭环。
 
 判据：做错一道题，其对应知识点当天进入队列。
 
-### 第 3 阶段：课程 Lesson
+### 第 3 阶段：课程 Lesson（首个只读垂直切片已落地）
 
-0801 模块五的七阶段流水线是最大的一块。先只做能立刻用的部分：
-课程对象 + 固定十段模板的骨架 + 与知识点/记忆项/题目的关联。
+0801 模块五的七阶段流水线是最大的一块。当前先落地能立刻使用的部分：
+`lessons` + `lesson_versions` 课程对象、固定十段模板的骨架、来源指针，以及
+`/lessons` 只读预习页。文档版本不可变，便于后续解释和回滚。
 **不**先做 Agent 一次性生成整节课——0801 明确反对这种做法。
+
+下一步边界：创建/编辑 draft、与知识点/记忆项/题目的显式关联、即时测验提交与反馈，
+再把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段。
 
 ### 第 4 阶段：任务 Task 与系统想法 System Idea
 
