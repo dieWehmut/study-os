@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { Lesson } from "@/api/lessons"
+import { normalizeLesson, type Lesson } from "@/api/lessons"
 import LessonDetail from "./LessonDetail"
 
 const mocks = vi.hoisted(() => ({ getLesson: vi.fn() }))
@@ -64,5 +64,41 @@ describe("lesson detail page", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("课程暂时无法读取")
     expect(screen.getByRole("link", { name: "返回课程" })).toHaveAttribute("href", "/lessons")
+  })
+
+  it("derives objectives from the canonical document section when no top-level field exists", async () => {
+    const documentOnlyLesson = normalizeLesson({
+      id: "lesson-document-only",
+      title: "Document-backed lesson",
+      subject: "physics",
+      status: "published",
+      document: {
+        schema_version: 12,
+        sections: [
+          {
+            id: "objectives-1",
+            type: "objectives",
+            title: "学习目标",
+            content: { items: ["说出牛顿第二定律", "用公式解释一个例子"] },
+          },
+          { id: "concept-1", type: "concept", title: "核心概念", content: "F = ma" },
+        ],
+      },
+    })
+    expect(documentOnlyLesson.objectives).toBeUndefined()
+    mocks.getLesson.mockResolvedValue(documentOnlyLesson)
+    render(
+      <MemoryRouter initialEntries={["/lessons/lesson-document-only"]}>
+        <Routes>
+          <Route path="/lessons/:id" element={<LessonDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole("heading", { name: "Document-backed lesson" })).toBeInTheDocument()
+    const objectiveCard = screen.getByText("这次只需要带走").closest("[data-slot='card']")
+    expect(objectiveCard).not.toBeNull()
+    expect(within(objectiveCard as HTMLElement).getByText("说出牛顿第二定律")).toBeInTheDocument()
+    expect(within(objectiveCard as HTMLElement).getByText("用公式解释一个例子")).toBeInTheDocument()
   })
 })

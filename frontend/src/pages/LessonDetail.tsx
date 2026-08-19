@@ -71,6 +71,19 @@ function contentItems(section: LessonSection): string[] {
   return []
 }
 
+function objectivesForLesson(lesson: Lesson): string[] {
+  if (lesson.objectives?.length) return lesson.objectives
+
+  const section = lesson.sections.find((candidate) => sectionType(candidate) === "objectives")
+  if (!section) return []
+
+  const items = contentItems(section)
+  if (items.length > 0) return items
+
+  const text = contentText(sectionContent(section)).trim()
+  return text ? [text] : []
+}
+
 function sourceLabel(lesson: Lesson): string {
   const title = lesson.source?.title || lesson.source_id || lesson.source_type
   if (!title) return "未关联资料"
@@ -142,6 +155,7 @@ export default function LessonDetail() {
   }, [id, requestVersion])
 
   const sections = useMemo(() => (lesson ? sortSections(lesson.sections) : []), [lesson])
+  const objectives = useMemo(() => (lesson ? objectivesForLesson(lesson) : []), [lesson])
 
   if (loading) {
     return <section aria-busy="true" className="grid gap-4"><p className="text-sm text-muted-foreground">正在打开课程…</p></section>
@@ -176,10 +190,10 @@ export default function LessonDetail() {
         </div>
       </header>
 
-      {lesson.objectives?.length ? (
+      {objectives.length ? (
         <Card className="border-primary/25 bg-primary/5">
           <CardHeader className="gap-1.5"><CardTitle className="text-base">这次只需要带走</CardTitle></CardHeader>
-          <CardContent><ul className="grid gap-2 text-sm leading-6">{lesson.objectives.map((objective, index) => <li key={`${objective}-${index}`} className="flex gap-2"><CheckCircle2 aria-hidden="true" className="mt-1 size-4 shrink-0 text-primary" />{objective}</li>)}</ul></CardContent>
+          <CardContent><ul className="grid gap-2 text-sm leading-6">{objectives.map((objective, index) => <li key={`${objective}-${index}`} className="flex gap-2"><CheckCircle2 aria-hidden="true" className="mt-1 size-4 shrink-0 text-primary" />{objective}</li>)}</ul></CardContent>
         </Card>
       ) : null}
 
