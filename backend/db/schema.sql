@@ -280,3 +280,12 @@ CREATE TABLE lesson_versions (
     PRIMARY KEY (lesson_id, version)
 );
 CREATE INDEX lesson_versions_created_idx ON lesson_versions(lesson_id, created_at DESC);
+
+CREATE TABLE lesson_links (
+    lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    target_type TEXT NOT NULL CHECK (target_type IN ('knowledge_item', 'prompt')),
+    target_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (lesson_id, target_type, target_id)
+);
+CREATE INDEX lesson_links_target_idx ON lesson_links(target_type, target_id, lesson_id);

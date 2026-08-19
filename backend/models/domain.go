@@ -208,6 +208,37 @@ type LessonVersion struct {
 	CreatedAt     time.Time      `json:"created_at"`
 }
 
+// LessonLink connects a lesson to a durable learning object. The target kind
+// is deliberately explicit: a raw ID is not enough to tell a knowledge item
+// from a memory prompt, and both may use unrelated ID namespaces.
+type LessonLink struct {
+	LessonID   string    `json:"lesson_id"`
+	TargetType string    `json:"target_type"`
+	TargetID   string    `json:"target_id"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type LessonLinkListOptions struct {
+	TargetType string
+	Limit      int
+	Offset     int
+}
+
+const (
+	LessonLinkTargetKnowledgeItem = "knowledge_item"
+	LessonLinkTargetPrompt        = "prompt"
+)
+
+var lessonLinkTargetTypes = map[string]struct{}{
+	LessonLinkTargetKnowledgeItem: {},
+	LessonLinkTargetPrompt:        {},
+}
+
+func IsLessonLinkTargetValid(targetType string) bool {
+	_, ok := lessonLinkTargetTypes[strings.TrimSpace(targetType)]
+	return ok
+}
+
 // LessonDocument is deliberately data-oriented: section content is JSON so a
 // later course renderer can add charts, questions, or media without changing
 // the Lesson row. The section kinds and their order form the stable contract.

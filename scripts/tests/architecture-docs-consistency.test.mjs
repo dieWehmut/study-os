@@ -39,6 +39,7 @@ test("ROADMAP names persisted objects instead of stale browser-only gaps", () =>
     "english_articles",
     "lessons",
     "lesson_versions",
+    "lesson_links",
   ]) {
     assert.match(schema, tablePattern(table), `schema is missing ${table}`)
     assert.match(roadmap, new RegExp(`\\b${table}\\b`), `ROADMAP is missing ${table}`)

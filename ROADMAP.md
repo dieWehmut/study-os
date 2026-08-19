@@ -10,15 +10,15 @@
 
 ## 一、对象盘点：0801 的 13 个底层对象，现在有几个
 
-盘点基线：schema 版本 12（`backend/db/db.go:19`，2026-08-19）。下表按 0801「三、首先要统一的底层对象」逐条对照。
+盘点基线：schema 版本 13（`backend/db/db.go:19`，2026-08-20）。下表按 0801「三、首先要统一的底层对象」逐条对照。
 新增迁移或底层对象时，必须同时更新本节；`scripts/tests/architecture-docs-consistency.test.mjs` 会检查这条基线和关键表名，避免路线图把已经落地的能力再次当成缺口。
 
 | # | 对象 | 现状 | 落点 |
 |---|---|---|---|
 | 1 | 学科 Subject | **列，不是表** | `knowledge_items.subject` 等多张表上的 TEXT 列 |
 | 2 | 原始材料 Source | ✅ | `sources` |
-| 3 | 课程 Lesson | 🟡 首个版本化垂直切片已落地 | `lessons` + `lesson_versions`；十段文档模板、来源字段、草稿写入与乐观版本更新，尚无 Agent 流水线 |
-| 4 | 知识点 Knowledge Point | ✅ 主体有，关系没有 | `knowledge_items`；缺前置/易混/掌握状态 |
+| 3 | 课程 Lesson | 🟡 首个版本化垂直切片已落地 | `lessons` + `lesson_versions` + `lesson_links`；十段文档模板、来源字段、草稿写入、乐观版本更新及知识点/记忆项关联，尚无 Agent 流水线 |
+| 4 | 知识点 Knowledge Point | ✅ 主体与课程关系已有 | `knowledge_items` + `lesson_links`；仍缺前置/易混/掌握状态 |
 | 5 | 二级结论 Insight | 🟡 靠 `item_type` + tag 表达 | 知识库已有「二级结论/解题策略/易错信号」筛选 |
 | 6 | 记忆项 Memory Item | ✅ | `prompts` + `review_states` |
 | 7 | 题目 Question | ✅ 基础记录已落地 | `questions`；含来源与可选 `knowledge_item_id` |
@@ -28,6 +28,9 @@
 | 11 | 学习会话 Study Session | ✅ 表在，写得少 | `study_sessions` |
 | 12 | 答疑记录 Q&A | 🟡 存了对话，没存结构 | `chat_messages`；缺「原误解—正确模型—掌握证据」 |
 | 13 | 系统想法 System Idea | ❌ | — |
+
+schema v13 新增 `lesson_links`：课程与 `knowledge_items`/`prompts` 的显式多对多关联，
+由存储层在同一事务内验证目标存在，并提供按课程和按目标的查询；Pages 静态适配器仍只读。
 
 另有一项 0801 列为「模块十」的基础设施**已经就位**：
 `domain_events`（`schema.sql:92`，读写在 `store.go:695/710`）。统一事件层不需要从头设计。
@@ -81,13 +84,15 @@
 `/lessons` 预习页。后端通过 `POST /api/lessons` 创建 draft、
 `GET /api/lessons`/`GET /api/lessons/{lessonID}` 读取，
 `PATCH /api/lessons/{lessonID}` 必须携带 `version`，遇到并发旧版本返回版本冲突；
-文档版本不可变，便于后续解释和回滚。
+文档版本不可变，便于后续解释和回滚。课程关联通过
+`POST /api/lessons/{lessonID}/links`、`GET /api/lessons/{lessonID}/links` 和
+`GET /api/lesson-links?target_type=&target_id=` 读取；目标类型目前固定为
+`knowledge_item` 或 `prompt`，不存在的目标返回 404，重复关联返回 409。
 GitHub Pages 的 `VITE_STATIC_DEMO` 适配器只提供这门课程的 GET 预览 fixture，
 不模拟创建、编辑或历史版本；写入与版本管理必须连接本地后端。
 **不**先做 Agent 一次性生成整节课——0801 明确反对这种做法。
 
-下一步边界：与知识点/记忆项/题目的显式关联、即时测验提交与反馈，
-再把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段。
+下一步边界：题目关联、即时测验提交与反馈，再把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段。
 
 ### 第 4 阶段：任务 Task 与系统想法 System Idea
 

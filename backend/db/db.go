@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 12
+const currentSchemaVersion = 13
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -374,6 +374,22 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				return fmt.Errorf("apply schema version %d: %w", version, err)
 			}
 		}
+	case 13:
+		statements := []string{
+			`CREATE TABLE IF NOT EXISTS lesson_links (
+				lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+				target_type TEXT NOT NULL CHECK (target_type IN ('knowledge_item', 'prompt')),
+				target_id TEXT NOT NULL,
+				created_at TEXT NOT NULL,
+				PRIMARY KEY (lesson_id, target_type, target_id)
+			)`,
+			`CREATE INDEX IF NOT EXISTS lesson_links_target_idx ON lesson_links(target_type, target_id, lesson_id)`,
+		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -428,6 +444,10 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 	case 12:
 		if !hasTable(ctx, tx, "lessons") || !hasTable(ctx, tx, "lesson_versions") {
 			return errors.New("schema version 12 is recorded but lesson tables are missing")
+		}
+	case 13:
+		if !hasTable(ctx, tx, "lesson_links") {
+			return errors.New("schema version 13 is recorded but lesson_links is missing")
 		}
 	}
 	return nil

@@ -45,3 +45,23 @@ func TestNormalizeLessonDocumentRejectsInvalidStructure(t *testing.T) {
 		})
 	}
 }
+
+func TestLessonLinkTargetValidation(t *testing.T) {
+	cases := []struct {
+		name  string
+		type_ string
+		valid bool
+	}{
+		{name: "knowledge item", type_: LessonLinkTargetKnowledgeItem, valid: true},
+		{name: "prompt", type_: LessonLinkTargetPrompt, valid: true},
+		{name: "empty", type_: "", valid: false},
+		{name: "unknown", type_: "question", valid: false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := IsLessonLinkTargetValid(testCase.type_); got != testCase.valid {
+				t.Fatalf("IsLessonLinkTargetValid(%q) = %v, want %v", testCase.type_, got, testCase.valid)
+			}
+		})
+	}
+}

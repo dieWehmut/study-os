@@ -235,8 +235,20 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/lessons", func(response http.ResponseWriter, request *http.Request) {
 			handleLessonList(response, request, application)
 		})
+		api.Get("/lesson-links", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonReverseLinks(response, request, application)
+		})
 		api.Post("/lessons", func(response http.ResponseWriter, request *http.Request) {
 			handleLessonCreate(response, request, application)
+		})
+		api.Get("/lessons/{lessonID}/links", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonLinkList(response, request, application)
+		})
+		api.Post("/lessons/{lessonID}/links", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonLinkCreate(response, request, application)
+		})
+		api.Delete("/lessons/{lessonID}/links/{targetType}/{targetID}", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonLinkDelete(response, request, application)
 		})
 		api.Get("/lessons/{lessonID}", func(response http.ResponseWriter, request *http.Request) {
 			handleLessonGet(response, request, application)
