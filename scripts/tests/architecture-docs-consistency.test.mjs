@@ -52,3 +52,11 @@ test("ROADMAP names persisted objects instead of stale browser-only gaps", () =>
   assert.doesNotMatch(roadmap, /错因 Error Cause\s*\|\s*❌/)
   assert.doesNotMatch(roadmap, /课程 Lesson\s*\|\s*❌/)
 })
+
+test("lesson documentation describes the versioned write and preview contract", () => {
+  assert.match(roadmap, /POST \/api\/lessons/)
+  assert.match(roadmap, /PATCH \/api\/lessons\/{lessonID}/)
+  assert.match(roadmap, /乐观版本|版本冲突/)
+  assert.match(read("docs/data-model.md"), /lesson_versions/)
+  assert.match(read("docs/data-model.md"), /固定十段|十段模板/)
+})

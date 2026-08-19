@@ -17,7 +17,7 @@
 |---|---|---|---|
 | 1 | 学科 Subject | **列，不是表** | `knowledge_items.subject` 等多张表上的 TEXT 列 |
 | 2 | 原始材料 Source | ✅ | `sources` |
-| 3 | 课程 Lesson | 🟡 首个只读骨架已落地 | `lessons` + `lesson_versions`；十段文档模板与来源字段，尚无创建/编辑 Agent 流水线 |
+| 3 | 课程 Lesson | 🟡 首个版本化垂直切片已落地 | `lessons` + `lesson_versions`；十段文档模板、来源字段、草稿写入与乐观版本更新，尚无 Agent 流水线 |
 | 4 | 知识点 Knowledge Point | ✅ 主体有，关系没有 | `knowledge_items`；缺前置/易混/掌握状态 |
 | 5 | 二级结论 Insight | 🟡 靠 `item_type` + tag 表达 | 知识库已有「二级结论/解题策略/易错信号」筛选 |
 | 6 | 记忆项 Memory Item | ✅ | `prompts` + `review_states` |
@@ -36,7 +36,7 @@
 `voice_roles`（schema v10，保存可自定义的语音角色与模型配置）和
 `english_articles`（schema v11，保存双语阅读文章及生成来源）。它们不是 Lesson 的替代品，
 但会成为课程/阅读回流时可引用的 Source。schema v12 新增的 `lessons` 与 `lesson_versions`
-只提供可追溯的 draft 文档和只读预习入口；内容生成、编辑与交互式测验仍在后续阶段。
+提供可追溯的 draft 文档、版本冲突保护和预习入口；内容生成与交互式测验仍在后续阶段。
 
 ## 二、错题存储：历史假数据已迁移，边界仍要写清
 
@@ -74,14 +74,17 @@
 
 判据：做错一道题，其对应知识点当天进入队列。
 
-### 第 3 阶段：课程 Lesson（首个只读垂直切片已落地）
+### 第 3 阶段：课程 Lesson（首个版本化垂直切片已落地）
 
 0801 模块五的七阶段流水线是最大的一块。当前先落地能立刻使用的部分：
 `lessons` + `lesson_versions` 课程对象、固定十段模板的骨架、来源指针，以及
-`/lessons` 只读预习页。文档版本不可变，便于后续解释和回滚。
+`/lessons` 预习页。后端通过 `POST /api/lessons` 创建 draft、
+`GET /api/lessons`/`GET /api/lessons/{lessonID}` 读取，
+`PATCH /api/lessons/{lessonID}` 必须携带 `version`，遇到并发旧版本返回版本冲突；
+文档版本不可变，便于后续解释和回滚。
 **不**先做 Agent 一次性生成整节课——0801 明确反对这种做法。
 
-下一步边界：创建/编辑 draft、与知识点/记忆项/题目的显式关联、即时测验提交与反馈，
+下一步边界：与知识点/记忆项/题目的显式关联、即时测验提交与反馈，
 再把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段。
 
 ### 第 4 阶段：任务 Task 与系统想法 System Idea
