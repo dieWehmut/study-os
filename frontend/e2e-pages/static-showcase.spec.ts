@@ -22,6 +22,10 @@ test("renders deep links from static fixtures without a backend", async ({ page 
 
   await page.goto("#/lessons/lesson-newton")
   await expect(page.locator("main")).toContainText("牛顿第二定律：从受力图开始")
+  const practice = page.locator("[data-section-kind='practice']")
+  await practice.getByRole("radio", { name: "8 N" }).check()
+  await practice.getByRole("button", { name: "提交答案" }).click()
+  await expect(practice.getByRole("status")).toContainText("回答正确")
 
   await expect(page.locator('[data-static-demo="true"]')).toBeVisible()
   expect(apiRequests).toEqual([])
