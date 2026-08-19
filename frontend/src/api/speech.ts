@@ -157,12 +157,13 @@ const generationHeader = "X-Study-OS-Request"
 // 播放和 revokeObjectURL——这里只管把 blob 交出去。
 export async function synthesizeVoiceRolePreview(id: string, text: string): Promise<Blob | null> {
   if (isStaticDemo()) {
-    if (typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.lang = "en-US"
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.speak(utterance)
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !window.speechSynthesis || typeof SpeechSynthesisUtterance === "undefined") {
+      throw new Error("Browser speech is unavailable in the static demo")
     }
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = "en-US"
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utterance)
     return null
   }
 

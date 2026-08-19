@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
   createVoiceRole,
@@ -24,6 +24,10 @@ describe("speech API", () => {
     mocks.resolveApiBase.mockReturnValue("http://127.0.0.1:8765/api")
   })
 
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it("reads the endpoint status and roles in one request", async () => {
     mocks.apiRequest.mockResolvedValue({
       speech: { provider: "openai", key_configured: true, configured: true, providers: [] },
@@ -45,6 +49,23 @@ describe("speech API", () => {
       body: JSON.stringify({ api_key: "sk-speech-secret", voice: "nova" }),
     })
     expect(JSON.stringify(result)).not.toContain("sk-speech-secret")
+  })
+
+  it("reports when a static preview has no browser speech fallback", async () => {
+    vi.stubEnv("VITE_STATIC_DEMO", "true")
+    const originalSpeechSynthesis = window.speechSynthesis
+    const originalUtterance = globalThis.SpeechSynthesisUtterance
+    Object.defineProperty(window, "speechSynthesis", { configurable: true, value: undefined })
+    Object.defineProperty(globalThis, "SpeechSynthesisUtterance", { configurable: true, value: undefined })
+
+    try {
+      await expect(import("./speech").then(({ synthesizeVoiceRolePreview }) =>
+        synthesizeVoiceRolePreview("voice-1", "A preview sentence"),
+      )).rejects.toThrow("Browser speech is unavailable")
+    } finally {
+      Object.defineProperty(window, "speechSynthesis", { configurable: true, value: originalSpeechSynthesis })
+      Object.defineProperty(globalThis, "SpeechSynthesisUtterance", { configurable: true, value: originalUtterance })
+    }
   })
 
   it("creates, updates and deletes a role on the roles collection", async () => {
