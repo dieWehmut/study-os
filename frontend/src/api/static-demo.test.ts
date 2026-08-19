@@ -180,6 +180,19 @@ describe("static Pages API fixtures", () => {
     ])
   })
 
+  it("includes a graded answer and explanation in the static practice fixture", async () => {
+    const detail = await staticDemoRequest<{
+      sections: Array<{ type: string; content?: unknown }>
+    }>("/lessons/lesson-newton")
+    const practice = detail.sections.find((section) => section.type === "practice")
+    expect(practice?.content).toMatchObject({
+      question: "若 m = 4 kg、a = 2 m/s²，F 是多少？",
+      options: ["2 N", "6 N", "8 N"],
+      correct_answer: "8 N",
+      explanation: expect.stringContaining("F = ma"),
+    })
+  })
+
   it("keeps lesson writes backend-only in the static Pages adapter", async () => {
     await expect(staticDemoRequest("/lessons", {
       method: "POST",
