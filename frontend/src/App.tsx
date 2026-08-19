@@ -15,6 +15,8 @@ import Settings from "@/pages/Settings"
 import EnglishArticleNew from "@/pages/EnglishArticleNew"
 import EnglishArticles from "@/pages/EnglishArticles"
 import EnglishArticleDetail from "@/pages/EnglishArticleDetail"
+import Lessons from "@/pages/Lessons"
+import LessonDetail from "@/pages/LessonDetail"
 import { isStaticDemo } from "@/lib/runtime"
 
 export default function App() {
@@ -40,6 +42,8 @@ export default function App() {
         <Route path="/reading/articles" element={<EnglishArticles />} />
         <Route path="/reading/articles/new" element={<EnglishArticleNew />} />
         <Route path="/reading/articles/:id" element={<EnglishArticleDetail />} />
+        <Route path="/lessons" element={<Lessons />} />
+        <Route path="/lessons/:id" element={<LessonDetail />} />
         <Route path="/import" element={<Import />} />
         <Route path="/memory" element={<Memory />} />
         <Route path="/integrate" element={<Integrate />} />

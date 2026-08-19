@@ -1,0 +1,68 @@
+import { render, screen } from "@testing-library/react"
+import { MemoryRouter, Route, Routes } from "react-router-dom"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+import type { Lesson } from "@/api/lessons"
+import LessonDetail from "./LessonDetail"
+
+const mocks = vi.hoisted(() => ({ getLesson: vi.fn() }))
+
+vi.mock("@/api/lessons", async () => {
+  const actual = await vi.importActual<typeof import("@/api/lessons")>("@/api/lessons")
+  return { ...actual, getLesson: mocks.getLesson }
+})
+
+const lesson: Lesson = {
+  id: "lesson-1",
+  title: "Newton's second law",
+  subject: "physics",
+  status: "published",
+  source: { id: "source-1", title: "Mechanics notes", type: "markdown", locator: "p. 3" },
+  objectives: ["识别变量", "建立受力关系"],
+  sections: [
+    { id: "quiz", kind: "quiz", title: "先试一题", body: "若 m=2、a=3，F 是多少？", items: ["6 N", "5 N"] },
+    { id: "concept", kind: "concept", title: "核心概念", body: "F = ma" },
+    { id: "diagnostic", kind: "diagnostic", title: "开始前", body: "你见过哪些力？" },
+  ],
+  estimated_minutes: 20,
+  created_at: "2026-08-19T00:00:00Z",
+  updated_at: "2026-08-19T00:00:00Z",
+}
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={["/lessons/lesson-1"]}>
+      <Routes>
+        <Route path="/lessons/:id" element={<LessonDetail />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+describe("lesson detail page", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("orders fixed sections for scanning and exposes provenance", async () => {
+    mocks.getLesson.mockResolvedValue(lesson)
+    renderPage()
+
+    expect(await screen.findByRole("heading", { name: "Newton's second law" })).toBeInTheDocument()
+    expect(screen.getByText("来源：Mechanics notes · p. 3")).toBeInTheDocument()
+    expect(screen.getByText("已发布")).toBeInTheDocument()
+
+    const sections = Array.from(document.querySelectorAll("[data-section-kind]"))
+    expect(sections.map((section) => section.getAttribute("data-section-kind"))).toEqual([
+      "diagnostic",
+      "concept",
+      "quiz",
+    ])
+  })
+
+  it("renders a retryable error state", async () => {
+    mocks.getLesson.mockRejectedValueOnce(new Error("offline"))
+    renderPage()
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("课程暂时无法读取")
+    expect(screen.getByRole("link", { name: "返回课程" })).toHaveAttribute("href", "/lessons")
+  })
+})

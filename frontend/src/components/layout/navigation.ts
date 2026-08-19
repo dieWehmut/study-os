@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   BookOpenText,
   BrainCircuit,
+  BookOpenCheck,
   House,
   Import as ImportIcon,
   MessagesSquare,
@@ -22,6 +23,7 @@ export interface NavigationItem {
 export const primaryNavigation: NavigationItem[] = [
   { path: "/", label: "首页", description: "今天的学习入口", icon: House },
   { path: "/knowledge", label: "知识库", description: "词汇与知识 Wiki", icon: BookOpenText },
+  { path: "/lessons", label: "课程", description: "先看结构，再开始学习", icon: BookOpenCheck },
   { path: "/reading", label: "阅读", description: "先看结构，再读正文", icon: ScanText },
   { path: "/memory", label: "记忆", description: "按计划完成复习", icon: BrainCircuit },
   { path: "/integrate", label: "整合", description: "导图与卡片整合", icon: Network },
