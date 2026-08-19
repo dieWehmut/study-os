@@ -156,4 +156,26 @@ describe("static Pages API fixtures", () => {
     expect(grouped.items.length).toBeGreaterThan(0)
     expect(grouped.items.every((item) => item.subject === "english")).toBe(true)
   })
+
+  it("provides the fixed ten-section lesson preview fixture", async () => {
+    const list = await staticDemoRequest<{ items: Array<{ id: string; sections_count?: number }> }>("/lessons")
+    const lessonID = list.items[0]?.id
+    expect(lessonID).toBeTruthy()
+    expect(list.items[0]?.sections_count).toBe(10)
+
+    const detail = await staticDemoRequest<{ sections: Array<{ type: string }> }>(`/lessons/${lessonID}`)
+    expect(detail.sections).toHaveLength(10)
+    expect(detail.sections.map((section) => section.type)).toEqual([
+      "diagnostic",
+      "objectives",
+      "concept",
+      "examples",
+      "visualization",
+      "practice",
+      "feedback",
+      "summary",
+      "memory",
+      "follow_up",
+    ])
+  })
 })

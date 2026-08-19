@@ -1,5 +1,6 @@
 import type { EnglishArticle, EnglishArticleContent } from "./english-articles"
 import type { IntegratedNote } from "./integrate"
+import type { Lesson } from "./lessons"
 import type { KnowledgeGroup, KnowledgeListResponse } from "./knowledge"
 import type { ChatMessage, DashboardData, DueReview, KnowledgeItem, ReviewEvaluation } from "./types"
 
@@ -37,6 +38,7 @@ interface StaticState {
   due: DueReview[]
   messages: ChatMessage[]
   notes: IntegratedNote[]
+  lessons: Lesson[]
   articles: EnglishArticle[]
   mistakes: StaticMistakePair[]
   vendors: Array<Record<string, unknown>>
@@ -202,6 +204,38 @@ function makeNote(): IntegratedNote {
   }
 }
 
+function makeLesson(): Lesson {
+  const sections = [
+    { id: "diagnostic", type: "diagnostic", title: "开始前", position: 0, required: true, content: "先说说：力、质量和加速度之间可能有什么关系？" },
+    { id: "objectives", type: "objectives", title: "学习目标", position: 1, required: true, content: ["识别公式中的变量", "用统一单位建立 F = ma"] },
+    { id: "concept", type: "concept", title: "核心概念", position: 2, required: true, content: "合力等于质量乘以加速度：F = ma。先画出方向，再代入数值。" },
+    { id: "examples", type: "examples", title: "一个例子", position: 3, content: "2 kg 物体以 3 m/s² 加速时，合力为 6 N。" },
+    { id: "visualization", type: "visualization", title: "图示与结构", position: 4, content: "先画出受力方向，再把每个方向的力放进同一个坐标约定。" },
+    { id: "practice", type: "practice", title: "马上练一题", position: 5, content: { question: "若 m = 4 kg、a = 2 m/s²，F 是多少？", options: ["2 N", "6 N", "8 N"] } },
+    { id: "feedback", type: "feedback", title: "反馈与纠正", position: 6, content: "如果答案不是 8 N，先检查单位和方向，再重新代入。" },
+    { id: "summary", type: "summary", title: "一句话总结", position: 7, content: "方向先于数字；单位一致后再使用 F = ma。" },
+    { id: "memory", type: "memory", title: "记忆确认", position: 8, content: "合上页面，用自己的话说出公式和一个使用条件。" },
+    { id: "follow-up", type: "follow_up", title: "下一步", position: 9, content: "去练习区记录一个仍然含糊的受力图。" },
+  ]
+  return {
+    id: "lesson-newton",
+    title: "牛顿第二定律：从受力图开始",
+    subject: "physics",
+    status: "published",
+    source_type: "knowledge",
+    source_id: "knowledge-newton",
+    source: { id: "knowledge-newton", title: "Newton's second law", type: "knowledge" },
+    document: { schema_version: 1, sections },
+    sections,
+    objectives: ["先看懂关系，再开始计算"],
+    estimated_minutes: 15,
+    sections_count: sections.length,
+    version: 1,
+    created_at: DEMO_NOW,
+    updated_at: DEMO_NOW,
+  }
+}
+
 function makeInitialState(): StaticState {
   const knowledge = makeKnowledge()
   const messages: ChatMessage[] = [
@@ -246,6 +280,7 @@ function makeInitialState(): StaticState {
     due: [makeDue(knowledge[0], 0), makeDue(knowledge[1], 1), makeDue(knowledge[2], 2)],
     messages,
     notes: [makeNote()],
+    lessons: [makeLesson()],
     articles: [makeArticle()],
     mistakes,
     vendors: [
@@ -675,6 +710,21 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     const note = state.notes.find((entry) => entry.id === id)
     if (!note) throw new StaticDemoError("Static demo note not found")
     return responseFor(note) as T
+  }
+
+  if (root === "lessons" && !id && method === "GET") {
+    const subject = subjectFrom(url.searchParams.get("subject"))
+    const status = url.searchParams.get("status")
+    const filtered = state.lessons.filter((lesson) => (!subject || lesson.subject === subject) && (!status || lesson.status === status))
+    const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0)
+    const requestedLimit = url.searchParams.get("limit")
+    const limit = Math.max(1, Number(requestedLimit ?? filtered.length) || filtered.length || 1)
+    return responseFor({ items: filtered.slice(offset, offset + limit), count: filtered.length }) as T
+  }
+  if (root === "lessons" && id && method === "GET") {
+    const lesson = state.lessons.find((entry) => entry.id === id)
+    if (!lesson) throw new StaticDemoError("Static demo lesson not found")
+    return responseFor(lesson) as T
   }
 
   if (root === "mistakes" && !id && method === "GET") return responseFor(mistakeList(subjectFrom(url.searchParams.get("subject")))) as T
