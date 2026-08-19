@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -100,5 +100,38 @@ describe("lesson detail page", () => {
     expect(objectiveCard).not.toBeNull()
     expect(within(objectiveCard as HTMLElement).getByText("说出牛顿第二定律")).toBeInTheDocument()
     expect(within(objectiveCard as HTMLElement).getByText("用公式解释一个例子")).toBeInTheDocument()
+  })
+
+  it("turns a structured practice section into an immediate local check", async () => {
+    mocks.getLesson.mockResolvedValue({
+      ...lesson,
+      sections: [
+        ...lesson.sections,
+        {
+          id: "practice-1",
+          type: "practice",
+          title: "马上练一题",
+          position: 5,
+          content: {
+            question: "若 m=2、a=3，F 是多少？",
+            options: ["5 N", "6 N"],
+            correct_answer: "6 N",
+            explanation: "F = ma，所以 2 × 3 = 6 N。",
+          },
+        },
+      ],
+    })
+    renderPage()
+
+    const practice = await screen.findByText("马上练一题")
+    const practiceSection = practice.closest("[data-section-kind='practice']")
+    expect(practiceSection).not.toBeNull()
+    const practiceView = within(practiceSection as HTMLElement)
+    expect(practiceView.getByText("若 m=2、a=3，F 是多少？")).toBeInTheDocument()
+    fireEvent.click(practiceView.getByRole("radio", { name: "6 N" }))
+    fireEvent.click(practiceView.getByRole("button", { name: "提交答案" }))
+
+    expect(practiceView.getByRole("status")).toHaveTextContent("回答正确")
+    expect(practiceView.getByRole("status")).toHaveTextContent("F = ma，所以 2 × 3 = 6 N。")
   })
 })

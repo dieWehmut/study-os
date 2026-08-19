@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom"
 
 import { getLesson, LESSON_SECTION_ORDER, type Lesson, type LessonSection } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
+import LessonPractice from "@/components/lessons/LessonPractice"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { subjectName } from "@/lib/subjects"
@@ -106,6 +107,8 @@ function sortSections(sections: LessonSection[]): LessonSection[] {
 
 function SectionView({ section }: { section: LessonSection }) {
   const type = sectionType(section)
+  if (type === "practice") return <LessonPractice section={section} />
+
   const text = contentText(sectionContent(section))
   const items = contentItems(section)
   const isQuiz = type === "practice" || type === "quiz"
