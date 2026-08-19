@@ -31,7 +31,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.tsx",
     css: true,
-    exclude: [...defaultExclude, "e2e/**"],
+    exclude: [...defaultExclude, "e2e/**", "e2e-pages/**"],
     // Vitest's 5s default is a stopwatch on the machine, not on the code. The
     // page-level tests render a whole route through Base UI into jsdom, and
     // when several workers do that at once the slowest of them lands just past
