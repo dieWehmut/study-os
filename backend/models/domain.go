@@ -157,6 +157,86 @@ type MistakeListOptions struct {
 	Limit   int
 }
 
+// ErrorCause is one structured explanation for why an answer failed. Global
+// rows have an empty Subject; subject rows refine the taxonomy without making
+// the same ID mean different things in different courses.
+type ErrorCause struct {
+	ID          string    `json:"id"`
+	Subject     string    `json:"subject,omitempty"`
+	ParentID    string    `json:"parent_id,omitempty"`
+	Label       string    `json:"label"`
+	ReviewFixes bool      `json:"review_fixes"`
+	Action      string    `json:"action,omitempty"`
+	Status      string    `json:"status"`
+	SourceType  string    `json:"source_type,omitempty"`
+	SourceID    string    `json:"source_id,omitempty"`
+	SortOrder   int       `json:"sort_order"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type ErrorCauseListOptions struct {
+	Subject string
+	Status  string
+	Limit   int
+	Offset  int
+}
+
+const (
+	ErrorCauseStatusCandidate = "candidate"
+	ErrorCauseStatusConfirmed = "confirmed"
+	ErrorCauseStatusArchived  = "archived"
+	ErrorCauseStatusAll       = "all"
+)
+
+func IsErrorCauseStatusValid(status string) bool {
+	switch strings.TrimSpace(status) {
+	case ErrorCauseStatusCandidate, ErrorCauseStatusConfirmed, ErrorCauseStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func (cause ErrorCause) Validate() error {
+	if !isErrorCauseIDValid(strings.TrimSpace(cause.ID)) {
+		return errors.New("error cause id must use lowercase letters, digits, colon, underscore, or hyphen")
+	}
+	if strings.TrimSpace(cause.Label) == "" {
+		return errors.New("error cause label is required")
+	}
+	if !IsErrorCauseStatusValid(cause.Status) {
+		return fmt.Errorf("error cause status %q is invalid", cause.Status)
+	}
+	if cause.SortOrder < 0 {
+		return errors.New("error cause sort_order must be non-negative")
+	}
+	if strings.TrimSpace(cause.ParentID) == strings.TrimSpace(cause.ID) {
+		return errors.New("error cause cannot be its own parent")
+	}
+	if (strings.TrimSpace(cause.SourceType) == "") != (strings.TrimSpace(cause.SourceID) == "") {
+		return errors.New("error cause source_type and source_id must be provided together")
+	}
+	return nil
+}
+
+func isErrorCauseIDValid(id string) bool {
+	if id == "" || len(id) > 96 {
+		return false
+	}
+	for index, character := range id {
+		letter := character >= 'a' && character <= 'z'
+		digit := character >= '0' && character <= '9'
+		if index == 0 && !letter && !digit {
+			return false
+		}
+		if !letter && !digit && character != ':' && character != '_' && character != '-' {
+			return false
+		}
+	}
+	return true
+}
+
 // Mistake pairs a Question with the attempt that got it wrong.
 type Mistake struct {
 	Question   Question         `json:"question"`

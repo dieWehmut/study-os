@@ -228,6 +228,22 @@ CREATE TABLE question_attempts (
 );
 CREATE INDEX question_attempts_question_idx ON question_attempts(question_id, occurred_at DESC);
 
+CREATE TABLE error_causes (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL DEFAULT '',
+    parent_id TEXT REFERENCES error_causes(id) ON DELETE SET NULL,
+    label TEXT NOT NULL,
+    review_fixes INTEGER NOT NULL DEFAULT 0 CHECK (review_fixes IN (0, 1)),
+    action TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate', 'confirmed', 'archived')),
+    source_type TEXT NOT NULL DEFAULT '',
+    source_id TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX error_causes_scope_idx ON error_causes(subject, status, sort_order, id);
+
 CREATE TABLE voice_roles (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

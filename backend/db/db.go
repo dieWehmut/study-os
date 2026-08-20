@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 15
+const currentSchemaVersion = 16
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -139,6 +139,9 @@ func migrate(ctx context.Context, database *sql.DB) error {
 				return err
 			}
 		}
+	}
+	if err := ensureDefaultErrorCauses(ctx, tx); err != nil {
+		return err
 	}
 	if err := verifySchema(ctx, tx, currentSchemaVersion); err != nil {
 		return err
@@ -430,6 +433,30 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				return fmt.Errorf("apply schema version %d: %w", version, err)
 			}
 		}
+	case 16:
+		statements := []string{
+			`CREATE TABLE IF NOT EXISTS error_causes (
+				id TEXT PRIMARY KEY,
+				subject TEXT NOT NULL DEFAULT '',
+				parent_id TEXT REFERENCES error_causes(id) ON DELETE SET NULL,
+				label TEXT NOT NULL,
+				review_fixes INTEGER NOT NULL DEFAULT 0 CHECK (review_fixes IN (0, 1)),
+				action TEXT NOT NULL DEFAULT '',
+				status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate', 'confirmed', 'archived')),
+				source_type TEXT NOT NULL DEFAULT '',
+				source_id TEXT NOT NULL DEFAULT '',
+				sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`,
+			`CREATE INDEX IF NOT EXISTS error_causes_scope_idx
+				ON error_causes(subject, status, sort_order, id)`,
+		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -507,6 +534,47 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 				!hasColumn(ctx, tx, "question_attempts", "is_correct")) {
 			return errors.New("schema version 15 is recorded but question attempt evidence is missing")
 		}
+	case 16:
+		if !hasTable(ctx, tx, "lessons") || !hasTable(ctx, tx, "lesson_versions") ||
+			!hasTable(ctx, tx, "lesson_links") || !hasTable(ctx, tx, "lesson_attempts") {
+			return errors.New("schema version 14 is recorded but lesson dependencies are missing")
+		}
+		if hasTable(ctx, tx, "questions") && hasTable(ctx, tx, "question_attempts") &&
+			(!hasColumn(ctx, tx, "question_attempts", "answer") ||
+				!hasColumn(ctx, tx, "question_attempts", "elapsed_ms") ||
+				!hasColumn(ctx, tx, "question_attempts", "is_correct")) {
+			return errors.New("schema version 15 is recorded but question attempt evidence is missing")
+		}
+		if !hasTable(ctx, tx, "error_causes") {
+			return errors.New("schema version 16 is recorded but error_causes is missing")
+		}
+	}
+	return nil
+}
+
+func ensureDefaultErrorCauses(ctx context.Context, tx *sql.Tx) error {
+	if !hasTable(ctx, tx, "error_causes") {
+		return errors.New("seed default error causes: error_causes is missing")
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT OR IGNORE INTO error_causes(
+			id, subject, parent_id, label, review_fixes, action, status,
+			source_type, source_id, sort_order, created_at, updated_at
+		) VALUES
+			('recall', '', NULL, '想不起来', 1, '回到记忆检测，让它排进复习队列', 'confirmed', '', '', 0,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+			('misread', '', NULL, '看错题', 0, '读题时先圈出条件和问的是什么，再动笔', 'confirmed', '', '', 1,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+			('careless', '', NULL, '算错 / 手滑', 0, '留出检查这一步的时间，别靠再记一遍', 'confirmed', '', '', 2,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+			('method', '', NULL, '思路不对', 0, '补的是方法，不是这道题：找同类题再做两道', 'confirmed', '', '', 3,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+			('time', '', NULL, '没时间做', 0, '问题在配速，不在这道题本身', 'confirmed', '', '', 4,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+			('unknown', '', NULL, '还没想清楚', 0, '先记下来，等想清楚再归类', 'confirmed', '', '', 5,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	`); err != nil {
+		return fmt.Errorf("seed default error causes: %w", err)
 	}
 	return nil
 }
