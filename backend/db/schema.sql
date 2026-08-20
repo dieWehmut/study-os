@@ -221,6 +221,9 @@ CREATE TABLE question_attempts (
     question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     cause TEXT NOT NULL DEFAULT '',
     note TEXT NOT NULL DEFAULT '',
+    answer TEXT NOT NULL DEFAULT '',
+    elapsed_ms INTEGER NOT NULL DEFAULT 0 CHECK (elapsed_ms >= 0),
+    is_correct INTEGER NOT NULL DEFAULT 0 CHECK (is_correct IN (0, 1)),
     occurred_at TEXT NOT NULL
 );
 CREATE INDEX question_attempts_question_idx ON question_attempts(question_id, occurred_at DESC);

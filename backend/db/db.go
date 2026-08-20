@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 14
+const currentSchemaVersion = 15
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -411,6 +411,25 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				return fmt.Errorf("apply schema version %d: %w", version, err)
 			}
 		}
+	case 15:
+		// Some historical test/fixture databases intentionally contain only
+		// the migrations under test. If the question tables do not exist yet,
+		// the question feature's later migration will create them; there is
+		// nothing to alter in this step.
+		if !hasTable(ctx, tx, "questions") || !hasTable(ctx, tx, "question_attempts") {
+			return nil
+		}
+		statements := []string{
+			`ALTER TABLE question_attempts ADD COLUMN answer TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE question_attempts ADD COLUMN elapsed_ms INTEGER NOT NULL DEFAULT 0 CHECK (elapsed_ms >= 0)`,
+			`ALTER TABLE question_attempts ADD COLUMN is_correct INTEGER NOT NULL DEFAULT 0 CHECK (is_correct IN (0, 1))`,
+			`UPDATE question_attempts SET is_correct = 1 WHERE cause = '' AND is_correct = 0`,
+		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -474,6 +493,19 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 		if !hasTable(ctx, tx, "lessons") || !hasTable(ctx, tx, "lesson_versions") ||
 			!hasTable(ctx, tx, "lesson_links") || !hasTable(ctx, tx, "lesson_attempts") {
 			return errors.New("schema version 14 is recorded but lesson dependencies are missing")
+		}
+	case 15:
+		// Keep the dependency diagnostic from v14 stable for partial legacy
+		// fixtures, then validate evidence when the question tables exist.
+		if !hasTable(ctx, tx, "lessons") || !hasTable(ctx, tx, "lesson_versions") ||
+			!hasTable(ctx, tx, "lesson_links") || !hasTable(ctx, tx, "lesson_attempts") {
+			return errors.New("schema version 14 is recorded but lesson dependencies are missing")
+		}
+		if hasTable(ctx, tx, "questions") && hasTable(ctx, tx, "question_attempts") &&
+			(!hasColumn(ctx, tx, "question_attempts", "answer") ||
+				!hasColumn(ctx, tx, "question_attempts", "elapsed_ms") ||
+				!hasColumn(ctx, tx, "question_attempts", "is_correct")) {
+			return errors.New("schema version 15 is recorded but question attempt evidence is missing")
 		}
 	}
 	return nil

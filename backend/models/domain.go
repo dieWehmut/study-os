@@ -126,6 +126,9 @@ type QuestionAttempt struct {
 	QuestionID string    `json:"question_id"`
 	Cause      string    `json:"cause,omitempty"`
 	Note       string    `json:"note,omitempty"`
+	Answer     string    `json:"answer,omitempty"`
+	ElapsedMS  int       `json:"elapsed_ms"`
+	IsCorrect  bool      `json:"is_correct"`
 	OccurredAt time.Time `json:"occurred_at"`
 }
 
@@ -136,6 +139,16 @@ type MistakeInput struct {
 	Stem       string `json:"stem"`
 	Cause      string `json:"cause,omitempty"`
 	Note       string `json:"note,omitempty"`
+	Answer     string `json:"answer,omitempty"`
+	ElapsedMS  int    `json:"elapsed_ms,omitempty"`
+	OccurredAt time.Time
+}
+
+// MistakeCorrectionInput is the evidence submitted after a learner revisits
+// a filed mistake. Unlike quick capture, correction requires an answer.
+type MistakeCorrectionInput struct {
+	Answer     string
+	ElapsedMS  int
 	OccurredAt time.Time
 }
 
@@ -146,8 +159,9 @@ type MistakeListOptions struct {
 
 // Mistake pairs a Question with the attempt that got it wrong.
 type Mistake struct {
-	Question Question        `json:"question"`
-	Attempt  QuestionAttempt `json:"attempt"`
+	Question   Question         `json:"question"`
+	Attempt    QuestionAttempt  `json:"attempt"`
+	Correction *QuestionAttempt `json:"correction,omitempty"`
 	// Corrected reports that this question has since been answered right.
 	//
 	// Derived from the existence of an attempt carrying no cause, never

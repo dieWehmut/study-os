@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -51,7 +53,12 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 		// filed and can never see again.
 		Cause:      strings.ToLower(strings.TrimSpace(input.Cause)),
 		Note:       strings.TrimSpace(input.Note),
+		Answer:     strings.TrimSpace(input.Answer),
+		ElapsedMS:  input.ElapsedMS,
 		OccurredAt: occurredAt,
+	}
+	if attempt.ElapsedMS < 0 {
+		return models.Mistake{}, fmt.Errorf("mistake elapsed_ms cannot be negative")
 	}
 
 	transaction, err := s.db.BeginTx(ctx, nil)
@@ -68,9 +75,10 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 		return models.Mistake{}, err
 	}
 	if _, err := transaction.ExecContext(ctx, `
-		INSERT INTO question_attempts(id, question_id, cause, note, occurred_at)
-		VALUES (?, ?, ?, ?, ?)`,
-		attempt.ID, attempt.QuestionID, attempt.Cause, attempt.Note, formatTime(attempt.OccurredAt),
+		INSERT INTO question_attempts(id, question_id, cause, note, answer, elapsed_ms, is_correct, occurred_at)
+		VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+		attempt.ID, attempt.QuestionID, attempt.Cause, attempt.Note, attempt.Answer, attempt.ElapsedMS,
+		formatTime(attempt.OccurredAt),
 	); err != nil {
 		return models.Mistake{}, err
 	}
@@ -89,10 +97,10 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 // Existence is also enough -- RecordMistake mints a fresh question every time,
 // so no question can go wrong, right, then wrong again.
 const mistakeSelect = `
-	SELECT a.id, a.question_id, a.cause, a.note, a.occurred_at,
+	SELECT a.id, a.question_id, a.cause, a.note, a.answer, a.elapsed_ms, a.is_correct, a.occurred_at,
 	       q.subject, q.stem, q.source_id, q.knowledge_item_id, q.created_at,
 	       EXISTS (SELECT 1 FROM question_attempts c
-	               WHERE c.question_id = a.question_id AND c.cause = '')
+	               WHERE c.question_id = a.question_id AND c.is_correct = 1)
 	FROM question_attempts a
 	JOIN questions q ON q.id = a.question_id`
 
@@ -130,7 +138,18 @@ func (s *Store) ListMistakes(ctx context.Context, options models.MistakeListOpti
 		}
 		mistakes = append(mistakes, mistake)
 	}
-	return mistakes, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	for index := range mistakes {
+		if err := s.attachMistakeCorrection(ctx, &mistakes[index]); err != nil {
+			return nil, err
+		}
+	}
+	return mistakes, nil
 }
 
 // DeleteMistake removes one filed attempt, and the question with it when no
@@ -175,32 +194,69 @@ func (s *Store) GetMistake(ctx context.Context, attemptID string) (models.Mistak
 	if err != nil {
 		return models.Mistake{}, mapNotFound(err, "mistake")
 	}
+	if err := s.attachMistakeCorrection(ctx, &mistake); err != nil {
+		return models.Mistake{}, err
+	}
 	return mistake, nil
 }
 
-// CorrectMistake files the retry that finally got this question right.
-//
-// The retry is another attempt on the same question, carrying no cause -- the
-// same two-row shape RecordMistake writes, which is what makes "how many times
-// did I get this wrong" still countable afterwards. The guard is in the
-// statement rather than around it so a double press cannot file two retries.
-func (s *Store) CorrectMistake(ctx context.Context, attemptID string) (models.Mistake, error) {
-	mistake, err := s.GetMistake(ctx, attemptID)
+// RecordMistakeCorrection files the retry that finally got this question
+// right, retaining the answer and elapsed time as evidence.
+func (s *Store) RecordMistakeCorrection(ctx context.Context, attemptID string, input models.MistakeCorrectionInput) (models.Mistake, error) {
+	return s.recordMistakeCorrection(ctx, attemptID, input, false)
+}
+
+// recordMistakeCorrection is shared with the legacy boolean-only entry point.
+// The compatibility path may create an empty-evidence retry for existing
+// callers; new API callers use the strict path above.
+func (s *Store) recordMistakeCorrection(ctx context.Context, attemptID string, input models.MistakeCorrectionInput, allowEmpty bool) (models.Mistake, error) {
+	answer := strings.TrimSpace(input.Answer)
+	if !allowEmpty && answer == "" {
+		return models.Mistake{}, fmt.Errorf("mistake correction answer is required")
+	}
+	if input.ElapsedMS < 0 {
+		return models.Mistake{}, fmt.Errorf("mistake correction elapsed_ms cannot be negative")
+	}
+	occurredAt := input.OccurredAt.UTC()
+	if occurredAt.IsZero() {
+		occurredAt = nowUTC()
+	}
+
+	transaction, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return models.Mistake{}, err
 	}
-	if _, err := s.db.ExecContext(ctx, `
-		INSERT INTO question_attempts(id, question_id, cause, note, occurred_at)
-		SELECT ?, ?, '', '', ?
+	defer func() { _ = transaction.Rollback() }()
+
+	var questionID, cause string
+	if err := transaction.QueryRowContext(ctx,
+		`SELECT question_id, cause FROM question_attempts WHERE id = ?`, attemptID,
+	).Scan(&questionID, &cause); err != nil {
+		return models.Mistake{}, mapNotFound(err, "mistake")
+	}
+	if strings.TrimSpace(cause) == "" {
+		return models.Mistake{}, fmt.Errorf("mistake %q is not a filed attempt", attemptID)
+	}
+	if _, err := transaction.ExecContext(ctx, `
+		INSERT INTO question_attempts(id, question_id, cause, note, answer, elapsed_ms, is_correct, occurred_at)
+		SELECT ?, ?, '', '', ?, ?, 1, ?
 		WHERE NOT EXISTS (
-			SELECT 1 FROM question_attempts WHERE question_id = ? AND cause = ''
+			SELECT 1 FROM question_attempts WHERE question_id = ? AND is_correct = 1
 		)`,
-		newMistakeID("qa"), mistake.Question.ID, formatTime(nowUTC()), mistake.Question.ID,
+		newMistakeID("qa"), questionID, answer, input.ElapsedMS, formatTime(occurredAt), questionID,
 	); err != nil {
 		return models.Mistake{}, err
 	}
-	mistake.Corrected = true
-	return mistake, nil
+	if err := transaction.Commit(); err != nil {
+		return models.Mistake{}, err
+	}
+	return s.GetMistake(ctx, attemptID)
+}
+
+// CorrectMistake keeps the pre-evidence store API usable for older callers.
+// New code should call RecordMistakeCorrection so the retry carries evidence.
+func (s *Store) CorrectMistake(ctx context.Context, attemptID string) (models.Mistake, error) {
+	return s.recordMistakeCorrection(ctx, attemptID, models.MistakeCorrectionInput{}, true)
 }
 
 // LinkQuestionToKnowledge records which library entry a question became.
@@ -218,7 +274,8 @@ func scanMistake(row scanner) (models.Mistake, error) {
 	var mistake models.Mistake
 	var occurredAt, createdAt string
 	if err := row.Scan(
-		&mistake.Attempt.ID, &mistake.Attempt.QuestionID, &mistake.Attempt.Cause, &mistake.Attempt.Note, &occurredAt,
+		&mistake.Attempt.ID, &mistake.Attempt.QuestionID, &mistake.Attempt.Cause, &mistake.Attempt.Note,
+		&mistake.Attempt.Answer, &mistake.Attempt.ElapsedMS, &mistake.Attempt.IsCorrect, &occurredAt,
 		&mistake.Question.Subject, &mistake.Question.Stem, &mistake.Question.SourceID,
 		&mistake.Question.KnowledgeItemID, &createdAt, &mistake.Corrected,
 	); err != nil {
@@ -236,4 +293,34 @@ func scanMistake(row scanner) (models.Mistake, error) {
 	}
 	mistake.Question.CreatedAt = parsedCreated
 	return mistake, nil
+}
+
+func (s *Store) attachMistakeCorrection(ctx context.Context, mistake *models.Mistake) error {
+	var correction models.QuestionAttempt
+	var occurredAt string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, question_id, cause, note, answer, elapsed_ms, is_correct, occurred_at
+		FROM question_attempts
+		WHERE question_id = ? AND is_correct = 1
+		ORDER BY occurred_at DESC, id DESC
+		LIMIT 1`, mistake.Question.ID).Scan(
+		&correction.ID, &correction.QuestionID, &correction.Cause, &correction.Note,
+		&correction.Answer, &correction.ElapsedMS, &correction.IsCorrect, &occurredAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		mistake.Correction = nil
+		mistake.Corrected = false
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	parsed, err := parseTime(occurredAt)
+	if err != nil {
+		return err
+	}
+	correction.OccurredAt = parsed
+	mistake.Correction = &correction
+	mistake.Corrected = true
+	return nil
 }

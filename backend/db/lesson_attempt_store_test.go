@@ -22,8 +22,8 @@ func TestLessonPracticeAttemptPersistsAndListsNewestFirst(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	if db.SchemaVersion != 14 {
-		t.Fatalf("schema version = %d, want 14", db.SchemaVersion)
+	if db.SchemaVersion < 14 {
+		t.Fatalf("schema version = %d, want at least 14", db.SchemaVersion)
 	}
 	if err := store.CreateLesson(ctx, models.Lesson{
 		ID: "lesson-attempts", Title: "练习证据", Document: models.NewLessonDocument(),
