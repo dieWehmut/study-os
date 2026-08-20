@@ -1,5 +1,6 @@
 import type { EnglishArticle, EnglishArticleContent } from "./english-articles"
 import type { IntegratedNote } from "./integrate"
+import type { LessonPracticeAttempt, LessonPracticeEvaluation } from "./lesson-practice"
 import type { Lesson } from "./lessons"
 import type { KnowledgeGroup, KnowledgeListResponse } from "./knowledge"
 import type { ChatMessage, DashboardData, DueReview, KnowledgeItem, ReviewEvaluation } from "./types"
@@ -39,6 +40,7 @@ interface StaticState {
   messages: ChatMessage[]
   notes: IntegratedNote[]
   lessons: Lesson[]
+  lessonAttempts: LessonPracticeAttempt[]
   articles: EnglishArticle[]
   mistakes: StaticMistakePair[]
   vendors: Array<Record<string, unknown>>
@@ -293,6 +295,7 @@ function makeInitialState(): StaticState {
     messages,
     notes: [makeNote()],
     lessons: [makeLesson()],
+    lessonAttempts: [],
     articles: [makeArticle()],
     mistakes,
     vendors: [
@@ -362,6 +365,81 @@ function stringField(record: Record<string, unknown>, field: string): string | u
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : []
+}
+
+function practiceText(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") return String(value).trim()
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>
+    for (const key of ["value", "label", "text", "answer", "correct_answer"]) {
+      const text = practiceText(record[key])
+      if (text) return text
+    }
+  }
+  return ""
+}
+
+function practiceAnswers(content: unknown): string[] {
+  if (!content || typeof content !== "object" || Array.isArray(content)) return []
+  const record = content as Record<string, unknown>
+  const raw = record.correct_answer ?? record.correctAnswer ?? record.answer
+  const values = Array.isArray(raw) ? raw : [raw]
+  return values.map(practiceText).filter(Boolean)
+}
+
+function practiceFeedback(content: unknown, keys: string[]): string {
+  if (!content || typeof content !== "object" || Array.isArray(content)) return ""
+  const record = content as Record<string, unknown>
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.trim()) return value.trim()
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const nested = practiceText(value)
+      if (nested) return nested
+    }
+  }
+  return ""
+}
+
+function lessonPracticeAttempt(
+  lesson: Lesson,
+  section: Lesson["sections"][number],
+  body: Record<string, unknown>,
+): LessonPracticeAttempt {
+  if (typeof body.answer !== "string" || !body.answer.trim()) {
+    throw new StaticDemoError("lesson practice answer is required", 400)
+  }
+  const elapsed = body.elapsed_ms === undefined ? 0 : body.elapsed_ms
+  if (typeof elapsed !== "number" || !Number.isInteger(elapsed) || elapsed < 0) {
+    throw new StaticDemoError("lesson practice elapsed_ms must be a non-negative integer", 400)
+  }
+
+  const answer = body.answer.trim()
+  const expected = practiceAnswers(section.content)
+  const normalizedAnswer = answer.trim().toLocaleLowerCase()
+  const referenceAnswer = expected[0] ?? ""
+  const evaluation: LessonPracticeEvaluation = expected.length === 0
+    ? "ungraded"
+    : expected.some((candidate) => candidate.toLocaleLowerCase() === normalizedAnswer)
+      ? "correct"
+      : "incorrect"
+  const feedback = evaluation === "correct"
+    ? practiceFeedback(section.content, ["correct_feedback", "correctFeedback", "feedback", "explanation"]) || "回答正确。"
+    : evaluation === "incorrect"
+      ? practiceFeedback(section.content, ["incorrect_feedback", "incorrectFeedback", "feedback", "explanation"]) || "请检查题目条件后再试。"
+      : practiceFeedback(section.content, ["feedback", "explanation"]) || "暂无标准答案，请对照反馈复盘。"
+
+  return {
+    id: newID("lesson-attempt"),
+    lesson_id: lesson.id,
+    section_id: section.id,
+    answer,
+    evaluation,
+    reference_answer: referenceAnswer,
+    feedback,
+    elapsed_ms: elapsed,
+    created_at: DEMO_NOW,
+  }
 }
 
 function withoutSecret(record: Record<string, unknown>): Record<string, unknown> {
@@ -736,6 +814,22 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     const requestedLimit = url.searchParams.get("limit")
     const limit = Math.max(1, Number(requestedLimit ?? filtered.length) || filtered.length || 1)
     return responseFor({ items: filtered.slice(offset, offset + limit), count: filtered.length }) as T
+  }
+  if (root === "lessons" && id && action === "practice" && parts[4] === "attempts" && (method === "POST" || method === "GET")) {
+    const lesson = state.lessons.find((entry) => entry.id === id)
+    if (!lesson) throw new StaticDemoError("Static demo lesson not found", 404)
+    const sectionID = parts[3] ?? ""
+    const section = lesson.sections.find((entry) => entry.id === sectionID)
+    if (!section) throw new StaticDemoError("Static demo lesson practice section not found", 404)
+    if (method === "POST") {
+      const attempt = lessonPracticeAttempt(lesson, section, body)
+      state.lessonAttempts.push(attempt)
+      return responseFor(attempt) as T
+    }
+    const items = state.lessonAttempts
+      .filter((entry) => entry.lesson_id === lesson.id && entry.section_id === section.id)
+      .reverse()
+    return responseFor({ items, count: items.length }) as T
   }
   if (root === "lessons" && id && method === "GET") {
     const lesson = state.lessons.find((entry) => entry.id === id)

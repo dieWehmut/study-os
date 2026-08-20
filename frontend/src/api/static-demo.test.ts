@@ -210,4 +210,103 @@ describe("static Pages API fixtures", () => {
       message: expect.stringMatching(/invalid lesson status/i),
     })
   })
+
+  it("records a trimmed, case-insensitive correct lesson answer", async () => {
+    const attempt = await staticDemoRequest<{
+      id: string
+      lesson_id: string
+      section_id: string
+      answer: string
+      evaluation: string
+      reference_answer: string
+      feedback: string
+      elapsed_ms: number
+      created_at: string
+    }>("/lessons/lesson-newton/practice/practice/attempts", {
+      method: "POST",
+      body: JSON.stringify({ answer: " 8 n ", elapsed_ms: 123 }),
+    })
+
+    expect(attempt).toMatchObject({
+      lesson_id: "lesson-newton",
+      section_id: "practice",
+      answer: "8 n",
+      evaluation: "correct",
+      reference_answer: "8 N",
+      elapsed_ms: 123,
+    })
+    expect(attempt.id).toBeTruthy()
+    expect(attempt.created_at).toBeTruthy()
+
+    const history = await staticDemoRequest<{ items: typeof attempt[]; count: number }>(
+      "/lessons/lesson-newton/practice/practice/attempts",
+    )
+    expect(history.count).toBe(1)
+    expect(history.items[0]).toEqual(attempt)
+  })
+
+  it("records an incorrect lesson answer with the reference and feedback", async () => {
+    const attempt = await staticDemoRequest<{ evaluation: string; reference_answer: string; feedback: string }>(
+      "/lessons/lesson-newton/practice/practice/attempts",
+      { method: "POST", body: JSON.stringify({ answer: "2 N", elapsed_ms: 0 }) },
+    )
+
+    expect(attempt).toMatchObject({
+      evaluation: "incorrect",
+      reference_answer: "8 N",
+    })
+    expect(attempt.feedback).toBeTruthy()
+  })
+
+  it("lists the newest lesson attempt first even with deterministic demo timestamps", async () => {
+    const route = "/lessons/lesson-newton/practice/practice/attempts"
+    const first = await staticDemoRequest<{ id: string }>(route, {
+      method: "POST",
+      body: JSON.stringify({ answer: "2 N", elapsed_ms: 10 }),
+    })
+    const second = await staticDemoRequest<{ id: string }>(route, {
+      method: "POST",
+      body: JSON.stringify({ answer: "8 N", elapsed_ms: 20 }),
+    })
+
+    const history = await staticDemoRequest<{ items: Array<{ id: string }>; count: number }>(route)
+
+    expect(history.count).toBe(2)
+    expect(history.items.map((item) => item.id)).toEqual([second.id, first.id])
+  })
+
+  it("keeps an answer without a key as an ungraded lesson attempt", async () => {
+    const attempt = await staticDemoRequest<{ evaluation: string; reference_answer: string; feedback: string }>(
+      "/lessons/lesson-newton/practice/memory/attempts",
+      { method: "POST", body: JSON.stringify({ answer: "我会先画受力图", elapsed_ms: 45 }) },
+    )
+
+    expect(attempt.evaluation).toBe("ungraded")
+    expect(attempt.reference_answer).toBe("")
+    expect(attempt.feedback).toMatch(/复盘|反馈/)
+  })
+
+  it("rejects empty answers, negative elapsed time, and unknown lesson sections", async () => {
+    const route = "/lessons/lesson-newton/practice/practice/attempts"
+    await expect(staticDemoRequest(route, {
+      method: "POST",
+      body: JSON.stringify({ answer: "   ", elapsed_ms: 10 }),
+    })).rejects.toMatchObject({ status: 400 })
+    await expect(staticDemoRequest(route, {
+      method: "POST",
+      body: JSON.stringify({ answer: "8 N", elapsed_ms: -1 }),
+    })).rejects.toMatchObject({ status: 400 })
+    await expect(staticDemoRequest(route, {
+      method: "POST",
+      body: JSON.stringify({ answer: "8 N", elapsed_ms: 1.5 }),
+    })).rejects.toMatchObject({ status: 400 })
+    await expect(staticDemoRequest("/lessons/missing/practice/practice/attempts", {
+      method: "POST",
+      body: JSON.stringify({ answer: "8 N", elapsed_ms: 10 }),
+    })).rejects.toMatchObject({ status: 404 })
+    await expect(staticDemoRequest("/lessons/lesson-newton/practice/missing/attempts", {
+      method: "POST",
+      body: JSON.stringify({ answer: "8 N", elapsed_ms: 10 }),
+    })).rejects.toMatchObject({ status: 404 })
+  })
 })

@@ -30,7 +30,7 @@
 | 13 | 系统想法 System Idea | ❌ | — |
 
 schema v13 新增 `lesson_links`：课程与 `knowledge_items`/`prompts` 的显式多对多关联，
-由存储层在同一事务内验证目标存在，并提供按课程和按目标的查询；Pages 静态适配器仍只读。
+由存储层在同一事务内验证目标存在，并提供按课程和按目标的查询；Pages 静态适配器不模拟关联写入。
 
 schema v14 新增 `lesson_attempts`：按 `lesson_id` 与课程文档中的 `section_id` 保存即时练习答案、
 判定、参考答案、反馈和耗时。它与 FSRS 的 `attempts` 分离，课程内答题只记录学习证据，不改变记忆调度。
@@ -91,8 +91,8 @@ schema v14 新增 `lesson_attempts`：按 `lesson_id` 与课程文档中的 `sec
 `POST /api/lessons/{lessonID}/links`、`GET /api/lessons/{lessonID}/links` 和
 `GET /api/lesson-links?target_type=&target_id=` 读取；目标类型目前固定为
 `knowledge_item` 或 `prompt`，不存在的目标返回 404，重复关联返回 409。
-GitHub Pages 的 `VITE_STATIC_DEMO` 适配器只提供这门课程的 GET 预览 fixture，
-不模拟创建、编辑或历史版本；写入与版本管理必须连接本地后端。
+GitHub Pages 的 `VITE_STATIC_DEMO` 适配器提供这门课程的 GET 预览 fixture，
+并在当前浏览器会话内模拟即时练习证据的 POST/GET；课程创建、编辑和历史版本仍必须连接本地后端。
 **不**先做 Agent 一次性生成整节课——0801 明确反对这种做法。
 
 下一步边界：题目关联、即时测验提交与反馈，再把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段。
