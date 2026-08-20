@@ -289,3 +289,17 @@ CREATE TABLE lesson_links (
     PRIMARY KEY (lesson_id, target_type, target_id)
 );
 CREATE INDEX lesson_links_target_idx ON lesson_links(target_type, target_id, lesson_id);
+
+CREATE TABLE lesson_attempts (
+    id TEXT PRIMARY KEY,
+    lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    section_id TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    evaluation TEXT NOT NULL CHECK (evaluation IN ('correct', 'incorrect', 'ungraded')),
+    reference_answer TEXT NOT NULL DEFAULT '',
+    feedback TEXT NOT NULL DEFAULT '',
+    elapsed_ms INTEGER NOT NULL DEFAULT 0 CHECK (elapsed_ms >= 0),
+    created_at TEXT NOT NULL
+);
+CREATE INDEX lesson_attempts_lesson_section_idx
+    ON lesson_attempts(lesson_id, section_id, created_at DESC, id DESC);

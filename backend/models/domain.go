@@ -218,6 +218,66 @@ type LessonLink struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// LessonPracticeAttempt is the learner's observable answer to one structured
+// practice section. It deliberately lives outside the memory attempt object:
+// submitting a course question records evidence, but must not schedule an
+// FSRS card.
+type LessonPracticeAttempt struct {
+	ID              string    `json:"id"`
+	LessonID        string    `json:"lesson_id"`
+	SectionID       string    `json:"section_id"`
+	Answer          string    `json:"answer"`
+	Evaluation      string    `json:"evaluation"`
+	ReferenceAnswer string    `json:"reference_answer,omitempty"`
+	Feedback        string    `json:"feedback"`
+	ElapsedMS       int       `json:"elapsed_ms"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+type LessonPracticeAttemptListOptions struct {
+	Limit  int
+	Offset int
+}
+
+const (
+	LessonPracticeEvaluationCorrect   = "correct"
+	LessonPracticeEvaluationIncorrect = "incorrect"
+	LessonPracticeEvaluationUngraded  = "ungraded"
+)
+
+var lessonPracticeEvaluations = map[string]struct{}{
+	LessonPracticeEvaluationCorrect:   {},
+	LessonPracticeEvaluationIncorrect: {},
+	LessonPracticeEvaluationUngraded:  {},
+}
+
+func IsLessonPracticeEvaluationValid(evaluation string) bool {
+	_, ok := lessonPracticeEvaluations[strings.TrimSpace(evaluation)]
+	return ok
+}
+
+func (attempt LessonPracticeAttempt) Validate() error {
+	if strings.TrimSpace(attempt.ID) == "" {
+		return errors.New("lesson practice attempt id is required")
+	}
+	if strings.TrimSpace(attempt.LessonID) == "" {
+		return errors.New("lesson practice attempt lesson id is required")
+	}
+	if strings.TrimSpace(attempt.SectionID) == "" {
+		return errors.New("lesson practice attempt section id is required")
+	}
+	if strings.TrimSpace(attempt.Answer) == "" {
+		return errors.New("lesson practice attempt answer is required")
+	}
+	if !IsLessonPracticeEvaluationValid(attempt.Evaluation) {
+		return fmt.Errorf("lesson practice attempt evaluation %q is invalid", attempt.Evaluation)
+	}
+	if attempt.ElapsedMS < 0 {
+		return errors.New("lesson practice attempt elapsed_ms must be non-negative")
+	}
+	return nil
+}
+
 type LessonLinkListOptions struct {
 	TargetType string
 	Limit      int
