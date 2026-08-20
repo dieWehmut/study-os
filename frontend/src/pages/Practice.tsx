@@ -166,6 +166,9 @@ export default function Practice() {
   const [rowError, setRowError] = useState("")
   const [queueing, setQueueing] = useState("")
   const [correcting, setCorrecting] = useState("")
+  const [correctionID, setCorrectionID] = useState("")
+  const [correctionAnswer, setCorrectionAnswer] = useState("")
+  const [correctionStartedAt, setCorrectionStartedAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   // Which cause row has its drawing board open, "" for none. A cause rather
   // than a flag: the row is the reason the board is on screen, and a second
@@ -182,6 +185,9 @@ export default function Practice() {
     listMistakes(subject === "all" ? {} : { subject })
       .then((loaded) => {
         if (!active) return []
+        setCorrectionID("")
+        setCorrectionAnswer("")
+        setCorrectionStartedAt(null)
         setRecords(loaded)
         setError("")
         return carryBrowserLogOver()
@@ -227,6 +233,11 @@ export default function Practice() {
     try {
       await deleteMistake(id)
       setRecords((current) => current.filter((entry) => entry.id !== id))
+      if (correctionID === id) {
+        setCorrectionID("")
+        setCorrectionAnswer("")
+        setCorrectionStartedAt(null)
+      }
       setError("")
     } catch (failure) {
       setError(describe(failure, "删除错题失败"))
@@ -272,16 +283,44 @@ export default function Practice() {
    * with the whole record, but taking it wholesale would let a rewrite of the
    * question text land under your cursor as the side effect of a press.
    */
-  async function correct(item: MistakeRecord) {
+  function openCorrection(item: MistakeRecord) {
     if (correcting) return
+    setCorrectionID(item.id)
+    setCorrectionAnswer("")
+    setCorrectionStartedAt(Date.now())
+    setRowError("")
+  }
+
+  function cancelCorrection() {
+    if (correcting) return
+    setCorrectionID("")
+    setCorrectionAnswer("")
+    setCorrectionStartedAt(null)
+    setRowError("")
+  }
+
+  async function correct(item: MistakeRecord) {
+    if (correcting || correctionID !== item.id) return
+    const answer = correctionAnswer.trim()
+    if (!answer) {
+      setRowError("订正答案不能为空")
+      return
+    }
+    const startedAt = correctionStartedAt ?? Date.now()
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
     setCorrecting(item.id)
     try {
-      const fixed = await correctMistake(item.id)
+      const fixed = await correctMistake(item.id, { answer, elapsedMs })
       setRecords((current) =>
         current.map((entry) =>
-          entry.id === item.id ? { ...entry, corrected: fixed.corrected } : entry,
+          entry.id === item.id
+            ? { ...entry, corrected: fixed.corrected, correction: fixed.correction }
+            : entry,
         ),
       )
+      setCorrectionID("")
+      setCorrectionAnswer("")
+      setCorrectionStartedAt(null)
       setRowError("")
     } catch (failure) {
       setRowError(describe(failure, "订正失败"))
@@ -417,7 +456,7 @@ export default function Practice() {
                 return (
                   <li
                     key={item.id}
-                    className="flex items-center gap-2 rounded-lg border bg-muted/25 px-3 py-2"
+                    className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/25 px-3 py-2"
                   >
                     <span className="truncate text-sm">{item.question}</span>
                     <Badge
@@ -457,8 +496,8 @@ export default function Practice() {
                         variant="ghost"
                         size="sm"
                         className="shrink-0"
-                        disabled={correcting === item.id}
-                        onClick={() => void correct(item)}
+                        disabled={Boolean(correcting) || Boolean(correctionID)}
+                        onClick={() => openCorrection(item)}
                       >
                         <CheckCheck aria-hidden="true" />
                         订正
@@ -472,6 +511,41 @@ export default function Practice() {
                     >
                       <Trash2 aria-hidden="true" />
                     </Button>
+                    {item.correction ? (
+                      <div className="w-full text-xs text-emerald-600 dark:text-emerald-400">
+                        答案：{item.correction.answer} · 用时：{item.correction.elapsedMs} ms
+                      </div>
+                    ) : null}
+                    {correctionID === item.id ? (
+                      <form
+                        className="flex w-full flex-wrap items-end gap-2 border-t pt-2"
+                        onSubmit={(event) => {
+                          event.preventDefault()
+                          void correct(item)
+                        }}
+                      >
+                        <div className="min-w-48 flex-1">
+                          <label htmlFor={`correction-answer-${item.id}`} className="mb-1 block text-xs text-muted-foreground">
+                            订正答案
+                          </label>
+                          <Input
+                            id={`correction-answer-${item.id}`}
+                            aria-label="订正答案"
+                            autoFocus
+                            value={correctionAnswer}
+                            onChange={(event) => setCorrectionAnswer(event.target.value)}
+                            placeholder="写下你确认后的答案"
+                            disabled={correcting === item.id}
+                          />
+                        </div>
+                        <Button type="submit" size="sm" disabled={correcting === item.id || !correctionAnswer.trim()}>
+                          {correcting === item.id ? "保存中…" : "提交订正"}
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" disabled={correcting === item.id} onClick={cancelCorrection}>
+                          取消订正
+                        </Button>
+                      </form>
+                    ) : null}
                   </li>
                 )
               })}

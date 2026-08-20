@@ -23,6 +23,11 @@ export interface MistakeRecord {
    * button stays offered rather than vanishing from every row.
    */
   corrected?: boolean
+  correction?: {
+    answer: string
+    elapsedMs: number
+    occurredAt: string
+  }
   createdAt: string
 }
 

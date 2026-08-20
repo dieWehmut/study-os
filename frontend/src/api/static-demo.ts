@@ -20,6 +20,17 @@ interface StaticMistakePair {
     question_id: string
     cause: string
     note?: string
+    answer?: string
+    elapsed_ms?: number
+    is_correct?: boolean
+    occurred_at: string
+  }
+  correction?: {
+    id: string
+    question_id: string
+    answer: string
+    elapsed_ms: number
+    is_correct: boolean
     occurred_at: string
   }
   corrected?: boolean
@@ -841,7 +852,16 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   if (root === "mistakes" && !id && method === "POST") {
     const pair: StaticMistakePair = {
       question: { id: newID("question"), subject: String(body.subject ?? "all"), stem: String(body.stem ?? ""), created_at: DEMO_NOW },
-      attempt: { id: newID("attempt"), question_id: "", cause: String(body.cause ?? "unknown"), note: String(body.note ?? ""), occurred_at: DEMO_NOW },
+      attempt: {
+        id: newID("attempt"),
+        question_id: "",
+        cause: String(body.cause ?? "unknown"),
+        note: String(body.note ?? ""),
+        answer: String(body.answer ?? "").trim() || undefined,
+        elapsed_ms: body.elapsed_ms === undefined ? 0 : Math.max(0, Math.trunc(Number(body.elapsed_ms) || 0)),
+        is_correct: false,
+        occurred_at: DEMO_NOW,
+      },
     }
     pair.attempt.question_id = pair.question.id
     state.mistakes.unshift(pair)
@@ -856,6 +876,20 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   if (root === "mistakes" && id && action === "correct" && method === "POST") {
     const pair = state.mistakes.find((entry) => entry.attempt.id === id)
     if (!pair) throw new StaticDemoError("Static demo mistake not found")
+    const answer = String(body.answer ?? "").trim()
+    const elapsedMS = Number(body.elapsed_ms)
+    if (!answer) throw new StaticDemoError("correction answer is required", 400)
+    if (!Number.isFinite(elapsedMS) || elapsedMS < 0) throw new StaticDemoError("correction elapsed_ms cannot be negative", 400)
+    if (pair.correction) return responseFor(pair) as T
+    const correctedAt = DEMO_NOW
+    pair.correction = {
+      id: newID("attempt"),
+      question_id: pair.question.id,
+      answer,
+      elapsed_ms: Math.trunc(elapsedMS),
+      is_correct: true,
+      occurred_at: correctedAt,
+    }
     pair.corrected = true
     return responseFor(pair) as T
   }

@@ -20,6 +20,14 @@ interface MistakePair {
     note?: string
     occurred_at: string
   }
+  correction?: {
+    id: string
+    question_id: string
+    answer?: string
+    elapsed_ms?: number
+    is_correct?: boolean
+    occurred_at: string
+  }
   /** The question has since been answered right. Derived server-side. */
   corrected?: boolean
 }
@@ -59,7 +67,17 @@ function toRecord(pair: MistakePair): MistakeRecord | null {
   const noted = pair.attempt.note?.trim() ? { ...linked, note: pair.attempt.note } : linked
   // Likewise absent: an older backend answers nothing, and "not yet fixed" is
   // the reading that leaves 订正 pressable instead of hiding it everywhere.
-  return pair.corrected ? { ...noted, corrected: true } : noted
+  const corrected = pair.corrected || pair.correction?.is_correct === true
+  if (!corrected) return noted
+  const correctionAnswer = pair.correction?.answer?.trim()
+  const correction = correctionAnswer && pair.correction
+    ? {
+        answer: correctionAnswer,
+        elapsedMs: Math.max(0, Math.trunc(pair.correction.elapsed_ms ?? 0)),
+        occurredAt: pair.correction.occurred_at,
+      }
+    : undefined
+  return correction ? { ...noted, corrected: true, correction } : { ...noted, corrected: true }
 }
 
 export async function listMistakes(options: ListMistakesOptions = {}): Promise<MistakeRecord[]> {
@@ -79,6 +97,8 @@ export async function recordMistake(filed: {
   question: string
   cause: MistakeCause
   note?: string
+  answer?: string
+  elapsedMs?: number
 }): Promise<MistakeRecord> {
   const pair = await apiRequest<MistakePair>("/mistakes", {
     method: "POST",
@@ -87,6 +107,8 @@ export async function recordMistake(filed: {
       stem: filed.question,
       cause: filed.cause,
       note: filed.note ?? "",
+      ...(filed.answer?.trim() ? { answer: filed.answer.trim() } : {}),
+      ...(filed.elapsedMs !== undefined ? { elapsed_ms: filed.elapsedMs } : {}),
     }),
   })
   const record = toRecord(pair)
@@ -126,10 +148,13 @@ export async function scheduleMistake(attemptID: string): Promise<string> {
  * and put it right" is the sentence the log exists to be able to say. The
  * answer comes back still a mistake, carrying the mark.
  */
-export async function correctMistake(attemptID: string): Promise<MistakeRecord> {
+export async function correctMistake(attemptID: string, evidence: { answer: string; elapsedMs: number }): Promise<MistakeRecord> {
   const pair = await apiRequest<MistakePair>(
     `/mistakes/${encodeURIComponent(attemptID)}/correct`,
-    { method: "POST" },
+    {
+      method: "POST",
+      body: JSON.stringify({ answer: evidence.answer.trim(), elapsed_ms: evidence.elapsedMs }),
+    },
   )
   const record = toRecord(pair)
   if (!record) throw new Error("服务端记下的错因无法识别")
