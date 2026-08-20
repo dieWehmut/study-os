@@ -42,6 +42,26 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   await expect(reopenedPractice.getByText(/\u5df2\u4f5c\u7b54\s*1\s*\u6b21/)).toBeVisible()
   await expect(reopenedPractice.getByRole("status")).toContainText("\u56de\u7b54\u6b63\u786e")
 
+  await page.evaluate(() => {
+    window.location.hash = "#/practice"
+  })
+  const mistakeRow = page.getByRole("listitem").filter({ hasText: "I used the wrong sign in F = ma." })
+  await mistakeRow.getByRole("button", { name: "\u8ba2\u6b63", exact: true }).click()
+  await mistakeRow.getByLabel("\u8ba2\u6b63\u7b54\u6848").fill("6 N")
+  await mistakeRow.getByRole("button", { name: "\u63d0\u4ea4\u8ba2\u6b63" }).click()
+  await expect(mistakeRow.getByText("\u5df2\u8ba2\u6b63", { exact: true })).toBeVisible()
+  await expect(mistakeRow).toContainText("\u7b54\u6848\uff1a6 N")
+
+  await page.evaluate(() => {
+    window.location.hash = "#/knowledge"
+  })
+  await expect(page.locator("main")).toBeVisible()
+  await page.evaluate(() => {
+    window.location.hash = "#/practice"
+  })
+  const reopenedMistake = page.getByRole("listitem").filter({ hasText: "I used the wrong sign in F = ma." })
+  await expect(reopenedMistake).toContainText("\u7b54\u6848\uff1a6 N")
+
   await expect(page.locator('[data-static-demo="true"]')).toBeVisible()
   expect(apiRequests).toEqual([])
   expect(runtimeErrors).toEqual([])
