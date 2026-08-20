@@ -75,11 +75,37 @@ describe("static Pages API fixtures", () => {
     const mistakes = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }> }>("/mistakes")
     const attempt = mistakes.items[0]?.attempt.id
     expect(attempt).toBeTruthy()
-    await expect(staticDemoRequest(`/mistakes/${attempt}/correct`, { method: "POST" })).resolves.toHaveProperty("corrected", true)
+    await expect(staticDemoRequest(`/mistakes/${attempt}/correct`, {
+      method: "POST",
+      body: JSON.stringify({ answer: " 6 N ", elapsed_ms: 4200 }),
+    })).resolves.toMatchObject({
+      corrected: true,
+      correction: { answer: "6 N", elapsed_ms: 4200, is_correct: true },
+    })
+
+    await expect(staticDemoRequest(`/mistakes/${attempt}/correct`, {
+      method: "POST",
+      body: JSON.stringify({ answer: "7 N", elapsed_ms: 5000 }),
+    })).resolves.toMatchObject({ correction: { answer: "6 N", elapsed_ms: 4200 } })
 
     const upload = await staticDemoRequest<{ job_id: string }>("/imports", { method: "POST", body: new FormData() })
     await expect(staticDemoRequest(`/imports/${upload.job_id}/preview`, { method: "POST", body: JSON.stringify({ mapping: {} }) })).resolves.toHaveProperty("summary")
     await expect(staticDemoRequest(`/imports/${upload.job_id}/commit`, { method: "POST", body: "{}" })).resolves.toHaveProperty("summary")
+  })
+
+  it("rejects static mistake corrections without usable evidence", async () => {
+    const mistakes = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }> }>("/mistakes")
+    const attempt = mistakes.items[0]?.attempt.id
+    expect(attempt).toBeTruthy()
+
+    await expect(staticDemoRequest(`/mistakes/${attempt}/correct`, {
+      method: "POST",
+      body: JSON.stringify({ answer: "   ", elapsed_ms: 1 }),
+    })).rejects.toMatchObject({ status: 400 })
+    await expect(staticDemoRequest(`/mistakes/${attempt}/correct`, {
+      method: "POST",
+      body: JSON.stringify({ answer: "6 N", elapsed_ms: -1 }),
+    })).rejects.toMatchObject({ status: 400 })
   })
 
   it("keeps dumped notes in the knowledge library and review queue", async () => {

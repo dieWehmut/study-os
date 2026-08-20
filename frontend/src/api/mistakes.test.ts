@@ -189,13 +189,34 @@ describe("mistakes API", () => {
       question: { id: "q-1", subject: "physics", stem: "受力分析", created_at: "2026-08-08T09:00:00Z" },
       attempt: { id: "qa-1", question_id: "q-1", cause: "method", occurred_at: "2026-08-08T09:00:00Z" },
       corrected: true,
+      correction: { id: "qa-correction-1", answer: "6 N", elapsed_ms: 4200, is_correct: true, occurred_at: "2026-08-08T09:01:00Z" },
     })
 
-    const fixed = await correctMistake("qa-1")
+    const fixed = await correctMistake("qa-1", { answer: "6 N", elapsedMs: 4200 })
 
-    expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1/correct", { method: "POST" })
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1/correct", {
+      method: "POST",
+      body: JSON.stringify({ answer: "6 N", elapsed_ms: 4200 }),
+    })
     expect(fixed.id).toBe("qa-1")
     expect(fixed.cause).toBe("method")
     expect(fixed.corrected).toBe(true)
+    expect(fixed.correction).toEqual({ answer: "6 N", elapsedMs: 4200, occurredAt: "2026-08-08T09:01:00Z" })
+  })
+
+  it("projects correction evidence from list responses", async () => {
+    mocks.apiRequest.mockResolvedValue({
+      count: 1,
+      items: [{
+        question: { id: "q-1", subject: "physics", stem: "F = ma", created_at: "2026-08-08T09:00:00Z" },
+        attempt: { id: "qa-1", question_id: "q-1", cause: "method", occurred_at: "2026-08-08T09:00:00Z" },
+        correction: { id: "qa-correction-1", question_id: "q-1", answer: "6 N", elapsed_ms: 4200, is_correct: true, occurred_at: "2026-08-08T09:01:00Z" },
+      }],
+    })
+
+    const records = await listMistakes()
+
+    expect(records[0].corrected).toBe(true)
+    expect(records[0].correction).toEqual({ answer: "6 N", elapsedMs: 4200, occurredAt: "2026-08-08T09:01:00Z" })
   })
 })
