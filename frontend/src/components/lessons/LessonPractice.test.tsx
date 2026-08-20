@@ -29,6 +29,7 @@ describe("LessonPractice", () => {
   beforeEach(() => {
     mocks.submitLessonPracticeAttempt.mockReset()
     mocks.listLessonPracticeAttempts.mockReset()
+    mocks.listLessonPracticeAttempts.mockResolvedValue({ count: 0, items: [] })
   })
 
   it("lets a learner choose and submit a structured question", () => {

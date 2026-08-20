@@ -1,7 +1,11 @@
 import { CircleHelp } from "lucide-react"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { submitLessonPracticeAttempt, type LessonPracticeAttempt } from "@/api/lesson-practice"
+import {
+  listLessonPracticeAttempts,
+  submitLessonPracticeAttempt,
+  type LessonPracticeAttempt,
+} from "@/api/lesson-practice"
 import type { LessonSection } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,6 +28,8 @@ interface PracticeResult {
   feedback: string
   referenceAnswer?: string
 }
+
+type PracticeHistoryState = "loading" | "ready" | "empty" | "error"
 
 export interface LessonPracticeProps {
   section: LessonSection
@@ -238,7 +244,52 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
   const [submitted, setSubmitted] = useState(false)
   const [result, setResult] = useState<PracticeResult | null>(null)
   const [evidenceState, setEvidenceState] = useState<"idle" | "saving" | "saved" | "failed">("idle")
+  const [historyState, setHistoryState] = useState<PracticeHistoryState>(lessonID ? "loading" : "empty")
+  const [historyCount, setHistoryCount] = useState(0)
+  const [latestAttempt, setLatestAttempt] = useState<LessonPracticeAttempt | null>(null)
   const startedAt = useRef(clockNow())
+  const historyRequest = useRef(0)
+
+  useEffect(() => {
+    let active = true
+    const requestID = ++historyRequest.current
+    if (!lessonID) {
+      queueMicrotask(() => {
+        if (!active) return
+        setHistoryState("empty")
+        setHistoryCount(0)
+        setLatestAttempt(null)
+      })
+      return () => {
+        active = false
+      }
+    }
+
+    queueMicrotask(() => {
+      if (!active || requestID !== historyRequest.current) return
+      setHistoryState("loading")
+      setHistoryCount(0)
+      setLatestAttempt(null)
+    })
+    void listLessonPracticeAttempts(lessonID, section.id)
+      .then((history) => {
+        if (!active || requestID !== historyRequest.current) return
+        const latest = history.items[0] ?? null
+        setHistoryCount(Math.max(history.count, history.items.length))
+        setLatestAttempt(latest)
+        setHistoryState(latest ? "ready" : "empty")
+      })
+      .catch(() => {
+        if (!active || requestID !== historyRequest.current) return
+        setHistoryState("error")
+        setHistoryCount(0)
+        setLatestAttempt(null)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [lessonID, section.id])
 
   async function submit() {
     if (selected === null || submitted) return
@@ -255,6 +306,10 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
         elapsedMs: Math.max(0, Math.round(clockNow() - startedAt.current)),
       })
       setResult(resultFromAttempt(attempt))
+      historyRequest.current += 1
+      setLatestAttempt(attempt)
+      setHistoryCount((count) => count + 1)
+      setHistoryState("ready")
       setEvidenceState("saved")
     } catch {
       setEvidenceState("failed")
@@ -263,11 +318,13 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
   const articleID = `lesson-practice-${section.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`
   const questionID = `${articleID}-question`
   const groupName = `${articleID}-options`
+  const visibleResult = result ?? (!submitted && latestAttempt ? resultFromAttempt(latestAttempt) : null)
 
   return (
     <article
       data-section-kind={type}
       data-practice-mode={content ? "interactive" : "legacy"}
+      data-practice-history={historyState}
       className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -285,6 +342,17 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
           }}
         >
           <p id={questionID} className="text-sm leading-7 text-foreground/90">{content.question}</p>
+          {lessonID && historyState === "loading" ? (
+            <p className="text-xs text-muted-foreground">正在读取练习记录…</p>
+          ) : null}
+          {lessonID && historyState === "ready" && historyCount > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              <span>{`已作答 ${historyCount} 次`}</span>
+              {latestAttempt && latestAttempt.elapsed_ms > 0
+                ? ` · 最近一次用时 ${Math.max(1, Math.round(latestAttempt.elapsed_ms / 1000))} 秒`
+                : null}
+            </p>
+          ) : null}
           <fieldset className="grid gap-2" aria-describedby={questionID}>
             <legend className="sr-only">选择答案</legend>
             {content.options.map((option, index) => (
@@ -313,20 +381,22 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
             <p className="text-xs text-muted-foreground">先选一个答案，再提交；提交后会显示即时反馈。</p>
             <Button type="submit" disabled={selected === null || submitted}>提交答案</Button>
           </div>
-          {result ? (
+          {visibleResult ? (
             <div
               role="status"
               aria-live="polite"
               className={cn(
                 "grid gap-2 rounded-lg border p-3 text-sm",
-                result.kind === "correct" && "border-primary/30 bg-primary/5",
-                result.kind === "incorrect" && "border-destructive/30 bg-destructive/5",
-                result.kind === "ungraded" && "border-border bg-muted/40",
+                visibleResult.kind === "correct" && "border-primary/30 bg-primary/5",
+                visibleResult.kind === "incorrect" && "border-destructive/30 bg-destructive/5",
+                visibleResult.kind === "ungraded" && "border-border bg-muted/40",
               )}
             >
-              <p className="font-medium">{result.label}</p>
-              <p className="leading-6">{result.feedback}</p>
-              {result.referenceAnswer ? <p className="text-muted-foreground">参考答案：{result.referenceAnswer}</p> : null}
+              <p className="font-medium">{visibleResult.label}</p>
+              <p className="leading-6">{visibleResult.feedback}</p>
+              {visibleResult.referenceAnswer ? (
+                <p className="text-muted-foreground">参考答案：{visibleResult.referenceAnswer}</p>
+              ) : null}
             </div>
           ) : null}
           {lessonID && evidenceState !== "idle" ? (
