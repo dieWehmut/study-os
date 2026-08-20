@@ -173,7 +173,9 @@ func TestMistakeCorrectEndpointMarksTheRowWithoutRemovingIt(t *testing.T) {
 		t.Fatalf("a mistake is not corrected the moment it is filed")
 	}
 
-	corrected := requestJSON(t, router, http.MethodPost, "/api/mistakes/"+created.Attempt.ID+"/correct", nil)
+	corrected := requestJSON(t, router, http.MethodPost, "/api/mistakes/"+created.Attempt.ID+"/correct", map[string]any{
+		"answer": "corrected answer", "elapsed_ms": 1200,
+	})
 	correctedBody := corrected.Body.String()
 	if corrected.Code != http.StatusOK {
 		t.Fatalf("correct = %d, body = %s", corrected.Code, correctedBody)
@@ -210,7 +212,9 @@ func TestMistakeCorrectSaysSoWhenThereIsNothingToCorrect(t *testing.T) {
 	application := testApplication(t, config.Config{})
 	router := httpapi.NewRouter(application)
 
-	missing := requestJSON(t, router, http.MethodPost, "/api/mistakes/never-filed/correct", nil)
+	missing := requestJSON(t, router, http.MethodPost, "/api/mistakes/never-filed/correct", map[string]any{
+		"answer": "corrected answer", "elapsed_ms": 1200,
+	})
 	body := missing.Body.String()
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("correct missing = %d, body = %s", missing.Code, body)

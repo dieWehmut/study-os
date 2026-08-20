@@ -37,7 +37,7 @@ func TestMistakeCorrectionEndpointCarriesAnswerAndElapsedEvidence(t *testing.T) 
 		t.Fatalf("correct = %d, body = %s", corrected.Code, corrected.Body.String())
 	}
 	var result struct {
-		Corrected bool `json:"corrected"`
+		Corrected  bool `json:"corrected"`
 		Correction struct {
 			Answer    string `json:"answer"`
 			ElapsedMS int    `json:"elapsed_ms"`
@@ -53,7 +53,9 @@ func TestMistakeCorrectionEndpointCarriesAnswerAndElapsedEvidence(t *testing.T) 
 		"answer": "7 N", "elapsed_ms": 5000,
 	})
 	var repeated struct {
-		Correction struct{ Answer string `json:"answer"` } `json:"correction"`
+		Correction struct {
+			Answer string `json:"answer"`
+		} `json:"correction"`
 	}
 	decodeJSON(t, again, &repeated)
 	if again.Code != http.StatusOK || repeated.Correction.Answer != "6 N" {
@@ -68,7 +70,9 @@ func TestMistakeCorrectionEndpointRejectsMissingEvidence(t *testing.T) {
 		"subject": "physics", "stem": "F = ma", "cause": "method",
 	})
 	var created struct {
-		Attempt struct{ ID string `json:"id"` } `json:"attempt"`
+		Attempt struct {
+			ID string `json:"id"`
+		} `json:"attempt"`
 	}
 	decodeJSON(t, filed, &created)
 

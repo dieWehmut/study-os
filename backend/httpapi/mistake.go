@@ -16,10 +16,12 @@ func handleMistakeCreate(response http.ResponseWriter, request *http.Request, ap
 		return
 	}
 	var input struct {
-		Subject string `json:"subject"`
-		Stem    string `json:"stem"`
-		Cause   string `json:"cause"`
-		Note    string `json:"note"`
+		Subject   string `json:"subject"`
+		Stem      string `json:"stem"`
+		Cause     string `json:"cause"`
+		Note      string `json:"note"`
+		Answer    string `json:"answer"`
+		ElapsedMS int    `json:"elapsed_ms"`
 	}
 	request.Body = http.MaxBytesReader(response, request.Body, 64<<10)
 	if err := decodeRequest(request, &input); err != nil {
@@ -31,10 +33,12 @@ func handleMistakeCreate(response http.ResponseWriter, request *http.Request, ap
 		return
 	}
 	filed, err := application.Store.RecordMistake(request.Context(), models.MistakeInput{
-		Subject: strings.ToLower(strings.TrimSpace(input.Subject)),
-		Stem:    input.Stem,
-		Cause:   input.Cause,
-		Note:    input.Note,
+		Subject:   strings.ToLower(strings.TrimSpace(input.Subject)),
+		Stem:      input.Stem,
+		Cause:     input.Cause,
+		Note:      input.Note,
+		Answer:    input.Answer,
+		ElapsedMS: input.ElapsedMS,
 	})
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "记录错题失败"})
@@ -65,7 +69,26 @@ func handleMistakeCorrect(response http.ResponseWriter, request *http.Request, a
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
 		return
 	}
-	corrected, err := application.Store.CorrectMistake(request.Context(), chi.URLParam(request, "attemptID"))
+	var input struct {
+		Answer    string `json:"answer"`
+		ElapsedMS int    `json:"elapsed_ms"`
+	}
+	request.Body = http.MaxBytesReader(response, request.Body, 16<<10)
+	if err := decodeRequest(request, &input); err != nil {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if strings.TrimSpace(input.Answer) == "" {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "correction answer is required"})
+		return
+	}
+	if input.ElapsedMS < 0 {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "correction elapsed_ms cannot be negative"})
+		return
+	}
+	corrected, err := application.Store.RecordMistakeCorrection(request.Context(), chi.URLParam(request, "attemptID"), models.MistakeCorrectionInput{
+		Answer: input.Answer, ElapsedMS: input.ElapsedMS,
+	})
 	if err != nil {
 		writeStoreError(response, err)
 		return
