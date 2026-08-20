@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { correctMistake, deleteMistake, listMistakes, recordMistake, scheduleMistake } from "./mistakes"
+import {
+  correctMistake,
+  deleteMistake,
+  listMistakes,
+  reclassifyMistake,
+  recordMistake,
+  scheduleMistake,
+} from "./mistakes"
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -42,9 +49,7 @@ describe("mistakes API", () => {
     ])
   })
 
-  it("drops a row whose cause is not in the taxonomy", async () => {
-    // Every count, badge and bar looks the cause up in MISTAKE_CAUSES. A cause
-    // we have since renamed would render blank and still swell the total.
+  it("preserves a free-text cause until it can be reclassified", async () => {
     mocks.apiRequest.mockResolvedValue({
       count: 2,
       items: [
@@ -62,7 +67,8 @@ describe("mistakes API", () => {
     const records = await listMistakes()
 
     expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes")
-    expect(records.map((record) => record.id)).toEqual(["qa-2"])
+    expect(records.map((record) => record.id)).toEqual(["qa-1", "qa-2"])
+    expect(records[0].cause).toBe("typo-that-never-existed")
   })
 
   it("files a mistake and hands back the row that was written", async () => {
@@ -143,6 +149,21 @@ describe("mistakes API", () => {
 
     expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1/schedule", { method: "POST" })
     expect(knowledgeId).toBe("k-mistake-1")
+  })
+
+  it("reclassifies by attempt id and URL-encodes the stable cause id", async () => {
+    mocks.apiRequest.mockResolvedValue({
+      question: { id: "q-1", subject: "physics", stem: "受力分析", created_at: "2026-08-08T09:00:00Z" },
+      attempt: { id: "qa-1", question_id: "q-1", cause: "physics:model-selection", occurred_at: "2026-08-08T09:00:00Z" },
+    })
+
+    const reclassified = await reclassifyMistake("qa-1", "physics:model-selection")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa-1/cause", {
+      method: "PATCH",
+      body: JSON.stringify({ cause: "physics:model-selection" }),
+    })
+    expect(reclassified.cause).toBe("physics:model-selection")
   })
 
   it("carries the mark that says a row has been put right", async () => {

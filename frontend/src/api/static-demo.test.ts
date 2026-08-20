@@ -108,6 +108,71 @@ describe("static Pages API fixtures", () => {
     })).rejects.toMatchObject({ status: 400 })
   })
 
+  it("mirrors the error cause candidate, confirmation, and reclassification contract", async () => {
+    const defaults = await staticDemoRequest<{
+      items: Array<{ id: string; status: string }>
+      count: number
+    }>("/error-causes?subject=physics")
+    expect(defaults.count).toBe(6)
+    expect(defaults.items.every((cause) => cause.status === "confirmed")).toBe(true)
+
+    const candidate = await staticDemoRequest<{
+      id: string
+      status: string
+      review_fixes: boolean
+    }>("/error-causes", {
+      method: "POST",
+      body: JSON.stringify({
+        id: "physics:model-selection",
+        subject: "physics",
+        parent_id: "method",
+        label: "模型选择错误",
+        review_fixes: true,
+        action: "重画受力图",
+      }),
+    })
+    expect(candidate).toMatchObject({
+      id: "physics:model-selection",
+      status: "candidate",
+      review_fixes: true,
+    })
+
+    const candidates = await staticDemoRequest<{ items: Array<{ id: string }>; count: number }>(
+      "/error-causes?subject=physics&status=candidate",
+    )
+    expect(candidates.count).toBe(1)
+    expect(candidates.items[0]?.id).toBe(candidate.id)
+
+    const mistakes = await staticDemoRequest<{
+      items: Array<{ question: { subject: string }; attempt: { id: string } }>
+    }>("/mistakes?subject=physics")
+    const attemptID = mistakes.items[0]?.attempt.id
+    expect(attemptID).toBeTruthy()
+    await expect(staticDemoRequest(`/mistakes/${attemptID}/cause`, {
+      method: "PATCH",
+      body: JSON.stringify({ cause: candidate.id }),
+    })).rejects.toMatchObject({ status: 400 })
+
+    const confirmed = await staticDemoRequest<{ status: string }>(
+      `/error-causes/${encodeURIComponent(candidate.id)}`,
+      { method: "PATCH", body: JSON.stringify({ status: "confirmed" }) },
+    )
+    expect(confirmed.status).toBe("confirmed")
+
+    const reclassified = await staticDemoRequest<{ attempt: { cause: string } }>(
+      `/mistakes/${attemptID}/cause`,
+      { method: "PATCH", body: JSON.stringify({ cause: candidate.id }) },
+    )
+    expect(reclassified.attempt.cause).toBe(candidate.id)
+    await expect(staticDemoRequest(`/mistakes/${attemptID}/schedule`, { method: "POST" })).resolves.toHaveProperty("knowledge_id")
+
+    const geography = await staticDemoRequest<{ items: Array<{ id: string }>; count: number }>(
+      "/error-causes?subject=geography",
+    )
+    expect(geography.count).toBe(6)
+    expect(geography.items.some((cause) => cause.id === candidate.id)).toBe(false)
+  })
+
   it("keeps dumped notes in the knowledge library and review queue", async () => {
     const dumped = await staticDemoRequest<{ id: string }>("/dump", {
       method: "POST",
