@@ -55,6 +55,17 @@ test("ROADMAP names persisted objects instead of stale browser-only gaps", () =>
   assert.doesNotMatch(roadmap, /课程 Lesson\s*\|\s*❌/)
 })
 
+test("ROADMAP records question-attempt evidence at the schema head", () => {
+  assert.match(schema, /answer TEXT NOT NULL DEFAULT ''/)
+  assert.match(schema, /elapsed_ms INTEGER NOT NULL DEFAULT 0 CHECK \(elapsed_ms >= 0\)/)
+  assert.match(schema, /is_correct INTEGER NOT NULL DEFAULT 0 CHECK \(is_correct IN \(0, 1\)\)/)
+  assert.match(databaseSource, /case 15:/)
+  assert.match(databaseSource, /ALTER TABLE question_attempts ADD COLUMN answer/)
+  assert.match(roadmap, /schema v15[\s\S]*question_attempts[\s\S]*answer[\s\S]*elapsed_ms[\s\S]*is_correct/)
+  assert.match(roadmap, /POST \/api\/mistakes\/\{attemptID\}\/correct/)
+  assert.match(roadmap, /订正[\s\S]*答案[\s\S]*用时/)
+})
+
 test("lesson documentation describes the versioned write and preview contract", () => {
   assert.match(roadmap, /POST \/api\/lessons/)
   assert.match(roadmap, /PATCH \/api\/lessons\/{lessonID}/)

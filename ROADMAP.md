@@ -10,7 +10,7 @@
 
 ## 一、对象盘点：0801 的 13 个底层对象，现在有几个
 
-盘点基线：schema 版本 14（`backend/db/db.go:19`，2026-08-20）。下表按 0801「三、首先要统一的底层对象」逐条对照。
+盘点基线：schema 版本 15（`backend/db/db.go:19`，2026-08-20）。下表按 0801「三、首先要统一的底层对象」逐条对照。
 新增迁移或底层对象时，必须同时更新本节；`scripts/tests/architecture-docs-consistency.test.mjs` 会检查这条基线和关键表名，避免路线图把已经落地的能力再次当成缺口。
 
 | # | 对象 | 现状 | 落点 |
@@ -22,7 +22,7 @@
 | 5 | 二级结论 Insight | 🟡 靠 `item_type` + tag 表达 | 知识库已有「二级结论/解题策略/易错信号」筛选 |
 | 6 | 记忆项 Memory Item | ✅ | `prompts` + `review_states` |
 | 7 | 题目 Question | ✅ 基础记录已落地 | `questions`；含来源与可选 `knowledge_item_id` |
-| 8 | 作答 Attempt | 🟡 三条记录链按语义分开 | 记忆项作答在 `attempts`；错题事件在 `question_attempts`；课程即时练习在 `lesson_attempts`，后者保存答案、耗时、确定性判定与反馈且不触发 FSRS |
+| 8 | 作答 Attempt | 🟡 三条记录链按语义分开 | 记忆项作答在 `attempts`；错题事件在 `question_attempts`，保存答案、耗时与正误；课程即时练习在 `lesson_attempts`，保存答案、耗时、确定性判定与反馈且不触发 FSRS |
 | 9 | 错因 Error Cause | 🟡 已持久化，分类仍在前端 | `question_attempts.cause` + `/api/mistakes`；六类 taxonomy 在 `frontend/src/lib/mistakes.ts`，尚无独立的学科错因表 |
 | 10 | 任务 Task | ❌ | — |
 | 11 | 学习会话 Study Session | ✅ 表在，写得少 | `study_sessions` |
@@ -34,6 +34,10 @@ schema v13 新增 `lesson_links`：课程与 `knowledge_items`/`prompts` 的显�
 
 schema v14 新增 `lesson_attempts`：按 `lesson_id` 与课程文档中的 `section_id` 保存即时练习答案、
 判定、参考答案、反馈和耗时。它与 FSRS 的 `attempts` 分离，课程内答题只记录学习证据，不改变记忆调度。
+
+schema v15 扩展 `question_attempts`：新增 `answer`、`elapsed_ms` 与 `is_correct`，把错题初次作答和
+订正后的正确作答都保存在同一题目的 attempt 历史里。旧版无错因的订正行迁移为 `is_correct=1`；
+`POST /api/mistakes/{attemptID}/correct` 要求答案与非负耗时，并以 `correction` 投影返回最近一次正确证据。
 
 另有一项 0801 列为「模块十」的基础设施**已经就位**：
 `domain_events`（`schema.sql:92`，读写在 `store.go:695/710`）。统一事件层不需要从头设计。
@@ -50,7 +54,7 @@ schema v14 新增 `lesson_attempts`：按 `lesson_id` 与课程文档中的 `sec
 
 做题工具（`frontend/src/pages/Practice.tsx`）现在以 `/api/mistakes` 为主存储，
 服务端把一条错题拆成 `questions` + `question_attempts`，并支持按学科查询、删除、订正，
-以及把可修复错因排进记忆队列。早期写入浏览器 `localStorage` 的记录只作为一次性迁移来源，
+订正会保存确认后的答案、计时和正确标记；系统也支持把可修复错因排进记忆队列。早期写入浏览器 `localStorage` 的记录只作为一次性迁移来源，
 迁移成功后会清除旧键；这保留了历史数据，又不会让新记录重新分叉。
 
 仍未完成的是错因 taxonomy 的后端化：`mistakes.ts` 里的六类（想不起来 / 看错题 / 算错 /
@@ -64,19 +68,20 @@ schema v14 新增 `lesson_attempts`：按 `lesson_id` 与课程文档中的 `sec
 ### 第 1 阶段：题目—作答—错因 落地到后端（已完成基础链路）
 
 1. `questions` 表：题干、学科、来源、可选关联知识点（题型字段仍待补）
-2. `question_attempts` 表：一题多做，当前保存错因、备注、发生时间（答案、用时、正误仍待补）
-3. `/api/mistakes`：错题创建、列表、删除、订正；`localStorage` 仅作为迁移来源
+2. `question_attempts` 表：一题多做，保存错因、备注、答案、用时、正误和发生时间；旧订正行已兼容迁移
+3. `/api/mistakes`：错题创建、列表、删除、证据化订正；`localStorage` 仅作为迁移来源
 4. `error_causes`：**尚未完成**，错因仍从 `mistakes.ts` 常量提供，下一步要升级成带学科维度的数据
    （0801：「以后你独立总结出的『地理六类错因』，就可以作为地理学科的专属分类体系」）
 
-判据（已满足基础部分）：错题能和知识点、记忆项 join 到一起；换设备后新错题还在。
-剩余判据：一题的完整作答证据（答案、耗时、正误）和可扩展的学科错因 taxonomy 能被查询。
+判据（作答证据已满足）：错题能和知识点、记忆项 join 到一起；换设备后新错题还在；初次作答和订正
+均可查询答案、耗时与正误。剩余判据：可扩展的学科错因 taxonomy 成为后端对象，并进入聚合诊断。
 
 ### 第 2 阶段：错因驱动复习（基础入口已落地）
 
 `mistakes.ts` 已经区分了「复习能修的」和「复习修不了的」，并由
 `POST /api/mistakes/{attemptID}/schedule` 执行排队；后端会复用知识库条目并避免重复排卡。
-当前仍缺按错因聚合的诊断视图，以及把“订正后证据”反馈给后续课程/题目选择的闭环。
+Practice 已用行内表单采集订正答案与用时，Pages 静态展示也在当前会话内保存相同证据。当前仍缺按错因聚合的
+诊断视图，以及把订正证据反馈给后续课程/题目选择的闭环。
 
 判据：做错一道题，其对应知识点当天进入队列。
 
@@ -98,7 +103,8 @@ GitHub Pages 的 `VITE_STATIC_DEMO` 适配器提供这门课程的 GET 预览 fi
 并在当前浏览器会话内模拟即时练习证据的 POST/GET；课程创建、编辑和历史版本仍必须连接本地后端。
 **不**先做 Agent 一次性生成整节课——0801 明确反对这种做法。
 
-下一步边界：题目关联、即时测验提交与反馈，再把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段。
+下一步边界：把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段，并用已有课程关联与
+即时练习证据驱动选题和质量回查。
 
 ### 第 4 阶段：任务 Task 与系统想法 System Idea
 
