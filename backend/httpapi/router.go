@@ -265,6 +265,15 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/mistakes", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeCreate(response, request, application)
 		})
+		api.Get("/error-causes", func(response http.ResponseWriter, request *http.Request) {
+			handleErrorCauseList(response, request, application)
+		})
+		api.Post("/error-causes", func(response http.ResponseWriter, request *http.Request) {
+			handleErrorCauseCreate(response, request, application)
+		})
+		api.Patch("/error-causes/{causeID}", func(response http.ResponseWriter, request *http.Request) {
+			handleErrorCauseUpdate(response, request, application)
+		})
 		api.Get("/mistakes", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeList(response, request, application)
 		})
@@ -276,6 +285,9 @@ func NewRouter(application *app.App) http.Handler {
 		})
 		api.Post("/mistakes/{attemptID}/correct", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeCorrect(response, request, application)
+		})
+		api.Patch("/mistakes/{attemptID}/cause", func(response http.ResponseWriter, request *http.Request) {
+			handleMistakeCauseUpdate(response, request, application)
 		})
 		api.Post("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupCreate(response, request, application)

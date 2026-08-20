@@ -37,7 +37,12 @@ func handleMistakeSchedule(response http.ResponseWriter, request *http.Request, 
 		return
 	}
 
-	if !memory.ReviewFixes(mistake.Attempt.Cause) {
+	reviewFixes, err := application.Store.ErrorCauseReviewFixes(ctx, mistake.Question.Subject, mistake.Attempt.Cause)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取错因策略失败"})
+		return
+	}
+	if !reviewFixes {
 		writeJSON(response, http.StatusBadRequest, map[string]string{
 			"error": "这类错误再复习一遍也不会好，先按它自己的办法处理",
 		})
