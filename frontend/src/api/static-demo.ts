@@ -36,6 +36,21 @@ interface StaticMistakePair {
   corrected?: boolean
 }
 
+interface StaticErrorCause {
+  id: string
+  subject: string
+  parent_id?: string
+  label: string
+  review_fixes: boolean
+  action: string
+  status: "candidate" | "confirmed" | "archived"
+  source_type?: string
+  source_id?: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
 interface StaticImportJob {
   jobId: string
   previewed: boolean
@@ -54,6 +69,7 @@ interface StaticState {
   lessonAttempts: LessonPracticeAttempt[]
   articles: EnglishArticle[]
   mistakes: StaticMistakePair[]
+  errorCauses: StaticErrorCause[]
   vendors: Array<Record<string, unknown>>
   activeProvider: string
   speech: Record<string, unknown>
@@ -261,6 +277,17 @@ function makeLesson(): Lesson {
   }
 }
 
+function makeErrorCauses(): StaticErrorCause[] {
+  return [
+    { id: "recall", subject: "", label: "想不起来", review_fixes: true, action: "回到记忆检测，让它排进复习队列", status: "confirmed", sort_order: 0, created_at: DEMO_NOW, updated_at: DEMO_NOW },
+    { id: "misread", subject: "", label: "看错题", review_fixes: false, action: "读题时先圈出条件和问的是什么，再动笔", status: "confirmed", sort_order: 1, created_at: DEMO_NOW, updated_at: DEMO_NOW },
+    { id: "careless", subject: "", label: "算错 / 手滑", review_fixes: false, action: "留出检查这一步的时间，别靠再记一遍", status: "confirmed", sort_order: 2, created_at: DEMO_NOW, updated_at: DEMO_NOW },
+    { id: "method", subject: "", label: "思路不对", review_fixes: false, action: "补的是方法，不是这道题：找同类题再做两道", status: "confirmed", sort_order: 3, created_at: DEMO_NOW, updated_at: DEMO_NOW },
+    { id: "time", subject: "", label: "没时间做", review_fixes: false, action: "问题在配速，不在这道题本身", status: "confirmed", sort_order: 4, created_at: DEMO_NOW, updated_at: DEMO_NOW },
+    { id: "unknown", subject: "", label: "还没想清楚", review_fixes: false, action: "先记下来，等想清楚再归类", status: "confirmed", sort_order: 5, created_at: DEMO_NOW, updated_at: DEMO_NOW },
+  ]
+}
+
 function makeInitialState(): StaticState {
   const knowledge = makeKnowledge()
   const messages: ChatMessage[] = [
@@ -309,6 +336,7 @@ function makeInitialState(): StaticState {
     lessonAttempts: [],
     articles: [makeArticle()],
     mistakes,
+    errorCauses: makeErrorCauses(),
     vendors: [
       { id: "mock", display_name: "Local demo", implemented: true, key_configured: false, models: ["static-demo"], active: true, base_url: "" },
       { id: "deepseek", display_name: "DeepSeek", implemented: true, key_configured: false, models: ["deepseek-chat", "deepseek-reasoner"], active: false, base_url: "https://api.deepseek.com/v1" },
@@ -605,6 +633,73 @@ function mistakeList(subject: string | undefined) {
   return { items: clone(items), count: items.length }
 }
 
+function errorCauseList(url: URL) {
+  const subject = url.searchParams.get("subject")?.trim().toLowerCase() ?? ""
+  const status = url.searchParams.get("status")?.trim().toLowerCase() || "confirmed"
+  if (!["candidate", "confirmed", "archived", "all"].includes(status)) {
+    throw new StaticDemoError("invalid error cause status", 400)
+  }
+  const filtered = state.errorCauses
+    .filter((cause) =>
+      (cause.subject === "" || cause.subject === subject)
+      && (status === "all" || cause.status === status),
+    )
+    .sort((left, right) => {
+      const scope = Number(left.subject !== "") - Number(right.subject !== "")
+      return scope || left.sort_order - right.sort_order || left.id.localeCompare(right.id)
+    })
+  const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0)
+  const limit = Math.max(1, Math.min(500, Number(url.searchParams.get("limit") ?? 200) || 200))
+  const items = filtered.slice(offset, offset + limit)
+  return { items, count: items.length }
+}
+
+function validateStaticErrorCauseParent(subject: string, parentID: string, id: string): void {
+  if (!parentID) return
+  if (parentID === id) throw new StaticDemoError("error cause cannot be its own parent", 400)
+  const parent = state.errorCauses.find((cause) => cause.id === parentID)
+  if (!parent) throw new StaticDemoError("parent error cause does not exist", 400)
+  if (parent.subject && parent.subject !== subject) {
+    throw new StaticDemoError("parent error cause belongs to another subject", 400)
+  }
+  if (!subject && parent.subject) {
+    throw new StaticDemoError("global error cause cannot use a subject parent", 400)
+  }
+}
+
+function errorCauseFromBody(body: Record<string, unknown>): StaticErrorCause {
+  const id = String(body.id ?? newID("cause")).trim().toLowerCase()
+  const subject = String(body.subject ?? "").trim().toLowerCase()
+  const parentID = String(body.parent_id ?? "").trim().toLowerCase()
+  const label = String(body.label ?? "").trim()
+  const sourceType = String(body.source_type ?? "").trim().toLowerCase()
+  const sourceID = String(body.source_id ?? "").trim()
+  const sortOrder = body.sort_order === undefined ? 0 : Number(body.sort_order)
+  if (!/^[a-z0-9][a-z0-9:_-]{0,95}$/.test(id)) throw new StaticDemoError("invalid error cause id", 400)
+  if (!label) throw new StaticDemoError("error cause label is required", 400)
+  if (!Number.isInteger(sortOrder) || sortOrder < 0) throw new StaticDemoError("invalid error cause sort_order", 400)
+  if (Boolean(sourceType) !== Boolean(sourceID)) {
+    throw new StaticDemoError("error cause source_type and source_id must be provided together", 400)
+  }
+  if (state.errorCauses.some((cause) => cause.id === id)) {
+    throw new StaticDemoError("error cause already exists", 409)
+  }
+  validateStaticErrorCauseParent(subject, parentID, id)
+  return {
+    id,
+    subject,
+    ...(parentID ? { parent_id: parentID } : {}),
+    label,
+    review_fixes: body.review_fixes === true,
+    action: String(body.action ?? "").trim(),
+    status: "candidate",
+    ...(sourceType ? { source_type: sourceType, source_id: sourceID } : {}),
+    sort_order: sortOrder,
+    created_at: DEMO_NOW,
+    updated_at: DEMO_NOW,
+  }
+}
+
 function statusPayload() {
   const activeVendor = state.vendors.find((vendor) => vendor.id === state.activeProvider)
   const models = stringList(activeVendor?.models)
@@ -848,6 +943,53 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor(lesson) as T
   }
 
+  if (root === "error-causes" && !id && method === "GET") return responseFor(errorCauseList(url)) as T
+  if (root === "error-causes" && !id && method === "POST") {
+    const cause = errorCauseFromBody(body)
+    state.errorCauses.push(cause)
+    return responseFor(cause) as T
+  }
+  if (root === "error-causes" && id && method === "PATCH") {
+    const cause = state.errorCauses.find((entry) => entry.id === id)
+    if (!cause) throw new StaticDemoError("Static demo error cause not found", 404)
+    if (hasField(body, "subject") && String(body.subject ?? "").trim().toLowerCase() !== cause.subject) {
+      throw new StaticDemoError("error cause subject is immutable", 400)
+    }
+    const parentID = hasField(body, "parent_id")
+      ? String(body.parent_id ?? "").trim().toLowerCase()
+      : cause.parent_id ?? ""
+    validateStaticErrorCauseParent(cause.subject, parentID, cause.id)
+    const status = hasField(body, "status") ? String(body.status ?? "").trim().toLowerCase() : cause.status
+    if (!["candidate", "confirmed", "archived"].includes(status)) {
+      throw new StaticDemoError("invalid error cause status", 400)
+    }
+    const label = hasField(body, "label") ? String(body.label ?? "").trim() : cause.label
+    if (!label) throw new StaticDemoError("error cause label is required", 400)
+    const sourceType = hasField(body, "source_type")
+      ? String(body.source_type ?? "").trim().toLowerCase()
+      : cause.source_type ?? ""
+    const sourceID = hasField(body, "source_id") ? String(body.source_id ?? "").trim() : cause.source_id ?? ""
+    if (Boolean(sourceType) !== Boolean(sourceID)) {
+      throw new StaticDemoError("error cause source_type and source_id must be provided together", 400)
+    }
+    const sortOrder = hasField(body, "sort_order") ? Number(body.sort_order) : cause.sort_order
+    if (!Number.isInteger(sortOrder) || sortOrder < 0) {
+      throw new StaticDemoError("invalid error cause sort_order", 400)
+    }
+    Object.assign(cause, {
+      parent_id: parentID || undefined,
+      label,
+      review_fixes: hasField(body, "review_fixes") ? body.review_fixes === true : cause.review_fixes,
+      action: hasField(body, "action") ? String(body.action ?? "").trim() : cause.action,
+      status: status as StaticErrorCause["status"],
+      source_type: sourceType || undefined,
+      source_id: sourceID || undefined,
+      sort_order: sortOrder,
+      updated_at: DEMO_NOW,
+    })
+    return responseFor(cause) as T
+  }
+
   if (root === "mistakes" && !id && method === "GET") return responseFor(mistakeList(subjectFrom(url.searchParams.get("subject")))) as T
   if (root === "mistakes" && !id && method === "POST") {
     const pair: StaticMistakePair = {
@@ -870,8 +1012,29 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   if (root === "mistakes" && id && action === "schedule" && method === "POST") {
     const pair = state.mistakes.find((entry) => entry.attempt.id === id)
     if (!pair) throw new StaticDemoError("Static demo mistake not found")
+    const policy = state.errorCauses.find((cause) =>
+      cause.id === pair.attempt.cause
+      && cause.status === "confirmed"
+      && (cause.subject === "" || cause.subject === pair.question.subject),
+    )
+    if (!policy?.review_fixes) {
+      throw new StaticDemoError("This error cause is not fixed by more review", 400)
+    }
     pair.question.knowledge_item_id = pair.question.knowledge_item_id ?? state.knowledge[0]?.id
     return responseFor({ knowledge_id: pair.question.knowledge_item_id ?? "" }) as T
+  }
+  if (root === "mistakes" && id && action === "cause" && method === "PATCH") {
+    const pair = state.mistakes.find((entry) => entry.attempt.id === id)
+    if (!pair) throw new StaticDemoError("Static demo mistake not found", 404)
+    const causeID = String(body.cause ?? "").trim()
+    const cause = state.errorCauses.find((entry) =>
+      entry.id === causeID
+      && entry.status === "confirmed"
+      && (entry.subject === "" || entry.subject === pair.question.subject),
+    )
+    if (!cause) throw new StaticDemoError("cause is not confirmed for this subject", 400)
+    pair.attempt.cause = cause.id
+    return responseFor(pair) as T
   }
   if (root === "mistakes" && id && action === "correct" && method === "POST") {
     const pair = state.mistakes.find((entry) => entry.attempt.id === id)

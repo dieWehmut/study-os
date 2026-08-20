@@ -85,9 +85,9 @@ describe("error causes API", () => {
       action: "画受力图并做一道变式题",
     })
 
-    expect(mocks.apiRequest).toHaveBeenCalledWith("/error-causes/physics%3Amodel-selection", {
-      method: "PATCH",
-      body: JSON.stringify({ status: "confirmed", action: "画受力图并做一道变式题" }),
-    })
+    const [path, init] = mocks.apiRequest.mock.calls[0] ?? []
+    expect(path).toBe("/error-causes/physics%3Amodel-selection")
+    expect(init).toMatchObject({ method: "PATCH" })
+    expect(JSON.parse(init.body)).toEqual({ status: "confirmed", action: "画受力图并做一道变式题" })
   })
 })

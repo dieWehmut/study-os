@@ -1,5 +1,5 @@
 import { apiRequest } from "./client"
-import { MISTAKE_CAUSES, type MistakeCause, type MistakeRecord } from "@/lib/mistakes"
+import type { MistakeCause, MistakeRecord } from "@/lib/mistakes"
 
 /**
  * How the store answers: a 题目 and one 作答 on it, kept apart because the same
@@ -45,18 +45,15 @@ export interface ListMistakesOptions {
 /**
  * Flatten one server pair into the row the page draws.
  *
- * Returns null for a cause the taxonomy no longer names. Every count, badge and
- * bar looks the cause up in MISTAKE_CAUSES, so an unrecognised one renders
- * blank while still swelling the total -- worse than losing the row.
+ * Keep a free-text cause visible even when the current taxonomy does not name
+ * it yet. The learner can reclassify it once a confirmed category exists.
  */
-function toRecord(pair: MistakePair): MistakeRecord | null {
-  if (!MISTAKE_CAUSES.some((spec) => spec.cause === pair.attempt.cause)) return null
-
+function toRecord(pair: MistakePair): MistakeRecord {
   const record: MistakeRecord = {
     id: pair.attempt.id,
     subject: pair.question.subject?.trim() || "all",
     question: pair.question.stem,
-    cause: pair.attempt.cause as MistakeCause,
+    cause: pair.attempt.cause?.trim() || "unknown",
     createdAt: pair.attempt.occurred_at,
   }
   // An absent link reads as "not queued". The other way round would lock the
@@ -86,10 +83,7 @@ export async function listMistakes(options: ListMistakesOptions = {}): Promise<M
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   const suffix = params.toString()
   const page = await apiRequest<MistakeListResponse>(`/mistakes${suffix ? `?${suffix}` : ""}`)
-  return (page.items ?? []).flatMap((pair) => {
-    const record = toRecord(pair)
-    return record ? [record] : []
-  })
+  return (page.items ?? []).map(toRecord)
 }
 
 export async function recordMistake(filed: {
@@ -111,9 +105,7 @@ export async function recordMistake(filed: {
       ...(filed.elapsedMs !== undefined ? { elapsed_ms: filed.elapsedMs } : {}),
     }),
   })
-  const record = toRecord(pair)
-  if (!record) throw new Error("服务端记下的错因无法识别")
-  return record
+  return toRecord(pair)
 }
 
 /**
@@ -156,7 +148,13 @@ export async function correctMistake(attemptID: string, evidence: { answer: stri
       body: JSON.stringify({ answer: evidence.answer.trim(), elapsed_ms: evidence.elapsedMs }),
     },
   )
-  const record = toRecord(pair)
-  if (!record) throw new Error("服务端记下的错因无法识别")
-  return record
+  return toRecord(pair)
+}
+
+export async function reclassifyMistake(attemptID: string, cause: MistakeCause): Promise<MistakeRecord> {
+  const pair = await apiRequest<MistakePair>(
+    `/mistakes/${encodeURIComponent(attemptID)}/cause`,
+    { method: "PATCH", body: JSON.stringify({ cause }) },
+  )
+  return toRecord(pair)
 }

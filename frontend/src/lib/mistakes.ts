@@ -1,4 +1,6 @@
-export type MistakeCause = "recall" | "misread" | "careless" | "method" | "time" | "unknown"
+// Stable taxonomy IDs come from the backend. The original six remain the
+// checked-in fallback, while free text stays readable until it is reclassified.
+export type MistakeCause = string
 
 export interface MistakeRecord {
   id: string
