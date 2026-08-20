@@ -4,10 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { LessonSection } from "@/api/lessons"
 import LessonPractice from "./LessonPractice"
 
-const mocks = vi.hoisted(() => ({ submitLessonPracticeAttempt: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  submitLessonPracticeAttempt: vi.fn(),
+  listLessonPracticeAttempts: vi.fn(),
+}))
 
 vi.mock("@/api/lesson-practice", () => ({
   submitLessonPracticeAttempt: mocks.submitLessonPracticeAttempt,
+  listLessonPracticeAttempts: mocks.listLessonPracticeAttempts,
 }))
 
 function renderPractice(content: unknown, overrides: Partial<LessonSection> = {}, lessonID?: string) {
@@ -24,6 +28,7 @@ function renderPractice(content: unknown, overrides: Partial<LessonSection> = {}
 describe("LessonPractice", () => {
   beforeEach(() => {
     mocks.submitLessonPracticeAttempt.mockReset()
+    mocks.listLessonPracticeAttempts.mockReset()
   })
 
   it("lets a learner choose and submit a structured question", () => {
@@ -136,5 +141,38 @@ describe("LessonPractice", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("本地反馈。")
     await waitFor(() => expect(screen.getByText("答题反馈已显示，但证据保存失败。")).toBeInTheDocument())
+  })
+
+  it("shows the latest saved result and count before the next submission", async () => {
+    mocks.listLessonPracticeAttempts.mockResolvedValue({
+      count: 1,
+      items: [{
+        id: "lesson-attempt-history",
+        lesson_id: "lesson-1",
+        section_id: "practice-1",
+        answer: "3",
+        evaluation: "incorrect",
+        reference_answer: "4",
+        feedback: "先检查加法结果。",
+        elapsed_ms: 640,
+        created_at: "2026-08-20T00:00:00Z",
+      }],
+    })
+    renderPractice({ question: "2 + 2 = ?", options: ["3", "4"], correct_answer: "4" }, {}, "lesson-1")
+
+    await waitFor(() => expect(screen.getByText("已作答 1 次")).toBeInTheDocument())
+    expect(screen.getByRole("status")).toHaveTextContent("回答不正确")
+    expect(screen.getByRole("status")).toHaveTextContent("参考答案：4")
+    expect(mocks.listLessonPracticeAttempts).toHaveBeenCalledWith("lesson-1", "practice-1")
+  })
+
+  it("keeps the practice usable when history loading fails", async () => {
+    mocks.listLessonPracticeAttempts.mockRejectedValue(new Error("offline"))
+    renderPractice({ question: "2 + 2 = ?", options: ["3", "4"], correct_answer: "4" }, {}, "lesson-1")
+
+    await waitFor(() => expect(document.querySelector('[data-practice-history="error"]')).toBeInTheDocument())
+    const submit = screen.getByRole("button", { name: "提交答案" })
+    fireEvent.click(screen.getByRole("radio", { name: "4" }))
+    expect(submit).toBeEnabled()
   })
 })

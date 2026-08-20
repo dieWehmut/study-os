@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { normalizeLesson, type Lesson } from "@/api/lessons"
 import LessonDetail from "./LessonDetail"
 
-const mocks = vi.hoisted(() => ({ getLesson: vi.fn(), submitLessonPracticeAttempt: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  getLesson: vi.fn(),
+  submitLessonPracticeAttempt: vi.fn(),
+  listLessonPracticeAttempts: vi.fn(),
+}))
 
 vi.mock("@/api/lessons", async () => {
   const actual = await vi.importActual<typeof import("@/api/lessons")>("@/api/lessons")
@@ -14,6 +18,7 @@ vi.mock("@/api/lessons", async () => {
 
 vi.mock("@/api/lesson-practice", () => ({
   submitLessonPracticeAttempt: mocks.submitLessonPracticeAttempt,
+  listLessonPracticeAttempts: mocks.listLessonPracticeAttempts,
 }))
 
 const lesson: Lesson = {
@@ -57,6 +62,7 @@ describe("lesson detail page", () => {
       elapsed_ms: 10,
       created_at: "2026-08-20T00:00:00Z",
     })
+    mocks.listLessonPracticeAttempts.mockResolvedValue({ count: 0, items: [] })
   })
 
   it("orders fixed sections for scanning and exposes provenance", async () => {
@@ -156,5 +162,38 @@ describe("lesson detail page", () => {
       "practice-1",
       expect.objectContaining({ answer: "6 N", elapsedMs: expect.any(Number) }),
     )
+  })
+
+  it("passes the lesson route identity into saved practice history", async () => {
+    mocks.listLessonPracticeAttempts.mockResolvedValue({
+      count: 1,
+      items: [{
+        id: "history-1",
+        lesson_id: "lesson-1",
+        section_id: "practice-1",
+        answer: "5 N",
+        evaluation: "incorrect",
+        reference_answer: "6 N",
+        feedback: "请重新计算。",
+        elapsed_ms: 300,
+        created_at: "2026-08-20T00:00:00Z",
+      }],
+    })
+    mocks.getLesson.mockResolvedValue({
+      ...lesson,
+      sections: [...lesson.sections, {
+        id: "practice-1",
+        type: "practice",
+        title: "马上练一题",
+        content: { question: "若 m=2、a=3，F 是多少？", options: ["5 N", "6 N"], correct_answer: "6 N" },
+      }],
+    })
+    renderPage()
+
+    const practice = await screen.findByText("马上练一题")
+    const practiceSection = practice.closest("[data-section-kind='practice']")
+    expect(practiceSection).not.toBeNull()
+    await waitFor(() => expect(within(practiceSection as HTMLElement).getByText("已作答 1 次")).toBeInTheDocument())
+    expect(mocks.listLessonPracticeAttempts).toHaveBeenCalledWith("lesson-1", "practice-1")
   })
 })
