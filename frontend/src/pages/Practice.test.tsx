@@ -57,13 +57,18 @@ describe("Practice page", () => {
     // 订正 answers with the row still a mistake, now carrying the mark. The
     // page reads the mark and keeps the text it already has, so the stub does
     // not need to echo the question back.
-    mocks.correctMistake.mockImplementation((id: string) =>
+    mocks.correctMistake.mockImplementation((id: string, evidence: { answer: string; elapsedMs: number }) =>
       Promise.resolve({
         id,
         subject: "all",
         question: "题",
         cause: "method",
         corrected: true,
+        correction: {
+          answer: evidence.answer,
+          elapsedMs: evidence.elapsedMs,
+          occurredAt: "2026-08-09T00:00:00Z",
+        },
         createdAt: "2026-08-09T00:00:00Z",
       }),
     )
@@ -329,7 +334,10 @@ describe("Practice page", () => {
     render(<Practice />)
     log("光合作用第 3 问", "算错 / 手滑")
 
-    expect(await screen.findByRole("button", { name: /^订正$/ })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole("button", { name: /^订正$/ }))
+
+    expect(screen.getByLabelText("订正答案")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /提交订正/ })).toBeDisabled()
   })
 
   it("keeps the row on the list after you put it right", async () => {
@@ -341,10 +349,14 @@ describe("Practice page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^订正$/ }))
 
+    fireEvent.change(screen.getByLabelText("订正答案"), { target: { value: "6 N" } })
+    fireEvent.click(screen.getByRole("button", { name: /提交订正/ }))
+
     expect(await screen.findByText("已订正")).toBeInTheDocument()
-    expect(mocks.correctMistake).toHaveBeenCalledWith("qa-1")
+    expect(mocks.correctMistake).toHaveBeenCalledWith("qa-1", expect.objectContaining({ answer: "6 N", elapsedMs: expect.any(Number) }))
     expect(screen.getByText("光合作用第 3 问")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^订正$/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/答案：6 N/)).toBeInTheDocument()
   })
 
   it("still counts a corrected mistake under the cause it happened for", async () => {
@@ -355,6 +367,8 @@ describe("Practice page", () => {
     await screen.findByText("光合作用第 3 问")
 
     fireEvent.click(screen.getByRole("button", { name: /^订正$/ }))
+    fireEvent.change(screen.getByLabelText("订正答案"), { target: { value: "6 N" } })
+    fireEvent.click(screen.getByRole("button", { name: /提交订正/ }))
     await screen.findByText("已订正")
 
     expect(screen.getByText("另有原因 1")).toBeInTheDocument()
@@ -369,8 +383,25 @@ describe("Practice page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^订正$/ }))
 
+    fireEvent.change(screen.getByLabelText("订正答案"), { target: { value: "6 N" } })
+    fireEvent.click(screen.getByRole("button", { name: /提交订正/ }))
+
     expect(await screen.findByText(/订正没写进去/)).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /^订正$/ })).toBeEnabled()
+    expect(screen.getByRole("button", { name: /提交订正/ })).toBeEnabled()
+  })
+
+  it("lets the learner cancel an open correction without writing", async () => {
+    render(<Practice />)
+    log("光合作用第 3 问", "看错题")
+    await screen.findByText("光合作用第 3 问")
+
+    fireEvent.click(screen.getByRole("button", { name: /^订正$/ }))
+    fireEvent.change(screen.getByLabelText("订正答案"), { target: { value: "不会提交" } })
+    fireEvent.click(screen.getByRole("button", { name: /取消订正/ }))
+
+    expect(screen.queryByLabelText("订正答案")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^订正$/ })).toBeInTheDocument()
+    expect(mocks.correctMistake).not.toHaveBeenCalled()
   })
 
   it("stops offering 订正 on a row the database already marked", async () => {
