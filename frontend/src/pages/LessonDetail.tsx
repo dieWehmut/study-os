@@ -105,9 +105,9 @@ function sortSections(sections: LessonSection[]): LessonSection[] {
   })
 }
 
-function SectionView({ section }: { section: LessonSection }) {
+function SectionView({ lessonID, section }: { lessonID: string; section: LessonSection }) {
   const type = sectionType(section)
-  if (type === "practice") return <LessonPractice section={section} />
+  if (type === "practice") return <LessonPractice lessonID={lessonID} section={section} />
 
   const text = contentText(sectionContent(section))
   const items = contentItems(section)
@@ -201,7 +201,7 @@ export default function LessonDetail() {
       ) : null}
 
       <div className="grid gap-3" aria-label="课程环节">
-        {sections.length > 0 ? sections.map((section) => <SectionView key={section.id} section={section} />) : (
+        {sections.length > 0 ? sections.map((section) => <SectionView key={section.id} lessonID={lesson.id} section={section} />) : (
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">这门课程还没有可预习的环节。</CardContent></Card>
         )}
       </div>

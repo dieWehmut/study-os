@@ -26,6 +26,7 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   await practice.getByRole("radio", { name: "8 N" }).check()
   await practice.getByRole("button", { name: "提交答案" }).click()
   await expect(practice.getByRole("status")).toContainText("回答正确")
+  await expect(practice.getByText("已保存答题证据")).toBeVisible()
 
   await expect(page.locator('[data-static-demo="true"]')).toBeVisible()
   expect(apiRequests).toEqual([])

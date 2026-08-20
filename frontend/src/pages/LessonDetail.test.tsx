@@ -1,16 +1,20 @@
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { normalizeLesson, type Lesson } from "@/api/lessons"
 import LessonDetail from "./LessonDetail"
 
-const mocks = vi.hoisted(() => ({ getLesson: vi.fn() }))
+const mocks = vi.hoisted(() => ({ getLesson: vi.fn(), submitLessonPracticeAttempt: vi.fn() }))
 
 vi.mock("@/api/lessons", async () => {
   const actual = await vi.importActual<typeof import("@/api/lessons")>("@/api/lessons")
   return { ...actual, getLesson: mocks.getLesson }
 })
+
+vi.mock("@/api/lesson-practice", () => ({
+  submitLessonPracticeAttempt: mocks.submitLessonPracticeAttempt,
+}))
 
 const lesson: Lesson = {
   id: "lesson-1",
@@ -40,7 +44,20 @@ function renderPage() {
 }
 
 describe("lesson detail page", () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.submitLessonPracticeAttempt.mockResolvedValue({
+      id: "lesson-attempt-test",
+      lesson_id: "lesson-1",
+      section_id: "practice-1",
+      answer: "6 N",
+      evaluation: "correct",
+      reference_answer: "6 N",
+      feedback: "服务端反馈：F = ma，所以 2 × 3 = 6 N。",
+      elapsed_ms: 10,
+      created_at: "2026-08-20T00:00:00Z",
+    })
+  })
 
   it("orders fixed sections for scanning and exposes provenance", async () => {
     mocks.getLesson.mockResolvedValue(lesson)
@@ -133,5 +150,11 @@ describe("lesson detail page", () => {
 
     expect(practiceView.getByRole("status")).toHaveTextContent("回答正确")
     expect(practiceView.getByRole("status")).toHaveTextContent("F = ma，所以 2 × 3 = 6 N。")
+    await waitFor(() => expect(practiceView.getByText("已保存答题证据")).toBeInTheDocument())
+    expect(mocks.submitLessonPracticeAttempt).toHaveBeenCalledWith(
+      "lesson-1",
+      "practice-1",
+      expect.objectContaining({ answer: "6 N", elapsedMs: expect.any(Number) }),
+    )
   })
 })

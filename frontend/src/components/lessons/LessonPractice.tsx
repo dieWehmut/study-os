@@ -1,6 +1,7 @@
 import { CircleHelp } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
+import { submitLessonPracticeAttempt, type LessonPracticeAttempt } from "@/api/lesson-practice"
 import type { LessonSection } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ interface PracticeResult {
 
 export interface LessonPracticeProps {
   section: LessonSection
+  lessonID?: string
 }
 
 const sectionLabels: Record<string, string> = {
@@ -184,6 +186,34 @@ function resultFor(content: PracticeContent, selected: number): PracticeResult {
   }
 }
 
+function resultFromAttempt(attempt: LessonPracticeAttempt): PracticeResult {
+  const kind = attempt.evaluation
+  if (kind === "correct") {
+    return {
+      kind,
+      label: "回答正确",
+      feedback: attempt.feedback || "回答正确。",
+    }
+  }
+  if (kind === "incorrect") {
+    return {
+      kind,
+      label: "回答不正确",
+      feedback: attempt.feedback || "请检查题目条件后再试。",
+      referenceAnswer: attempt.reference_answer || undefined,
+    }
+  }
+  return {
+    kind: "ungraded",
+    label: "已提交",
+    feedback: attempt.feedback || "暂无标准答案，请对照反馈复盘。",
+  }
+}
+
+function clockNow(): number {
+  return typeof performance !== "undefined" ? performance.now() : Date.now()
+}
+
 function LegacyPractice({ section }: LessonPracticeProps) {
   const text = legacyText(sectionContent(section))
   const items = legacyItems(section)
@@ -201,18 +231,35 @@ function LegacyPractice({ section }: LessonPracticeProps) {
   )
 }
 
-export default function LessonPractice({ section }: LessonPracticeProps) {
+export default function LessonPractice({ section, lessonID }: LessonPracticeProps) {
   const type = sectionType(section)
   const content = parseContent(section)
   const [selected, setSelected] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  const [result, setResult] = useState<PracticeResult | null>(null)
+  const [evidenceState, setEvidenceState] = useState<"idle" | "saving" | "saved" | "failed">("idle")
+  const startedAt = useRef(clockNow())
 
-  function submit() {
+  async function submit() {
     if (selected === null || submitted) return
+    if (!content) return
+    const optimisticResult = resultFor(content, selected)
+    setResult(optimisticResult)
     setSubmitted(true)
-  }
+    if (!lessonID) return
 
-  const result = submitted && selected !== null && content ? resultFor(content, selected) : null
+    setEvidenceState("saving")
+    try {
+      const attempt = await submitLessonPracticeAttempt(lessonID, section.id, {
+        answer: content.options[selected],
+        elapsedMs: Math.max(0, Math.round(clockNow() - startedAt.current)),
+      })
+      setResult(resultFromAttempt(attempt))
+      setEvidenceState("saved")
+    } catch {
+      setEvidenceState("failed")
+    }
+  }
   const articleID = `lesson-practice-${section.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`
   const questionID = `${articleID}-question`
   const groupName = `${articleID}-options`
@@ -234,7 +281,7 @@ export default function LessonPractice({ section }: LessonPracticeProps) {
           className="grid gap-4"
           onSubmit={(event) => {
             event.preventDefault()
-            submit()
+            void submit()
           }}
         >
           <p id={questionID} className="text-sm leading-7 text-foreground/90">{content.question}</p>
@@ -281,6 +328,20 @@ export default function LessonPractice({ section }: LessonPracticeProps) {
               <p className="leading-6">{result.feedback}</p>
               {result.referenceAnswer ? <p className="text-muted-foreground">参考答案：{result.referenceAnswer}</p> : null}
             </div>
+          ) : null}
+          {lessonID && evidenceState !== "idle" ? (
+            <p
+              data-evidence-state={evidenceState}
+              aria-live="polite"
+              className={cn(
+                "text-xs",
+                evidenceState === "failed" ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {evidenceState === "saving" ? "正在保存答题证据…" : null}
+              {evidenceState === "saved" ? "已保存答题证据" : null}
+              {evidenceState === "failed" ? "答题反馈已显示，但证据保存失败。" : null}
+            </p>
           ) : null}
         </form>
       ) : (

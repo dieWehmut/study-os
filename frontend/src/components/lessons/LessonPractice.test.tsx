@@ -1,10 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { LessonSection } from "@/api/lessons"
 import LessonPractice from "./LessonPractice"
 
-function renderPractice(content: unknown, overrides: Partial<LessonSection> = {}) {
+const mocks = vi.hoisted(() => ({ submitLessonPracticeAttempt: vi.fn() }))
+
+vi.mock("@/api/lesson-practice", () => ({
+  submitLessonPracticeAttempt: mocks.submitLessonPracticeAttempt,
+}))
+
+function renderPractice(content: unknown, overrides: Partial<LessonSection> = {}, lessonID?: string) {
   const section: LessonSection = {
     id: "practice-1",
     type: "practice",
@@ -12,10 +18,14 @@ function renderPractice(content: unknown, overrides: Partial<LessonSection> = {}
     content,
     ...overrides,
   }
-  return render(<LessonPractice section={section} />)
+  return render(<LessonPractice lessonID={lessonID} section={section} />)
 }
 
 describe("LessonPractice", () => {
+  beforeEach(() => {
+    mocks.submitLessonPracticeAttempt.mockReset()
+  })
+
   it("lets a learner choose and submit a structured question", () => {
     renderPractice({
       question: "若 m = 4 kg、a = 2 m/s²，F 是多少？",
@@ -79,5 +89,52 @@ describe("LessonPractice", () => {
     expect(screen.getByText("写出一个例子")).toBeInTheDocument()
     expect(screen.getByText("这道练习暂时没有可交互的选项。")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "提交答案" })).not.toBeInTheDocument()
+  })
+
+  it("saves evidence after showing the optimistic result", async () => {
+    mocks.submitLessonPracticeAttempt.mockResolvedValue({
+      id: "lesson-attempt-1",
+      lesson_id: "lesson-1",
+      section_id: "practice-1",
+      answer: "8 N",
+      evaluation: "correct",
+      reference_answer: "8 N",
+      feedback: "服务端确认正确。",
+      elapsed_ms: 12,
+      created_at: "2026-08-20T00:00:00Z",
+    })
+    renderPractice({
+      question: "2 + 2 = ?",
+      options: ["3", "4"],
+      correct_answer: "4",
+      explanation: "本地反馈。",
+    }, {}, "lesson-1")
+
+    fireEvent.click(screen.getByRole("radio", { name: "4" }))
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+
+    expect(screen.getByRole("status")).toHaveTextContent("回答正确")
+    await waitFor(() => expect(screen.getByText("已保存答题证据")).toBeInTheDocument())
+    expect(screen.getByRole("status")).toHaveTextContent("服务端确认正确。")
+    expect(mocks.submitLessonPracticeAttempt).toHaveBeenCalledWith("lesson-1", "practice-1", expect.objectContaining({ answer: "4" }))
+  })
+
+  it("keeps local feedback when evidence persistence fails", async () => {
+    mocks.submitLessonPracticeAttempt.mockRejectedValue(new Error("offline"))
+    render(<LessonPractice
+      lessonID="lesson-1"
+      section={{
+        id: "practice-1",
+        type: "practice",
+        title: "马上练一题",
+        content: { question: "2 + 2 = ?", options: ["3", "4"], correct_answer: "4", explanation: "本地反馈。" },
+      }}
+    />)
+
+    fireEvent.click(screen.getByRole("radio", { name: "4" }))
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+
+    expect(screen.getByRole("status")).toHaveTextContent("本地反馈。")
+    await waitFor(() => expect(screen.getByText("答题反馈已显示，但证据保存失败。")).toBeInTheDocument())
   })
 })
