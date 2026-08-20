@@ -58,6 +58,8 @@ test("ROADMAP names persisted objects instead of stale browser-only gaps", () =>
 test("lesson documentation describes the versioned write and preview contract", () => {
   assert.match(roadmap, /POST \/api\/lessons/)
   assert.match(roadmap, /PATCH \/api\/lessons\/{lessonID}/)
+  assert.match(roadmap, /POST \/api\/lessons\/{lessonID}\/practice\/{sectionID}\/attempts/)
+  assert.match(roadmap, /lesson_attempts[\s\S]*FSRS/)
   assert.match(roadmap, /乐观版本|版本冲突/)
   assert.match(roadmap, /固定十段|十段模板/)
   assert.match(roadmap, /VITE_STATIC_DEMO[\s\S]*GET 预览 fixture[\s\S]*浏览器会话内模拟即时练习证据的 POST\/GET/)

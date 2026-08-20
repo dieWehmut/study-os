@@ -250,6 +250,12 @@ func NewRouter(application *app.App) http.Handler {
 		api.Delete("/lessons/{lessonID}/links/{targetType}/{targetID}", func(response http.ResponseWriter, request *http.Request) {
 			handleLessonLinkDelete(response, request, application)
 		})
+		api.Get("/lessons/{lessonID}/practice/{sectionID}/attempts", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonPracticeAttemptList(response, request, application)
+		})
+		api.Post("/lessons/{lessonID}/practice/{sectionID}/attempts", func(response http.ResponseWriter, request *http.Request) {
+			handleLessonPracticeAttemptCreate(response, request, application)
+		})
 		api.Get("/lessons/{lessonID}", func(response http.ResponseWriter, request *http.Request) {
 			handleLessonGet(response, request, application)
 		})

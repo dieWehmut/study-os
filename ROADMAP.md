@@ -91,6 +91,9 @@ schema v14 新增 `lesson_attempts`：按 `lesson_id` 与课程文档中的 `sec
 `POST /api/lessons/{lessonID}/links`、`GET /api/lessons/{lessonID}/links` 和
 `GET /api/lesson-links?target_type=&target_id=` 读取；目标类型目前固定为
 `knowledge_item` 或 `prompt`，不存在的目标返回 404，重复关联返回 409。
+即时练习通过 `POST /api/lessons/{lessonID}/practice/{sectionID}/attempts` 提交答案，
+由服务端按课程段落中的标准答案做确定性判定；`GET` 同一路径按时间倒序读取证据。
+课程练习证据独立存于 `lesson_attempts`，不会写入 FSRS 的 `attempts`。
 GitHub Pages 的 `VITE_STATIC_DEMO` 适配器提供这门课程的 GET 预览 fixture，
 并在当前浏览器会话内模拟即时练习证据的 POST/GET；课程创建、编辑和历史版本仍必须连接本地后端。
 **不**先做 Agent 一次性生成整节课——0801 明确反对这种做法。
