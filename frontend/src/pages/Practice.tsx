@@ -30,6 +30,8 @@ import { ScoringBoard } from "@/features/chinese/ScoringBoard"
 import { LongSentenceBoard } from "@/features/english/LongSentenceBoard"
 import { ChainBoard } from "@/features/geography/ChainBoard"
 import { DerivationBoard } from "@/features/math/DerivationBoard"
+import { SubjectEvidenceEditor } from "@/features/mistake/SubjectEvidenceEditor"
+import { subjectEvidenceToolFor } from "@/features/mistake/subject-evidence"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
 import { MotionBoard } from "@/features/physics/MotionBoard"
 import {
@@ -164,6 +166,7 @@ async function carryBrowserLogOver(): Promise<MistakeRecord[]> {
         question: record.question,
         cause: record.cause,
         ...(record.note ? { note: record.note } : {}),
+        ...(record.evidence ? { evidence: record.evidence } : {}),
       }),
     )
   }
@@ -183,6 +186,7 @@ export default function Practice() {
   const [queueing, setQueueing] = useState("")
   const [correcting, setCorrecting] = useState("")
   const [correctionID, setCorrectionID] = useState("")
+  const [evidenceID, setEvidenceID] = useState("")
   const [correctionAnswer, setCorrectionAnswer] = useState("")
   const [correctionStartedAt, setCorrectionStartedAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
@@ -202,6 +206,7 @@ export default function Practice() {
       .then((loaded) => {
         if (!active) return []
         setCorrectionID("")
+        setEvidenceID("")
         setCorrectionAnswer("")
         setCorrectionStartedAt(null)
         setRecords(loaded)
@@ -268,6 +273,7 @@ export default function Practice() {
         setCorrectionAnswer("")
         setCorrectionStartedAt(null)
       }
+      if (evidenceID === id) setEvidenceID("")
       setError("")
     } catch (failure) {
       setError(describe(failure, "删除错题失败"))
@@ -483,6 +489,7 @@ export default function Practice() {
             <ul className="flex flex-col gap-2">
               {records.map((item) => {
                 const spec = causeSpecFor(item.cause, taxonomy)
+                const evidenceTool = subjectEvidenceToolFor(item)
                 return (
                   <li
                     key={item.id}
@@ -533,6 +540,17 @@ export default function Practice() {
                         订正
                       </Button>
                     )}
+                    {evidenceTool ? (
+                      <Button
+                        type="button"
+                        variant={evidenceID === item.id ? "secondary" : "outline"}
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => setEvidenceID((open) => (open === item.id ? "" : item.id))}
+                      >
+                        {evidenceID === item.id ? "收起诊断" : item.evidence ? "继续诊断" : "开始诊断"}
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -544,6 +562,21 @@ export default function Practice() {
                     {item.correction ? (
                       <div className="w-full text-xs text-emerald-600 dark:text-emerald-400">
                         答案：{item.correction.answer} · 用时：{item.correction.elapsedMs} ms
+                      </div>
+                    ) : null}
+                    {evidenceID === item.id && evidenceTool ? (
+                      <div className="w-full border-t pt-2">
+                        <SubjectEvidenceEditor
+                          key={item.id}
+                          record={item}
+                          onSaved={(saved) => {
+                            setRecords((current) =>
+                              current.map((entry) =>
+                                entry.id === item.id ? { ...entry, evidence: saved.evidence } : entry,
+                              ),
+                            )
+                          }}
+                        />
                       </div>
                     ) : null}
                     {correctionID === item.id ? (

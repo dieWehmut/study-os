@@ -8,6 +8,7 @@ import { useSubjectStore } from "@/store/useSubjectStore"
 const mocks = vi.hoisted(() => ({
   listMistakes: vi.fn(),
   recordMistake: vi.fn(),
+  updateMistakeEvidence: vi.fn(),
   deleteMistake: vi.fn(),
   scheduleMistake: vi.fn(),
   correctMistake: vi.fn(),
@@ -57,6 +58,16 @@ describe("Practice page", () => {
     mocks.listErrorCauses.mockResolvedValue([])
     mocks.deleteMistake.mockResolvedValue(undefined)
     mocks.scheduleMistake.mockResolvedValue("k-mistake-1")
+    mocks.updateMistakeEvidence.mockImplementation((id: string, evidence: unknown) =>
+      Promise.resolve({
+        id,
+        subject: "math",
+        question: "解方程",
+        cause: "method",
+        evidence,
+        createdAt: "2026-08-09T00:00:00Z",
+      }),
+    )
     // 订正 answers with the row still a mistake, now carrying the mark. The
     // page reads the mark and keeps the text it already has, so the stub does
     // not need to echo the question back.
@@ -258,6 +269,85 @@ describe("Practice page", () => {
     expect(mocks.recordMistake.mock.calls.map((call) => call[0].question)).toEqual(["旧一点的", "新一点的"])
     // Clearing the key is what makes it once rather than every mount.
     await waitFor(() => expect(localStorage.getItem(mistakesStorageKey)).toBeNull())
+  })
+
+  it("carries subject evidence with a browser-local mistake before clearing it", async () => {
+    const evidence = {
+      version: 1 as const,
+      subject: "math" as const,
+      tool: "derivation" as const,
+      data: { lines: ["2x+4=10", "2x=6", "x=3"] },
+    }
+    localStorage.setItem(
+      mistakesStorageKey,
+      JSON.stringify([
+        {
+          id: "old-with-evidence",
+          subject: "math",
+          question: "解方程 2x+4=10",
+          cause: "method",
+          evidence,
+          createdAt: "2026-08-07T00:00:00Z",
+        },
+      ]),
+    )
+    mocks.recordMistake.mockResolvedValueOnce({
+      id: "qa-evidence",
+      subject: "math",
+      question: "解方程 2x+4=10",
+      cause: "method",
+      evidence,
+      createdAt: "2026-08-09T00:00:00Z",
+    })
+
+    render(<Practice />)
+
+    await waitFor(() => {
+      expect(mocks.recordMistake).toHaveBeenCalledWith({
+        subject: "math",
+        question: "解方程 2x+4=10",
+        cause: "method",
+        evidence,
+      })
+    })
+    await waitFor(() => expect(localStorage.getItem(mistakesStorageKey)).toBeNull())
+  })
+
+  it("opens and saves the dedicated tool on the concrete mistake row", async () => {
+    useSubjectStore.setState({ subject: "math" })
+    mocks.listMistakes.mockResolvedValueOnce([
+      {
+        id: "qa-math",
+        subject: "math",
+        question: "解方程",
+        cause: "method",
+        evidence: {
+          version: 1,
+          subject: "math",
+          tool: "derivation",
+          data: { lines: ["2x+4=10", "2x=6"] },
+        },
+        createdAt: "2026-08-09T00:00:00Z",
+      },
+    ])
+
+    render(<Practice />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "继续诊断" }))
+    const derivation = screen.getByLabelText("把过程一行一行写下来")
+    expect(derivation).toHaveValue("2x+4=10\n2x=6")
+    fireEvent.change(derivation, { target: { value: "2x+4=10\n2x=6\nx=3" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存诊断证据" }))
+
+    await waitFor(() => {
+      expect(mocks.updateMistakeEvidence).toHaveBeenCalledWith("qa-math", {
+        version: 1,
+        subject: "math",
+        tool: "derivation",
+        data: { lines: ["2x+4=10", "2x=6", "x=3"] },
+      })
+    })
+    expect(screen.getByRole("status")).toHaveTextContent("已保存")
   })
 
   it("keeps the browser log when the migration could not be written", async () => {
