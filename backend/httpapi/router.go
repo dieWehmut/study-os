@@ -211,6 +211,16 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/chat/conversations", func(response http.ResponseWriter, request *http.Request) {
 			handleChatConversations(response, request, application)
 		})
+		api.Get("/chat/records/{sessionID}", func(response http.ResponseWriter, request *http.Request) {
+			handleQARecordGet(response, request, application)
+		})
+		api.Put("/chat/records/{sessionID}", func(response http.ResponseWriter, request *http.Request) {
+			handleQARecordPut(response, request, application)
+		})
+		for _, path := range []string{"/chat/records", "/chat/records/"} {
+			api.Get(path, handleQARecordMissingSession)
+			api.Put(path, handleQARecordMissingSession)
+		}
 		api.Post("/chat/attachments", func(response http.ResponseWriter, request *http.Request) {
 			handleChatAttachmentUpload(response, request, application)
 		})
