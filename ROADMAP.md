@@ -10,7 +10,7 @@
 
 ## 一、对象盘点：0801 的 13 个底层对象，现在有几个
 
-盘点基线：schema 版本 15（`backend/db/db.go:19`，2026-08-20）。下表按 0801「三、首先要统一的底层对象」逐条对照。
+盘点基线：schema 版本 16（`backend/db/db.go:19`，2026-08-21）。下表按 0801「三、首先要统一的底层对象」逐条对照。
 新增迁移或底层对象时，必须同时更新本节；`scripts/tests/architecture-docs-consistency.test.mjs` 会检查这条基线和关键表名，避免路线图把已经落地的能力再次当成缺口。
 
 | # | 对象 | 现状 | 落点 |
@@ -23,7 +23,7 @@
 | 6 | 记忆项 Memory Item | ✅ | `prompts` + `review_states` |
 | 7 | 题目 Question | ✅ 基础记录已落地 | `questions`；含来源与可选 `knowledge_item_id` |
 | 8 | 作答 Attempt | 🟡 三条记录链按语义分开 | 记忆项作答在 `attempts`；错题事件在 `question_attempts`，保存答案、耗时与正误；课程即时练习在 `lesson_attempts`，保存答案、耗时、确定性判定与反馈且不触发 FSRS |
-| 9 | 错因 Error Cause | 🟡 已持久化，分类仍在前端 | `question_attempts.cause` + `/api/mistakes`；六类 taxonomy 在 `frontend/src/lib/mistakes.ts`，尚无独立的学科错因表 |
+| 9 | 错因 Error Cause | ✅ 已持久化并可扩展 | `error_causes` + `/api/error-causes`；支持全局/学科分类、候选确认、归档和错题重分类 |
 | 10 | 任务 Task | ❌ | — |
 | 11 | 学习会话 Study Session | ✅ 表在，写得少 | `study_sessions` |
 | 12 | 答疑记录 Q&A | 🟡 存了对话，没存结构 | `chat_messages`；缺「原误解—正确模型—掌握证据」 |
@@ -38,6 +38,12 @@ schema v14 新增 `lesson_attempts`：按 `lesson_id` 与课程文档中的 `sec
 schema v15 扩展 `question_attempts`：新增 `answer`、`elapsed_ms` 与 `is_correct`，把错题初次作答和
 订正后的正确作答都保存在同一题目的 attempt 历史里。旧版无错因的订正行迁移为 `is_correct=1`；
 `POST /api/mistakes/{attemptID}/correct` 要求答案与非负耗时，并以 `correction` 投影返回最近一次正确证据。
+
+schema v16 新增 `error_causes`：保存全局及学科范围的稳定错因 ID、标签、行动建议、是否适合复习、
+候选/确认/归档状态与来源。`GET /api/error-causes` 提供 Practice taxonomy，
+`POST /api/error-causes` 支持提出分类，`PATCH /api/error-causes/{causeID}` 支持确认与归档，
+`PATCH /api/mistakes/{attemptID}/cause`
+允许把历史自由文本错因重新归类；未知自由文本仍可保留，不会因客户端 taxonomy 更新而丢失。
 
 另有一项 0801 列为「模块十」的基础设施**已经就位**：
 `domain_events`（`schema.sql:92`，读写在 `store.go:695/710`）。统一事件层不需要从头设计。
@@ -57,9 +63,8 @@ schema v15 扩展 `question_attempts`：新增 `answer`、`elapsed_ms` 与 `is_c
 订正会保存确认后的答案、计时和正确标记；系统也支持把可修复错因排进记忆队列。早期写入浏览器 `localStorage` 的记录只作为一次性迁移来源，
 迁移成功后会清除旧键；这保留了历史数据，又不会让新记录重新分叉。
 
-仍未完成的是错因 taxonomy 的后端化：`mistakes.ts` 里的六类（想不起来 / 看错题 / 算错 /
-思路不对 / 没时间 / 还没想清楚）目前是应用常量，尚未支持按学科扩展或由用户确认。因此，
-题目—作答—错因的持久化入口已经可用，但不能把它误称为完整的 Error Cause 对象。
+错因 taxonomy 已完成后端化：旧六类作为确认的全局默认种子，Practice 按学科读取 `error_causes`，
+并保留未知自由文本作为待确认记录。因此题目—作答—错因链路现在既能持久化历史，也能逐步扩展学科分类。
 
 ## 三、执行序
 
@@ -70,11 +75,12 @@ schema v15 扩展 `question_attempts`：新增 `answer`、`elapsed_ms` 与 `is_c
 1. `questions` 表：题干、学科、来源、可选关联知识点（题型字段仍待补）
 2. `question_attempts` 表：一题多做，保存错因、备注、答案、用时、正误和发生时间；旧订正行已兼容迁移
 3. `/api/mistakes`：错题创建、列表、删除、证据化订正；`localStorage` 仅作为迁移来源
-4. `error_causes`：**尚未完成**，错因仍从 `mistakes.ts` 常量提供，下一步要升级成带学科维度的数据
+4. `error_causes`：已落地为 schema v16 与 `/api/error-causes`，旧六类作为默认种子；Practice
+   会合并后端确认分类并为未知自由文本提供保守回退。后续可继续沉淀各学科自己的分类体系
    （0801：「以后你独立总结出的『地理六类错因』，就可以作为地理学科的专属分类体系」）
 
 判据（作答证据已满足）：错题能和知识点、记忆项 join 到一起；换设备后新错题还在；初次作答和订正
-均可查询答案、耗时与正误。剩余判据：可扩展的学科错因 taxonomy 成为后端对象，并进入聚合诊断。
+均可查询答案、耗时与正误；可扩展的学科错因 taxonomy 已成为后端对象并进入 Practice 聚合诊断。
 
 ### 第 2 阶段：错因驱动复习（基础入口已落地）
 
