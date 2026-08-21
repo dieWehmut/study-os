@@ -1,0 +1,1690 @@
+---
+tags:
+  - mwe
+  - moc
+---
+
+# 多词表达 wiki · 索引
+
+共 **1593** 篇词汇笔记 + **10** 篇语法家族笔记。来源:【英语18】高中英语重点短语汇总 ∪ 【英语81】高考英语必须掌握的340条高频词组。
+
+- [[01-全量总表]] —— 含未单独建笔记的条目
+- [[99-待补表达]] —— 笔记中引用但尚未建立的表达
+
+## 语法家族
+
+- [[要求-建议-命令类动词 + (that) sb. (should) do —— 省略式虚拟语气]] —— 7 条
+- [[no matter + 疑问词 与 wh-ever 的分工]] —— 5 条
+- [[感官-使役动词 + 宾语 + 补语-do - doing - done 怎么选]] —— 5 条
+- [[It is + 过去分词 + that...(转述被动句式)及其主动转换]] —— 3 条
+- [[It is no use - no good doing sth.(做某事没用)]] —— 2 条
+- [[Hardly...when - No sooner...than--一...就...-的部分倒装]] —— 2 条
+- [[It is (high) time (that) sb. did sth.(早该做某事了)]] —— 1 条
+- [[It is one's turn to do sth.(轮到某人做某事)]] —— 1 条
+- [[I suppose (that) sb. is doing sth.(我猜某人正在做某事)]] —— 1 条
+- [[What a shame to do sth.!(做某事真是太可惜-太不像话了)]] —— 1 条
+
+## A–Z
+
+### A  (162)
+
+- [[a (great-large) number of|a (great/large) number of]] `collocation`
+- [[A as well as B]] `fixed-expression`
+- [[A besides B]] `fixed-expression`
+- [[a bit]] `collocation`
+- [[a bunch of]] `collocation`
+- [[a certain]] `collocation`
+- [[a couple of]] `collocation`
+- [[a crowd of]] `collocation`
+- [[a few pieces of advice]] `collocation`
+- [[a good-great deal of|a good/great deal of]] `collocation`
+- [[a good-great many|a good/great many]] `collocation`
+- [[a great deal]] `collocation`
+- [[a group of]] `collocation`
+- [[a kind of sth|a kind of sth.]] `collocation`
+- [[a knife and fork]] `fixed-expression`
+- [[a knowledge of]] `collocation`
+- [[a lack of]] `collocation`
+- [[a large quantity of]] `collocation`
+- [[a large-great amount of|a large/great amount of]] `collocation`
+- [[a little]] `collocation`
+- [[a loaf of bread]] `collocation`
+- [[a narrow escape]] `collocation/idiom`
+- [[a piece of advice]] `collocation`
+- [[a place of interest]] `fixed-expression`
+- [[a point of view]] `collocation`
+- [[A rather than B]] `fixed-expression`
+- [[a sequence of]] `collocation`
+- [[a series of]] `collocation`
+- [[a third]] `collocation`
+- [[a total of]] `collocation`
+- [[a type of]] `collocation`
+- [[a variety of]] `collocation`
+- [[a waste of money-time-|a waste of money/time/]] `collocation`
+- [[a wide variety of]] `collocation`
+- [[a year and a half]] `collocation/fixed-expression`
+- [[above all]] `fixed-expression`
+- [[according to]] `fixed-expression/lexical-phrase`
+- [[achieve one's aim-goal|achieve one's aim/goal]] `collocation`
+- [[act a part]] `idiom`
+- [[act as if]] `fixed-expression`
+- [[act the part of sb|act the part of sb.]] `collocation`
+- [[add A to B]] `collocation`
+- [[add to]] `phrasal-verb`
+- [[add up]] `phrasal-verb`
+- [[address a-the letter|address a/the letter]] `collocation`
+- [[address sth. to sb|address sth. to sb.]] `collocation`
+- [[admit to]] `phrasal-verb`
+- [[adopt a positive approach]] `collocation`
+- [[advise sb. to do]] `collocation`
+- [[afford sb. sth|afford sb. sth.]] `collocation`
+- [[afford sth. to sb|afford sth. to sb.]] `collocation`
+- [[afford to do]] `collocation`
+- [[after a time]] `fixed-expression`
+- [[after a while]] `fixed-expression/lexical-phrase`
+- [[after all]] `fixed-expression`
+- [[agree on]] `phrasal-verb`
+- [[agree to do]] `collocation`
+- [[agree to one's plan-suggestion|agree to one's plan/suggestion]] `collocation`
+- [[agree with one's idea-opinion-analysis|agree with one's idea/opinion/analysis]] `collocation`
+- [[agree with sb|agree with sb.]] `phrasal-verb`
+- [[agree with sb. on that point]] `collocation`
+- [[agreement on|agreement on ...]] `collocation`
+- [[ahead of]] `fixed-expression/lexical-phrase`
+- [[ahead of time]] `fixed-expression/lexical-phrase`
+- [[aim at]] `phrasal-verb`
+- [[aim to do]] `collocation`
+- [[all at once]] `fixed-expression`
+- [[all but]] `idiom`
+- [[all kinds of]] `collocation`
+- [[all of a sudden]] `fixed-expression`
+- [[all over]] `fixed-expression`
+- [[all over again]] `fixed-expression`
+- [[all right]] `fixed-expression`
+- [[all sorts of]] `collocation`
+- [[all such]] `collocation/fixed-expression`
+- [[all the same]] `fixed-expression`
+- [[all the time]] `fixed-expression/lexical-phrase`
+- [[all the way]] `fixed-expression/lexical-phrase`
+- [[all the year round]] `fixed-expression/lexical-phrase`
+- [[all through the(night-year-one's life)|all through the(night/year/one's life)]] `fixed-expression`
+- [[allow doing-sb. to do|allow doing/sb. to do]] `collocation`
+- [[an average of|an average of ...]] `collocation`
+- [[announce sth. to sb|announce sth. to sb.]] `collocation`
+- [[announce to sb. sth|announce to sb. sth.]] `collocation`
+- [[answer for]] `phrasal-verb`
+- [[anything but]] `fixed-expression/idiom`
+- [[apart from]] `fixed-expression`
+- [[appear to do]] `collocation`
+- [[apply for]] `phrasal-verb`
+- [[apply one's minds to]] `collocation`
+- [[appreciate doing]] `collocation`
+- [[as a matter of fact]] `fixed-expression`
+- [[as a result of]] `fixed-expression`
+- [[as a result(of)]] `fixed-expression`
+- [[as a rule]] `fixed-expression`
+- [[as far as]] `fixed-expression/lexical-phrase`
+- [[as far as ...be concerned]] `fixed-expression`
+- [[as follows]] `fixed-expression`
+- [[as for]] `fixed-expression/lexical-phrase`
+- [[as good as]] `fixed-expression`
+- [[as if]] `fixed-expression/lexical-phrase`
+- [[as long as]] `fixed-expression`
+- [[as one body]] `collocation`
+- [[as regards]] `fixed-expression/lexical-phrase`
+- [[as soon as]] `fixed-expression`
+- [[as though]] `fixed-expression/lexical-phrase`
+- [[as to]] `fixed-expression/lexical-phrase`
+- [[as usual]] `fixed-expression`
+- [[as well]] `fixed-expression`
+- [[as well as]] `fixed-expression`
+- [[aside from]] `fixed-expression`
+- [[ask for a leave]] `collocation`
+- [[ask sb. for advice]] `collocation`
+- [[ask some questions of sb|ask some questions of sb.]] `collocation`
+- [[at a distance]] `collocation/lexical-phrase`
+- [[at a great depth]] `collocation`
+- [[at a loss]] `fixed-expression/idiom`
+- [[at a mouthful]] `fixed-expression`
+- [[at a time]] `fixed-expression`
+- [[at advanced levels]] `collocation`
+- [[at all]] `fixed-expression`
+- [[at all costs]] `idiom/fixed-expression`
+- [[at all events]] `idiom/fixed-expression`
+- [[at all times]] `fixed-expression`
+- [[at any rate]] `idiom`
+- [[at best]] `idiom/fixed-expression`
+- [[at first]] `fixed-expression`
+- [[at first blush]] `idiom`
+- [[at first sight]] `fixed-expression`
+- [[at full speed]] `collocation`
+- [[at hand]] `fixed-expression`
+- [[at heart]] `fixed-expression/idiom`
+- [[at home]] `fixed-expression`
+- [[at intervals]] `fixed-expression`
+- [[at large]] `fixed-expression/idiom`
+- [[at last]] `fixed-expression`
+- [[at least]] `fixed-expression`
+- [[at length]] `fixed-expression`
+- [[at most]] `fixed-expression`
+- [[at no time]] `fixed-expression`
+- [[at one time]] `fixed-expression`
+- [[at one's disposal]] `fixed-expression`
+- [[at present]] `fixed-expression`
+- [[at the cost of]] `fixed-expression`
+- [[at the invitation of sb|at the invitation of sb.]] `fixed-expression`
+- [[at the latest]] `fixed-expression`
+- [[at the mercy of]] `fixed-expression/idiom`
+- [[at the moment]] `fixed-expression`
+- [[at the most]] `fixed-expression`
+- [[at the price of]] `fixed-expression`
+- [[at the risk of]] `fixed-expression`
+- [[at the same time]] `fixed-expression`
+- [[at the sight of]] `fixed-expression`
+- [[at the speed of]] `collocation`
+- [[at the thought of]] `collocation/fixed-expression`
+- [[at the top of the voice]] `collocation/idiom`
+- [[at this rate]] `fixed-expression`
+- [[at times]] `fixed-expression`
+- [[attempt to do]] `collocation`
+- [[attend to sth|attend to sth.]] `phrasal-verb`
+- [[attitude to-towards sth|attitude to/towards sth.]] `collocation`
+- [[attract one's attention]] `collocation`
+
+### B  (218)
+
+- [[back and forth]] `fixed-expression`
+- [[back of]] `fixed-expression/lexical-phrase`
+- [[bark at]] `phrasal-verb`
+- [[be (good) value for money]] `collocation`
+- [[be able to do]] `fixed-expression`
+- [[be about to do]] `fixed-expression`
+- [[be absent from]] `collocation`
+- [[be absorbed in]] `collocation`
+- [[be admitted into universities]] `collocation`
+- [[be afraid of doing]] `collocation`
+- [[be afraid of sth.-sb|be afraid of sth./sb.]] `collocation`
+- [[be afraid that]] `collocation`
+- [[be afraid to do]] `collocation`
+- [[be after sth.-sb|be after sth./sb.]] `collocation`
+- [[be along with]] `collocation`
+- [[be an expert on-in-at sth|be an expert on/in/at sth.]] `collocation`
+- [[be angry at sth|be angry at sth.]] `collocation`
+- [[be angry with sb.-sth|be angry with sb./sth.]] `collocation`
+- [[be anxious about]] `collocation`
+- [[be anxious for sth|be anxious for sth.]] `collocation`
+- [[be anxious to do]] `collocation`
+- [[be ashamed of]] `collocation`
+- [[be at breakfast-lunch-supper|be at breakfast/lunch/supper]] `collocation`
+- [[be at the same level]] `collocation`
+- [[be aware of sth|be aware of sth.]] `collocation`
+- [[be aware of-that|be aware of/that]] `collocation`
+- [[be away from]] `collocation`
+- [[be based on]] `collocation`
+- [[be better off]] `idiom`
+- [[be blind in one eye]] `collocation`
+- [[be blind to]] `idiom`
+- [[be built from|be built from...]] `collocation`
+- [[be busy doing]] `collocation`
+- [[be busy with]] `collocation`
+- [[be caught in]] `collocation`
+- [[be concerned about]] `collocation`
+- [[be connected with]] `collocation`
+- [[be content to do]] `collocation`
+- [[be content with]] `collocation`
+- [[be crowded with]] `collocation`
+- [[be curious about|be curious about...]] `collocation`
+- [[be deaf to]] `idiom`
+- [[be disappointed in sth|be disappointed in sth.]] `collocation`
+- [[be disappointed with sb.-sth|be disappointed with sb./sth.]] `collocation`
+- [[be done away with]] `phrasal-verb`
+- [[be dressed in]] `collocation`
+- [[be due to do]] `collocation`
+- [[be due to sth|be due to sth.]] `collocation`
+- [[be dying for]] `collocation`
+- [[be dying to do]] `idiom`
+- [[be eager to do]] `collocation`
+- [[be engaged in]] `collocation`
+- [[be engaged to]] `collocation`
+- [[be equal to]] `collocation`
+- [[be expert in-at doing|be expert in/at doing]] `collocation`
+- [[be famous as]] `collocation`
+- [[be famous for]] `collocation`
+- [[be famous to sb|be famous to sb.]] `collocation`
+- [[be favourable to]] `collocation`
+- [[be fit for sth|be fit for sth.]] `collocation`
+- [[be fond of]] `collocation`
+- [[be friendly-kind-polite to sb|be friendly/kind/polite to sb.]] `collocation`
+- [[be going to do]] `collocation/fixed-expression`
+- [[be gone]] `collocation`
+- [[be good on sb|be good on sb.]] `collocation`
+- [[be hard on sb|be hard on sb.]] `collocation`
+- [[be harmful to]] `collocation`
+- [[be honoured for sth|be honoured for sth.]] `collocation`
+- [[be in (the) majority]] `collocation`
+- [[be in business]] `collocation`
+- [[be in danger]] `collocation`
+- [[be in darkness]] `collocation`
+- [[be in disorder]] `collocation`
+- [[be in earnest]] `collocation/fixed-expression`
+- [[be in good order]] `collocation`
+- [[be in great need]] `collocation`
+- [[be in hospital]] `collocation`
+- [[be in low-high spirits|be in low/high spirits]] `collocation`
+- [[be in poor health]] `collocation`
+- [[be in-under one's charge|be in/under one's charge]] `collocation`
+- [[be in-under the charge of sb|be in/under the charge of sb.]] `collocation`
+- [[be introduced into]] `collocation`
+- [[be keen on]] `collocation`
+- [[be known for]] `collocation`
+- [[be known to sb|be known to sb.]] `collocation`
+- [[be lacking in]] `collocation`
+- [[be longing for]] `collocation`
+- [[be longing to do]] `collocation`
+- [[be lost]] `collocation/idiom`
+- [[be lost in thought]] `idiom`
+- [[be made from]] `collocation`
+- [[be made into]] `collocation`
+- [[be made of]] `collocation`
+- [[be made up of]] `collocation`
+- [[be marked with]] `collocation`
+- [[be measured in]] `collocation`
+- [[be missing]] `fixed-expression`
+- [[be nothing more than]] `fixed-expression`
+- [[be of different sizes-colours-weights-ages- shapes|be of different sizes/colours/weights/ages/ shapes]] `collocation`
+- [[be of great-no help-value-importance-use to sb|be of great/no help/value/importance/use to sb.]] `collocation`
+- [[be of the same size-colour-weight-age-shape|be of the same size/colour/weight/age/shape]] `collocation`
+- [[be off]] `phrasal-verb`
+- [[be on a visit from sp|be on a visit from sp.]] `fixed-expression`
+- [[be on a visit to sp|be on a visit to sp.]] `fixed-expression`
+- [[be on business]] `fixed-expression`
+- [[be on diet]] `fixed-expression`
+- [[be on duty]] `collocation/fixed-expression`
+- [[be on fire]] `collocation/fixed-expression`
+- [[be on holiday-vacation|be on holiday/vacation]] `fixed-expression`
+- [[be on sale]] `fixed-expression`
+- [[be on show]] `fixed-expression`
+- [[be on strike]] `fixed-expression`
+- [[be on the march]] `collocation/fixed-expression`
+- [[be out of fashion]] `fixed-expression`
+- [[be out of order]] `idiom`
+- [[be out of reach]] `idiom`
+- [[be out of work]] `fixed-expression`
+- [[be popular among sb|be popular among sb.]] `collocation`
+- [[be popular with sb|be popular with sb.]] `collocation`
+- [[be prepared for]] `collocation`
+- [[be present at (the meeting)]] `collocation`
+- [[be proud of]] `collocation`
+- [[be put to a new use]] `collocation`
+- [[be ready for]] `collocation`
+- [[be ready to do]] `collocation`
+- [[be reduced by]] `collocation`
+- [[be related to]] `collocation`
+- [[be responsble for]] `collocation`
+- [[be rich in]] `collocation`
+- [[be satisfied with]] `collocation`
+- [[be senior to]] `collocation`
+- [[be set in]] `collocation`
+- [[be short of]] `collocation`
+- [[be shown into sp|be shown into sp.]] `phrasal-verb`
+- [[be strict in sth|be strict in sth.]] `collocation`
+- [[be strict with sb|be strict with sb.]] `collocation`
+- [[be successful in doing sth|be successful in doing sth.]] `collocation`
+- [[be suitable for]] `collocation`
+- [[Be sure(certain) to do]] `fixed-expression`
+- [[be tired from sth.-doing|be tired from sth./doing]] `collocation`
+- [[be tired of sth.-doing|be tired of sth./doing]] `collocation`
+- [[be tired out]] `collocation/phrasal-verb`
+- [[be to blame]] `collocation/idiom`
+- [[be under construction]] `collocation/lexical-phrase`
+- [[be up to]] `phrasal-verb`
+- [[be well received]] `collocation/lexical-phrase`
+- [[be worried about]] `collocation`
+- [[be worth doing]] `collocation`
+- [[be worth sth|be worth sth.]] `collocation`
+- [[be worthy of]] `collocation`
+- [[be-become known as|be/become known as]] `collocation`
+- [[beat sb. black and blue]] `idiom`
+- [[beat sb. on the head]] `fixed-expression`
+- [[beat sb. to death]] `fixed-expression`
+- [[become a success]] `collocation`
+- [[before all]] `fixed-expression`
+- [[before long]] `fixed-expression/lexical-phrase`
+- [[begin with]] `phrasal-verb`
+- [[believe in]] `phrasal-verb`
+- [[belong to sb|belong to sb.]] `phrasal-verb`
+- [[benefit from]] `phrasal-verb`
+- [[beside point]] `fixed-expression`
+- [[beyond question]] `fixed-expression/idiom`
+- [[beyond question]] `fixed-expression/collocation`
+- [[beyond reach]] `fixed-expression/idiom`
+- [[beyond that]] `lexical-phrase`
+- [[beyond the sea]] `fixed-expression`
+- [[black out]] `phrasal-verb`
+- [[black tea]] `collocation`
+- [[blow away]] `phrasal-verb`
+- [[break away from]] `phrasal-verb`
+- [[break down]] `phrasal-verb`
+- [[break in]] `phrasal-verb`
+- [[break into pieces]] `collocation`
+- [[break off]] `phrasal-verb`
+- [[break one's promise-words|break one's promise/words]] `collocation`
+- [[break out]] `phrasal-verb`
+- [[break the record]] `collocation`
+- [[break the rules]] `collocation`
+- [[break up]] `phrasal-verb`
+- [[bring about]] `phrasal-verb`
+- [[bring down]] `phrasal-verb`
+- [[bring in]] `phrasal-verb`
+- [[bring on]] `phrasal-verb`
+- [[bring sth. to one's notice]] `collocation/lexical-phrase`
+- [[bring up]] `phrasal-verb`
+- [[build up]] `phrasal-verb`
+- [[burn down]] `phrasal-verb`
+- [[burn sth. to the ground]] `collocation/idiom`
+- [[burn up]] `phrasal-verb`
+- [[burst in]] `phrasal-verb`
+- [[burst into flames]] `phrasal-verb/collocation`
+- [[burst into laughter]] `phrasal-verb/collocation`
+- [[burst into tears-laughter|burst into tears/laughter]] `phrasal-verb/collocation`
+- [[burst out doing]] `phrasal-verb`
+- [[by accident]] `fixed-expression/lexical-phrase`
+- [[by air]] `fixed-expression`
+- [[by all means]] `fixed-expression/lexical-phrase`
+- [[by and by]] `fixed-expression/lexical-phrase`
+- [[by chance]] `fixed-expression/lexical-phrase`
+- [[by degrees]] `fixed-expression/lexical-phrase`
+- [[by far]] `fixed-expression/lexical-phrase`
+- [[by hand]] `fixed-expression/lexical-phrase`
+- [[by itself]] `fixed-expression/lexical-phrase`
+- [[by means of]] `fixed-expression/lexical-phrase`
+- [[by mistake]] `fixed-expression/lexical-phrase`
+- [[by no means]] `fixed-expression/lexical-phrase`
+- [[by ones and twos]] `fixed-expression/lexical-phrase`
+- [[by oneself]] `fixed-expression/lexical-phrase`
+- [[by reason of]] `fixed-expression/lexical-phrase`
+- [[by the end]] `collocation/fixed-expression`
+- [[by the hour-day-week-minute-month-year|by the hour/day/week/minute/month/year]] `collocation/fixed-expression`
+- [[by the time]] `fixed-expression`
+- [[by the way]] `fixed-expression/lexical-phrase`
+- [[by this means]] `fixed-expression/lexical-phrase`
+- [[by virtue of]] `fixed-expression/lexical-phrase`
+- [[by way of]] `fixed-expression/lexical-phrase`
+- [[by weight-length-volume|by weight/length/volume]] `collocation/fixed-expression`
+
+### C  (86)
+
+- [[call after]] `phrasal-verb`
+- [[call at sp|call at sp.]] `phrasal-verb`
+- [[call for]] `phrasal-verb`
+- [[call in sb|call in sb.]] `phrasal-verb`
+- [[call on sb|call on sb.]] `phrasal-verb`
+- [[call on sb. to do]] `phrasal-verb`
+- [[call one's attention to sth|call one's attention to sth.]] `collocation`
+- [[call to mind]] `idiom`
+- [[call up sb|call up sb.]] `phrasal-verb`
+- [[calm down]] `phrasal-verb`
+- [[can't help doing]] `fixed-expression/collocation`
+- [[can't resist doing]] `fixed-expression/collocation`
+- [[carry away]] `phrasal-verb`
+- [[carry forward]] `phrasal-verb`
+- [[carry off]] `phrasal-verb`
+- [[carry on]] `phrasal-verb`
+- [[carry out]] `phrasal-verb`
+- [[catch a cold]] `collocation`
+- [[catch fire]] `collocation`
+- [[catch in]] `phrasal-verb`
+- [[catch one's attention]] `collocation`
+- [[catch sight of]] `collocation/idiom`
+- [[caught by the]] `fixed-expression`
+- [[change A for B]] `collocation`
+- [[change into]] `phrasal-verb`
+- [[check with|check with...]] `phrasal-verb`
+- [[clear away]] `phrasal-verb`
+- [[clear out]] `phrasal-verb`
+- [[clear up]] `phrasal-verb`
+- [[close to]] `collocation`
+- [[come about]] `phrasal-verb`
+- [[come across]] `phrasal-verb`
+- [[come along]] `phrasal-verb`
+- [[come at]] `phrasal-verb`
+- [[come away]] `phrasal-verb`
+- [[come back]] `phrasal-verb`
+- [[come down]] `phrasal-verb`
+- [[come forth]] `phrasal-verb`
+- [[come into being]] `collocation/idiom`
+- [[come into effect]] `collocation/idiom`
+- [[come off]] `phrasal-verb`
+- [[come on]] `phrasal-verb`
+- [[come out]] `phrasal-verb`
+- [[come round]] `phrasal-verb`
+- [[come to]] `phrasal-verb`
+- [[come to an end]] `collocation/idiom`
+- [[come to one's notice]] `collocation/idiom`
+- [[come to power]] `collocation`
+- [[come true]] `collocation/idiom`
+- [[come up]] `phrasal-verb`
+- [[come upon]] `phrasal-verb`
+- [[comment on|comment on ...]] `collocation`
+- [[compare A to B]] `collocation`
+- [[compare A with B]] `collocation`
+- [[compare notes]] `collocation/idiom`
+- [[compared with-to A, B|compared with/to A, B]] `lexical-phrase`
+- [[concentrate on|concentrate on ...]] `collocation`
+- [[confront with|confront with...]] `collocation`
+- [[congratulate sb.-sth. (on sth.)|congratulate sb./sth. (on sth.)]] `collocation`
+- [[congratulations on sth|congratulations on sth.]] `fixed-expression`
+- [[connect A to B]] `collocation`
+- [[connect A with B]] `collocation`
+- [[consider sb. to have done]] `collocation`
+- [[consider sb.-sth. to be-as|consider sb./sth. to be/as]] `collocation`
+- [[consider sth.-doing|consider sth./doing]] `collocation`
+- [[consist of]] `phrasal-verb`
+- [[content oneself with sth|content oneself with sth.]] `collocation`
+- [[continue doing]] `collocation`
+- [[continue to do]] `collocation`
+- [[continue with sth|continue with sth.]] `collocation`
+- [[contribute sth. to sth|contribute sth. to sth.]] `collocation`
+- [[convert sth. into sth|convert sth. into sth.]] `collocation`
+- [[count on-upon|count on/upon]] `phrasal-verb`
+- [[cover sth.-sb. with sth|cover sth./sb. with sth.]] `collocation`
+- [[cover the events]] `collocation`
+- [[cross out]] `phrasal-verb`
+- [[crowd off]] `phrasal-verb`
+- [[cry out]] `phrasal-verb`
+- [[cure sb. of]] `collocation`
+- [[cut away]] `phrasal-verb`
+- [[cut down]] `phrasal-verb`
+- [[cut off]] `phrasal-verb`
+- [[cut out]] `phrasal-verb`
+- [[cut sth. in half]] `fixed-expression`
+- [[cut sth. into halves]] `fixed-expression`
+- [[cut up]] `phrasal-verb`
+
+### D  (66)
+
+- [[dance to the music]] `collocation`
+- [[dare to do]] `collocation`
+- [[date back to]] `phrasal-verb`
+- [[date from]] `phrasal-verb`
+- [[day after day]] `fixed-expression/lexical-phrase`
+- [[day and night]] `fixed-expression`
+- [[day by day]] `fixed-expression/lexical-phrase`
+- [[deal in]] `phrasal-verb`
+- [[deal with]] `phrasal-verb`
+- [[declare sb.-sth. to be adj.-n|declare sb./sth. to be adj./n.]] `collocation`
+- [[deep into the night]] `collocation`
+- [[delay doing-sth|delay doing/sth.]] `collocation`
+- [[demand sth. of-from sb|demand sth. of/from sb.]] `collocation`
+- [[demand to do]] `collocation`
+- [[depend on-upon|depend on/upon]] `phrasal-verb`
+- [[describe sth. to sb|describe sth. to sb.]] `collocation`
+- [[determine sb. to do]] `collocation`
+- [[determine to do]] `collocation`
+- [[develop a habit]] `collocation`
+- [[develop an interest in sth|develop an interest in sth.]] `collocation/lexical-phrase`
+- [[develop films]] `collocation`
+- [[devote sth.-oneself to sth.-doing|devote sth./oneself to sth./doing]] `collocation`
+- [[die away]] `phrasal-verb`
+- [[die down]] `phrasal-verb`
+- [[die from polluted air-over work-an accident-|die from polluted air/over work/an accident/]] `collocation`
+- [[die of grief-cold-hungry-old age-|die of grief/cold/hungry/old age/]] `collocation`
+- [[die out]] `phrasal-verb`
+- [[differ from|differ from...]] `collocation`
+- [[differ in|differ in...]] `collocation`
+- [[dig out]] `phrasal-verb`
+- [[direct sb. to do]] `collocation`
+- [[discourage sb. from sth.-doing|discourage sb. from sth./doing]] `collocation`
+- [[dislike doing-sb.-sth|dislike doing/sb./sth.]] `collocation`
+- [[distinguish ... from|distinguish ... from ...]] `collocation`
+- [[dive off]] `phrasal-verb`
+- [[divide ... into|divide ... into ...]] `collocation`
+- [[divide sth. by sth|divide sth. by sth.]] `collocation`
+- [[divide sth. into]] `collocation`
+- [[do a good deed]] `collocation`
+- [[do away with]] `phrasal-verb`
+- [[do damage to]] `collocation`
+- [[do good-harm to sb.-sth|do good/harm to sb./sth.]] `collocation`
+- [[do not give in an inch]] `idiom`
+- [[do research on-in-about-into sth|do research on/in/about/into sth.]] `collocation`
+- [[do sb. a favour]] `collocation`
+- [[do sb. good-harm|do sb. good/harm]] `collocation`
+- [[do sb. the favour to do-of doing|do sb. the favour to do/of doing]] `collocation/fixed-expression`
+- [[do sth. by hand]] `collocation`
+- [[do sth. by turns]] `collocation/fixed-expression`
+- [[do sth. deep-far into the night|do sth. deep/far into the night]] `collocation/fixed-expression`
+- [[do sth. for fun]] `collocation`
+- [[do sth. in good faith]] `collocation/fixed-expression`
+- [[do sth. on purpose]] `collocation`
+- [[do up]] `phrasal-verb`
+- [[do with]] `phrasal-verb`
+- [[draw a deep breath]] `collocation`
+- [[draw conclusions]] `collocation`
+- [[draw in]] `phrasal-verb`
+- [[draw one's attention]] `collocation`
+- [[draw up]] `phrasal-verb`
+- [[dream of sth.-doing|dream of sth./doing]] `collocation`
+- [[drink to]] `collocation`
+- [[drive sb. to tears]] `collocation/fixed-expression`
+- [[drop in at sp|drop in at sp.]] `phrasal-verb`
+- [[drop in on sb|drop in on sb.]] `phrasal-verb`
+- [[due to]] `fixed-expression`
+
+### E  (27)
+
+- [[each other]] `fixed-expression`
+- [[eager for]] `collocation`
+- [[early bird]] `idiom`
+- [[earn one's living]] `collocation/fixed-expression`
+- [[easy-going]] `collocation/fixed-expression`
+- [[eat one's words]] `idiom`
+- [[eat up]] `phrasal-verb`
+- [[either A or B]] `fixed-expression`
+- [[enable sb. to do|enable sb. to do ...]] `collocation`
+- [[encourage sb. to do sth|encourage sb. to do sth.]] `collocation`
+- [[end up with]] `phrasal-verb`
+- [[enter for]] `phrasal-verb`
+- [[escape being done]] `collocation`
+- [[escape doing sth|escape doing sth.]] `collocation`
+- [[escape from sp|escape from sp.]] `collocation`
+- [[even if-though|even if/though]] `fixed-expression`
+- [[ever so]] `fixed-expression`
+- [[every now and then]] `fixed-expression`
+- [[every one of sb.-sth|every one of sb./sth.]] `collocation/fixed-expression`
+- [[every other]] `fixed-expression`
+- [[every two]] `fixed-expression`
+- [[except for]] `collocation/fixed-expression`
+- [[expect of-from|expect of/from...]] `collocation`
+- [[expect sb. to do]] `collocation`
+- [[explain sth. to sb|explain sth. to sb.]] `collocation`
+- [[explain to sb. sth|explain to sb. sth.]] `collocation`
+- [[export to]] `collocation`
+
+### F  (80)
+
+- [[face to face]] `fixed-expression`
+- [[face-to-face]] `collocation/fixed-expression`
+- [[fail to do]] `collocation`
+- [[fall asleep]] `collocation`
+- [[fall behind]] `phrasal-verb`
+- [[fall ill]] `collocation`
+- [[fall in love with sb|fall in love with sb.]] `fixed-expression/idiom`
+- [[fall off]] `phrasal-verb`
+- [[fall to pieces]] `fixed-expression/idiom`
+- [[far and near]] `fixed-expression`
+- [[far and wide]] `fixed-expression`
+- [[far from]] `collocation/fixed-expression`
+- [[fast asleep]] `collocation`
+- [[feed on sth|feed on sth.]] `collocation/phrasal-verb`
+- [[feed sb.-sth. with-on sth|feed sb./sth. with/on sth.]] `collocation`
+- [[feed sth. to sb.-sth|feed sth. to sb./sth.]] `collocation`
+- [[feel like doing...-sth|feel like doing…/sth.]] `collocation/fixed-expression`
+- [[feel one's way]] `fixed-expression/idiom`
+- [[feel out]] `phrasal-verb`
+- [[fight against]] `collocation/phrasal-verb`
+- [[fight back]] `phrasal-verb`
+- [[fight with]] `collocation/phrasal-verb`
+- [[figure on]] `phrasal-verb`
+- [[figure out]] `phrasal-verb`
+- [[fill with]] `collocation/phrasal-verb`
+- [[find out]] `phrasal-verb`
+- [[finish off]] `phrasal-verb`
+- [[fire escape]] `collocation`
+- [[fire out]] `phrasal-verb`
+- [[fire up]] `phrasal-verb`
+- [[first aid]] `collocation`
+- [[first of all]] `fixed-expression`
+- [[fix a time-date for sth.-doing|fix a time/date for sth./doing]] `collocation`
+- [[fix a time-date to do|fix a time/date to do]] `collocation`
+- [[fix A to B]] `collocation`
+- [[fix one's attention on sth|fix one's attention on sth.]] `collocation/fixed-expression`
+- [[fix one's eyes on sth|fix one's eyes on sth.]] `fixed-expression/idiom`
+- [[fix sb. sth|fix sb. sth.]] `collocation`
+- [[fix sth. for sb|fix sth. for sb.]] `collocation`
+- [[float off]] `phrasal-verb`
+- [[focus on]] `phrasal-verb/collocation`
+- [[fold up]] `phrasal-verb`
+- [[follow one's advice on]] `collocation`
+- [[follow the rules]] `collocation`
+- [[fool about-around|fool about/around]] `phrasal-verb`
+- [[fool sb. into doing sth|fool sb. into doing sth.]] `collocation`
+- [[for (political) reasons]] `collocation`
+- [[for a while]] `fixed-expression`
+- [[for ages]] `fixed-expression`
+- [[for ever]] `fixed-expression`
+- [[for example]] `fixed-expression`
+- [[for fear that]] `fixed-expression`
+- [[for free]] `fixed-expression`
+- [[for God's sake]] `fixed-expression`
+- [[for good]] `fixed-expression`
+- [[for instance]] `fixed-expression`
+- [[for one thing]] `fixed-expression`
+- [[for one's sake]] `fixed-expression`
+- [[for oneself]] `fixed-expression`
+- [[for sale]] `fixed-expression`
+- [[for the better]] `fixed-expression`
+- [[for the first time]] `fixed-expression`
+- [[for the moment]] `fixed-expression`
+- [[for the present]] `fixed-expression`
+- [[for the purpose of|for the purpose of...]] `fixed-expression`
+- [[for the sake of]] `fixed-expression`
+- [[for the time being]] `fixed-expression`
+- [[forbid sb. to do]] `collocation`
+- [[force oneself to one's feet]] `collocation/fixed-expression`
+- [[force sb. to do]] `collocation`
+- [[foreign affairs]] `collocation`
+- [[form a habit]] `collocation`
+- [[frankly speaking]] `fixed-expression/lexical-phrase`
+- [[free from]] `collocation`
+- [[from cover to cover]] `fixed-expression`
+- [[from door to door]] `fixed-expression`
+- [[from side to side]] `fixed-expression`
+- [[from that time on]] `fixed-expression`
+- [[from the beginning]] `fixed-expression`
+- [[from time to time]] `fixed-expression`
+
+### G  (77)
+
+- [[gain in]] `phrasal-verb`
+- [[generally speaking]] `fixed-expression/lexical-phrase`
+- [[get across]] `phrasal-verb`
+- [[get along (well) with]] `phrasal-verb`
+- [[get caught in]] `collocation/phrasal-verb`
+- [[get changed]] `fixed-expression`
+- [[get close to sth.-sb|get close to sth./sb.]] `collocation`
+- [[get down to sth.-doing|get down to sth./doing]] `phrasal-verb`
+- [[get hold of]] `phrasal-verb`
+- [[get in]] `phrasal-verb`
+- [[get in touch with]] `fixed-expression/phrasal-verb`
+- [[get into]] `phrasal-verb`
+- [[get into the habit of]] `collocation/fixed-expression`
+- [[get it settled]] `collocation`
+- [[get married]] `collocation`
+- [[get off]] `phrasal-verb`
+- [[get on (well) with sb.-sth|get on (well) with sb./sth.]] `phrasal-verb`
+- [[get on the right track]] `fixed-expression/idiom`
+- [[get over]] `phrasal-verb`
+- [[get paid]] `collocation`
+- [[get ready for sth|get ready for sth.]] `collocation`
+- [[get rid of]] `fixed-expression/phrasal-verb`
+- [[get sb. to do-doing-done|get sb. to do/doing/done]] `collocation`
+- [[get separated]] `collocation`
+- [[get sth. ready for]] `collocation`
+- [[get through]] `phrasal-verb`
+- [[get tired of sth.-doing|get tired of sth./doing]] `collocation`
+- [[get to]] `phrasal-verb`
+- [[get to know sb|get to know sb.]] `collocation`
+- [[get together]] `phrasal-verb`
+- [[get up to one's feet]] `collocation/fixed-expression`
+- [[get word]] `collocation`
+- [[give a hand]] `collocation/idiom`
+- [[give a thought to sb.-sth|give a thought to sb./sth.]] `fixed-expression`
+- [[give an order for sth|give an order for sth.]] `collocation`
+- [[give away]] `phrasal-verb`
+- [[give back]] `phrasal-verb`
+- [[give birth to]] `collocation/fixed-expression`
+- [[give in]] `phrasal-verb`
+- [[give off]] `phrasal-verb`
+- [[give one's love-wishes-regards to sb|give one's love/wishes/regards to sb.]] `collocation/fixed-expression`
+- [[give out]] `phrasal-verb`
+- [[give over]] `phrasal-verb`
+- [[give sb. a lift]] `collocation`
+- [[give sb. a message]] `collocation`
+- [[give sb. advice on sth.-how to do|give sb. advice on sth./how to do]] `collocation`
+- [[give sth. away]] `phrasal-verb`
+- [[give up sth.-doing|give up sth./doing]] `phrasal-verb`
+- [[give way to]] `idiom/phrasal-verb`
+- [[go aboard a plane-ship|go aboard a plane/ship]] `collocation`
+- [[go abroad]] `collocation`
+- [[go after]] `phrasal-verb`
+- [[go against]] `phrasal-verb`
+- [[Go ahead|Go ahead.]] `fixed-expression`
+- [[go all the way back to the time of]] `fixed-expression`
+- [[go bad]] `collocation`
+- [[go by]] `phrasal-verb`
+- [[go down]] `phrasal-verb`
+- [[go in for]] `phrasal-verb`
+- [[go mad about sth.-doing|go mad about sth./doing]] `collocation`
+- [[go missing]] `collocation`
+- [[go off]] `phrasal-verb`
+- [[go off duty]] `collocation`
+- [[go on a trip on sp|go on a trip on sp.]] `collocation`
+- [[go on board]] `collocation/phrasal-verb`
+- [[go out]] `phrasal-verb`
+- [[go over]] `phrasal-verb`
+- [[go through]] `phrasal-verb`
+- [[go up]] `phrasal-verb`
+- [[go with]] `phrasal-verb`
+- [[good for nothing]] `fixed-expression/idiom`
+- [[Good luck with your trip|Good luck with your trip.]] `fixed-expression`
+- [[good manners]] `collocation`
+- [[graduate from]] `collocation/phrasal-verb`
+- [[grow out of]] `phrasal-verb`
+- [[grow rich]] `collocation`
+- [[guess sb. to be]] `collocation`
+
+### H  (47)
+
+- [[hand down]] `phrasal-verb`
+- [[hand in]] `phrasal-verb`
+- [[hand in hand]] `fixed-expression/idiom`
+- [[hand out]] `phrasal-verb`
+- [[hand over]] `phrasal-verb`
+- [[hang up]] `phrasal-verb`
+- [[have a cold]] `collocation`
+- [[have a great effect on]] `collocation`
+- [[have a high opinion of]] `collocation`
+- [[have a problem with sth|have a problem with sth.]] `collocation`
+- [[have a rest]] `collocation`
+- [[have a seat]] `lexical-phrase`
+- [[have a short memory]] `collocation`
+- [[have a talk with sb|have a talk with sb.]] `collocation`
+- [[have a word with sb|have a word with sb.]] `collocation`
+- [[have an effect on sb|have an effect on sb.]] `collocation`
+- [[have difficulty-trouble (in) doing-sth|have difficulty/trouble (in) doing/sth.]] `collocation`
+- [[have on]] `phrasal-verb`
+- [[have sth. on]] `phrasal-verb`
+- [[have sth. on-with-about sb|have sth. on/with/about sb.]] `collocation/fixed-expression`
+- [[have sth. to do with sb.-sth|have sth. to do with sb./sth.]] `fixed-expression`
+- [[have the habit of doing]] `collocation`
+- [[have trouble with sth|have trouble with sth.]] `collocation`
+- [[have words with sb|have words with sb.]] `collocation/idiom`
+- [[head on]] `fixed-expression/phrasal-verb`
+- [[hear about sth.-sb. (through sb.)|hear about sth./sb. (through sb.)]] `phrasal-verb`
+- [[hear from]] `phrasal-verb`
+- [[hear of sth.-sb|hear of sth./sb.]] `phrasal-verb`
+- [[hear sb.-sth. do|hear sb./sth. do]] `collocation/fixed-expression`
+- [[heart and soul]] `fixed-expression/idiom`
+- [[heavy smoker]] `collocation`
+- [[help sb. out]] `phrasal-verb`
+- [[hold a position]] `collocation`
+- [[hold back]] `phrasal-verb`
+- [[hold down]] `phrasal-verb`
+- [[hold for questioning]] `collocation`
+- [[hold on]] `phrasal-verb`
+- [[hold one's breath]] `collocation`
+- [[hold one's head high]] `idiom`
+- [[hold out]] `phrasal-verb`
+- [[hold the record]] `collocation`
+- [[hold to]] `phrasal-verb`
+- [[hold up]] `phrasal-verb`
+- [[honestly speaking]] `fixed-expression/lexical-phrase`
+- [[how about|how about ...]] `fixed-expression`
+- [[hundreds of thousands of]] `collocation`
+- [[hunt for]] `phrasal-verb`
+
+### I  (128)
+
+- [[I (don't) doubt that-if-whether|I (don't) doubt that/if/whether]] `collocation/fixed-expression`
+- [[I wonder whether-how|I wonder whether/how]] `collocation/fixed-expression`
+- [[I'm afraid that]] `lexical-phrase`
+- [[if any]] `fixed-expression`
+- [[if not]] `fixed-expression`
+- [[imagine (sb.) doing sth|imagine (sb.) doing sth.]] `collocation/fixed-expression`
+- [[imagine sb.-sth. to be|imagine sb./sth. to be]] `collocation`
+- [[in (good) order]] `fixed-expression`
+- [[in (the)light of]] `fixed-expression`
+- [[in a high-low voice|in a high/low voice]] `fixed-expression`
+- [[in a hurry]] `fixed-expression`
+- [[in a moment]] `fixed-expression`
+- [[in a sense]] `fixed-expression`
+- [[in a way]] `fixed-expression`
+- [[in a while]] `fixed-expression`
+- [[in a word]] `fixed-expression`
+- [[in accordance with]] `fixed-expression`
+- [[in addition]] `fixed-expression`
+- [[in advance]] `fixed-expression`
+- [[in all]] `fixed-expression`
+- [[in any case]] `fixed-expression`
+- [[in any event]] `fixed-expression`
+- [[in brief]] `fixed-expression`
+- [[in case]] `fixed-expression`
+- [[in charge of]] `fixed-expression`
+- [[in common]] `fixed-expression`
+- [[in consequence(of)]] `fixed-expression`
+- [[in debt]] `fixed-expression`
+- [[in depth]] `fixed-expression`
+- [[in despair]] `fixed-expression`
+- [[in detail]] `fixed-expression`
+- [[in difficulty]] `fixed-expression`
+- [[in disapproval]] `fixed-expression`
+- [[in effect]] `fixed-expression`
+- [[in fact]] `fixed-expression`
+- [[in favor of]] `fixed-expression`
+- [[in favour of]] `fixed-expression`
+- [[in front of]] `fixed-expression`
+- [[in future]] `fixed-expression`
+- [[in general]] `fixed-expression`
+- [[in half]] `fixed-expression`
+- [[in hand]] `fixed-expression`
+- [[in honor of]] `fixed-expression`
+- [[in honour of]] `fixed-expression`
+- [[in hopes of doing]] `collocation/fixed-expression`
+- [[in itself]] `fixed-expression`
+- [[in line with]] `fixed-expression`
+- [[in memory of]] `fixed-expression`
+- [[in no case]] `fixed-expression`
+- [[in no time]] `fixed-expression`
+- [[in no way]] `fixed-expression`
+- [[in one's (fifties)]] `collocation/fixed-expression`
+- [[in one's absence]] `collocation/fixed-expression`
+- [[in one's judgement]] `collocation/fixed-expression`
+- [[in one's opinion]] `collocation/fixed-expression`
+- [[in one's spare time]] `fixed-expression`
+- [[in one's way]] `idiom`
+- [[in order]] `fixed-expression`
+- [[in other words]] `fixed-expression`
+- [[in pain]] `fixed-expression`
+- [[in part]] `fixed-expression`
+- [[in particular]] `fixed-expression`
+- [[in person]] `fixed-expression`
+- [[in place]] `fixed-expression`
+- [[in place of]] `fixed-expression`
+- [[in practice]] `fixed-expression`
+- [[in praise of sb|in praise of sb.]] `collocation/fixed-expression`
+- [[in proportion to]] `fixed-expression`
+- [[in public]] `fixed-expression`
+- [[in quantity]] `fixed-expression`
+- [[in question]] `fixed-expression`
+- [[in reach]] `fixed-expression`
+- [[in regard to]] `fixed-expression`
+- [[in relation to]] `fixed-expression`
+- [[in return]] `fixed-expression`
+- [[in search of]] `fixed-expression`
+- [[in short]] `fixed-expression`
+- [[in sight]] `fixed-expression`
+- [[in silence]] `fixed-expression`
+- [[in space]] `collocation`
+- [[in spite of]] `fixed-expression`
+- [[in step]] `fixed-expression`
+- [[in sympathy with]] `fixed-expression`
+- [[in tears]] `collocation/fixed-expression`
+- [[in that]] `fixed-expression`
+- [[in that case]] `fixed-expression`
+- [[in that circumstances]] `fixed-expression`
+- [[in the (1870)'s-(1870)s|in the (1870)'s/(1870)s]] `collocation/fixed-expression`
+- [[in the beginning]] `fixed-expression`
+- [[in the case of sth.-sb|in the case of sth./sb.]] `fixed-expression`
+- [[in the course of]] `fixed-expression`
+- [[in the dark]] `idiom/fixed-expression`
+- [[in the direction of]] `collocation/fixed-expression`
+- [[in the distance]] `fixed-expression`
+- [[in the early days]] `collocation/fixed-expression`
+- [[in the end]] `idiom/fixed-expression`
+- [[in the event of]] `fixed-expression`
+- [[in the face of]] `idiom/fixed-expression`
+- [[in the fields of sth|in the fields of sth.]] `collocation`
+- [[in the first place]] `idiom/fixed-expression`
+- [[in the front of]] `fixed-expression`
+- [[in the future]] `fixed-expression`
+- [[in the hope of doing]] `fixed-expression/lexical-phrase`
+- [[in the last hour]] `lexical-phrase`
+- [[in the last ten years]] `collocation/lexical-phrase`
+- [[in the least]] `idiom/fixed-expression`
+- [[in the long run]] `idiom/fixed-expression`
+- [[in the way]] `fixed-expression`
+- [[in the world]] `fixed-expression`
+- [[in the years to come]] `fixed-expression`
+- [[in time]] `fixed-expression`
+- [[in total]] `fixed-expression`
+- [[in touch]] `fixed-expression`
+- [[in turn]] `fixed-expression`
+- [[in vain]] `fixed-expression`
+- [[in years to come]] `fixed-expression`
+- [[increase by]] `phrasal-verb`
+- [[insist on doing-sth|insist on doing/sth.]] `phrasal-verb`
+- [[instead of]] `fixed-expression`
+- [[intend for]] `phrasal-verb`
+- [[intend to do]] `collocation/phrasal-verb`
+- [[It is tempting to conclude that]] `lexical-phrase`
+- [[It is up to sb.(to do)]] `fixed-expression`
+- [[It is useless doing]] `fixed-expression`
+- [[It makes no difference|It makes no difference.]] `fixed-expression`
+- [[It occurred to sb. that]] `fixed-expression`
+- [[It seems to sb|It seems to sb.]] `lexical-phrase`
+- [[It so happened that]] `fixed-expression`
+
+### J  (5)
+
+- [[join in]] `phrasal-verb`
+- [[join sb. in]] `phrasal-verb`
+- [[Judging by-from...,|Judging by/from…,]] `fixed-expression`
+- [[jump with joy]] `collocation`
+- [[just now]] `fixed-expression`
+
+### K  (25)
+
+- [[keep (sb.-sth.) away from|keep (sb./sth.) away from]] `phrasal-verb`
+- [[keep a record of]] `collocation`
+- [[keep a strict eye on sb.-sth|keep a strict eye on sb./sth.]] `idiom`
+- [[keep back]] `phrasal-verb`
+- [[keep good hours]] `collocation/fixed-expression`
+- [[keep in touch with]] `fixed-expression`
+- [[keep off]] `phrasal-verb`
+- [[keep on doing sth|keep on doing sth.]] `phrasal-verb`
+- [[keep one's promise-words|keep one's promise/words]] `collocation`
+- [[keep out]] `phrasal-verb`
+- [[keep sb. doing sth|keep sb. doing sth.]] `collocation`
+- [[keep sb. from doing sth|keep sb. from doing sth.]] `phrasal-verb`
+- [[keep sth. in check]] `collocation/fixed-expression`
+- [[keep the record]] `collocation`
+- [[keep the rules]] `collocation`
+- [[keep up]] `phrasal-verb`
+- [[kiss each other goodbye-hello|kiss each other goodbye/hello]] `fixed-expression`
+- [[knock at-on the door-window|knock at/on the door/window]] `collocation`
+- [[knock down]] `phrasal-verb`
+- [[knock into sb|knock into sb.]] `phrasal-verb`
+- [[knock over]] `phrasal-verb`
+- [[knock sb.-sth. off|knock sb./sth. off]] `phrasal-verb`
+- [[knock sth. into sth|knock sth. into sth.]] `phrasal-verb`
+- [[knock sth. out of sth|knock sth. out of sth.]] `phrasal-verb`
+- [[know about sb|know about sb.]] `collocation`
+
+### L  (49)
+
+- [[land on]] `phrasal-verb`
+- [[land on its legs]] `idiom`
+- [[Lantern Festival]] `fixed-expression`
+- [[laugh at sb|laugh at sb.]] `phrasal-verb`
+- [[laugh sb. off one's fears]] `fixed-expression`
+- [[lay the person on his-her back|lay the person on his/her back]] `collocation`
+- [[lead a simple life]] `collocation`
+- [[lead to]] `phrasal-verb`
+- [[lean over|lean over...]] `phrasal-verb`
+- [[learn ... by heart]] `idiom/fixed-expression`
+- [[leave for sp|leave for sp.]] `phrasal-verb`
+- [[leave sb. alone]] `idiom`
+- [[leave sb. doing]] `collocation`
+- [[leave sth. to chance]] `idiom`
+- [[leave sth. to sb.-sth|leave sth. to sb./sth.]] `collocation`
+- [[let sb. down]] `phrasal-verb`
+- [[lie around]] `phrasal-verb`
+- [[lie in]] `phrasal-verb`
+- [[lie on]] `phrasal-verb`
+- [[lie to]] `phrasal-verb`
+- [[light up]] `phrasal-verb`
+- [[like doing]] `collocation`
+- [[like to do]] `collocation`
+- [[line up to]] `idiom`
+- [[listen for]] `phrasal-verb`
+- [[little by little]] `fixed-expression`
+- [[live a simple life]] `collocation`
+- [[live on sth|live on sth.]] `collocation/phrasal-verb`
+- [[load with]] `collocation/phrasal-verb`
+- [[long before]] `fixed-expression`
+- [[look ahead]] `phrasal-verb`
+- [[look by]] `phrasal-verb`
+- [[look down upon]] `phrasal-verb`
+- [[look for]] `phrasal-verb`
+- [[look forward(s) to doing-sth|look forward(s) to doing/sth.]] `collocation/phrasal-verb`
+- [[look into]] `phrasal-verb`
+- [[look on sb.-sth. as|look on sb./sth. as]] `fixed-expression/phrasal-verb`
+- [[Look out|Look out.]] `fixed-expression`
+- [[look over]] `phrasal-verb`
+- [[look sb.-sth. up and down|look sb./sth. up and down]] `fixed-expression/idiom`
+- [[look through]] `phrasal-verb`
+- [[looking forward to]] `fixed-expression/phrasal-verb`
+- [[lose heart]] `collocation/idiom`
+- [[lose one's life-lives|lose one's life/lives]] `collocation/idiom`
+- [[lose one's sight]] `collocation/idiom`
+- [[lose one's temper]] `collocation/idiom`
+- [[lose one's way]] `collocation/idiom`
+- [[lose touch with]] `collocation/phrasal-verb`
+- [[lots of]] `collocation`
+
+### M  (50)
+
+- [[make (good) use of]] `collocation`
+- [[make a (phone) call]] `collocation`
+- [[make a choice]] `collocation`
+- [[make a decision]] `collocation`
+- [[make a fire]] `collocation`
+- [[make a fool of oneself]] `idiom`
+- [[make a fresh start]] `collocation`
+- [[make a hit]] `collocation/idiom`
+- [[make a plan for]] `collocation`
+- [[make a promise]] `collocation`
+- [[make a search for]] `collocation`
+- [[make a trip]] `collocation`
+- [[make an effort to do]] `collocation`
+- [[make arrangements]] `collocation`
+- [[make contributions to sth.-doing|make contributions to sth./doing]] `collocation`
+- [[make ends meet oneself]] `idiom`
+- [[make for]] `phrasal-verb`
+- [[make fun of sb|make fun of sb.]] `collocation`
+- [[make no answer]] `collocation`
+- [[make one's living (by doing)]] `collocation/lexical-phrase`
+- [[make one's way]] `idiom`
+- [[make out]] `phrasal-verb`
+- [[make progress]] `collocation`
+- [[make room for sb|make room for sb.]] `collocation`
+- [[make sacrifices to do|make sacrifices to do..]] `collocation`
+- [[make sense of sth|make sense of sth.]] `collocation`
+- [[make sth. into sth|make sth. into sth.]] `collocation`
+- [[make sth. out of sth|make sth. out of sth.]] `collocation`
+- [[make sth. to one's own measure]] `collocation`
+- [[Make sure(certain) that]] `fixed-expression`
+- [[make up]] `phrasal-verb`
+- [[make up one's mind (to do)]] `idiom`
+- [[make use of sth|make use of sth.]] `collocation`
+- [[manage to do]] `collocation`
+- [[many a]] `fixed-expression`
+- [[many happy returns of the day]] `fixed-expression`
+- [[marry A to B]] `collocation`
+- [[mean doing]] `collocation`
+- [[mean to do]] `collocation`
+- [[meet one's needs-demands-requirements|meet one's needs/demands/requirements]] `collocation`
+- [[meet the standard of]] `collocation`
+- [[meet with]] `phrasal-verb`
+- [[mention sth. to sb|mention sth. to sb.]] `collocation`
+- [[mention to sb. sth|mention to sb. sth.]] `collocation`
+- [[middle ages]] `fixed-expression`
+- [[mix sb. up sth|mix sb. up sth.]] `phrasal-verb`
+- [[more or less]] `fixed-expression`
+- [[more than one]] `fixed-expression`
+- [[move around]] `phrasal-verb`
+- [[much too]] `collocation/fixed-expression`
+
+### N  (34)
+
+- [[name out]] `phrasal-verb`
+- [[named after]] `phrasal-verb`
+- [[need doing-to be done|need doing/to be done]] `collocation`
+- [[neither A nor B]] `fixed-expression`
+- [[next door]] `fixed-expression/idiom`
+- [[next to]] `fixed-expression`
+- [[no better than]] `fixed-expression`
+- [[no doubt]] `fixed-expression/lexical-phrase`
+- [[no later than]] `fixed-expression`
+- [[no less than]] `fixed-expression`
+- [[no longer]] `fixed-expression`
+- [[no more]] `fixed-expression`
+- [[no more than]] `fixed-expression`
+- [[no wonder]] `fixed-expression`
+- [[Nobody but A]] `fixed-expression`
+- [[none other than]] `fixed-expression/idiom`
+- [[not a bit]] `fixed-expression`
+- [[Not A but B]] `fixed-expression`
+- [[not a little]] `fixed-expression/idiom`
+- [[not all]] `fixed-expression`
+- [[not any longer]] `fixed-expression`
+- [[not any more]] `fixed-expression`
+- [[not both]] `fixed-expression`
+- [[Not only A but (also) B]] `fixed-expression`
+- [[not only ... but also|not only … but also]] `fixed-expression`
+- [[Not until...did|Not until…did]] `fixed-expression`
+- [[nothing but]] `fixed-expression`
+- [[nothing but-except|nothing but/except]] `fixed-expression`
+- [[notice sb.-sth. do|notice sb./sth. do]] `collocation`
+- [[not...at all|not…at all]] `fixed-expression`
+- [[not...in the least|not…in the least]] `fixed-expression`
+- [[not...other than|not…other than]] `fixed-expression`
+- [[now and then]] `fixed-expression`
+- [[now that]] `fixed-expression`
+
+### O  (75)
+
+- [[object to sth.-doing|object to sth./doing]] `collocation/phrasal-verb`
+- [[of one's own]] `collocation/fixed-expression`
+- [[of oneself]] `fixed-expression`
+- [[of+no-great+interest-help-value-use-important-...+to sb|of+no/great+interest/help/value/use/important/…+to sb.]] `collocation/fixed-expression`
+- [[off and on]] `fixed-expression`
+- [[off duty]] `fixed-expression`
+- [[offer (sb.) money for sth|offer (sb.) money for sth.]] `collocation`
+- [[offer (sth.) for money]] `collocation`
+- [[offer sth. to sb|offer sth. to sb.]] `collocation`
+- [[offer to do]] `collocation`
+- [[on (the) one hand]] `fixed-expression`
+- [[on a large-small scale|on a large/small scale]] `fixed-expression`
+- [[on account of]] `fixed-expression/lexical-phrase`
+- [[on arrival]] `fixed-expression/lexical-phrase`
+- [[on average]] `fixed-expression/lexical-phrase`
+- [[on behalf of]] `fixed-expression/lexical-phrase`
+- [[on board]] `fixed-expression/lexical-phrase`
+- [[on business]] `fixed-expression/lexical-phrase`
+- [[on condition that]] `fixed-expression`
+- [[On doing......,|On doing……,]] `fixed-expression`
+- [[on duty]] `fixed-expression`
+- [[on earth]] `idiom`
+- [[on fire]] `fixed-expression/idiom`
+- [[on foot]] `fixed-expression/idiom`
+- [[on guard]] `fixed-expression`
+- [[on hand]] `fixed-expression`
+- [[on occasion(s)]] `fixed-expression`
+- [[on offer]] `fixed-expression`
+- [[on one's feet]] `fixed-expression/idiom`
+- [[on one's guard]] `fixed-expression`
+- [[on one's own]] `fixed-expression`
+- [[on purpose]] `fixed-expression/lexical-phrase`
+- [[on sale]] `fixed-expression`
+- [[on schedule]] `fixed-expression`
+- [[on second thoughts]] `fixed-expression/lexical-phrase`
+- [[on the contrary]] `fixed-expression/lexical-phrase`
+- [[on the grounds of]] `fixed-expression/lexical-phrase`
+- [[on the other hand]] `fixed-expression`
+- [[on the point of]] `fixed-expression`
+- [[on the road]] `fixed-expression`
+- [[on the side]] `fixed-expression/idiom`
+- [[on the spot]] `fixed-expression`
+- [[on the whole]] `fixed-expression/lexical-phrase`
+- [[on time]] `fixed-expression`
+- [[on(an-the) average|on(an/the) average]] `fixed-expression/lexical-phrase`
+- [[once in a while]] `fixed-expression`
+- [[once upon a time]] `fixed-expression/idiom`
+- [[once(and)for all]] `fixed-expression`
+- [[one after another]] `fixed-expression`
+- [[one another]] `fixed-expression`
+- [[only to find]] `fixed-expression/lexical-phrase`
+- [[only-but-all too pleased-happy-thankful to do|only/but/all too pleased/happy/thankful to do]] `collocation/fixed-expression`
+- [[operate on sb|operate on sb.]] `phrasal-verb`
+- [[operate on sp|operate on sp.]] `phrasal-verb`
+- [[or else]] `fixed-expression/lexical-phrase`
+- [[or rather]] `fixed-expression/lexical-phrase`
+- [[or so]] `fixed-expression`
+- [[other than]] `fixed-expression`
+- [[out of]] `fixed-expression`
+- [[out of breath]] `idiom`
+- [[out of control]] `idiom`
+- [[out of date]] `fixed-expression`
+- [[out of doors]] `idiom`
+- [[out of one's reach]] `idiom`
+- [[out of order]] `idiom`
+- [[out of place]] `idiom`
+- [[out of practice]] `idiom`
+- [[out of sight]] `idiom`
+- [[out of the question]] `idiom`
+- [[out of touch]] `idiom`
+- [[over and over again]] `fixed-expression`
+- [[over and over(again)]] `fixed-expression`
+- [[over the years]] `lexical-phrase`
+- [[owe one's success to sb|owe one's success to sb.]] `collocation`
+- [[owe sth. to sb|owe sth. to sb.]] `collocation`
+
+### P  (61)
+
+- [[pass away]] `phrasal-verb`
+- [[pass down]] `phrasal-verb`
+- [[pass on]] `phrasal-verb`
+- [[pass through]] `phrasal-verb`
+- [[pay (special-little-much) attention to sth.- doing|pay (special/little/much) attention to sth./ doing]] `collocation`
+- [[pay a visit to sp|pay a visit to sp.]] `collocation`
+- [[pay off the money-debt|pay off the money/debt]] `phrasal-verb`
+- [[pay one's way]] `idiom`
+- [[permit doing-sb. to do|permit doing/sb. to do]] `collocation`
+- [[persist in]] `collocation/phrasal-verb`
+- [[persuade sb. (not) to do]] `collocation`
+- [[persuade sb. into doing]] `collocation`
+- [[persuade sb. out of doing]] `collocation`
+- [[pick on]] `phrasal-verb`
+- [[pick out]] `phrasal-verb`
+- [[pick up]] `phrasal-verb`
+- [[play ... roles]] `collocation`
+- [[play a joke with sb|play a joke with sb.]] `collocation/fixed-expression`
+- [[play a part in]] `collocation`
+- [[play a trick on sb|play a trick on sb.]] `collocation/fixed-expression`
+- [[play against sb|play against sb.]] `collocation`
+- [[play on words]] `idiom/lexical-phrase`
+- [[play the part of sb|play the part of sb.]] `collocation/fixed-expression`
+- [[plenty of]] `collocation`
+- [[pocket money]] `collocation`
+- [[point at]] `phrasal-verb`
+- [[point of view]] `collocation/lexical-phrase`
+- [[point out]] `phrasal-verb`
+- [[point to]] `phrasal-verb`
+- [[pour in]] `phrasal-verb`
+- [[prefer doing... to doing|prefer doing… to doing]] `fixed-expression`
+- [[prefer sth. to sth|prefer sth. to sth.]] `fixed-expression`
+- [[prefer to do]] `fixed-expression`
+- [[prepare oneself for]] `collocation`
+- [[prevent sb.-sth. from doing|prevent sb./sth. from doing]] `collocation/fixed-expression`
+- [[protect sb.-sth. from being done-sth|protect sb./sth. from being done/sth.]] `collocation/fixed-expression`
+- [[provide sb. with sth|provide sb. with sth.]] `collocation`
+- [[provide sth. to sb|provide sth. to sb.]] `collocation`
+- [[pull on]] `phrasal-verb`
+- [[push over]] `phrasal-verb`
+- [[put a question]] `collocation`
+- [[put a stop to sth|put a stop to sth.]] `collocation`
+- [[put a tax on sth|put a tax on sth.]] `collocation`
+- [[put aside]] `phrasal-verb`
+- [[put away]] `phrasal-verb`
+- [[put down]] `phrasal-verb`
+- [[put forward]] `phrasal-verb`
+- [[put off]] `phrasal-verb`
+- [[put on]] `phrasal-verb`
+- [[put on airs]] `idiom`
+- [[put on weight]] `collocation`
+- [[put one's heart into]] `idiom/lexical-phrase`
+- [[put out the fire]] `phrasal-verb`
+- [[put sb. in-into prison|put sb. in/into prison]] `collocation`
+- [[put sb. through to sb|put sb. through to sb.]] `collocation/phrasal-verb`
+- [[put sb. to death]] `collocation/fixed-expression`
+- [[put sb. to the trouble of doing]] `collocation`
+- [[put sth. into-in practice|put sth. into/in practice]] `collocation`
+- [[put through]] `phrasal-verb`
+- [[put up]] `phrasal-verb`
+- [[put up with]] `phrasal-verb`
+
+### Q  (3)
+
+- [[quantities of]] `collocation`
+- [[quite a few]] `collocation`
+- [[quite a lot of]] `collocation`
+
+### R  (45)
+
+- [[raise a cheer]] `collocation`
+- [[raise a question]] `collocation`
+- [[range from sth. to sth|range from sth. to sth.]] `collocation`
+- [[rather than]] `fixed-expression`
+- [[reach an agreement]] `collocation`
+- [[read between the lines]] `idiom`
+- [[read one's thoughts]] `collocation/lexical-phrase`
+- [[read through]] `phrasal-verb`
+- [[receive (his doctor's) degree]] `collocation`
+- [[reduce sb.-sth. to sth.-doing|reduce sb./sth. to sth./doing]] `collocation`
+- [[refer to]] `phrasal-verb`
+- [[regard sb.-sth. as|regard sb./sth. as]] `collocation`
+- [[regardless of]] `fixed-expression`
+- [[regret doing]] `collocation`
+- [[regret to do]] `collocation`
+- [[rely on sb|rely on sb.]] `collocation/phrasal-verb`
+- [[remain in business]] `collocation`
+- [[remain in poor health]] `collocation`
+- [[remember doing]] `collocation`
+- [[remember sb. to sb|remember sb. to sb.]] `fixed-expression`
+- [[remember to do]] `collocation`
+- [[remind sb. of sth.-sb|remind sb. of sth./sb.]] `collocation`
+- [[remind sb. that]] `collocation`
+- [[replace ... with|replace ... with ...]] `collocation`
+- [[reply to]] `collocation/phrasal-verb`
+- [[require doing-to be done|require doing/to be done]] `collocation`
+- [[rest room]] `collocation/fixed-expression`
+- [[result from]] `collocation/phrasal-verb`
+- [[result in]] `phrasal-verb/collocation`
+- [[return sth. to sb|return sth. to sb.]] `collocation`
+- [[return to normal]] `collocation`
+- [[right away]] `fixed-expression/lexical-phrase`
+- [[right now]] `fixed-expression/lexical-phrase`
+- [[ring back]] `phrasal-verb`
+- [[ring off]] `phrasal-verb`
+- [[rob sb. of sth|rob sb. of sth.]] `collocation`
+- [[round the clock]] `fixed-expression/lexical-phrase`
+- [[run about]] `phrasal-verb`
+- [[run around]] `phrasal-verb`
+- [[run at top speed]] `collocation`
+- [[run in]] `phrasal-verb`
+- [[run off]] `phrasal-verb`
+- [[run out]] `phrasal-verb`
+- [[run short]] `phrasal-verb`
+- [[rush hour]] `collocation/fixed-expression`
+
+### S  (147)
+
+- [[safe and sound]] `fixed-expression/idiom`
+- [[satisfy one's needs-demands-requirements|satisfy one's needs/demands/requirements]] `collocation`
+- [[save sth. for]] `collocation`
+- [[say to oneself]] `fixed-expression/lexical-phrase`
+- [[sb. be determined to do]] `fixed-expression`
+- [[sb. be familiar with sth|sb. be familiar with sth.]] `collocation`
+- [[sb. be likely to do]] `collocation`
+- [[sb. be married to sb|sb. be married to sb.]] `collocation`
+- [[sb. be not oneself]] `fixed-expression/lexical-phrase`
+- [[sb. be pleased to do...-at doing|sb. be pleased to do…/at doing]] `collocation`
+- [[sb. be pleased with sth|sb. be pleased with sth.]] `collocation`
+- [[sb. be supplied with sth|sb. be supplied with sth.]] `collocation`
+- [[sb. be supposed to do]] `fixed-expression`
+- [[sb. be supposed to have done]] `fixed-expression`
+- [[sb. be sure-certain of(about) sth.-doing|sb. be sure/certain of(about) sth./doing]] `collocation`
+- [[sb. be sure-certain to do|sb. be sure/certain to do]] `collocation`
+- [[sb. be thought of-as|sb. be thought of/as]] `collocation`
+- [[sb. be used to doing-sth|sb. be used to doing/sth.]] `fixed-expression`
+- [[sb. be wanted on the phone]] `collocation/fixed-expression`
+- [[sb. do so-such...as to do|sb. do so/such…as to do]] `fixed-expression`
+- [[sb. end sth. with sth|sb. end sth. with sth.]] `collocation`
+- [[sb. get used to doing-sth|sb. get used to doing/sth.]] `fixed-expression`
+- [[sb. happen to do]] `collocation`
+- [[sb. have been married for (3 years)]] `collocation`
+- [[sb. have no doubt that]] `collocation/lexical-phrase`
+- [[sb. have sth. for breakfast-lunch-supper|sb. have sth. for breakfast/lunch/supper]] `collocation`
+- [[sb. used to do]] `collocation`
+- [[sb. would prefer to do]] `fixed-expression`
+- [[Scarcely...when|Scarcely…when]] `fixed-expression`
+- [[scores of (people)]] `collocation`
+- [[search for sb.-sth|search for sb./sth.]] `collocation/phrasal-verb`
+- [[search sp. for sb.-sth|search sp. for sb./sth.]] `collocation`
+- [[seat oneself]] `collocation`
+- [[see about]] `phrasal-verb`
+- [[see around]] `phrasal-verb`
+- [[see New Year in]] `collocation`
+- [[see off]] `phrasal-verb`
+- [[see out]] `phrasal-verb`
+- [[see over]] `phrasal-verb`
+- [[see to]] `phrasal-verb`
+- [[seek for]] `phrasal-verb`
+- [[seek the sun]] `lexical-phrase`
+- [[sell well]] `collocation`
+- [[send away]] `phrasal-verb`
+- [[send for]] `phrasal-verb`
+- [[send in]] `phrasal-verb`
+- [[send off]] `phrasal-verb`
+- [[send one's love-wishes-regards|send one's love/wishes/regards]] `collocation`
+- [[send out]] `phrasal-verb`
+- [[send round-around|send round/around]] `phrasal-verb`
+- [[send up]] `phrasal-verb`
+- [[sentence sb. to death]] `collocation`
+- [[separate A from B]] `collocation`
+- [[set a good example to sb|set a good example to sb.]] `collocation`
+- [[set about doing]] `phrasal-verb`
+- [[set apart from]] `phrasal-verb`
+- [[set aside]] `phrasal-verb`
+- [[set fire to sth|set fire to sth.]] `collocation`
+- [[set in]] `phrasal-verb`
+- [[set off for sp|set off for sp.]] `phrasal-verb/collocation`
+- [[set out for sp|set out for sp.]] `collocation/phrasal-verb`
+- [[set out to do]] `phrasal-verb`
+- [[set sb. free]] `phrasal-verb/collocation`
+- [[set up]] `phrasal-verb`
+- [[settle down]] `phrasal-verb`
+- [[shake hands with sb|shake hands with sb.]] `collocation`
+- [[shift round the clock]] `collocation`
+- [[shoot at]] `phrasal-verb`
+- [[shout at sb|shout at sb.]] `collocation`
+- [[shout to sb|shout to sb.]] `collocation`
+- [[show (sb.) around]] `collocation/phrasal-verb`
+- [[show (sb.) out]] `phrasal-verb`
+- [[show off]] `phrasal-verb`
+- [[side by side]] `fixed-expression/lexical-phrase`
+- [[since then]] `collocation/fixed-expression`
+- [[sing high praise for]] `collocation`
+- [[slip out]] `phrasal-verb`
+- [[smooth away]] `phrasal-verb`
+- [[so as to do]] `collocation/fixed-expression`
+- [[so far]] `fixed-expression/lexical-phrase`
+- [[So far as I know-see,|So far as I know/see,]] `lexical-phrase`
+- [[So it is-was with sb|So it is/was with sb..]] `fixed-expression`
+- [[So long|So long.]] `fixed-expression/lexical-phrase`
+- [[so that]] `fixed-expression`
+- [[some day]] `collocation/fixed-expression`
+- [[some time]] `fixed-expression`
+- [[some times]] `fixed-expression`
+- [[someone else's (book)]] `fixed-expression`
+- [[something as follows]] `fixed-expression`
+- [[sooner or later]] `fixed-expression/lexical-phrase`
+- [[speak about]] `collocation/phrasal-verb`
+- [[speak highly of sb|speak highly of sb.]] `collocation`
+- [[speak in a high-low voice|speak in a high/low voice]] `collocation`
+- [[speak into the telephone]] `collocation`
+- [[speed up]] `phrasal-verb`
+- [[spend time in doing]] `collocation`
+- [[spend time on sth.-doing|spend time on sth./doing]] `collocation`
+- [[spit out]] `phrasal-verb`
+- [[stand for]] `phrasal-verb`
+- [[stand still]] `collocation`
+- [[stare at]] `collocation/phrasal-verb`
+- [[start a fire]] `collocation`
+- [[start doing]] `collocation`
+- [[start for sp|start for sp.]] `phrasal-verb`
+- [[start to do]] `collocation`
+- [[stay silent]] `collocation`
+- [[stay still]] `collocation`
+- [[stay up]] `phrasal-verb`
+- [[step by step]] `fixed-expression/lexical-phrase`
+- [[step into]] `phrasal-verb`
+- [[step onto]] `phrasal-verb`
+- [[sth. be familiar to sb|sth. be familiar to sb.]] `collocation`
+- [[sth. be in question]] `fixed-expression`
+- [[sth. be out of question]] `idiom/fixed-expression`
+- [[sth. be supplied to sb|sth. be supplied to sb.]] `collocation`
+- [[sth. be taken for]] `collocation/phrasal-verb`
+- [[sth. be to the taste]] `collocation`
+- [[sth. be used as]] `collocation`
+- [[sth. be used for]] `collocation`
+- [[sth. be used to do]] `collocation`
+- [[sth. cost sb. some money]] `collocation`
+- [[sth. happen to sb|sth. happen to sb.]] `collocation`
+- [[sth. last sb. some time]] `collocation`
+- [[sth. stand on end]] `collocation/idiom`
+- [[stick in]] `phrasal-verb`
+- [[stick to]] `phrasal-verb`
+- [[stop doing]] `collocation`
+- [[stop sb.-sth. (from) doing|stop sb./sth. (from) doing]] `collocation`
+- [[store up]] `phrasal-verb`
+- [[strictly speaking]] `fixed-expression/lexical-phrase`
+- [[strike a match]] `collocation`
+- [[struggle against]] `collocation/phrasal-verb`
+- [[struggle to one's feet]] `collocation/idiom`
+- [[struggle with]] `collocation/phrasal-verb`
+- [[succeed in doing sth|succeed in doing sth.]] `collocation`
+- [[such as]] `fixed-expression`
+- [[suffer from]] `collocation/phrasal-verb`
+- [[suggest doing...-sth|suggest doing…/sth.]] `collocation`
+- [[suggest sth. to sb|suggest sth. to sb.]] `collocation`
+- [[suggest that]] `collocation`
+- [[suggest to sb. sth|suggest to sb. sth.]] `collocation`
+- [[suit his act to the needs of the (students)]] `collocation`
+- [[supply sb. with sth|supply sb. with sth.]] `collocation`
+- [[supply sth. to sb|supply sth. to sb.]] `collocation`
+- [[suppose sb. to be]] `collocation`
+- [[suppose sb. to do]] `collocation`
+- [[switch off]] `phrasal-verb`
+
+### T  (144)
+
+- [[take (an active) part in]] `collocation`
+- [[take ... for example]] `collocation/fixed-expression`
+- [[take ... for granted]] `collocation/idiom`
+- [[take a deep breath]] `collocation`
+- [[take a message for sb|take a message for sb.]] `collocation`
+- [[take a message to sb|take a message to sb.]] `collocation`
+- [[take a rest]] `collocation`
+- [[take a seat]] `collocation`
+- [[take a taxi]] `collocation`
+- [[take a trip]] `collocation`
+- [[take after]] `phrasal-verb`
+- [[take along]] `phrasal-verb`
+- [[take around]] `phrasal-verb`
+- [[take aside]] `phrasal-verb`
+- [[take away]] `phrasal-verb`
+- [[take back]] `phrasal-verb`
+- [[take care]] `fixed-expression/lexical-phrase`
+- [[take control of]] `collocation`
+- [[take down]] `phrasal-verb`
+- [[take from]] `collocation/phrasal-verb`
+- [[take in]] `phrasal-verb`
+- [[take it easy]] `idiom/lexical-phrase`
+- [[take it for granted that]] `collocation/idiom`
+- [[take measures]] `collocation`
+- [[take no notice of]] `collocation`
+- [[take notes]] `collocation`
+- [[take notice that]] `collocation`
+- [[take off]] `phrasal-verb`
+- [[take office]] `collocation`
+- [[take on]] `phrasal-verb`
+- [[take one's attention]] `collocation`
+- [[take one's leave]] `collocation/fixed-expression`
+- [[take one's time]] `collocation/idiom`
+- [[take out (of sp.)]] `phrasal-verb`
+- [[take over]] `phrasal-verb`
+- [[take photographs of sb.-sth|take photographs of sb./sth.]] `collocation`
+- [[take pity-mercy on sb.-sth|take pity/mercy on sb./sth.]] `collocation`
+- [[take place]] `collocation`
+- [[take pride in]] `collocation`
+- [[take sb.-sth. seriously|take sb./sth. seriously]] `collocation`
+- [[take sides in]] `collocation`
+- [[take sides with]] `collocation`
+- [[take sth. as]] `collocation`
+- [[take sth. for]] `collocation/phrasal-verb`
+- [[take sth. for granted]] `idiom/collocation`
+- [[take sth.-sb. for|take sth./sb. for]] `phrasal-verb/collocation`
+- [[take sth.-sb.-doing for example|take sth./sb./doing for example]] `fixed-expression/collocation`
+- [[take the place of]] `idiom/collocation`
+- [[take to]] `phrasal-verb`
+- [[take turns at doing]] `collocation`
+- [[take turns to do sth|take turns to do sth.]] `collocation`
+- [[take up]] `phrasal-verb`
+- [[talk of]] `collocation/phrasal-verb`
+- [[talk to oneself]] `collocation`
+- [[talking of]] `collocation/fixed-expression`
+- [[tear oneself away from]] `idiom`
+- [[tell lies-a lie|tell lies/a lie]] `collocation`
+- [[tell the difference between A and B]] `collocation`
+- [[tend to do]] `collocation`
+- [[tens of thousands of]] `collocation`
+- [[thanks for]] `collocation`
+- [[thanks to]] `collocation/fixed-expression`
+- [[that is (to say)]] `fixed-expression/lexical-phrase`
+- [[the answer-key to the question|the answer/key to the question]] `collocation`
+- [[the attitude to-towards sth|the attitude to/towards sth.]] `collocation`
+- [[the ban on sth.-doing|the ban on sth./doing]] `collocation`
+- [[the cost of living]] `collocation`
+- [[the damage to]] `collocation`
+- [[the entrance to sp|the entrance to sp.]] `collocation`
+- [[the first time]] `fixed-expression`
+- [[the key to doing]] `collocation`
+- [[the key to the door]] `collocation`
+- [[the last sentence but one]] `collocation/fixed-expression`
+- [[the majority]] `collocation`
+- [[the minute]] `fixed-expression`
+- [[the moment]] `fixed-expression`
+- [[the more..., the more|the more…, the more]] `fixed-expression`
+- [[the number of the]] `collocation`
+- [[the other]] `fixed-expression`
+- [[the other day]] `idiom/collocation`
+- [[the others]] `fixed-expression`
+- [[the reason for sth|the reason for sth.]] `collocation`
+- [[The reason why...is that|The reason why…is that]] `fixed-expression`
+- [[the rest of]] `lexical-phrase`
+- [[the road to sp|the road to sp.]] `collocation`
+- [[the same as]] `collocation/fixed-expression`
+- [[the second]] `fixed-expression`
+- [[the students' union]] `collocation/fixed-expression`
+- [[the survey on|the survey on ...]] `collocation`
+- [[the two of sb|the two of sb.]] `collocation/fixed-expression`
+- [[the very thing]] `collocation/fixed-expression`
+- [[the way to sp|the way to sp.]] `collocation`
+- [[There is no doubt that]] `fixed-expression/lexical-phrase`
+- [[There is no need for sb. to do]] `fixed-expression`
+- [[There is no need to do]] `fixed-expression`
+- [[There is no point in doing sth|There is no point in doing sth.]] `collocation/fixed-expression`
+- [[There is no trouble in doing]] `collocation/fixed-expression`
+- [[There seem(s) to be]] `fixed-expression`
+- [[There used to be]] `fixed-expression`
+- [[There's no need for sb. to do]] `fixed-expression`
+- [[think about]] `collocation/phrasal-verb`
+- [[think highly of]] `collocation/phrasal-verb`
+- [[think of sb. as]] `collocation/phrasal-verb`
+- [[think of sth.-sb.-doing|think of sth./sb./doing]] `collocation/phrasal-verb`
+- [[think over]] `phrasal-verb`
+- [[think well of sb|think well of sb.]] `collocation/phrasal-verb`
+- [[throw away]] `phrasal-verb`
+- [[throw up]] `phrasal-verb`
+- [[time and time again]] `fixed-expression`
+- [[time to do]] `collocation/fixed-expression`
+- [[to one's joy-delight|to one's joy/delight]] `collocation/fixed-expression`
+- [[to one's surprise]] `collocation/fixed-expression`
+- [[to oneself]] `fixed-expression`
+- [[to tell the truth]] `fixed-expression/lexical-phrase`
+- [[to the joy-delight of sb|to the joy/delight of sb.]] `collocation/fixed-expression`
+- [[to the point]] `collocation/idiom`
+- [[too many]] `collocation`
+- [[too much]] `collocation`
+- [[track down]] `phrasal-verb`
+- [[trade in sth|trade in sth.]] `phrasal-verb`
+- [[trade sth. for sth|trade sth. for sth.]] `collocation/phrasal-verb`
+- [[trade sth. with sb|trade sth. with sb.]] `collocation/phrasal-verb`
+- [[translate into]] `collocation/phrasal-verb`
+- [[treat sb.-sth. as if-though|treat sb./sth. as if/though]] `collocation/fixed-expression`
+- [[treat sth. as]] `collocation`
+- [[trust in]] `collocation/phrasal-verb`
+- [[try doing]] `collocation`
+- [[try one's best to do]] `collocation/fixed-expression`
+- [[try one's fortune]] `collocation/idiom`
+- [[try to do]] `collocation`
+- [[turn a blind eye to]] `idiom`
+- [[turn a deaf ear to]] `idiom`
+- [[turn against]] `phrasal-verb`
+- [[turn away]] `phrasal-verb`
+- [[turn down]] `phrasal-verb`
+- [[turn for the worse]] `collocation/fixed-expression`
+- [[turn into]] `phrasal-verb`
+- [[turn off]] `phrasal-verb`
+- [[turn on]] `phrasal-verb`
+- [[turn out]] `phrasal-verb`
+- [[turn over]] `phrasal-verb`
+- [[turn to]] `phrasal-verb`
+- [[turn up]] `phrasal-verb`
+- [[turn yellow-green-|turn yellow/green/]] `collocation`
+
+### U  (7)
+
+- [[under control]] `fixed-expression`
+- [[under the circumstances]] `fixed-expression`
+- [[under the pressure]] `collocation`
+- [[up to]] `fixed-expression`
+- [[up to date]] `fixed-expression`
+- [[upside down]] `fixed-expression`
+- [[use up]] `phrasal-verb`
+
+### W  (53)
+
+- [[wait for]] `phrasal-verb`
+- [[wake up]] `phrasal-verb`
+- [[want doing-to be done|want doing/to be done]] `lexical-phrase`
+- [[want sb. to do]] `collocation`
+- [[warn sb. not-never to do|warn sb. not/never to do]] `collocation`
+- [[warn sb. of sth|warn sb. of sth.]] `collocation`
+- [[wash away]] `phrasal-verb`
+- [[wash out]] `phrasal-verb`
+- [[wash well]] `collocation`
+- [[Watch out|Watch out.]] `fixed-expression/lexical-phrase`
+- [[water closet]] `collocation/fixed-expression`
+- [[wave goodbye]] `collocation`
+- [[wave hello-goodbye to sb|wave hello/goodbye to sb.]] `collocation`
+- [[wave sb. hello-goodbye|wave sb. hello/goodbye]] `collocation`
+- [[way of life]] `collocation`
+- [[wear out]] `phrasal-verb`
+- [[what about]] `fixed-expression/lexical-phrase`
+- [[what if]] `fixed-expression/lexical-phrase`
+- [[What the hell is that!]] `fixed-expression`
+- [[What's going on-|What's going on?]] `lexical-phrase`
+- [[what's more|what's more.]] `fixed-expression/lexical-phrase`
+- [[What's up-|What's up?]] `fixed-expression/lexical-phrase`
+- [[when and where]] `fixed-expression`
+- [[whether ... or|whether … or]] `fixed-expression`
+- [[win a majority]] `collocation`
+- [[wind one's way]] `collocation/idiom`
+- [[wind sth. around sth|wind sth. around sth.]] `collocation`
+- [[wind the clock-watch|wind the clock/watch]] `collocation`
+- [[wipe out]] `phrasal-verb`
+- [[wish for sth|wish for sth.]] `collocation`
+- [[wish sb. n.-adj|wish sb. n./adj.]] `collocation`
+- [[wish sb. to do]] `collocation`
+- [[wish that]] `collocation`
+- [[wish to do]] `collocation`
+- [[with great care]] `collocation`
+- [[with regard to]] `fixed-expression`
+- [[with the exception of]] `fixed-expression`
+- [[within reach]] `collocation`
+- [[wonder at-about|wonder at/about]] `phrasal-verb/collocation`
+- [[wonder to do]] `fixed-expression`
+- [[Word came that|Word came that…]] `fixed-expression`
+- [[word for word]] `fixed-expression`
+- [[work on sth|work on sth.]] `phrasal-verb`
+- [[worry about]] `phrasal-verb/collocation`
+- [[worse still]] `fixed-expression`
+- [[would like sb. to do]] `fixed-expression`
+- [[would prefer to do than do]] `fixed-expression`
+- [[would rather sb. did]] `fixed-expression`
+- [[would rather to do than do]] `fixed-expression`
+- [[write articles for sth|write articles for sth.]] `collocation`
+- [[write articles on (many subjects)]] `collocation`
+- [[write down]] `phrasal-verb`
+- [[write sth. for a newspaper]] `collocation`
+
+### Y  (4)
+
+- [[year after year]] `collocation/fixed-expression`
+- [[year by year]] `collocation/fixed-expression`
+- [[You'd better do sth|You'd better do sth.]] `fixed-expression`
+- [[You've got to|You've got to...]] `fixed-expression`
+
