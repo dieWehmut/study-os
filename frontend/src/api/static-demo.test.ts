@@ -234,6 +234,36 @@ describe("static Pages API fixtures", () => {
     })).rejects.toMatchObject({ status: 400 })
   })
 
+  it("rejects malformed evidence request bodies without clearing saved evidence", async () => {
+    const evidence = {
+      version: 1,
+      subject: "math",
+      tool: "derivation",
+      data: { lines: ["x+1=2", "x=1"] },
+    }
+    const created = await staticDemoRequest<{
+      attempt: { id: string; evidence?: unknown }
+    }>("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({ subject: "math", stem: "解方程", cause: "method", evidence }),
+    })
+
+    for (const body of ["{not json", "[]", "1", "null"]) {
+      await expect(staticDemoRequest(`/mistakes/${created.attempt.id}/evidence`, {
+        method: "PATCH",
+        body,
+      })).rejects.toMatchObject({ status: 400 })
+    }
+    await expect(staticDemoRequest(`/mistakes/${created.attempt.id}/evidence`, {
+      method: "PATCH",
+    })).rejects.toMatchObject({ status: 400 })
+
+    const listed = await staticDemoRequest<{
+      items: Array<{ attempt: { id: string; evidence?: unknown } }>
+    }>("/mistakes?subject=math")
+    expect(listed.items.find((item) => item.attempt.id === created.attempt.id)?.attempt.evidence).toEqual(evidence)
+  })
+
   it("mirrors the error cause candidate, confirmation, and reclassification contract", async () => {
     const defaults = await staticDemoRequest<{
       items: Array<{ id: string; status: string }>

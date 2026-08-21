@@ -407,12 +407,16 @@ function clone<T>(value: T): T {
 
 function bodyRecord(init?: RequestInit): Record<string, unknown> {
   if (!init?.body || typeof init.body !== "string") return {}
+  let value: unknown
   try {
-    const value: unknown = JSON.parse(init.body)
-    return value && typeof value === "object" ? value as Record<string, unknown> : {}
+    value = JSON.parse(init.body)
   } catch {
-    return {}
+    throw new StaticDemoError("Request body must be valid JSON", 400)
   }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new StaticDemoError("Request body must be a JSON object", 400)
+  }
+  return value as Record<string, unknown>
 }
 
 function hasField(record: Record<string, unknown>, field: string): boolean {
@@ -1115,6 +1119,9 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   if (root === "mistakes" && id && action === "evidence" && method === "PATCH") {
     const pair = state.mistakes.find((entry) => entry.attempt.id === id)
     if (!pair) throw new StaticDemoError("Static demo mistake not found", 404)
+    if (!hasField(body, "evidence") || !Object.keys(body).every((key) => key === "evidence")) {
+      throw new StaticDemoError("Evidence request must contain only evidence", 400)
+    }
     try {
       const evidence = normalizeSubjectAttemptEvidence(pair.question.subject, body.evidence)
       if (evidence) pair.attempt.evidence = evidence
