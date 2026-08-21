@@ -85,6 +85,64 @@ describe("application shell", () => {
     expect(drawer).toHaveAttribute("aria-hidden", "true")
   })
 
+  it("hides the desktop sidebar and releases the content gutter", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    const desktopToggle = screen.getByRole("button", { name: "隐藏侧栏" })
+    const themeToggle = screen.getByRole("button", { name: "切换到暗色模式" })
+    const sidebar = container.querySelector("#desktop-sidebar")
+    const layout = container.querySelector("[data-layout-content]")
+
+    expect(desktopToggle).toHaveClass("md:inline-flex")
+    expect(desktopToggle).toHaveAttribute("aria-controls", "desktop-sidebar")
+    expect(desktopToggle).toHaveAttribute("aria-expanded", "true")
+    expect(
+      desktopToggle.compareDocumentPosition(themeToggle) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(sidebar).not.toHaveAttribute("aria-hidden", "true")
+    expect(layout).toHaveClass("md:pl-64")
+
+    fireEvent.click(desktopToggle)
+
+    expect(screen.getByRole("button", { name: "显示侧栏" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    )
+    expect(sidebar).toHaveAttribute("aria-hidden", "true")
+    expect(layout).toHaveClass("md:pl-0")
+    expect(layout).not.toHaveClass("md:pl-64")
+    expect(localStorage.getItem("study-os.desktop-sidebar-hidden")).toBe("true")
+  })
+
+  it("restores a hidden desktop sidebar preference on mount", () => {
+    localStorage.setItem("study-os.desktop-sidebar-hidden", "true")
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole("button", { name: "显示侧栏" })).toBeInTheDocument()
+    expect(container.querySelector("#desktop-sidebar")).toHaveAttribute("aria-hidden", "true")
+    expect(container.querySelector("[data-layout-content]")).toHaveClass("md:pl-0")
+  })
+
+  it("tightens the desktop shell gutter", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(container.querySelector("header > div")).toHaveClass("lg:px-5")
+    expect(container.querySelector("main")).toHaveClass("lg:px-5")
+  })
+
   it("removes verbose nav descriptions and gives the sidebar one fixed width", () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/"]}>

@@ -8,12 +8,37 @@ import { NavList } from "./NavList"
 import { Sidebar } from "./Sidebar"
 import { SidebarProfile } from "./SidebarProfile"
 
+const DESKTOP_SIDEBAR_STORAGE_KEY = "study-os.desktop-sidebar-hidden"
+
+function readDesktopSidebarHidden() {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  try {
+    return window.localStorage.getItem(DESKTOP_SIDEBAR_STORAGE_KEY) === "true"
+  } catch {
+    return false
+  }
+}
+
 interface AppShellProps {
   children: ReactNode
 }
 
 export function AppShell({ children }: AppShellProps) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(readDesktopSidebarHidden)
+
+  function toggleDesktopSidebar() {
+    const nextHidden = !desktopSidebarHidden
+    setDesktopSidebarHidden(nextHidden)
+    try {
+      window.localStorage.setItem(DESKTOP_SIDEBAR_STORAGE_KEY, String(nextHidden))
+    } catch {
+      // Restricted browsing contexts may deny storage; the current session still works.
+    }
+  }
 
   useEffect(() => {
     if (mobileDrawerOpen) {
@@ -29,7 +54,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-dvh bg-background">
       {/* Desktop Sidebar */}
-      <Sidebar />
+      <Sidebar hidden={desktopSidebarHidden} />
 
       {/* Mobile Drawer Overlay */}
       {mobileDrawerOpen && (
@@ -51,22 +76,30 @@ export function AppShell({ children }: AppShellProps) {
         <NavList label="移动端主导航" onNavigate={() => setMobileDrawerOpen(false)} />
       </aside>
 
-      {/* 这里的 pl 必须和 Sidebar 的 w-64 对齐：侧栏是 fixed 的，不占文档流，
-          正文得自己让出那一栏的位置。 */}
-      <div className="min-h-dvh md:pl-64">
-        <Header onMenuToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)} />
+      <div
+        data-layout-content
+        className={cn(
+          "min-h-dvh transition-[padding] duration-200",
+          desktopSidebarHidden ? "md:pl-0" : "md:pl-64",
+        )}
+      >
+        <Header
+          desktopSidebarHidden={desktopSidebarHidden}
+          onDesktopSidebarToggle={toggleDesktopSidebar}
+          onMenuToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+        />
         {isStaticDemo() ? (
           <div
             role="status"
             data-static-demo="true"
-            className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8"
+            className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-5"
           >
             <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
               GitHub Pages 展示模式 · 数据只在当前页面内演示，不会写入后端
             </div>
           </div>
         ) : null}
-        <main className="mx-auto w-full max-w-7xl px-4 pb-10 pt-6 sm:px-6 md:pb-10 lg:px-8 lg:pt-8">
+        <main className="mx-auto w-full max-w-7xl px-4 pb-10 pt-6 sm:px-6 md:pb-10 lg:px-5 lg:pt-8">
           {children}
           <GiscusComments />
         </main>
