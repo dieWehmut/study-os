@@ -40,6 +40,7 @@ describe("mistakes API", () => {
     expect(records).toEqual([
       {
         id: "qa-1",
+        questionId: "q-1",
         subject: "physics",
         question: "受力分析",
         cause: "method",

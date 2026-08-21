@@ -4,6 +4,8 @@ export type MistakeCause = string
 
 export interface MistakeRecord {
   id: string
+  /** The stable question id, distinct from this attempt's id. */
+  questionId?: string
   subject: string
   question: string
   cause: MistakeCause
@@ -299,7 +301,8 @@ function toRecord(value: unknown): MistakeRecord | null {
     cause: row.cause as MistakeCause,
     createdAt: row.createdAt,
   }
-  return isFilled(row.note) ? { ...record, note: row.note } : record
+  const withQuestion = isFilled(row.questionId) ? { ...record, questionId: row.questionId } : record
+  return isFilled(row.note) ? { ...withQuestion, note: row.note } : withQuestion
 }
 
 export function readMistakes(): MistakeRecord[] {

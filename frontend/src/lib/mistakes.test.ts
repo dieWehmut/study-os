@@ -218,6 +218,13 @@ describe("keeping the log", () => {
       record("recall", "b"),
     ])
   })
+
+  it("keeps the stable question id when a server row is cached locally", () => {
+    const cached = { ...record("method", "a"), questionId: "question-1" }
+    localStorage.setItem(mistakesStorageKey, JSON.stringify([cached]))
+
+    expect(readMistakes()).toEqual([cached])
+  })
 })
 
 describe("what to do about a cause, by subject", () => {

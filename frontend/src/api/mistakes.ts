@@ -51,6 +51,7 @@ export interface ListMistakesOptions {
 function toRecord(pair: MistakePair): MistakeRecord {
   const record: MistakeRecord = {
     id: pair.attempt.id,
+    questionId: pair.question.id,
     subject: pair.question.subject?.trim() || "all",
     question: pair.question.stem,
     cause: pair.attempt.cause?.trim() || "unknown",

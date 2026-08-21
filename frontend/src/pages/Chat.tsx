@@ -1,18 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ArrowUp, MessageSquarePlus, Paperclip, Sparkles } from "lucide-react"
 
 import {
+  getQARecord,
   listChatConversations,
   listChatMessages,
+  saveQARecord,
   sendChatMessage,
   uploadChatAttachment,
   type ChatAttachmentResult,
   type ChatConversation,
+  type QARecord,
+  type QARecordInput,
 } from "@/api/chat"
+import { listKnowledge } from "@/api/knowledge"
+import { listLessons } from "@/api/lessons"
+import { listMistakes } from "@/api/mistakes"
 import type { ChatMessage } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
+import QARecordPanel, { type QAContextOption } from "@/features/chat/QARecordPanel"
+import { qaContextValue } from "@/features/chat/qa-record"
 import { takeAskDraft } from "@/lib/ask-draft"
 import { subjectName } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
@@ -34,6 +43,29 @@ function formatTime(value: string): string {
   return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
 }
 
+interface CompletedTurn {
+  id: string
+  question: string
+  answer: string
+}
+
+function latestCompletedTurn(items: ChatMessage[]): CompletedTurn | null {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const assistant = items[index]
+    if (assistant.role !== "assistant") continue
+    if (items.slice(index + 1).some((item) => item.role === "user")) return null
+    if (assistant.status !== "done" || !assistant.content.trim()) continue
+    for (let previous = index - 1; previous >= 0; previous -= 1) {
+      if (items[previous].role === "user") {
+        if (!items[previous].content.trim()) return null
+        return { id: assistant.id, question: items[previous].content, answer: assistant.content }
+      }
+    }
+    return null
+  }
+  return null
+}
+
 export default function Chat() {
   const subject = useSubjectStore((state) => state.subject)
   const setSubject = useSubjectStore((state) => state.setSubject)
@@ -49,10 +81,30 @@ export default function Chat() {
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
+  const [qaRecord, setQARecord] = useState<QARecord | null>(null)
+  const [qaSaving, setQASaving] = useState(false)
+  const [qaError, setQAError] = useState("")
+  const [qaSavedAt, setQASavedAt] = useState("")
+  const [qaContextOptions, setQAContextOptions] = useState<QAContextOption[]>([])
+  const [qaLoadedKey, setQALoadedKey] = useState<string | null>(null)
+  const [qaContextLoadedKey, setQAContextLoadedKey] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<number | null>(null)
+  const conversationRequestRef = useRef(0)
+  const qaRequestRef = useRef(0)
+  const qaSaveRequestRef = useRef(0)
+  const activeSessionRef = useRef<string | null>(null)
+  const sendRequestRef = useRef(0)
+  const localMessageCounterRef = useRef(0)
   const sentRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [])
 
   const refreshConversations = useCallback(() => {
     return listChatConversations(subject === "all" ? "" : subject, 50)
@@ -68,11 +120,25 @@ export default function Chat() {
   }, [refreshConversations])
 
   function resetChat() {
+    conversationRequestRef.current += 1
+    qaRequestRef.current += 1
+    qaSaveRequestRef.current += 1
+    sendRequestRef.current += 1
+    stopPolling()
     sentRef.current = false
+    activeSessionRef.current = null
+    setSending(false)
     setActiveSession(null)
     setMessages([])
     setAttachments([])
     setError("")
+    setQARecord(null)
+    setQASaving(false)
+    setQAError("")
+    setQASavedAt("")
+    setQAContextOptions([])
+    setQALoadedKey(null)
+    setQAContextLoadedKey(null)
   }
 
   function changeSubject(value: string) {
@@ -86,41 +152,163 @@ export default function Chat() {
 
   useEffect(() => {
     return () => {
-      if (pollRef.current !== null) window.clearInterval(pollRef.current)
+      stopPolling()
     }
-  }, [])
+  }, [stopPolling])
 
   function openConversation(sessionId: string) {
+    const requestID = ++conversationRequestRef.current
+    qaRequestRef.current += 1
+    qaSaveRequestRef.current += 1
+    sendRequestRef.current += 1
+    stopPolling()
     sentRef.current = true
+    activeSessionRef.current = sessionId
+    setSending(false)
     setActiveSession(sessionId)
     setMessages([])
     setLoading(true)
     setError("")
+    setQARecord(null)
+    setQASaving(false)
+    setQAError("")
+    setQASavedAt("")
+    setQAContextOptions([])
+    setQALoadedKey(null)
+    setQAContextLoadedKey(null)
     listChatMessages(subject === "all" ? "" : subject, sessionId, 50)
-      .then((result) => setMessages(result.items))
-      .catch(() => setError("读取对话失败，请重试。"))
-      .finally(() => setLoading(false))
+      .then((result) => {
+        if (conversationRequestRef.current === requestID) setMessages(result.items)
+      })
+      .catch(() => {
+        if (conversationRequestRef.current === requestID) setError("读取对话失败，请重试。")
+      })
+      .finally(() => {
+        if (conversationRequestRef.current === requestID) setLoading(false)
+      })
   }
 
   function startNewChat() {
+    conversationRequestRef.current += 1
+    qaRequestRef.current += 1
+    qaSaveRequestRef.current += 1
+    sendRequestRef.current += 1
+    stopPolling()
     sentRef.current = false
+    activeSessionRef.current = null
+    setSending(false)
     setActiveSession(null)
     setMessages([])
     setAttachments([])
     setError("")
+    setQARecord(null)
+    setQASaving(false)
+    setQAError("")
+    setQASavedAt("")
+    setQAContextOptions([])
+    setQALoadedKey(null)
+    setQAContextLoadedKey(null)
+  }
+
+  const completedTurn = useMemo(() => latestCompletedTurn(messages), [messages])
+  const qaPrefill = useMemo<Partial<QARecordInput> | undefined>(() => {
+    if (!completedTurn || qaRecord) return undefined
+    return { original_understanding: completedTurn.question, corrected_model: completedTurn.answer }
+  }, [completedTurn, qaRecord])
+  const completedQuestion = completedTurn?.question ?? ""
+  const completedAnswer = completedTurn?.answer ?? ""
+  const completedTurnID = completedTurn?.id ?? ""
+  const qaKey = activeSession && completedTurn
+    ? `${activeSession}:${completedTurn.id}`
+    : ""
+  const qaLoading = Boolean(qaKey && qaLoadedKey !== qaKey)
+  const qaContextLoading = Boolean(qaKey && qaContextLoadedKey !== qaKey)
+
+  useEffect(() => {
+    const sessionID = activeSession
+    const requestID = ++qaRequestRef.current
+    if (!sessionID || !completedAnswer) return
+    const currentKey = `${sessionID}:${completedTurnID}`
+
+    void getQARecord(sessionID)
+      .then((record) => {
+        if (qaRequestRef.current === requestID) {
+          setQARecord(record)
+          setQAError("")
+        }
+      })
+      .catch(() => {
+        if (qaRequestRef.current === requestID) setQAError("读取学习记录失败，仍可填写新的记录。")
+      })
+      .finally(() => {
+        if (qaRequestRef.current === requestID) setQALoadedKey(currentKey)
+      })
+
+    const subjectFilter = subject === "all" ? undefined : subject
+    void Promise.allSettled([
+      listKnowledge({ subject: subjectFilter, limit: 100, offset: 0 }),
+      listMistakes(subjectFilter ? { subject: subjectFilter, limit: 100 } : { limit: 100 }),
+      listLessons({ subject: subjectFilter, limit: 100, offset: 0 }),
+    ]).then(([knowledge, mistakes, lessons]) => {
+      if (qaRequestRef.current !== requestID) return
+      const options: QAContextOption[] = []
+      if (knowledge.status === "fulfilled") {
+        for (const item of knowledge.value.items) {
+          options.push({ value: qaContextValue("knowledge_item", item.id), label: `知识点：${item.term}` })
+        }
+      }
+      if (mistakes.status === "fulfilled") {
+        for (const item of mistakes.value) {
+          if (item.questionId) options.push({ value: qaContextValue("question", item.questionId), label: `错题：${item.question}` })
+        }
+      }
+      if (lessons.status === "fulfilled") {
+        for (const item of lessons.value.items) {
+          options.push({ value: qaContextValue("lesson", item.id), label: `课程：${item.title}` })
+        }
+      }
+      setQAContextOptions(options)
+      setQAContextLoadedKey(currentKey)
+    })
+  }, [activeSession, completedQuestion, completedAnswer, completedTurnID, subject])
+
+  async function handleQASave(input: QARecordInput) {
+    const sessionID = activeSession
+    if (!sessionID) return
+    const requestID = ++qaSaveRequestRef.current
+    setQASaving(true)
+    setQAError("")
+    setQASavedAt("")
+    try {
+      const saved = await saveQARecord(sessionID, input)
+      if (activeSessionRef.current !== sessionID || qaSaveRequestRef.current !== requestID) return
+      setQARecord(saved)
+      setQASavedAt(formatTime(saved.updated_at) || saved.updated_at)
+    } catch {
+      if (activeSessionRef.current === sessionID && qaSaveRequestRef.current === requestID) setQAError("保存学习记录失败，请重试。")
+    } finally {
+      if (activeSessionRef.current === sessionID && qaSaveRequestRef.current === requestID) setQASaving(false)
+    }
   }
 
   async function send() {
     const message = draft.trim()
     if (!message || sending) return
+    const sendRequestID = ++sendRequestRef.current
+    const sessionAtStart = activeSessionRef.current
+    qaRequestRef.current += 1
+    qaSaveRequestRef.current += 1
     setSending(true)
     setError("")
+    setQASaving(false)
+    setQAError("")
     sentRef.current = true
     const now = new Date().toISOString()
+    const localMessageID = ++localMessageCounterRef.current
     setMessages((current) => [
       ...current,
-      { id: `local-user-${Date.now()}`, role: "user", content: message, status: "done", created_at: now },
-      { id: `local-ai-${Date.now()}`, role: "assistant", content: "", status: "pending", created_at: now },
+      { id: `local-user-${localMessageID}`, role: "user", content: message, status: "done", created_at: now },
+      { id: `local-ai-${localMessageID}`, role: "assistant", content: "", status: "pending", created_at: now },
     ])
     setDraft("")
     const attachmentIds = attachments.map((attachment) => attachment.id)
@@ -131,31 +319,52 @@ export default function Chat() {
         activeSession ?? undefined,
         attachmentIds.length > 0 ? attachmentIds : undefined,
       )
+      if (sendRequestRef.current !== sendRequestID || activeSessionRef.current !== sessionAtStart) return
+      activeSessionRef.current = result.session_id
       setActiveSession(result.session_id)
       setAttachments([])
       const sessionId = result.session_id
-      const started = Date.now()
+      stopPolling()
+      let pollsRemaining = 80
       const timer = window.setInterval(async () => {
-        if (Date.now() - started > 120_000) {
+        if (sendRequestRef.current !== sendRequestID || activeSessionRef.current !== sessionId) {
           window.clearInterval(timer)
-          pollRef.current = null
-          setSending(false)
+          if (pollRef.current === timer) pollRef.current = null
           return
         }
-        const result = await listChatMessages(subject === "all" ? "" : subject, sessionId, 50)
-        setMessages(result.items)
-        const hasPending = result.items.some((item) => item.status === "pending")
-        if (!hasPending) {
+        pollsRemaining -= 1
+        if (pollsRemaining <= 0) {
           window.clearInterval(timer)
-          pollRef.current = null
-          setSending(false)
-          void refreshConversations()
+          if (pollRef.current === timer) pollRef.current = null
+          if (sendRequestRef.current === sendRequestID) setSending(false)
+          return
+        }
+        try {
+          const result = await listChatMessages(subject === "all" ? "" : subject, sessionId, 50)
+          if (sendRequestRef.current !== sendRequestID || activeSessionRef.current !== sessionId) return
+          setMessages(result.items)
+          const hasPending = result.items.some((item) => item.status === "pending")
+          if (!hasPending) {
+            window.clearInterval(timer)
+            if (pollRef.current === timer) pollRef.current = null
+            setSending(false)
+            void refreshConversations()
+          }
+        } catch {
+          window.clearInterval(timer)
+          if (pollRef.current === timer) pollRef.current = null
+          if (sendRequestRef.current === sendRequestID) {
+            setSending(false)
+            setError("读取回答失败，请重试。")
+          }
         }
       }, 1500)
       pollRef.current = timer
     } catch {
-      setSending(false)
-      setError("发送失败，请重试。")
+      if (sendRequestRef.current === sendRequestID) {
+        setSending(false)
+        setError("发送失败，请重试。")
+      }
     }
   }
 
@@ -276,6 +485,24 @@ export default function Chat() {
               </div>
             </CardContent>
           </Card>
+
+          {activeSession && completedTurn ? (
+            <QARecordPanel
+              key={`${activeSession}:${qaRecord?.id ?? "draft"}:${qaRecord?.updated_at ?? ""}`}
+              sessionId={activeSession}
+              subject={subject}
+              subjectLabel={subject === "all" ? "综合" : subjectName(subject)}
+              initialRecord={qaRecord}
+              prefill={qaPrefill}
+              loading={qaLoading}
+              saving={qaSaving}
+              error={qaError}
+              savedAt={qaSavedAt}
+              contextOptions={qaContextOptions}
+              contextLoading={qaContextLoading}
+              onSave={handleQASave}
+            />
+          ) : null}
 
           <div className="grid gap-2">
             {attachments.length > 0 ? (
