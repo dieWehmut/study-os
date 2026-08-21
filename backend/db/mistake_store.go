@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,6 +14,10 @@ import (
 )
 
 var mistakeSequence atomic.Uint64
+
+// ErrInvalidMistakeEvidence identifies a subject artifact that cannot be
+// attached to the selected question attempt.
+var ErrInvalidMistakeEvidence = errors.New("invalid mistake evidence")
 
 // newMistakeID mints ids inside the store rather than at the caller, because a
 // filed mistake is two rows written together: the attempt has to point at
@@ -36,6 +41,10 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 	occurredAt := input.OccurredAt.UTC()
 	if occurredAt.IsZero() {
 		occurredAt = nowUTC()
+	}
+	evidence, err := models.NormalizeSubjectAttemptEvidence(input.Subject, input.EvidenceJSON)
+	if err != nil {
+		return models.Mistake{}, fmt.Errorf("%w: %v", ErrInvalidMistakeEvidence, err)
 	}
 
 	question := models.Question{
@@ -75,13 +84,14 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 		return models.Mistake{}, err
 	}
 	if _, err := transaction.ExecContext(ctx, `
-		INSERT INTO question_attempts(id, question_id, cause, note, answer, elapsed_ms, is_correct, occurred_at)
-		VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+		INSERT INTO question_attempts(id, question_id, cause, note, answer, elapsed_ms, is_correct, evidence_json, occurred_at)
+		VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
 		attempt.ID, attempt.QuestionID, attempt.Cause, attempt.Note, attempt.Answer, attempt.ElapsedMS,
-		formatTime(attempt.OccurredAt),
+		evidence, formatTime(attempt.OccurredAt),
 	); err != nil {
 		return models.Mistake{}, err
 	}
+	attempt.EvidenceJSON = evidence
 	if err := transaction.Commit(); err != nil {
 		return models.Mistake{}, err
 	}
@@ -97,7 +107,7 @@ func (s *Store) RecordMistake(ctx context.Context, input models.MistakeInput) (m
 // Existence is also enough -- RecordMistake mints a fresh question every time,
 // so no question can go wrong, right, then wrong again.
 const mistakeSelect = `
-	SELECT a.id, a.question_id, a.cause, a.note, a.answer, a.elapsed_ms, a.is_correct, a.occurred_at,
+	SELECT a.id, a.question_id, a.cause, a.note, a.answer, a.elapsed_ms, a.is_correct, a.evidence_json, a.occurred_at,
 	       q.subject, q.stem, q.source_id, q.knowledge_item_id, q.created_at,
 	       EXISTS (SELECT 1 FROM question_attempts c
 	               WHERE c.question_id = a.question_id AND c.is_correct = 1)
@@ -270,17 +280,47 @@ func (s *TxStore) LinkQuestionToKnowledge(ctx context.Context, questionID, knowl
 	return err
 }
 
+// UpdateMistakeEvidence replaces the subject-specific artifact for one
+// question attempt. It deliberately returns the full pair so list/detail
+// callers and the editor share one response shape.
+func (s *Store) UpdateMistakeEvidence(ctx context.Context, attemptID string, raw json.RawMessage) (models.Mistake, error) {
+	transaction, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.Mistake{}, err
+	}
+	defer func() { _ = transaction.Rollback() }()
+
+	var subject string
+	if err := transaction.QueryRowContext(ctx, `
+		SELECT q.subject FROM question_attempts a JOIN questions q ON q.id = a.question_id WHERE a.id = ?`, attemptID,
+	).Scan(&subject); err != nil {
+		return models.Mistake{}, mapNotFound(err, "mistake")
+	}
+	evidence, err := models.NormalizeSubjectAttemptEvidence(subject, raw)
+	if err != nil {
+		return models.Mistake{}, fmt.Errorf("%w: %v", ErrInvalidMistakeEvidence, err)
+	}
+	if _, err := transaction.ExecContext(ctx, `UPDATE question_attempts SET evidence_json = ? WHERE id = ?`, evidence, attemptID); err != nil {
+		return models.Mistake{}, err
+	}
+	if err := transaction.Commit(); err != nil {
+		return models.Mistake{}, err
+	}
+	return s.GetMistake(ctx, attemptID)
+}
+
 func scanMistake(row scanner) (models.Mistake, error) {
 	var mistake models.Mistake
-	var occurredAt, createdAt string
+	var evidence, occurredAt, createdAt string
 	if err := row.Scan(
 		&mistake.Attempt.ID, &mistake.Attempt.QuestionID, &mistake.Attempt.Cause, &mistake.Attempt.Note,
-		&mistake.Attempt.Answer, &mistake.Attempt.ElapsedMS, &mistake.Attempt.IsCorrect, &occurredAt,
+		&mistake.Attempt.Answer, &mistake.Attempt.ElapsedMS, &mistake.Attempt.IsCorrect, &evidence, &occurredAt,
 		&mistake.Question.Subject, &mistake.Question.Stem, &mistake.Question.SourceID,
 		&mistake.Question.KnowledgeItemID, &createdAt, &mistake.Corrected,
 	); err != nil {
 		return models.Mistake{}, err
 	}
+	mistake.Attempt.EvidenceJSON = json.RawMessage(evidence)
 	mistake.Question.ID = mistake.Attempt.QuestionID
 	parsedOccurred, err := parseTime(occurredAt)
 	if err != nil {
@@ -297,15 +337,15 @@ func scanMistake(row scanner) (models.Mistake, error) {
 
 func (s *Store) attachMistakeCorrection(ctx context.Context, mistake *models.Mistake) error {
 	var correction models.QuestionAttempt
-	var occurredAt string
+	var evidence, occurredAt string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, question_id, cause, note, answer, elapsed_ms, is_correct, occurred_at
+		SELECT id, question_id, cause, note, answer, elapsed_ms, is_correct, evidence_json, occurred_at
 		FROM question_attempts
 		WHERE question_id = ? AND is_correct = 1
 		ORDER BY occurred_at DESC, id DESC
 		LIMIT 1`, mistake.Question.ID).Scan(
 		&correction.ID, &correction.QuestionID, &correction.Cause, &correction.Note,
-		&correction.Answer, &correction.ElapsedMS, &correction.IsCorrect, &occurredAt,
+		&correction.Answer, &correction.ElapsedMS, &correction.IsCorrect, &evidence, &occurredAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		mistake.Correction = nil
@@ -315,6 +355,7 @@ func (s *Store) attachMistakeCorrection(ctx context.Context, mistake *models.Mis
 	if err != nil {
 		return err
 	}
+	correction.EvidenceJSON = json.RawMessage(evidence)
 	parsed, err := parseTime(occurredAt)
 	if err != nil {
 		return err

@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 17
+const currentSchemaVersion = 18
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -482,6 +482,15 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				return fmt.Errorf("apply schema version %d: %w", version, err)
 			}
 		}
+	case 18:
+		if !hasTable(ctx, tx, "question_attempts") {
+			return nil
+		}
+		if !hasColumn(ctx, tx, "question_attempts", "evidence_json") {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE question_attempts ADD COLUMN evidence_json TEXT NOT NULL DEFAULT '{}'`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -591,6 +600,13 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 		}
 		if !hasUniqueIndexOnColumn(ctx, tx, "qa_records", "qa_records_session_idx", "session_id") {
 			return errors.New("schema version 17 is recorded but qa_records_session_idx is missing or invalid")
+		}
+	case 18:
+		if err := verifySchema(ctx, tx, 17); err != nil {
+			return err
+		}
+		if hasTable(ctx, tx, "question_attempts") && !hasColumn(ctx, tx, "question_attempts", "evidence_json") {
+			return errors.New("schema version 18 is recorded but question_attempts.evidence_json is missing")
 		}
 	}
 	return nil

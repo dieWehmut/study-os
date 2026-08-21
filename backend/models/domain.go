@@ -192,26 +192,28 @@ type Question struct {
 // taxonomy from the Practice page; only some of those causes are ones that
 // scheduling more review can actually fix.
 type QuestionAttempt struct {
-	ID         string    `json:"id"`
-	QuestionID string    `json:"question_id"`
-	Cause      string    `json:"cause,omitempty"`
-	Note       string    `json:"note,omitempty"`
-	Answer     string    `json:"answer,omitempty"`
-	ElapsedMS  int       `json:"elapsed_ms"`
-	IsCorrect  bool      `json:"is_correct"`
-	OccurredAt time.Time `json:"occurred_at"`
+	ID           string          `json:"id"`
+	QuestionID   string          `json:"question_id"`
+	Cause        string          `json:"cause,omitempty"`
+	Note         string          `json:"note,omitempty"`
+	Answer       string          `json:"answer,omitempty"`
+	ElapsedMS    int             `json:"elapsed_ms"`
+	IsCorrect    bool            `json:"is_correct"`
+	EvidenceJSON json.RawMessage `json:"evidence"`
+	OccurredAt   time.Time       `json:"occurred_at"`
 }
 
 // MistakeInput files one wrong answer: the question text and why it went
 // wrong, in a single call, because a 错题 is only ever entered as a pair.
 type MistakeInput struct {
-	Subject    string `json:"subject,omitempty"`
-	Stem       string `json:"stem"`
-	Cause      string `json:"cause,omitempty"`
-	Note       string `json:"note,omitempty"`
-	Answer     string `json:"answer,omitempty"`
-	ElapsedMS  int    `json:"elapsed_ms,omitempty"`
-	OccurredAt time.Time
+	Subject      string          `json:"subject,omitempty"`
+	Stem         string          `json:"stem"`
+	Cause        string          `json:"cause,omitempty"`
+	Note         string          `json:"note,omitempty"`
+	Answer       string          `json:"answer,omitempty"`
+	ElapsedMS    int             `json:"elapsed_ms,omitempty"`
+	EvidenceJSON json.RawMessage `json:"evidence,omitempty"`
+	OccurredAt   time.Time
 }
 
 // MistakeCorrectionInput is the evidence submitted after a learner revisits

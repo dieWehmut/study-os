@@ -64,8 +64,8 @@ func TestQARecordUpsertPersistsAndPreservesIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	if db.SchemaVersion != 17 {
-		t.Fatalf("schema version = %d, want 17", db.SchemaVersion)
+	if db.SchemaVersion != 18 {
+		t.Fatalf("schema version = %d, want 18", db.SchemaVersion)
 	}
 	createChatSession(t, ctx, store, "session-qa", "physics")
 

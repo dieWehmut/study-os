@@ -242,6 +242,7 @@ CREATE TABLE question_attempts (
     answer TEXT NOT NULL DEFAULT '',
     elapsed_ms INTEGER NOT NULL DEFAULT 0 CHECK (elapsed_ms >= 0),
     is_correct INTEGER NOT NULL DEFAULT 0 CHECK (is_correct IN (0, 1)),
+    evidence_json TEXT NOT NULL DEFAULT '{}',
     occurred_at TEXT NOT NULL
 );
 CREATE INDEX question_attempts_question_idx ON question_attempts(question_id, occurred_at DESC);

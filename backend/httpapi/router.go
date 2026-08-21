@@ -296,6 +296,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/mistakes/{attemptID}/correct", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeCorrect(response, request, application)
 		})
+		api.Patch("/mistakes/{attemptID}/evidence", func(response http.ResponseWriter, request *http.Request) {
+			handleMistakeEvidenceUpdate(response, request, application)
+		})
 		api.Patch("/mistakes/{attemptID}/cause", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeCauseUpdate(response, request, application)
 		})
