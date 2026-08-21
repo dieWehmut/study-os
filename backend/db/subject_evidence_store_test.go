@@ -122,3 +122,32 @@ func TestStoreUpgradesSchemaVersionSeventeenWithSubjectEvidence(t *testing.T) {
 		t.Fatalf("upgraded mistakes = %#v", listed)
 	}
 }
+
+func TestStoreRejectsSchemaWithOnlyOneQuestionTable(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "broken-question-schema.db")
+	store, err := db.Open(ctx, path)
+	if err != nil {
+		t.Fatalf("create current store: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("close current store: %v", err)
+	}
+
+	broken, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open broken sqlite: %v", err)
+	}
+	if _, err := broken.ExecContext(ctx, `DROP TABLE question_attempts`); err != nil {
+		_ = broken.Close()
+		t.Fatalf("drop question_attempts: %v", err)
+	}
+	if err := broken.Close(); err != nil {
+		t.Fatalf("close broken sqlite: %v", err)
+	}
+
+	if reopened, err := db.Open(ctx, path); err == nil {
+		_ = reopened.Close()
+		t.Fatal("expected incomplete question schema to be rejected")
+	}
+}

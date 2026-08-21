@@ -483,7 +483,12 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 			}
 		}
 	case 18:
-		if !hasTable(ctx, tx, "question_attempts") {
+		hasQuestions := hasTable(ctx, tx, "questions")
+		hasAttempts := hasTable(ctx, tx, "question_attempts")
+		if hasQuestions != hasAttempts {
+			return errors.New("schema version 18 requires questions and question_attempts together")
+		}
+		if !hasAttempts {
 			return nil
 		}
 		if !hasColumn(ctx, tx, "question_attempts", "evidence_json") {
@@ -605,7 +610,12 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 		if err := verifySchema(ctx, tx, 17); err != nil {
 			return err
 		}
-		if hasTable(ctx, tx, "question_attempts") && !hasColumn(ctx, tx, "question_attempts", "evidence_json") {
+		hasQuestions := hasTable(ctx, tx, "questions")
+		hasAttempts := hasTable(ctx, tx, "question_attempts")
+		if hasQuestions != hasAttempts {
+			return errors.New("schema version 18 is recorded but question tables are incomplete")
+		}
+		if hasAttempts && !hasColumn(ctx, tx, "question_attempts", "evidence_json") {
 			return errors.New("schema version 18 is recorded but question_attempts.evidence_json is missing")
 		}
 	}

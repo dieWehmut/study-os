@@ -56,6 +56,10 @@ func TestNormalizeSubjectAttemptEvidenceRejectsWrongSubjectAndMalformedData(t *t
 		{name: "wrong version", subject: "math", raw: `{"version":2,"subject":"math","tool":"derivation","data":{"lines":["x=1","x=1"]}}`},
 		{name: "too few derivation lines", subject: "math", raw: `{"version":1,"subject":"math","tool":"derivation","data":{"lines":["x=1"]}}`},
 		{name: "empty equation", subject: "chemistry", raw: `{"version":1,"subject":"chemistry","tool":"equation","data":{"equation":" "}}`},
+		{name: "motion type poisoning", subject: "physics", raw: `{"version":1,"subject":"physics","tool":"motion","data":{"stages":[{"id":"s","name":"加速","v0":"oops"}]}}`},
+		{name: "motion unknown derived quantity", subject: "physics", raw: `{"version":1,"subject":"physics","tool":"motion","data":{"stages":[{"id":"s","name":"加速","derived":["energy"]}]}}`},
+		{name: "motion negative time", subject: "physics", raw: `{"version":1,"subject":"physics","tool":"motion","data":{"stages":[{"id":"s","name":"加速","t":-1}]}}`},
+		{name: "force magnitude out of range", subject: "physics", raw: `{"version":1,"subject":"physics","tool":"free_body","data":{"forces":[{"id":"g","name":"重力","magnitude":-1,"angle":270,"kind":"field"}]}}`},
 		{name: "malformed", subject: "geography", raw: `{"version":1`},
 	}
 

@@ -123,13 +123,23 @@ func validateSubjectEvidenceData(tool string, raw json.RawMessage) error {
 			return errors.New("free_body evidence requires at least one force")
 		}
 		for _, force := range data.Forces {
-			if strings.TrimSpace(force.ID) == "" || strings.TrimSpace(force.Name) == "" || (force.Kind != "contact" && force.Kind != "field") {
+			if strings.TrimSpace(force.ID) == "" || strings.TrimSpace(force.Name) == "" ||
+				(force.Kind != "contact" && force.Kind != "field") || force.Magnitude < 0 || force.Magnitude > 1e12 {
 				return errors.New("free_body evidence contains an invalid force")
 			}
 		}
 	case "motion":
 		var data struct {
-			Stages []map[string]any `json:"stages"`
+			Stages []struct {
+				ID      string   `json:"id"`
+				Name    string   `json:"name"`
+				V0      *float64 `json:"v0"`
+				V       *float64 `json:"v"`
+				A       *float64 `json:"a"`
+				T       *float64 `json:"t"`
+				X       *float64 `json:"x"`
+				Derived []string `json:"derived"`
+			} `json:"stages"`
 		}
 		if err := decodeStrictJSON(raw, &data); err != nil {
 			return fmt.Errorf("motion evidence: %w", err)
@@ -138,8 +148,18 @@ func validateSubjectEvidenceData(tool string, raw json.RawMessage) error {
 			return errors.New("motion evidence requires at least one stage")
 		}
 		for _, stage := range data.Stages {
-			if strings.TrimSpace(stringValue(stage["id"])) == "" || strings.TrimSpace(stringValue(stage["name"])) == "" {
+			if strings.TrimSpace(stage.ID) == "" || strings.TrimSpace(stage.Name) == "" ||
+				(stage.V0 != nil && !finiteMotionValue(*stage.V0)) ||
+				(stage.V != nil && !finiteMotionValue(*stage.V)) ||
+				(stage.A != nil && !finiteMotionValue(*stage.A)) ||
+				(stage.T != nil && (*stage.T < 0 || !finiteMotionValue(*stage.T))) ||
+				(stage.X != nil && !finiteMotionValue(*stage.X)) {
 				return errors.New("motion evidence contains an invalid stage")
+			}
+			for _, quantity := range stage.Derived {
+				if quantity != "v0" && quantity != "v" && quantity != "a" && quantity != "t" && quantity != "x" {
+					return errors.New("motion evidence contains an invalid derived quantity")
+				}
 			}
 		}
 	case "equation":
@@ -200,7 +220,6 @@ func nonEmptyStrings(values []string) []string {
 	return result
 }
 
-func stringValue(value any) string {
-	text, _ := value.(string)
-	return text
+func finiteMotionValue(value float64) bool {
+	return value >= -1e12 && value <= 1e12
 }
