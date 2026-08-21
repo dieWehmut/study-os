@@ -20,6 +20,7 @@ import {
   recordMistake,
   scheduleMistake,
 } from "@/api/mistakes"
+import { listErrorCauses, type ErrorCause } from "@/api/error-causes"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,16 +35,30 @@ import { MotionBoard } from "@/features/physics/MotionBoard"
 import {
   MISTAKE_CAUSES,
   causeActionFor,
+  causeSpecFor,
   clearStoredMistakes,
+  mergeMistakeCauses,
   readMistakes,
   summarizeMistakes,
   type MistakeCause,
+  type MistakeCauseSpec,
   type MistakeRecord,
 } from "@/lib/mistakes"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 function describe(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+function taxonomySpecs(causes: ErrorCause[]): MistakeCauseSpec[] {
+  return mergeMistakeCauses(
+    causes.map((cause) => ({
+      cause: cause.id,
+      label: cause.label,
+      reviewFixes: cause.reviewFixes,
+      action: cause.action,
+    })),
+  )
 }
 
 interface CauseBoard {
@@ -160,6 +175,7 @@ export default function Practice() {
   const subject = useSubjectStore((state) => state.subject)
   const [question, setQuestion] = useState("")
   const [records, setRecords] = useState<MistakeRecord[]>([])
+  const [taxonomy, setTaxonomy] = useState<MistakeCauseSpec[]>(MISTAKE_CAUSES)
   const [error, setError] = useState("")
   // Shared by every action that acts on one row -- 排进复习 and 订正 both fail
   // the same way, and one line under the list is where you are already looking.
@@ -204,7 +220,21 @@ export default function Practice() {
     }
   }, [subject])
 
-  const summary = summarizeMistakes(records)
+  useEffect(() => {
+    let active = true
+    listErrorCauses(subject === "all" ? {} : { subject })
+      .then((loaded) => {
+        if (active) setTaxonomy(taxonomySpecs(loaded))
+      })
+      .catch(() => {
+        if (active) setTaxonomy(MISTAKE_CAUSES)
+      })
+    return () => {
+      active = false
+    }
+  }, [subject])
+
+  const summary = summarizeMistakes(records, taxonomy)
   const pending = question.trim()
 
   // Picking the cause is the save. A separate 保存 button would be a third
@@ -354,7 +384,7 @@ export default function Practice() {
             placeholder="哪道题？一句话就够"
           />
           <div className="flex flex-wrap gap-2">
-            {MISTAKE_CAUSES.map((spec) => (
+            {taxonomy.map((spec) => (
               <Button
                 key={spec.cause}
                 variant="outline"
@@ -412,7 +442,7 @@ export default function Practice() {
                     put it better -- 物理's 思路不对 means the wrong model, and
                     the fix is a drawing, not two more problems. */}
                 <p className="text-xs text-muted-foreground">
-                  {causeActionFor(subject, spec.cause)}
+                  {causeActionFor(subject, spec.cause, taxonomy)}
                 </p>
                 {/* Only where the sentence above actually asks for one.
                     语文's 默写 asks for nothing that can be drawn, and a board
@@ -452,7 +482,7 @@ export default function Practice() {
           ) : (
             <ul className="flex flex-col gap-2">
               {records.map((item) => {
-                const spec = MISTAKE_CAUSES.find((entry) => entry.cause === item.cause)
+                const spec = causeSpecFor(item.cause, taxonomy)
                 return (
                   <li
                     key={item.id}

@@ -168,10 +168,43 @@ export const SUBJECT_CAUSE_ACTIONS: Record<string, Partial<Record<MistakeCause, 
  * database, which is older than this table and will outlive it. An unknown id
  * should cost you the tailored sentence, not the row.
  */
-export function causeActionFor(subject: string, cause: MistakeCause): string {
+export function fallbackCauseSpec(cause: MistakeCause): MistakeCauseSpec {
+  return {
+    cause,
+    label: `未分类：${cause}`,
+    reviewFixes: false,
+    action: "暂未归类，先保留原始错因，之后确认分类",
+  }
+}
+
+export function causeSpecFor(
+  cause: MistakeCause,
+  taxonomy: MistakeCauseSpec[] = MISTAKE_CAUSES,
+): MistakeCauseSpec {
+  return taxonomy.find((spec) => spec.cause === cause) ?? fallbackCauseSpec(cause)
+}
+
+export function mergeMistakeCauses(loaded: MistakeCauseSpec[]): MistakeCauseSpec[] {
+  const byCause = new Map(loaded.map((spec) => [spec.cause, spec]))
+  const merged = MISTAKE_CAUSES.map((spec) => byCause.get(spec.cause) ?? spec)
+  const known = new Set(merged.map((spec) => spec.cause))
+  for (const spec of loaded) {
+    if (!known.has(spec.cause)) {
+      merged.push(spec)
+      known.add(spec.cause)
+    }
+  }
+  return merged
+}
+
+export function causeActionFor(
+  subject: string,
+  cause: MistakeCause,
+  taxonomy: MistakeCauseSpec[] = MISTAKE_CAUSES,
+): string {
   const tailored = SUBJECT_CAUSE_ACTIONS[subject]?.[cause]
   if (tailored) return tailored
-  return MISTAKE_CAUSES.find((spec) => spec.cause === cause)?.action ?? ""
+  return causeSpecFor(cause, taxonomy).action
 }
 
 /**
@@ -181,18 +214,27 @@ export function causeActionFor(subject: string, cause: MistakeCause): string {
  * two that matter. Ties keep the taxonomy's own order rather than whatever the
  * input happened to be in, so the same log always renders the same list.
  */
-export function summarizeMistakes(records: MistakeRecord[]): MistakeSummary {
+export function summarizeMistakes(
+  records: MistakeRecord[],
+  taxonomy: MistakeCauseSpec[] = MISTAKE_CAUSES,
+): MistakeSummary {
   const total = records.length
   const counts = new Map<MistakeCause, number>()
   for (const item of records) {
     counts.set(item.cause, (counts.get(item.cause) ?? 0) + 1)
   }
 
-  const byCause = MISTAKE_CAUSES.flatMap((spec) => {
+  const specs = [...taxonomy]
+  const known = new Set(specs.map((spec) => spec.cause))
+  for (const cause of counts.keys()) {
+    if (!known.has(cause)) specs.push(fallbackCauseSpec(cause))
+  }
+  const order = new Map(specs.map((spec, index) => [spec.cause, index]))
+  const byCause = specs.flatMap((spec) => {
     const count = counts.get(spec.cause) ?? 0
     if (count === 0) return []
-    return [{ spec, count, percent: Math.round((count / total) * 100) }]
-  }).sort((a, b) => b.count - a.count)
+    return [{ spec, count, percent: total ? Math.round((count / total) * 100) : 0 }]
+  }).sort((a, b) => b.count - a.count || (order.get(a.spec.cause) ?? 0) - (order.get(b.spec.cause) ?? 0))
 
   const reviewFixable = byCause.reduce(
     (sum, entry) => (entry.spec.reviewFixes ? sum + entry.count : sum),
@@ -248,7 +290,7 @@ function toRecord(value: unknown): MistakeRecord | null {
   if (typeof value !== "object" || value === null) return null
   const row = value as Record<string, unknown>
   if (!isFilled(row.id) || !isFilled(row.question) || !isFilled(row.createdAt)) return null
-  if (!MISTAKE_CAUSES.some((spec) => spec.cause === row.cause)) return null
+  if (!isFilled(row.cause)) return null
 
   const record: MistakeRecord = {
     id: row.id,
