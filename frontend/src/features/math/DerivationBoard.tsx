@@ -5,6 +5,19 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { checkDerivation, type StepVerdict } from "@/lib/derivation"
 
+export interface DerivationBoardValue {
+  lines: string[]
+}
+
+interface DerivationBoardProps {
+  initialValue?: DerivationBoardValue
+  onChange?: (value: DerivationBoardValue) => void
+}
+
+function derivationLines(value: string): string[] {
+  return value.split("\n").map((line) => line.trim()).filter((line) => line !== "")
+}
+
 /**
  * A derivation, checked line against line.
  *
@@ -12,12 +25,12 @@ import { checkDerivation, type StepVerdict } from "@/lib/derivation"
  * first line that does not follow, and deliberately says nothing about the
  * lines below it, since those are downstream of the break.
  */
-export function DerivationBoard() {
-  const [written, setWritten] = useState("")
+export function DerivationBoard({ initialValue, onChange }: DerivationBoardProps = {}) {
+  const [written, setWritten] = useState(() => initialValue?.lines.join("\n") ?? "")
 
   // A blank line between two steps is spacing. Numbering it would put the
   // reported line one off, which is the one number this board must get right.
-  const lines = written.split("\n").map((line) => line.trim()).filter((line) => line !== "")
+  const lines = derivationLines(written)
   const checked = checkDerivation(lines)
   const broken = checked.steps.findIndex(
     (step) => step.verdict === "diverges" || step.verdict === "unreadable",
@@ -28,7 +41,11 @@ export function DerivationBoard() {
       <Textarea
         aria-label="把过程一行一行写下来"
         value={written}
-        onChange={(event) => setWritten(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value
+          setWritten(next)
+          onChange?.({ lines: derivationLines(next) })
+        }}
         placeholder={"一行一步，比如\n2x+4=10\n2x=6\nx=3"}
         rows={5}
       />

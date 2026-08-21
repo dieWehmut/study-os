@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { ScoringBoard } from "./ScoringBoard"
 
@@ -12,6 +12,32 @@ function answer(text: string) {
 }
 
 describe("laying an answer against the 得分点", () => {
+  it("restores saved work and reports either text box as serializable data", () => {
+    const onChange = vi.fn()
+    render(
+      <ScoringBoard
+        initialValue={{ points: ["借景抒情", "思乡之情"], answer: "借景抒情" }}
+        onChange={onChange}
+      />,
+    )
+
+    expect(screen.getByLabelText("标准答案的得分点")).toHaveValue("借景抒情\n思乡之情")
+    expect(screen.getByLabelText("你写的答案")).toHaveValue("借景抒情")
+    expect(onChange).not.toHaveBeenCalled()
+
+    answer("借景抒情，也表达思乡之情")
+    expect(onChange).toHaveBeenLastCalledWith({
+      points: ["借景抒情", "思乡之情"],
+      answer: "借景抒情，也表达思乡之情",
+    })
+
+    listPoints("借景抒情\n对比手法")
+    expect(onChange).toHaveBeenLastCalledWith({
+      points: ["借景抒情", "对比手法"],
+      answer: "借景抒情，也表达思乡之情",
+    })
+  })
+
   it("counts how many points the answer reached", () => {
     render(<ScoringBoard />)
 

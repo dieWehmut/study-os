@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { FreeBodyBoard } from "./FreeBodyBoard"
 
@@ -12,6 +12,35 @@ function addForce(name: string, magnitude: string, angle: string, field = false)
 }
 
 describe("drawing a free-body diagram", () => {
+  it("restores forces and reports additions and removals", () => {
+    const onChange = vi.fn()
+    render(
+      <FreeBodyBoard
+        initialValue={{
+          forces: [{ id: "gravity", name: "重力", magnitude: 10, angle: 270, kind: "field" }],
+        }}
+        onChange={onChange}
+      />,
+    )
+
+    expect(screen.getByText("重力")).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: "受力图，共 1 个力" })).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+
+    addForce("支持力", "10", "90")
+    expect(onChange).toHaveBeenLastCalledWith({
+      forces: [
+        { id: "gravity", name: "重力", magnitude: 10, angle: 270, kind: "field" },
+        { id: "支持力-1", name: "支持力", magnitude: 10, angle: 90, kind: "contact" },
+      ],
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "删掉 重力" }))
+    expect(onChange).toHaveBeenLastCalledWith({
+      forces: [{ id: "支持力-1", name: "支持力", magnitude: 10, angle: 90, kind: "contact" }],
+    })
+  })
+
   it("keeps every force you add, named", () => {
     render(<FreeBodyBoard />)
 

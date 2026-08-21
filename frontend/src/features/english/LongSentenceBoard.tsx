@@ -5,6 +5,15 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { splitSentence, type ClauseRole } from "@/lib/long-sentence"
 
+export interface LongSentenceBoardValue {
+  sentence: string
+}
+
+interface LongSentenceBoardProps {
+  initialValue?: LongSentenceBoardValue
+  onChange?: (value: LongSentenceBoardValue) => void
+}
+
 /**
  * A 长难句, taken apart until its 主谓 sit next to each other.
  *
@@ -27,8 +36,8 @@ const ROLE_NAMES: Record<ClauseRole, string> = {
   nominal: "名词性从句",
 }
 
-export function LongSentenceBoard() {
-  const [sentence, setSentence] = useState("")
+export function LongSentenceBoard({ initialValue, onChange }: LongSentenceBoardProps = {}) {
+  const [sentence, setSentence] = useState(() => initialValue?.sentence ?? "")
 
   const written = sentence.trim() !== ""
   const split = splitSentence(sentence)
@@ -43,7 +52,11 @@ export function LongSentenceBoard() {
       <Textarea
         aria-label="这句长难句"
         value={sentence}
-        onChange={(event) => setSentence(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value
+          setSentence(next)
+          onChange?.({ sentence: next })
+        }}
         placeholder="把读不动的那一句抄进来"
         rows={3}
       />

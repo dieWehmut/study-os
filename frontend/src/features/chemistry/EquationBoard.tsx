@@ -6,6 +6,15 @@ import { checkEquation, type Species } from "@/lib/equation"
 
 import { Formula } from "./Formula"
 
+export interface EquationBoardValue {
+  equation: string
+}
+
+interface EquationBoardProps {
+  initialValue?: EquationBoardValue
+  onChange?: (value: EquationBoardValue) => void
+}
+
 /**
  * A written equation, read back as chemistry rather than as a line of text.
  *
@@ -13,8 +22,8 @@ import { Formula } from "./Formula"
  * handwriting -- the whole failure is that it looked right the first time. So
  * the board counts the atoms itself and names what disagrees.
  */
-export function EquationBoard() {
-  const [equation, setEquation] = useState("")
+export function EquationBoard({ initialValue, onChange }: EquationBoardProps = {}) {
+  const [equation, setEquation] = useState(() => initialValue?.equation ?? "")
 
   const written = equation.trim() !== ""
   const checked = checkEquation(equation)
@@ -32,7 +41,11 @@ export function EquationBoard() {
       <Input
         aria-label="化学方程式"
         value={equation}
-        onChange={(event) => setEquation(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value
+          setEquation(next)
+          onChange?.({ equation: next })
+        }}
         placeholder="例如 2H2 + O2 = 2H2O"
       />
 

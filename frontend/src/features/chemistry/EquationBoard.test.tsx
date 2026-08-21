@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { EquationBoard } from "./EquationBoard"
 
@@ -8,6 +8,22 @@ function write(equation: string) {
 }
 
 describe("checking an equation you have just written", () => {
+  it("restores a saved equation and reports every edit", () => {
+    const onChange = vi.fn()
+    render(
+      <EquationBoard
+        initialValue={{ equation: "2H2 + O2 = 2H2O" }}
+        onChange={onChange}
+      />,
+    )
+
+    expect(screen.getByLabelText("化学方程式")).toHaveValue("2H2 + O2 = 2H2O")
+    expect(onChange).not.toHaveBeenCalled()
+
+    write("N2 + 3H2 = 2NH3")
+    expect(onChange).toHaveBeenLastCalledWith({ equation: "N2 + 3H2 = 2NH3" })
+  })
+
   it("says so when both sides add up", () => {
     render(<EquationBoard />)
 

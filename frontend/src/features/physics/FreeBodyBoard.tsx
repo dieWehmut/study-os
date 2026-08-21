@@ -6,6 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { checkForces, resolveForces, type Force, type ForceKind } from "@/lib/freebody"
 
+export interface FreeBodyBoardValue {
+  forces: Force[]
+}
+
+interface FreeBodyBoardProps {
+  initialValue?: FreeBodyBoardValue
+  onChange?: (value: FreeBodyBoardValue) => void
+}
+
 /** Where the body sits on the canvas, and how long a 1 N arrow is drawn. */
 const centre = 120
 const canvas = 240
@@ -30,8 +39,10 @@ function pointAt(angle: number, length: number): { x: number; y: number } {
   return { x: centre + length * Math.cos(radians), y: centre - length * Math.sin(radians) }
 }
 
-export function FreeBodyBoard() {
-  const [forces, setForces] = useState<Force[]>([])
+export function FreeBodyBoard({ initialValue, onChange }: FreeBodyBoardProps = {}) {
+  const [forces, setForces] = useState<Force[]>(() =>
+    initialValue?.forces.map((force) => ({ ...force })) ?? [],
+  )
   const [name, setName] = useState("")
   const [magnitude, setMagnitude] = useState("")
   const [angle, setAngle] = useState("")
@@ -50,10 +61,12 @@ export function FreeBodyBoard() {
 
   function add() {
     if (!ready) return
-    setForces((current) => [
-      ...current,
-      { id: `${name.trim()}-${current.length}`, name: name.trim(), magnitude: size, angle: direction, kind },
-    ])
+    const next = [
+      ...forces,
+      { id: `${name.trim()}-${forces.length}`, name: name.trim(), magnitude: size, angle: direction, kind },
+    ]
+    setForces(next)
+    onChange?.({ forces: next })
     setName("")
     setMagnitude("")
     setAngle("")
@@ -146,7 +159,11 @@ export function FreeBodyBoard() {
                   variant="ghost"
                   className="ml-auto"
                   aria-label={`删掉 ${force.name}`}
-                  onClick={() => setForces((current) => current.filter((entry) => entry.id !== force.id))}
+                  onClick={() => {
+                    const next = forces.filter((entry) => entry.id !== force.id)
+                    setForces(next)
+                    onChange?.({ forces: next })
+                  }}
                 >
                   <Trash2 aria-hidden="true" />
                 </Button>

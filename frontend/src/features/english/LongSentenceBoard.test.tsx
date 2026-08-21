@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { LongSentenceBoard } from "./LongSentenceBoard"
 
@@ -8,6 +8,20 @@ function type(sentence: string) {
 }
 
 describe("taking a 长难句 apart to find its 主谓", () => {
+  it("restores the saved sentence and reports every edit", () => {
+    const onChange = vi.fn()
+    const saved = "The book that I bought is here."
+    render(<LongSentenceBoard initialValue={{ sentence: saved }} onChange={onChange} />)
+
+    expect(screen.getByLabelText("这句长难句")).toHaveValue(saved)
+    expect(onChange).not.toHaveBeenCalled()
+
+    type("Although he was tired, he finished the work.")
+    expect(onChange).toHaveBeenLastCalledWith({
+      sentence: "Although he was tired, he finished the work.",
+    })
+  })
+
   it("puts the main clause up on its own, with a hole where the rest stood", () => {
     // This is the whole point. 先找主谓 fails on a long sentence because
     // everything hanging off the subject sits between it and its verb -- so

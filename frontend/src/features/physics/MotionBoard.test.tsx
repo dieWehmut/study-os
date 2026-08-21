@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
+
+import type { SolvedStage } from "@/lib/kinematics"
 
 import { MotionBoard } from "./MotionBoard"
 
@@ -15,6 +17,38 @@ function addStage(
 }
 
 describe("dividing a motion into stages", () => {
+  it("restores stages and reports additions and removals", () => {
+    const onChange = vi.fn()
+    const saved: SolvedStage = {
+      id: "accelerate",
+      name: "加速",
+      v0: 0,
+      v: 10,
+      a: 2,
+      t: 5,
+      x: 25,
+      derived: ["v", "x"],
+    }
+    render(<MotionBoard initialValue={{ stages: [saved] }} onChange={onChange} />)
+
+    expect(screen.getByRole("heading", { level: 4, name: "加速" })).toBeInTheDocument()
+    expect(screen.getByText("末速度 10 m/s")).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+
+    addStage("匀速", { "初速度（m/s）": "10", "加速度（m/s²）": "0", "时间（s）": "2" })
+    expect(onChange).toHaveBeenLastCalledWith({
+      stages: expect.arrayContaining([
+        expect.objectContaining({ id: "accelerate", name: "加速" }),
+        expect.objectContaining({ id: "匀速-1", name: "匀速", v0: 10, t: 2 }),
+      ]),
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "删掉 加速" }))
+    expect(onChange).toHaveBeenLastCalledWith({
+      stages: [expect.objectContaining({ id: "匀速-1", name: "匀速" })],
+    })
+  })
+
   it("keeps every stage you add, named and in order", () => {
     render(<MotionBoard />)
 

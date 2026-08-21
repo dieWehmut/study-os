@@ -5,6 +5,23 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { checkCoverage } from "@/lib/scoring-points"
 
+export interface ScoringBoardValue {
+  points: string[]
+  answer: string
+}
+
+interface ScoringBoardProps {
+  initialValue?: ScoringBoardValue
+  onChange?: (value: ScoringBoardValue) => void
+}
+
+function pointLines(value: string): string[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+}
+
 /**
  * An answer, laid against the 得分点 it was meant to hit.
  *
@@ -13,18 +30,14 @@ import { checkCoverage } from "@/lib/scoring-points"
  * answer on screen you re-read it and it reads complete, which is exactly the
  * failure the advice is about.
  */
-export function ScoringBoard() {
-  const [listed, setListed] = useState("")
-  const [answer, setAnswer] = useState("")
+export function ScoringBoard({ initialValue, onChange }: ScoringBoardProps = {}) {
+  const [listed, setListed] = useState(() => initialValue?.points.join("\n") ?? "")
+  const [answer, setAnswer] = useState(() => initialValue?.answer ?? "")
 
   // A blank line between two points is spacing. Counting it would put 踩到 2/3
   // where 2/2 is the truth, and the denominator is the number this board is
   // for.
-  const points = listed
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line !== "")
-    .map((text) => ({ text }))
+  const points = pointLines(listed).map((text) => ({ text }))
 
   const checked = checkCoverage(points, answer)
   const written = answer.trim() !== ""
@@ -35,14 +48,22 @@ export function ScoringBoard() {
       <Textarea
         aria-label="标准答案的得分点"
         value={listed}
-        onChange={(event) => setListed(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value
+          setListed(next)
+          onChange?.({ points: pointLines(next), answer })
+        }}
         placeholder={"一行一个点，比如\n借景抒情\n对比/衬托\n思乡之情"}
         rows={4}
       />
       <Textarea
         aria-label="你写的答案"
         value={answer}
-        onChange={(event) => setAnswer(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value
+          setAnswer(next)
+          onChange?.({ points: pointLines(listed), answer: next })
+        }}
         placeholder="把你自己写的那一段抄进来"
         rows={4}
       />

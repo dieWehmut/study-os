@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { ChainBoard } from "./ChainBoard"
 
@@ -10,6 +10,32 @@ function link(cause: string, effect: string) {
 }
 
 describe("writing out a 因果链 one link at a time", () => {
+  it("restores links and reports additions and removals", () => {
+    const onChange = vi.fn()
+    render(
+      <ChainBoard
+        initialValue={{ links: [{ cause: "太阳辐射强", effect: "地表增温" }] }}
+        onChange={onChange}
+      />,
+    )
+
+    expect(screen.getByText("太阳辐射强")).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+
+    link("地表增温", "空气受热上升")
+    expect(onChange).toHaveBeenLastCalledWith({
+      links: [
+        { cause: "太阳辐射强", effect: "地表增温" },
+        { cause: "地表增温", effect: "空气受热上升" },
+      ],
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "删掉第 1 环" }))
+    expect(onChange).toHaveBeenLastCalledWith({
+      links: [{ cause: "地表增温", effect: "空气受热上升" }],
+    })
+  })
+
   it("says so when the chain runs from end to end", () => {
     render(<ChainBoard />)
 

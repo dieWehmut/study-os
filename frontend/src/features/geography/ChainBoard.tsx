@@ -6,6 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { checkChain, type ChainLink } from "@/lib/causal-chain"
 
+export interface ChainBoardValue {
+  links: ChainLink[]
+}
+
+interface ChainBoardProps {
+  initialValue?: ChainBoardValue
+  onChange?: (value: ChainBoardValue) => void
+}
+
 /**
  * A 因果链, written out one 环 at a time.
  *
@@ -14,8 +23,10 @@ import { checkChain, type ChainLink } from "@/lib/causal-chain"
  * joins up in your head as you read it -- the gap only becomes visible once
  * each 环 has to name where it starts.
  */
-export function ChainBoard() {
-  const [links, setLinks] = useState<ChainLink[]>([])
+export function ChainBoard({ initialValue, onChange }: ChainBoardProps = {}) {
+  const [links, setLinks] = useState<ChainLink[]>(() =>
+    initialValue?.links.map((link) => ({ ...link })) ?? [],
+  )
   const [cause, setCause] = useState("")
   const [effect, setEffect] = useState("")
 
@@ -25,7 +36,9 @@ export function ChainBoard() {
 
   function add() {
     if (half) return
-    setLinks((current) => [...current, { cause: cause.trim(), effect: effect.trim() }])
+    const next = [...links, { cause: cause.trim(), effect: effect.trim() }]
+    setLinks(next)
+    onChange?.({ links: next })
     setCause("")
     setEffect("")
   }
@@ -83,7 +96,11 @@ export function ChainBoard() {
                   size="icon"
                   className="shrink-0"
                   aria-label={`删掉第 ${index + 1} 环`}
-                  onClick={() => setLinks((current) => current.filter((_, at) => at !== index))}
+                  onClick={() => {
+                    const next = links.filter((_, at) => at !== index)
+                    setLinks(next)
+                    onChange?.({ links: next })
+                  }}
                 >
                   <Trash2 aria-hidden="true" />
                 </Button>

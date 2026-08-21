@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { DerivationBoard } from "./DerivationBoard"
 
@@ -10,6 +10,22 @@ function write(lines: string[]) {
 }
 
 describe("locating the step a derivation went wrong at", () => {
+  it("restores saved lines and reports the normalized derivation as it changes", () => {
+    const onChange = vi.fn()
+    render(
+      <DerivationBoard
+        initialValue={{ lines: ["2x+4=10", "2x=6"] }}
+        onChange={onChange}
+      />,
+    )
+
+    expect(screen.getByLabelText("把过程一行一行写下来")).toHaveValue("2x+4=10\n2x=6")
+    expect(onChange).not.toHaveBeenCalled()
+
+    write(["2x+4=10", "", "2x=6", "x=3"])
+    expect(onChange).toHaveBeenLastCalledWith({ lines: ["2x+4=10", "2x=6", "x=3"] })
+  })
+
   it("points at the first line that does not follow", () => {
     render(<DerivationBoard />)
 

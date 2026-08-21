@@ -23,6 +23,15 @@ const fields: Field[] = [
 
 const empty: Record<Quantity, string> = { v0: "", v: "", a: "", t: "", x: "" }
 
+export interface MotionBoardValue {
+  stages: SolvedStage[]
+}
+
+interface MotionBoardProps {
+  initialValue?: MotionBoardValue
+  onChange?: (value: MotionBoardValue) => void
+}
+
 /**
  * A blank box and a box holding nonsense are the same thing: a quantity you
  * have not given. Neither is an error worth interrupting for -- the stage is
@@ -59,8 +68,10 @@ function span(stage: SolvedStage, total: number): number {
   return (stage.t / total) * 100
 }
 
-export function MotionBoard() {
-  const [stages, setStages] = useState<SolvedStage[]>([])
+export function MotionBoard({ initialValue, onChange }: MotionBoardProps = {}) {
+  const [stages, setStages] = useState<SolvedStage[]>(() =>
+    initialValue?.stages.map((stage) => ({ ...stage, derived: [...stage.derived] })) ?? [],
+  )
   const [name, setName] = useState("")
   const [draft, setDraft] = useState<Record<Quantity, string>>(empty)
 
@@ -71,10 +82,10 @@ export function MotionBoard() {
   function add() {
     const trimmed = name.trim()
     if (trimmed === "") return
-    setStages((current) => [
-      ...current,
+    const next = [
+      ...stages,
       solveStage({
-        id: `${trimmed}-${current.length}`,
+        id: `${trimmed}-${stages.length}`,
         name: trimmed,
         v0: parse(draft.v0),
         v: parse(draft.v),
@@ -82,7 +93,9 @@ export function MotionBoard() {
         t: parse(draft.t),
         x: parse(draft.x),
       }),
-    ])
+    ]
+    setStages(next)
+    onChange?.({ stages: next })
     setName("")
     setDraft(empty)
   }
@@ -143,7 +156,11 @@ export function MotionBoard() {
                     size="icon"
                     className="ml-auto"
                     aria-label={`删掉 ${stage.name}`}
-                    onClick={() => setStages((current) => current.filter((entry) => entry.id !== stage.id))}
+                    onClick={() => {
+                      const next = stages.filter((entry) => entry.id !== stage.id)
+                      setStages(next)
+                      onChange?.({ stages: next })
+                    }}
                   >
                     <Trash2 aria-hidden="true" />
                   </Button>
