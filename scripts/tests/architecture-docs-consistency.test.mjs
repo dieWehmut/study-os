@@ -41,18 +41,20 @@ test("ROADMAP names persisted objects instead of stale browser-only gaps", () =>
     "lesson_versions",
     "lesson_links",
     "lesson_attempts",
+    "error_causes",
   ]) {
     assert.match(schema, tablePattern(table), `schema is missing ${table}`)
     assert.match(roadmap, new RegExp(`\\b${table}\\b`), `ROADMAP is missing ${table}`)
   }
 
   assert.match(roadmap, /题目 Question\s*\|\s*✅/)
-  assert.match(roadmap, /错因 Error Cause\s*\|\s*🟡/)
+  assert.match(roadmap, /错因 Error Cause\s*\|\s*✅/)
   assert.match(roadmap, /课程 Lesson\s*\|\s*🟡/)
   assert.match(roadmap, /\/api\/mistakes/)
   assert.doesNotMatch(roadmap, /题目 Question\s*\|\s*❌/)
   assert.doesNotMatch(roadmap, /错因 Error Cause\s*\|\s*❌/)
   assert.doesNotMatch(roadmap, /课程 Lesson\s*\|\s*❌/)
+  assert.doesNotMatch(roadmap, /error_causes`：\*\*尚未完成\*\*/)
 })
 
 test("ROADMAP records question-attempt evidence at the schema head", () => {
@@ -62,6 +64,9 @@ test("ROADMAP records question-attempt evidence at the schema head", () => {
   assert.match(databaseSource, /case 15:/)
   assert.match(databaseSource, /ALTER TABLE question_attempts ADD COLUMN answer/)
   assert.match(roadmap, /schema v15[\s\S]*question_attempts[\s\S]*answer[\s\S]*elapsed_ms[\s\S]*is_correct/)
+  assert.match(roadmap, /schema v16[\s\S]*error_causes[\s\S]*GET \/api\/error-causes/)
+  assert.match(roadmap, /POST \/api\/error-causes[\s\S]*PATCH \/api\/error-causes/)
+  assert.match(roadmap, /PATCH \/api\/mistakes\/\{attemptID\}\/cause/)
   assert.match(roadmap, /POST \/api\/mistakes\/\{attemptID\}\/correct/)
   assert.match(roadmap, /订正[\s\S]*答案[\s\S]*用时/)
 })
