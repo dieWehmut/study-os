@@ -203,6 +203,12 @@ describe("static Pages API fixtures", () => {
       items: Array<{ attempt: { id: string; evidence?: unknown } }>
     }>("/mistakes?subject=math")
     expect(listed.items.find((item) => item.attempt.id === created.attempt.id)?.attempt.evidence).toEqual(replacement)
+
+    const cleared = await staticDemoRequest<{ attempt: { evidence?: unknown } }>(
+      `/mistakes/${created.attempt.id}/evidence`,
+      { method: "PATCH", body: JSON.stringify({ evidence: {} }) },
+    )
+    expect(cleared.attempt.evidence).toEqual({})
   })
 
   it("rejects invalid static subject evidence and reports missing attempts", async () => {
@@ -232,6 +238,28 @@ describe("static Pages API fixtures", () => {
         evidence: { version: 1, subject: "physics", tool: "free_body", data: { forces: [] } },
       }),
     })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it("keeps mistake creation as strict as the backend route", async () => {
+    await expect(staticDemoRequest("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({ subject: "math", stem: " ", cause: "method" }),
+    })).rejects.toMatchObject({ status: 400 })
+
+    await expect(staticDemoRequest("/mistakes", { method: "POST" })).rejects.toMatchObject({ status: 400 })
+
+    await expect(staticDemoRequest("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({ subject: "math", stem: "解方程", cause: "method", extra: true }),
+    })).rejects.toMatchObject({ status: 400 })
+
+    await expect(staticDemoRequest("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({ stem: "只写题干也能先记下" }),
+    })).resolves.toMatchObject({
+      question: { subject: "", stem: "只写题干也能先记下" },
+      attempt: { cause: "" },
+    })
   })
 
   it("rejects malformed evidence request bodies without clearing saved evidence", async () => {

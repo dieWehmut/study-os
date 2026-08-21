@@ -50,6 +50,8 @@ describe("subject attempt evidence", () => {
     ["math", { version: 2, subject: "math", tool: "derivation", data: { lines: ["x=1", "x=1"] } }],
     ["math", { version: 1, subject: "math", tool: "derivation", data: { lines: ["x=1"] } }],
     ["physics", { version: 1, subject: "physics", tool: "free_body", data: { forces: [{ id: "g", name: "重力", magnitude: -1, angle: 270, kind: "field" }] } }],
+    ["physics", { version: 1, subject: "physics", tool: "free_body", data: { forces: [{ id: "g", name: "重力", angle: 270, kind: "field" }] } }],
+    ["physics", { version: 1, subject: "physics", tool: "free_body", data: { forces: [{ id: "g", name: "重力", magnitude: 10, kind: "field" }] } }],
     ["physics", { version: 1, subject: "physics", tool: "motion", data: { stages: [{ id: "s", name: "加速", t: -1 }] } }],
     ["chemistry", { version: 1, subject: "chemistry", tool: "equation", data: { equation: " " } }],
     ["geography", { version: 1, subject: "geography", tool: "causal_chain", data: { links: [{ cause: "城市化", effect: " " }] } }],

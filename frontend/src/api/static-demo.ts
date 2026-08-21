@@ -21,7 +21,7 @@ interface StaticMistakePair {
     question_id: string
     cause: string
     note?: string
-    evidence?: MistakeEvidence
+    evidence?: MistakeEvidence | Record<string, never>
     answer?: string
     elapsed_ms?: number
     is_correct?: boolean
@@ -1091,7 +1091,15 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
 
   if (root === "mistakes" && !id && method === "GET") return responseFor(mistakeList(subjectFrom(url.searchParams.get("subject")))) as T
   if (root === "mistakes" && !id && method === "POST") {
-    const subject = String(body.subject ?? "all").trim().toLowerCase()
+    if (!init?.body || typeof init.body !== "string" || init.body.trim() === "") {
+      throw new StaticDemoError("Request body is required", 400)
+    }
+    if (!Object.keys(body).every((key) => ["subject", "stem", "cause", "note", "answer", "elapsed_ms", "evidence"].includes(key))) {
+      throw new StaticDemoError("Mistake request contains an unknown field", 400)
+    }
+    const subject = String(body.subject ?? "").trim().toLowerCase()
+    const stem = String(body.stem ?? "").trim()
+    if (!stem) throw new StaticDemoError("Mistake stem is required", 400)
     let evidence: MistakeEvidence | undefined
     try {
       evidence = normalizeSubjectAttemptEvidence(subject, body.evidence)
@@ -1099,11 +1107,11 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
       throw new StaticDemoError(error instanceof Error ? error.message : "invalid subject attempt evidence", 400)
     }
     const pair: StaticMistakePair = {
-      question: { id: newID("question"), subject, stem: String(body.stem ?? ""), created_at: DEMO_NOW },
+      question: { id: newID("question"), subject, stem, created_at: DEMO_NOW },
       attempt: {
         id: newID("attempt"),
         question_id: "",
-        cause: String(body.cause ?? "unknown"),
+        cause: String(body.cause ?? "").trim().toLowerCase(),
         note: String(body.note ?? ""),
         answer: String(body.answer ?? "").trim() || undefined,
         elapsed_ms: body.elapsed_ms === undefined ? 0 : Math.max(0, Math.trunc(Number(body.elapsed_ms) || 0)),
@@ -1124,8 +1132,7 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     }
     try {
       const evidence = normalizeSubjectAttemptEvidence(pair.question.subject, body.evidence)
-      if (evidence) pair.attempt.evidence = evidence
-      else delete pair.attempt.evidence
+      pair.attempt.evidence = evidence ?? {}
     } catch (error) {
       throw new StaticDemoError(error instanceof Error ? error.message : "invalid subject attempt evidence", 400)
     }

@@ -109,11 +109,11 @@ func validateSubjectEvidenceData(tool string, raw json.RawMessage) error {
 	case "free_body":
 		var data struct {
 			Forces []struct {
-				ID        string  `json:"id"`
-				Name      string  `json:"name"`
-				Magnitude float64 `json:"magnitude"`
-				Angle     float64 `json:"angle"`
-				Kind      string  `json:"kind"`
+				ID        string   `json:"id"`
+				Name      string   `json:"name"`
+				Magnitude *float64 `json:"magnitude"`
+				Angle     *float64 `json:"angle"`
+				Kind      string   `json:"kind"`
 			} `json:"forces"`
 		}
 		if err := decodeStrictJSON(raw, &data); err != nil {
@@ -124,7 +124,9 @@ func validateSubjectEvidenceData(tool string, raw json.RawMessage) error {
 		}
 		for _, force := range data.Forces {
 			if strings.TrimSpace(force.ID) == "" || strings.TrimSpace(force.Name) == "" ||
-				(force.Kind != "contact" && force.Kind != "field") || force.Magnitude < 0 || force.Magnitude > 1e12 {
+				(force.Kind != "contact" && force.Kind != "field") || force.Magnitude == nil || force.Angle == nil ||
+				!finiteEvidenceNumber(*force.Magnitude) || *force.Magnitude < 0 ||
+				!finiteEvidenceNumber(*force.Angle) {
 				return errors.New("free_body evidence contains an invalid force")
 			}
 		}
@@ -222,4 +224,8 @@ func nonEmptyStrings(values []string) []string {
 
 func finiteMotionValue(value float64) bool {
 	return value >= -1e12 && value <= 1e12
+}
+
+func finiteEvidenceNumber(value float64) bool {
+	return value == value && value >= -1e12 && value <= 1e12
 }
