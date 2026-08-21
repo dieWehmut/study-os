@@ -45,9 +45,10 @@ describe("AppShell comments placement", () => {
     renderShell()
 
     const content = screen.getByTestId("route-content")
-    const comments = screen.getByRole("region", { name: "页面评论" })
+    const comments = screen.getByRole("region", { name: "讨论" })
 
     expect(content.compareDocumentPosition(comments) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(comments.querySelector("h2")).toBeNull()
   })
 
   it.each([
@@ -60,6 +61,6 @@ describe("AppShell comments placement", () => {
 
     renderShell()
 
-    expect(screen.queryByRole("region", { name: "页面评论" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "讨论" })).not.toBeInTheDocument()
   })
 })

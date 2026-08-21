@@ -36,10 +36,9 @@ export function GiscusComments() {
 
   return (
     <section
-      aria-label="页面评论"
+      aria-label="讨论"
       className="mt-10 border-t border-border/60 pt-6"
     >
-      <h2 className="mb-3 text-sm font-semibold text-foreground">页面评论</h2>
       <Giscus
         key={term}
         repo={config.repo as `${string}/${string}`}

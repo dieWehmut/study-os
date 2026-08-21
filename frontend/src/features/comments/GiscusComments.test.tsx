@@ -50,7 +50,7 @@ describe("GiscusComments", () => {
 
     renderAt()
 
-    expect(screen.queryByRole("region", { name: "页面评论" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "讨论" })).not.toBeInTheDocument()
     expect(mocks.giscus).not.toHaveBeenCalled()
   })
 
@@ -59,14 +59,15 @@ describe("GiscusComments", () => {
 
     renderAt()
 
-    expect(screen.queryByRole("region", { name: "页面评论" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "讨论" })).not.toBeInTheDocument()
     expect(mocks.giscus).not.toHaveBeenCalled()
   })
 
   it("uses a route-specific discussion term and fixed widget options", () => {
     renderAt("/knowledge")
 
-    expect(screen.getByRole("region", { name: "页面评论" })).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: "讨论" })).toBeInTheDocument()
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument()
     expect(mocks.giscus).toHaveBeenCalledWith(
       expect.objectContaining({
         repo: "dieWehmut/study-os",
