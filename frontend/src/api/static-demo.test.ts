@@ -170,6 +170,70 @@ describe("static Pages API fixtures", () => {
     })).rejects.toMatchObject({ status: 400 })
   })
 
+  it("persists subject evidence on static mistake creation and updates", async () => {
+    const original = {
+      version: 1,
+      subject: "math",
+      tool: "derivation",
+      data: { lines: ["2x+4=10", "2x=6"] },
+    }
+    const created = await staticDemoRequest<{
+      attempt: { id: string; evidence?: unknown }
+    }>("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({ subject: "math", stem: "解方程", cause: "method", evidence: original }),
+    })
+    expect(created.attempt.evidence).toEqual(original)
+
+    const replacement = {
+      version: 1,
+      subject: "math",
+      tool: "derivation",
+      data: { lines: ["2x+4=10", "2x=6", "x=3"] },
+    }
+    const updated = await staticDemoRequest<{
+      attempt: { evidence?: unknown }
+    }>(`/mistakes/${created.attempt.id}/evidence`, {
+      method: "PATCH",
+      body: JSON.stringify({ evidence: replacement }),
+    })
+    expect(updated.attempt.evidence).toEqual(replacement)
+
+    const listed = await staticDemoRequest<{
+      items: Array<{ attempt: { id: string; evidence?: unknown } }>
+    }>("/mistakes?subject=math")
+    expect(listed.items.find((item) => item.attempt.id === created.attempt.id)?.attempt.evidence).toEqual(replacement)
+  })
+
+  it("rejects invalid static subject evidence and reports missing attempts", async () => {
+    await expect(staticDemoRequest("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({
+        subject: "math",
+        stem: "解方程",
+        cause: "method",
+        evidence: { version: 1, subject: "chemistry", tool: "equation", data: { equation: "H2" } },
+      }),
+    })).rejects.toMatchObject({ status: 400 })
+
+    await expect(staticDemoRequest("/mistakes/missing-attempt/evidence", {
+      method: "PATCH",
+      body: JSON.stringify({
+        evidence: { version: 1, subject: "math", tool: "derivation", data: { lines: ["x=1", "x=1"] } },
+      }),
+    })).rejects.toMatchObject({ status: 404 })
+
+    const physics = await staticDemoRequest<{
+      items: Array<{ attempt: { id: string } }>
+    }>("/mistakes?subject=physics")
+    await expect(staticDemoRequest(`/mistakes/${physics.items[0]?.attempt.id}/evidence`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        evidence: { version: 1, subject: "physics", tool: "free_body", data: { forces: [] } },
+      }),
+    })).rejects.toMatchObject({ status: 400 })
+  })
+
   it("mirrors the error cause candidate, confirmation, and reclassification contract", async () => {
     const defaults = await staticDemoRequest<{
       items: Array<{ id: string; status: string }>

@@ -1,3 +1,5 @@
+import { normalizeSubjectAttemptEvidence, type MistakeEvidence } from "./mistake-evidence"
+
 // Stable taxonomy IDs come from the backend. The original six remain the
 // checked-in fallback, while free text stays readable until it is reclassified.
 export type MistakeCause = string
@@ -32,6 +34,7 @@ export interface MistakeRecord {
     elapsedMs: number
     occurredAt: string
   }
+  evidence?: MistakeEvidence
   createdAt: string
 }
 
@@ -264,6 +267,7 @@ export function createMistake(filed: {
   question: string
   cause: MistakeCause
   note?: string
+  evidence?: MistakeEvidence
 }): MistakeRecord {
   filedThisSession += 1
   const record: MistakeRecord = {
@@ -273,7 +277,10 @@ export function createMistake(filed: {
     cause: filed.cause,
     createdAt: new Date().toISOString(),
   }
-  return filed.note ? { ...record, note: filed.note } : record
+  const noted = filed.note ? { ...record, note: filed.note } : record
+  if (!filed.evidence) return noted
+  const evidence = normalizeSubjectAttemptEvidence(filed.subject, filed.evidence)
+  return evidence ? { ...noted, evidence } : noted
 }
 
 function isFilled(value: unknown): value is string {
@@ -302,7 +309,13 @@ function toRecord(value: unknown): MistakeRecord | null {
     createdAt: row.createdAt,
   }
   const withQuestion = isFilled(row.questionId) ? { ...record, questionId: row.questionId } : record
-  return isFilled(row.note) ? { ...withQuestion, note: row.note } : withQuestion
+  const noted = isFilled(row.note) ? { ...withQuestion, note: row.note } : withQuestion
+  try {
+    const evidence = normalizeSubjectAttemptEvidence(record.subject, row.evidence)
+    return evidence ? { ...noted, evidence } : noted
+  } catch {
+    return noted
+  }
 }
 
 export function readMistakes(): MistakeRecord[] {

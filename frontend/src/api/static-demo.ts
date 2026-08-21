@@ -4,6 +4,7 @@ import type { LessonPracticeAttempt, LessonPracticeEvaluation } from "./lesson-p
 import type { Lesson } from "./lessons"
 import type { KnowledgeGroup, KnowledgeListResponse } from "./knowledge"
 import type { ChatMessage, DashboardData, DueReview, KnowledgeItem, ReviewEvaluation } from "./types"
+import { normalizeSubjectAttemptEvidence, type MistakeEvidence } from "@/lib/mistake-evidence"
 
 const DEMO_NOW = "2026-08-18T09:00:00.000Z"
 
@@ -20,6 +21,7 @@ interface StaticMistakePair {
     question_id: string
     cause: string
     note?: string
+    evidence?: MistakeEvidence
     answer?: string
     elapsed_ms?: number
     is_correct?: boolean
@@ -1085,8 +1087,15 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
 
   if (root === "mistakes" && !id && method === "GET") return responseFor(mistakeList(subjectFrom(url.searchParams.get("subject")))) as T
   if (root === "mistakes" && !id && method === "POST") {
+    const subject = String(body.subject ?? "all").trim().toLowerCase()
+    let evidence: MistakeEvidence | undefined
+    try {
+      evidence = normalizeSubjectAttemptEvidence(subject, body.evidence)
+    } catch (error) {
+      throw new StaticDemoError(error instanceof Error ? error.message : "invalid subject attempt evidence", 400)
+    }
     const pair: StaticMistakePair = {
-      question: { id: newID("question"), subject: String(body.subject ?? "all"), stem: String(body.stem ?? ""), created_at: DEMO_NOW },
+      question: { id: newID("question"), subject, stem: String(body.stem ?? ""), created_at: DEMO_NOW },
       attempt: {
         id: newID("attempt"),
         question_id: "",
@@ -1096,10 +1105,23 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
         elapsed_ms: body.elapsed_ms === undefined ? 0 : Math.max(0, Math.trunc(Number(body.elapsed_ms) || 0)),
         is_correct: false,
         occurred_at: DEMO_NOW,
+        ...(evidence ? { evidence } : {}),
       },
     }
     pair.attempt.question_id = pair.question.id
     state.mistakes.unshift(pair)
+    return responseFor(pair) as T
+  }
+  if (root === "mistakes" && id && action === "evidence" && method === "PATCH") {
+    const pair = state.mistakes.find((entry) => entry.attempt.id === id)
+    if (!pair) throw new StaticDemoError("Static demo mistake not found", 404)
+    try {
+      const evidence = normalizeSubjectAttemptEvidence(pair.question.subject, body.evidence)
+      if (evidence) pair.attempt.evidence = evidence
+      else delete pair.attempt.evidence
+    } catch (error) {
+      throw new StaticDemoError(error instanceof Error ? error.message : "invalid subject attempt evidence", 400)
+    }
     return responseFor(pair) as T
   }
   if (root === "mistakes" && id && action === "schedule" && method === "POST") {

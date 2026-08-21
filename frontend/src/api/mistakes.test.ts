@@ -7,6 +7,7 @@ import {
   reclassifyMistake,
   recordMistake,
   scheduleMistake,
+  updateMistakeEvidence,
 } from "./mistakes"
 
 const mocks = vi.hoisted(() => ({
@@ -86,6 +87,59 @@ describe("mistakes API", () => {
     })
     expect(filed.id).toBe("qa-9")
     expect(filed.note).toBeUndefined()
+  })
+
+  it("files and projects subject evidence without changing empty rows", async () => {
+    const evidence = {
+      version: 1 as const,
+      subject: "geography" as const,
+      tool: "causal_chain" as const,
+      data: { links: [{ cause: "城市化", effect: "下垫面硬化" }] },
+    }
+    mocks.apiRequest.mockResolvedValue({
+      question: { id: "q-10", subject: "geography", stem: "分析城市化影响", created_at: "2026-08-09T02:00:00Z" },
+      attempt: { id: "qa-10", question_id: "q-10", cause: "method", evidence, occurred_at: "2026-08-09T02:00:00Z" },
+    })
+
+    const filed = await recordMistake({
+      subject: "geography",
+      question: "分析城市化影响",
+      cause: "method",
+      evidence,
+    })
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({
+        subject: "geography",
+        stem: "分析城市化影响",
+        cause: "method",
+        note: "",
+        evidence,
+      }),
+    })
+    expect(filed.evidence).toEqual(evidence)
+  })
+
+  it("updates evidence by encoded attempt id and returns the projected row", async () => {
+    const evidence = {
+      version: 1 as const,
+      subject: "math" as const,
+      tool: "derivation" as const,
+      data: { lines: ["2x+4=10", "2x=6", "x=3"] },
+    }
+    mocks.apiRequest.mockResolvedValue({
+      question: { id: "q-11", subject: "math", stem: "解方程", created_at: "2026-08-09T03:00:00Z" },
+      attempt: { id: "qa/11", question_id: "q-11", cause: "method", evidence, occurred_at: "2026-08-09T03:00:00Z" },
+    })
+
+    const updated = await updateMistakeEvidence("qa/11", evidence)
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/mistakes/qa%2F11/evidence", {
+      method: "PATCH",
+      body: JSON.stringify({ evidence }),
+    })
+    expect(updated.evidence).toEqual(evidence)
   })
 
   it("deletes by the attempt id, because that is what a row on the page is", async () => {

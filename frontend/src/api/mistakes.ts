@@ -1,4 +1,5 @@
 import { apiRequest } from "./client"
+import { normalizeSubjectAttemptEvidence, type MistakeEvidence } from "@/lib/mistake-evidence"
 import type { MistakeCause, MistakeRecord } from "@/lib/mistakes"
 
 /**
@@ -18,6 +19,7 @@ interface MistakePair {
     question_id: string
     cause?: string
     note?: string
+    evidence?: unknown
     occurred_at: string
   }
   correction?: {
@@ -63,10 +65,18 @@ function toRecord(pair: MistakePair): MistakeRecord {
     ? { ...record, knowledgeItemId: pair.question.knowledge_item_id }
     : record
   const noted = pair.attempt.note?.trim() ? { ...linked, note: pair.attempt.note } : linked
+  let withEvidence = noted
+  try {
+    const evidence = normalizeSubjectAttemptEvidence(record.subject, pair.attempt.evidence)
+    if (evidence) withEvidence = { ...noted, evidence }
+  } catch {
+    // A newer server may send a tool this client does not know yet. Keep the
+    // mistake row readable while omitting the artifact until the client learns it.
+  }
   // Likewise absent: an older backend answers nothing, and "not yet fixed" is
   // the reading that leaves 订正 pressable instead of hiding it everywhere.
   const corrected = pair.corrected || pair.correction?.is_correct === true
-  if (!corrected) return noted
+  if (!corrected) return withEvidence
   const correctionAnswer = pair.correction?.answer?.trim()
   const correction = correctionAnswer && pair.correction
     ? {
@@ -75,7 +85,7 @@ function toRecord(pair: MistakePair): MistakeRecord {
         occurredAt: pair.correction.occurred_at,
       }
     : undefined
-  return correction ? { ...noted, corrected: true, correction } : { ...noted, corrected: true }
+  return correction ? { ...withEvidence, corrected: true, correction } : { ...withEvidence, corrected: true }
 }
 
 export async function listMistakes(options: ListMistakesOptions = {}): Promise<MistakeRecord[]> {
@@ -94,7 +104,11 @@ export async function recordMistake(filed: {
   note?: string
   answer?: string
   elapsedMs?: number
+  evidence?: MistakeEvidence
 }): Promise<MistakeRecord> {
+  const evidence = filed.evidence
+    ? normalizeSubjectAttemptEvidence(filed.subject, filed.evidence)
+    : undefined
   const pair = await apiRequest<MistakePair>("/mistakes", {
     method: "POST",
     body: JSON.stringify({
@@ -104,8 +118,23 @@ export async function recordMistake(filed: {
       note: filed.note ?? "",
       ...(filed.answer?.trim() ? { answer: filed.answer.trim() } : {}),
       ...(filed.elapsedMs !== undefined ? { elapsed_ms: filed.elapsedMs } : {}),
+      ...(evidence ? { evidence } : {}),
     }),
   })
+  return toRecord(pair)
+}
+
+export async function updateMistakeEvidence(
+  attemptID: string,
+  evidence: MistakeEvidence | null | undefined,
+): Promise<MistakeRecord> {
+  const pair = await apiRequest<MistakePair>(
+    `/mistakes/${encodeURIComponent(attemptID)}/evidence`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ evidence: evidence ?? {} }),
+    },
+  )
   return toRecord(pair)
 }
 
