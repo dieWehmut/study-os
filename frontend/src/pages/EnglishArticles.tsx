@@ -1,6 +1,8 @@
 import { BookOpenText } from "lucide-react"
+import { Link } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
+import { buttonVariants } from "@/components/ui/button"
 import EnglishArticleLibrary from "@/features/english-articles/EnglishArticleLibrary"
 
 export default function EnglishArticles() {
@@ -13,6 +15,11 @@ export default function EnglishArticles() {
           把英文原文整理成双语精读材料，并从这里继续阅读、重新生成或导出。
         </p>
       </header>
+      <nav aria-label="reading modes" className="flex flex-wrap gap-2 border-b border-border pb-3">
+        <Link to="/reading" className={buttonVariants({ variant: "outline", size: "sm" })}>逐节阅读</Link>
+        <span className={buttonVariants({ size: "sm" })}>英语时文</span>
+        <Link to="/reading/english-corpora" className={buttonVariants({ variant: "outline", size: "sm" })}>英语语料</Link>
+      </nav>
       <EnglishArticleLibrary />
     </section>
   )

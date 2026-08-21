@@ -15,6 +15,7 @@ import Settings from "@/pages/Settings"
 import EnglishArticleNew from "@/pages/EnglishArticleNew"
 import EnglishArticles from "@/pages/EnglishArticles"
 import EnglishArticleDetail from "@/pages/EnglishArticleDetail"
+import EnglishCorpora from "@/pages/EnglishCorpora"
 import Lessons from "@/pages/Lessons"
 import LessonDetail from "@/pages/LessonDetail"
 import { isStaticDemo } from "@/lib/runtime"
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/reading/articles" element={<EnglishArticles />} />
         <Route path="/reading/articles/new" element={<EnglishArticleNew />} />
         <Route path="/reading/articles/:id" element={<EnglishArticleDetail />} />
+        <Route path="/reading/english-corpora" element={<EnglishCorpora />} />
         <Route path="/lessons" element={<Lessons />} />
         <Route path="/lessons/:id" element={<LessonDetail />} />
         <Route path="/import" element={<Import />} />

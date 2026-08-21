@@ -18,6 +18,7 @@ vi.mock("@/pages/Reading", () => ({ default: () => <div>reading</div> }))
 vi.mock("@/pages/EnglishArticles", () => ({ default: () => <div>english-library</div> }))
 vi.mock("@/pages/EnglishArticleNew", () => ({ default: () => <div>english-new</div> }))
 vi.mock("@/pages/EnglishArticleDetail", () => ({ default: () => <div>english-detail</div> }))
+vi.mock("@/pages/EnglishCorpora", () => ({ default: () => <div>english-corpora</div> }))
 vi.mock("@/pages/Lessons", () => ({ default: () => <div>lessons</div> }))
 vi.mock("@/pages/LessonDetail", () => ({ default: () => <div>lesson-detail</div> }))
 
@@ -26,6 +27,7 @@ describe("English article routes", () => {
     ["/reading/articles", "english-library"],
     ["/reading/articles/new", "english-new"],
     ["/reading/articles/article-1", "english-detail"],
+    ["/reading/english-corpora", "english-corpora"],
   ])("registers %s", (path, text) => {
     render(
       <MemoryRouter initialEntries={[path]}>

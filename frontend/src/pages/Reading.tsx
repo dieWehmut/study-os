@@ -201,6 +201,12 @@ export default function Reading() {
         >
           <BookOpenText aria-hidden="true" className="size-4 text-primary" />英语时文
         </Link>
+        <Link
+          to="/reading/english-corpora"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted"
+        >
+          <BookOpenText aria-hidden="true" className="size-4 text-primary" />英语语料
+        </Link>
       </nav>
 
       <Card>
