@@ -10,7 +10,7 @@
 
 ## 一、对象盘点：0801 的 13 个底层对象，现在有几个
 
-盘点基线：schema 版本 17（`backend/db/db.go:19`，2026-08-21）。下表按 0801「三、首先要统一的底层对象」逐条对照。
+盘点基线：schema 版本 18（`backend/db/db.go:19`，2026-08-22）。下表按 0801「三、首先要统一的底层对象」逐条对照。
 新增迁移或底层对象时，必须同时更新本节；`scripts/tests/architecture-docs-consistency.test.mjs` 会检查这条基线和关键表名，避免路线图把已经落地的能力再次当成缺口。
 
 | # | 对象 | 现状 | 落点 |
@@ -22,7 +22,7 @@
 | 5 | 二级结论 Insight | 🟡 靠 `item_type` + tag 表达 | 知识库已有「二级结论/解题策略/易错信号」筛选 |
 | 6 | 记忆项 Memory Item | ✅ | `prompts` + `review_states` |
 | 7 | 题目 Question | ✅ 基础记录已落地 | `questions`；含来源与可选 `knowledge_item_id` |
-| 8 | 作答 Attempt | 🟡 三条记录链按语义分开 | 记忆项作答在 `attempts`；错题事件在 `question_attempts`，保存答案、耗时与正误；课程即时练习在 `lesson_attempts`，保存答案、耗时、确定性判定与反馈且不触发 FSRS |
+| 8 | 作答 Attempt | 🟡 三条记录链按语义分开 | 记忆项作答在 `attempts`；错题事件在 `question_attempts`，保存答案、耗时、正误与六科诊断证据；课程即时练习在 `lesson_attempts`，保存答案、耗时、确定性判定与反馈且不触发 FSRS |
 | 9 | 错因 Error Cause | ✅ 已持久化并可扩展 | `error_causes` + `/api/error-causes`；支持全局/学科分类、候选确认、归档和错题重分类 |
 | 10 | 任务 Task | ❌ | — |
 | 11 | 学习会话 Study Session | ✅ 表在，写得少 | `study_sessions` |
@@ -51,6 +51,12 @@ schema v17 新增 `qa_records`：每个 `chat_messages.session_id` 最多保存�
 Pages 当前浏览器会话内的同契约模拟、以及答疑页单列编辑面板均已接入；会话切换、发送和轮询的旧请求
 不会覆盖当前记录。下一步是把已确认的记录显式回流到记忆项或任务，不做未经用户确认的自动写入。
 
+schema v18 为 `question_attempts` 新增 `evidence_json`：用版本化外壳保存六科专用诊断板的可恢复输入，
+包括语文得分点、数学推导、英语长难句、物理受力图/运动分段、化学方程式和地理因果链。写入入口为
+`PATCH /api/mistakes/{attemptID}/evidence`，创建错题时的 POST 也接受同一外壳；后端会校验学科与工具的对应关系，
+错题列表、详情和订正结果都会返回 `attempt.evidence`。GitHub Pages 静态适配器实现同路径、状态码和校验，
+因此本地后端与 Pages 演示使用同一份证据契约；空对象 `{}` 表示尚未补充证据，不改变旧数据语义。
+
 另有一项 0801 列为「模块十」的基础设施**已经就位**：
 `domain_events`（`schema.sql:92`，读写在 `store.go:695/710`）。统一事件层不需要从头设计。
 
@@ -65,7 +71,7 @@ Pages 当前浏览器会话内的同契约模拟、以及答疑页单列编辑�
 0801 设计原则第 ② 条是「一个对象，多种视图」——底层只能有一条记录。
 
 做题工具（`frontend/src/pages/Practice.tsx`）现在以 `/api/mistakes` 为主存储，
-服务端把一条错题拆成 `questions` + `question_attempts`，并支持按学科查询、删除、订正，
+服务端把一条错题拆成 `questions` + `question_attempts`，并支持按学科查询、删除、订正和保存六科诊断证据，
 订正会保存确认后的答案、计时和正确标记；系统也支持把可修复错因排进记忆队列。早期写入浏览器 `localStorage` 的记录只作为一次性迁移来源，
 迁移成功后会清除旧键；这保留了历史数据，又不会让新记录重新分叉。
 
@@ -79,8 +85,9 @@ Pages 当前浏览器会话内的同契约模拟、以及答疑页单列编辑�
 ### 第 1 阶段：题目—作答—错因 落地到后端（已完成基础链路）
 
 1. `questions` 表：题干、学科、来源、可选关联知识点（题型字段仍待补）
-2. `question_attempts` 表：一题多做，保存错因、备注、答案、用时、正误和发生时间；旧订正行已兼容迁移
-3. `/api/mistakes`：错题创建、列表、删除、证据化订正；`localStorage` 仅作为迁移来源
+2. `question_attempts` 表：一题多做，保存错因、备注、答案、用时、正误、六科诊断证据和发生时间；旧订正行已兼容迁移
+3. `/api/mistakes`：错题创建、列表、删除、证据化订正；`PATCH /api/mistakes/{attemptID}/evidence` 更新诊断证据，
+   `localStorage` 仅作为迁移来源，GitHub Pages 静态适配器保持相同契约
 4. `error_causes`：已落地为 schema v16 与 `/api/error-causes`，旧六类作为默认种子；Practice
    会合并后端确认分类并为未知自由文本提供保守回退。后续可继续沉淀各学科自己的分类体系
    （0801：「以后你独立总结出的『地理六类错因』，就可以作为地理学科的专属分类体系」）
@@ -92,8 +99,9 @@ Pages 当前浏览器会话内的同契约模拟、以及答疑页单列编辑�
 
 `mistakes.ts` 已经区分了「复习能修的」和「复习修不了的」，并由
 `POST /api/mistakes/{attemptID}/schedule` 执行排队；后端会复用知识库条目并避免重复排卡。
-Practice 已用行内表单采集订正答案与用时，Pages 静态展示也在当前会话内保存相同证据。当前仍缺按错因聚合的
-诊断视图，以及把订正证据反馈给后续课程/题目选择的闭环。
+Practice 已用行内表单采集订正答案与用时，并在具体错题行中打开对应学科诊断板；六科板的输入会通过
+`PATCH /api/mistakes/{attemptID}/evidence` 持久化，重新加载后可恢复，Pages 静态展示也在当前会话内保存相同证据。
+当前仍缺按错因聚合的诊断视图、学科专用的自动判分/掌握度推断，以及把订正证据反馈给后续课程/题目选择的闭环。
 
 判据：做错一道题，其对应知识点当天进入队列。
 

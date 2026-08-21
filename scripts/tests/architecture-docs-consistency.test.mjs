@@ -78,6 +78,16 @@ test("ROADMAP records question-attempt evidence at the schema head", () => {
   assert.match(roadmap, /订正[\s\S]*答案[\s\S]*用时/)
 })
 
+test("schema v18 records restorable six-subject diagnostic evidence", () => {
+  assert.match(schema, /evidence_json TEXT NOT NULL DEFAULT '\{\}'/)
+  assert.match(databaseSource, /case 18:/)
+  assert.match(databaseSource, /ALTER TABLE question_attempts ADD COLUMN evidence_json/)
+  assert.match(roadmap, /schema v18[\s\S]*question_attempts[\s\S]*evidence_json/)
+  assert.match(roadmap, /PATCH \/api\/mistakes\/\{attemptID\}\/evidence/)
+  assert.match(roadmap, /GitHub Pages 静态适配器[\s\S]*同路径、状态码和校验/)
+  assert.match(roadmap, /Pages 静态展示[\s\S]*保存相同证据/)
+})
+
 test("lesson documentation describes the versioned write and preview contract", () => {
   assert.match(roadmap, /POST \/api\/lessons/)
   assert.match(roadmap, /PATCH \/api\/lessons\/{lessonID}/)
