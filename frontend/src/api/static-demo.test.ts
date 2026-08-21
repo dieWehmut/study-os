@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { resetStaticDemoState, staticDemoRequest } from "./static-demo"
+import { getQARecord, saveQARecord } from "./chat"
 
 describe("static Pages API fixtures", () => {
   beforeEach(() => resetStaticDemoState())
+
+  afterEach(() => vi.unstubAllEnvs())
 
   it("returns a useful dashboard without touching the network", async () => {
     const dashboard = await staticDemoRequest<{
@@ -44,6 +47,65 @@ describe("static Pages API fixtures", () => {
       `/chat/messages?subject=english&session_id=${encodeURIComponent(result.session_id)}`,
     )
     expect(messages.items.map((message) => message.role)).toEqual(["user", "assistant"])
+  })
+
+  it("persists structured QA records in the Pages session", async () => {
+    vi.stubEnv("VITE_STATIC_DEMO", "true")
+    await staticDemoRequest("/chat", {
+      method: "POST",
+      body: JSON.stringify({ session_id: "session/qa", subject: "physics", message: "Explain force." }),
+    })
+
+    const created = await saveQARecord("session/qa", {
+      subject: "physics",
+      original_understanding: "Force directly creates velocity.",
+      corrected_model: "Net force creates acceleration.",
+      mastery_evidence: "I solved a new transfer problem.",
+      unresolved: "How does drag change the model?",
+      status: "open",
+    })
+    expect(created.id).toMatch(/^qa-/)
+    expect(created.session_id).toBe("session/qa")
+
+    const fetched = await getQARecord("session/qa")
+    expect(fetched).toEqual(created)
+
+    const updated = await saveQARecord("session/qa", {
+      subject: "physics",
+      original_understanding: created.original_understanding,
+      corrected_model: "The vector sum of forces determines acceleration.",
+      mastery_evidence: "I explained an inclined-plane example.",
+      unresolved: "",
+      status: "understood",
+    })
+    expect(updated.id).toBe(created.id)
+    expect(updated.created_at).toBe(created.created_at)
+    expect(updated.updated_at).not.toBe(created.updated_at)
+    expect(updated.corrected_model).toContain("vector sum")
+
+    await expect(getQARecord("missing-session")).resolves.toBeNull()
+  })
+
+  it("validates static QA record status and paired context fields", async () => {
+    await staticDemoRequest("/chat", {
+      method: "POST",
+      body: JSON.stringify({ session_id: "session-invalid", subject: "physics", message: "Explain force." }),
+    })
+    await expect(staticDemoRequest("/chat/records/session-invalid", {
+      method: "PUT",
+      body: JSON.stringify({ subject: "physics", status: "complete" }),
+    })).rejects.toMatchObject({ status: 400 })
+    await expect(staticDemoRequest("/chat/records/session-invalid", {
+      method: "PUT",
+      body: JSON.stringify({ subject: "physics", context_type: "lesson" }),
+    })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it("rejects QA records for chat sessions that do not exist", async () => {
+    await expect(staticDemoRequest("/chat/records/missing-session", {
+      method: "PUT",
+      body: JSON.stringify({ subject: "physics", status: "open" }),
+    })).rejects.toMatchObject({ status: 404 })
   })
 
   it("rejects unsupported server-only calls instead of issuing a request", async () => {

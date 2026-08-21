@@ -61,7 +61,16 @@ export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  if (isStaticDemo()) return staticDemoRequest<T>(path, init)
+  if (isStaticDemo()) {
+    try {
+      return await staticDemoRequest<T>(path, init)
+    } catch (error) {
+      if (error instanceof StaticDemoError) {
+        throw new ApiError(error.status, error.message)
+      }
+      throw error
+    }
+  }
 
   const { baseUrl, token } = await resolveApiConfig()
   const headers = new Headers(init?.headers)
@@ -117,5 +126,5 @@ export async function apiRequest<T>(
   const text = await response.text()
   return (text ? JSON.parse(text) : undefined) as T
 }
-import { staticDemoRequest } from "./static-demo"
+import { StaticDemoError, staticDemoRequest } from "./static-demo"
 import { isStaticDemo } from "@/lib/runtime"

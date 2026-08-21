@@ -51,6 +51,24 @@ interface StaticErrorCause {
   updated_at: string
 }
 
+type StaticQARecordStatus = "open" | "understood" | "follow_up"
+type StaticQARecordContextType = "knowledge_item" | "question" | "lesson"
+
+interface StaticQARecord {
+  id: string
+  session_id: string
+  subject: string
+  context_type?: StaticQARecordContextType
+  context_id?: string
+  original_understanding: string
+  corrected_model: string
+  mastery_evidence: string
+  unresolved: string
+  status: StaticQARecordStatus
+  created_at: string
+  updated_at: string
+}
+
 interface StaticImportJob {
   jobId: string
   previewed: boolean
@@ -64,6 +82,7 @@ interface StaticState {
   groups: KnowledgeGroup[]
   due: DueReview[]
   messages: ChatMessage[]
+  qaRecords: Map<string, StaticQARecord>
   notes: IntegratedNote[]
   lessons: Lesson[]
   lessonAttempts: LessonPracticeAttempt[]
@@ -331,6 +350,7 @@ function makeInitialState(): StaticState {
     ],
     due: [makeDue(knowledge[0], 0), makeDue(knowledge[1], 1), makeDue(knowledge[2], 2)],
     messages,
+    qaRecords: new Map(),
     notes: [makeNote()],
     lessons: [makeLesson()],
     lessonAttempts: [],
@@ -491,6 +511,62 @@ function newID(prefix: string): string {
   const id = `${prefix}-${state.sequence}`
   state.sequence += 1
   return id
+}
+
+function nextStaticTimestamp(previous: string): string {
+  return new Date(Date.parse(previous) + 1).toISOString()
+}
+
+function qaRecordContextExists(contextType: StaticQARecordContextType, contextID: string): boolean {
+  switch (contextType) {
+    case "knowledge_item":
+      return state.knowledge.some((item) => item.id === contextID)
+    case "question":
+      return state.mistakes.some((pair) => pair.question.id === contextID)
+    case "lesson":
+      return state.lessons.some((lesson) => lesson.id === contextID)
+  }
+}
+
+function qaRecordFromBody(sessionID: string, body: Record<string, unknown>): StaticQARecord {
+  const subject = String(body.subject ?? "").trim()
+  if (!subject) throw new StaticDemoError("qa record subject is required", 400)
+
+  const rawStatus = String(body.status ?? "").trim() || "open"
+  if (!(["open", "understood", "follow_up"] as string[]).includes(rawStatus)) {
+    throw new StaticDemoError("invalid qa record status", 400)
+  }
+
+  const contextType = String(body.context_type ?? "").trim()
+  const contextID = String(body.context_id ?? "").trim()
+  if (Boolean(contextType) !== Boolean(contextID)) {
+    throw new StaticDemoError("qa record context type and id must be provided together", 400)
+  }
+  if (contextType && !(["knowledge_item", "question", "lesson"] as string[]).includes(contextType)) {
+    throw new StaticDemoError("invalid qa record context type", 400)
+  }
+  if (contextType && !qaRecordContextExists(contextType as StaticQARecordContextType, contextID)) {
+    throw new StaticDemoError("Static demo QA record context not found", 404)
+  }
+
+  const existing = state.qaRecords.get(sessionID)
+  const createdAt = existing?.created_at ?? DEMO_NOW
+  return {
+    id: existing?.id ?? newID("qa"),
+    session_id: sessionID,
+    subject,
+    ...(contextType ? {
+      context_type: contextType as StaticQARecordContextType,
+      context_id: contextID,
+    } : {}),
+    original_understanding: String(body.original_understanding ?? ""),
+    corrected_model: String(body.corrected_model ?? ""),
+    mastery_evidence: String(body.mastery_evidence ?? ""),
+    unresolved: String(body.unresolved ?? ""),
+    status: rawStatus as StaticQARecordStatus,
+    created_at: createdAt,
+    updated_at: existing ? nextStaticTimestamp(existing.updated_at) : createdAt,
+  }
 }
 
 function subjectFrom(value: string | null): string | undefined {
@@ -875,6 +951,23 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   }
 
   if (root === "chat" && id === "conversations" && method === "GET") return responseFor(chatConversations(subjectFrom(url.searchParams.get("subject")))) as T
+  if (root === "chat" && id === "records") {
+    const sessionID = String(action ?? "").trim()
+    if (!sessionID) throw new StaticDemoError("session id is required", 400)
+    if (!state.messages.some((message) => message.session_id === sessionID)) {
+      throw new StaticDemoError("Static demo chat session not found", 404)
+    }
+    if (method === "GET") {
+      const record = state.qaRecords.get(sessionID)
+      if (!record) throw new StaticDemoError("Static demo QA record not found", 404)
+      return responseFor(record) as T
+    }
+    if (method === "PUT") {
+      const record = qaRecordFromBody(sessionID, body)
+      state.qaRecords.set(sessionID, record)
+      return responseFor(record) as T
+    }
+  }
   if (root === "chat" && id === "messages" && method === "GET") {
     const session = url.searchParams.get("session_id")
     const subject = subjectFrom(url.searchParams.get("subject"))

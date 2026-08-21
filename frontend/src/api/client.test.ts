@@ -121,4 +121,13 @@ describe("resolveApiBase", () => {
     })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it("normalizes static demo failures to the shared API error contract", async () => {
+    vi.stubEnv("VITE_STATIC_DEMO", "true")
+
+    await expect(apiRequest("/chat/records/missing-session")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 404,
+    })
+  })
 })
