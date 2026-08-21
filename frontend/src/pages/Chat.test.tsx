@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Chat from "./Chat"
@@ -93,6 +93,19 @@ describe("Chat page", () => {
 
     await waitFor(() => expect(mocks.uploadChatAttachment).toHaveBeenCalled())
     expect(await screen.findByText("notes.txt")).toBeInTheDocument()
+  })
+
+  it("keeps upload and send controls inside the composer bottom-right action area", () => {
+    render(<Chat />)
+
+    const composer = screen.getByRole("group", { name: "消息编辑器" })
+    const actions = within(composer).getByRole("group", { name: "消息操作" })
+    const upload = within(actions).getByRole("button", { name: "上传附件" })
+    const send = within(actions).getByRole("button", { name: "发送" })
+
+    expect(composer).toContainElement(screen.getByLabelText("发给 AI 的消息"))
+    expect(actions).toHaveClass("absolute", "right-3", "bottom-3")
+    expect(upload.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { MessageSquarePlus, Paperclip, SendHorizonal, Sparkles } from "lucide-react"
+import { ArrowUp, MessageSquarePlus, Paperclip, Sparkles } from "lucide-react"
 
 import {
   listChatConversations,
@@ -296,11 +296,12 @@ export default function Chat() {
                 ))}
               </div>
             ) : null}
-            <div className="flex items-end gap-2">
+            <div
+              role="group"
+              aria-label="消息编辑器"
+              className="relative min-h-28 rounded-3xl border border-input bg-background transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40"
+            >
               <input ref={fileInputRef} type="file" className="hidden" onChange={(event) => void handleFile(event)} />
-              <Button type="button" variant="outline" size="icon" aria-label="上传附件" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-                <Paperclip aria-hidden="true" />
-              </Button>
               <textarea
                 aria-label="发给 AI 的消息"
                 value={draft}
@@ -308,12 +309,32 @@ export default function Chat() {
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void send()
                 }}
-                placeholder={`在「${subject === "all" ? "综合" : subjectName(subject)}」下提问…（Ctrl + Enter 发送）`}
-                className="min-h-20 flex-1 resize-y rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder={`在「${subject === "all" ? "综合" : subjectName(subject)}」下提问…`}
+                className="min-h-28 w-full resize-y rounded-3xl border-0 bg-transparent px-4 pt-4 pr-24 pb-14 text-sm outline-none"
               />
-              <Button disabled={!draft.trim() || sending} onClick={() => void send()}>
-                <SendHorizonal data-icon="inline-start" />{sending ? "已提交" : "发送"}
-              </Button>
+              <div role="group" aria-label="消息操作" className="absolute right-3 bottom-3 flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  className="rounded-full text-muted-foreground"
+                  aria-label="上传附件"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon-lg"
+                  className="rounded-full"
+                  aria-label={sending ? "已提交" : "发送"}
+                  disabled={!draft.trim() || sending}
+                  onClick={() => void send()}
+                >
+                  <ArrowUp aria-hidden="true" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
