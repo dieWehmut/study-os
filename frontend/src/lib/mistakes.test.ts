@@ -8,6 +8,7 @@ import {
   mistakesStorageKey,
   readMistakes,
   summarizeMistakes,
+  type MistakeCauseSpec,
   writeMistakes,
   type MistakeCause,
   type MistakeRecord,
@@ -115,6 +116,29 @@ describe("summarizing mistakes", () => {
     expect(summary.corrected).toBe(1)
     expect(summary.byCause.find((entry) => entry.spec.cause === "recall")?.count).toBe(2)
   })
+
+  it("counts a confirmed subject-specific cause supplied by the backend", () => {
+    const taxonomy: MistakeCauseSpec[] = [
+      { cause: "physics:model-selection", label: "模型选择错误", reviewFixes: true, action: "重画受力图" },
+    ]
+    const summary = summarizeMistakes([record("physics:model-selection")], taxonomy)
+
+    expect(summary.byCause).toEqual([
+      expect.objectContaining({
+        count: 1,
+        spec: expect.objectContaining({ cause: "physics:model-selection", label: "模型选择错误" }),
+      }),
+    ])
+    expect(summary.reviewFixable).toBe(1)
+  })
+
+  it("keeps an unknown free-text cause visible as a conservative fallback", () => {
+    const summary = summarizeMistakes([record("not-yet-classified")], MISTAKE_CAUSES)
+
+    expect(summary.byCause[0]?.spec.label).toContain("not-yet-classified")
+    expect(summary.byCause[0]?.spec.reviewFixes).toBe(false)
+    expect(summary.needsOtherFix).toBe(1)
+  })
 })
 
 describe("filing a mistake", () => {
@@ -183,20 +207,27 @@ describe("keeping the log", () => {
     expect(readMistakes()).toEqual([record("misread", "b")])
   })
 
-  it("drops a cause it no longer recognizes", () => {
-    // The page looks each cause up in the taxonomy to draw its label. A row
-    // naming a cause that has since been renamed would render a blank badge
-    // and count toward a total it belongs to nowhere in.
+  it("keeps a cause it no longer recognizes for later reclassification", () => {
     localStorage.setItem(
       mistakesStorageKey,
       JSON.stringify([{ ...record("recall", "a"), cause: "vibes" }, record("recall", "b")]),
     )
 
-    expect(readMistakes()).toEqual([record("recall", "b")])
+    expect(readMistakes()).toEqual([
+      expect.objectContaining({ id: "a", cause: "vibes" }),
+      record("recall", "b"),
+    ])
   })
 })
 
 describe("what to do about a cause, by subject", () => {
+  it("uses a persisted action for a new subject-specific cause", () => {
+    const taxonomy: MistakeCauseSpec[] = [
+      { cause: "physics:model-selection", label: "模型选择错误", reviewFixes: true, action: "重画受力图" },
+    ]
+
+    expect(causeActionFor("physics", "physics:model-selection", taxonomy)).toBe("重画受力图")
+  })
   it("says something a physics student can actually go and do", () => {
     // 思路不对 in 物理 is nearly always the wrong model picked, and the fix is
     // a drawing, not more problems. The generic advice -- 找同类题再做两道 --

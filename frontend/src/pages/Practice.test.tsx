@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
   deleteMistake: vi.fn(),
   scheduleMistake: vi.fn(),
   correctMistake: vi.fn(),
+  listErrorCauses: vi.fn(),
 }))
 
 vi.mock("@/api/mistakes", () => mocks)
+vi.mock("@/api/error-causes", () => ({ listErrorCauses: mocks.listErrorCauses }))
 
 let filed = 0
 
@@ -52,6 +54,7 @@ describe("Practice page", () => {
     filed = 0
     useSubjectStore.setState({ subject: "all" })
     mocks.listMistakes.mockResolvedValue([])
+    mocks.listErrorCauses.mockResolvedValue([])
     mocks.deleteMistake.mockResolvedValue(undefined)
     mocks.scheduleMistake.mockResolvedValue("k-mistake-1")
     // 订正 answers with the row still a mistake, now carrying the mark. The
@@ -120,6 +123,44 @@ describe("Practice page", () => {
 
     expect(screen.getByText("复习能解决 1")).toBeInTheDocument()
     expect(screen.getByText("另有原因 2")).toBeInTheDocument()
+  })
+
+  it("offers confirmed subject-specific causes and their persisted action", async () => {
+    useSubjectStore.setState({ subject: "physics" })
+    mocks.listErrorCauses.mockResolvedValueOnce([
+      {
+        id: "physics:model-selection",
+        subject: "physics",
+        label: "模型选择错误",
+        reviewFixes: true,
+        action: "重画受力图并选择模型",
+        status: "confirmed",
+        sortOrder: 20,
+        createdAt: "2026-08-20T00:00:00Z",
+        updatedAt: "2026-08-20T00:00:00Z",
+      },
+    ])
+
+    mocks.recordMistake.mockResolvedValueOnce({
+      id: "qa-custom",
+      subject: "physics",
+      question: "模型选错的一题",
+      cause: "physics:model-selection",
+      createdAt: "2026-08-20T00:00:00Z",
+    })
+    render(<Practice />)
+
+    expect(await screen.findByRole("button", { name: "模型选择错误" })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText("错题"), { target: { value: "模型选错的一题" } })
+    fireEvent.click(screen.getByRole("button", { name: "模型选择错误" }))
+
+    expect(await screen.findByText("模型选错的一题")).toBeInTheDocument()
+    expect(screen.getByText("重画受力图并选择模型")).toBeInTheDocument()
+    expect(mocks.recordMistake).toHaveBeenCalledWith({
+      subject: "physics",
+      question: "模型选错的一题",
+      cause: "physics:model-selection",
+    })
   })
 
   it("says what to do about a cause review will not fix", async () => {
