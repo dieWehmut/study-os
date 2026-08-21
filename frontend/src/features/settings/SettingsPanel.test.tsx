@@ -134,6 +134,9 @@ describe("SettingsPanel", () => {
 
     expect(await screen.findByText("AI 服务商")).toBeInTheDocument()
     expect(container.querySelectorAll('[class*="grid-cols-2"]')).toHaveLength(0)
+    expect(container.firstElementChild).toHaveClass("flex", "flex-col")
+    expect(container.firstElementChild?.firstElementChild).toHaveClass("flex", "flex-col")
+    expect(container.firstElementChild?.lastElementChild).toHaveClass("flex", "flex-col")
   })
 
   it("shows every registered vendor and never renders a provider secret", async () => {

@@ -446,8 +446,8 @@ export default function SettingsPanel() {
   const speechDirty = Object.keys(speechConfigDiff()).length > 0
 
   return (
-    <div className="grid items-start gap-4">
-      <div className="grid content-start gap-4">
+    <div className="flex flex-col items-stretch gap-4">
+      <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
@@ -711,7 +711,7 @@ export default function SettingsPanel() {
         </Card>
       </div>
 
-      <div className="grid content-start gap-4">
+      <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
