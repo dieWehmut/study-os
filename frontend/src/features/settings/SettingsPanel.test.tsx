@@ -129,6 +129,13 @@ describe("SettingsPanel", () => {
     mocks.uploadVoiceRoleAvatar.mockResolvedValue({ id: "voice-1", has_avatar: true, size_bytes: 1024 })
   })
 
+  it("keeps every settings configuration in a single column", async () => {
+    const { container } = render(<SettingsPanel />)
+
+    expect(await screen.findByText("AI 服务商")).toBeInTheDocument()
+    expect(container.querySelectorAll('[class*="grid-cols-2"]')).toHaveLength(0)
+  })
+
   it("shows every registered vendor and never renders a provider secret", async () => {
     render(<SettingsPanel />)
 

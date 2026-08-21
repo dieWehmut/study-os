@@ -324,7 +324,7 @@ export default function SettingsPanel() {
   function renderRoleFields(idPrefix: string) {
     return (
       <>
-        <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="grid gap-2.5">
           <label className="grid gap-1 text-xs font-medium" htmlFor={`${idPrefix}-name`}>
             名字
             <input
@@ -350,7 +350,7 @@ export default function SettingsPanel() {
             />
           </label>
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="grid gap-2.5">
           <label className="grid gap-1 text-xs font-medium" htmlFor={`${idPrefix}-voice`}>
             发音人
             <input
@@ -446,12 +446,7 @@ export default function SettingsPanel() {
   const speechDirty = Object.keys(speechConfigDiff()).length > 0
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-2">
-      {/*
-        两列是显式的，不是让卡片在一个 grid 里自动淌。自动流会按高度把卡片
-        塞进下一个空位，所以「语音合成」这种长卡片一变高就会把右边的卡片挤到
-        别的列去。分成两个列容器之后，每一列的内容顺序就固定了。
-      */}
+    <div className="grid items-start gap-4">
       <div className="grid content-start gap-4">
         <Card>
           <CardHeader>
@@ -520,7 +515,7 @@ export default function SettingsPanel() {
                     <strong className="text-sm">默认接口</strong>
                     <span className="text-xs text-muted-foreground">{speech.key_configured ? "密钥已配置（仅显示状态）" : "尚未配置密钥"}</span>
                   </div>
-                  <div className="grid gap-2.5 sm:grid-cols-2">
+                  <div className="grid gap-2.5">
                     <label className="grid gap-1 text-xs font-medium" htmlFor="speech-provider">
                       服务预设
                       <Select
@@ -572,7 +567,7 @@ export default function SettingsPanel() {
                     />
                   </label>
                   {selectedSpeechSpec?.local ? <p className="text-xs text-muted-foreground">本地服务通常不需要 API Key。</p> : null}
-                  <div className="grid gap-2.5 sm:grid-cols-2">
+                  <div className="grid gap-2.5">
                     <label className="grid gap-1 text-xs font-medium" htmlFor="speech-model">
                       模型
                       <input
@@ -795,7 +790,7 @@ export default function SettingsPanel() {
                         className="h-8 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid gap-2">
                       <label className="grid gap-1 text-xs font-medium" htmlFor={`${vendor.id}-model`}>
                         模型
                         <Input
@@ -919,12 +914,12 @@ export default function SettingsPanel() {
       </div>
 
       {error ? (
-        <div role="alert" className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/35 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/35 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           <span>{error}</span>
           <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw data-icon="inline-start" />重试</Button>
         </div>
       ) : null}
-      {notice ? <p aria-live="polite" className="lg:col-span-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</p> : null}
+      {notice ? <p aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</p> : null}
     </div>
   )
 }
