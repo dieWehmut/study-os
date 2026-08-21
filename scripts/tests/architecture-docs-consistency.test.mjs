@@ -42,6 +42,7 @@ test("ROADMAP names persisted objects instead of stale browser-only gaps", () =>
     "lesson_links",
     "lesson_attempts",
     "error_causes",
+    "qa_records",
   ]) {
     assert.match(schema, tablePattern(table), `schema is missing ${table}`)
     assert.match(roadmap, new RegExp(`\\b${table}\\b`), `ROADMAP is missing ${table}`)
@@ -65,6 +66,7 @@ test("ROADMAP records question-attempt evidence at the schema head", () => {
   assert.match(databaseSource, /ALTER TABLE question_attempts ADD COLUMN answer/)
   assert.match(roadmap, /schema v15[\s\S]*question_attempts[\s\S]*answer[\s\S]*elapsed_ms[\s\S]*is_correct/)
   assert.match(roadmap, /schema v16[\s\S]*error_causes[\s\S]*GET \/api\/error-causes/)
+  assert.match(roadmap, /schema v17[\s\S]*qa_records[\s\S]*chat_messages\.session_id/)
   assert.match(roadmap, /POST \/api\/error-causes[\s\S]*PATCH \/api\/error-causes/)
   assert.match(roadmap, /PATCH \/api\/mistakes\/\{attemptID\}\/cause/)
   assert.match(roadmap, /POST \/api\/mistakes\/\{attemptID\}\/correct/)

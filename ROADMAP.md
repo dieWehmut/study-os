@@ -10,7 +10,7 @@
 
 ## 一、对象盘点：0801 的 13 个底层对象，现在有几个
 
-盘点基线：schema 版本 16（`backend/db/db.go:19`，2026-08-21）。下表按 0801「三、首先要统一的底层对象」逐条对照。
+盘点基线：schema 版本 17（`backend/db/db.go:19`，2026-08-21）。下表按 0801「三、首先要统一的底层对象」逐条对照。
 新增迁移或底层对象时，必须同时更新本节；`scripts/tests/architecture-docs-consistency.test.mjs` 会检查这条基线和关键表名，避免路线图把已经落地的能力再次当成缺口。
 
 | # | 对象 | 现状 | 落点 |
@@ -26,7 +26,7 @@
 | 9 | 错因 Error Cause | ✅ 已持久化并可扩展 | `error_causes` + `/api/error-causes`；支持全局/学科分类、候选确认、归档和错题重分类 |
 | 10 | 任务 Task | ❌ | — |
 | 11 | 学习会话 Study Session | ✅ 表在，写得少 | `study_sessions` |
-| 12 | 答疑记录 Q&A | 🟡 存了对话，没存结构 | `chat_messages`；缺「原误解—正确模型—掌握证据」 |
+| 12 | 答疑记录 Q&A | 🟡 结构已持久化，交互待落地 | `chat_messages` + `qa_records`；已保存「原理解—正确模型—掌握证据—未解决点」，待接入 API、Pages 与答疑页 |
 | 13 | 系统想法 System Idea | ❌ | — |
 
 schema v13 新增 `lesson_links`：课程与 `knowledge_items`/`prompts` 的显式多对多关联，
@@ -44,6 +44,11 @@ schema v16 新增 `error_causes`：保存全局及学科范围的稳定错因 ID
 `POST /api/error-causes` 支持提出分类，`PATCH /api/error-causes/{causeID}` 支持确认与归档，
 `PATCH /api/mistakes/{attemptID}/cause`
 允许把历史自由文本错因重新归类；未知自由文本仍可保留，不会因客户端 taxonomy 更新而丢失。
+
+schema v17 新增 `qa_records`：每个 `chat_messages.session_id` 最多保存一条可反复更新的结构化答疑记录，
+记录学科、可选知识点/题目/课程关联、原理解、正确模型、掌握证据、未解决点与状态。存储层在同一事务内
+验证会话和关联目标存在；重复保存保留首次记录 ID 与创建时间。目前底层对象与迁移已落地，HTTP、Pages
+静态适配器和答疑页编辑面板在本轮后续小步接入。
 
 另有一项 0801 列为「模块十」的基础设施**已经就位**：
 `domain_events`（`schema.sql:92`，读写在 `store.go:695/710`）。统一事件层不需要从头设计。

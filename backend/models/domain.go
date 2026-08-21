@@ -104,6 +104,76 @@ type ChatMessage struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// QARecord is the editable learning-evidence projection for one immutable
+// chat transcript. SessionID is unique in storage, so repeated saves update
+// the same record instead of creating competing summaries of a conversation.
+type QARecord struct {
+	ID                    string    `json:"id"`
+	SessionID             string    `json:"session_id"`
+	Subject               string    `json:"subject"`
+	ContextType           string    `json:"context_type,omitempty"`
+	ContextID             string    `json:"context_id,omitempty"`
+	OriginalUnderstanding string    `json:"original_understanding"`
+	CorrectedModel        string    `json:"corrected_model"`
+	MasteryEvidence       string    `json:"mastery_evidence"`
+	Unresolved            string    `json:"unresolved"`
+	Status                string    `json:"status"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+const (
+	QARecordStatusOpen       = "open"
+	QARecordStatusUnderstood = "understood"
+	QARecordStatusFollowUp   = "follow_up"
+
+	QARecordContextKnowledgeItem = "knowledge_item"
+	QARecordContextQuestion      = "question"
+	QARecordContextLesson        = "lesson"
+)
+
+func IsQARecordStatusValid(status string) bool {
+	switch strings.TrimSpace(status) {
+	case QARecordStatusOpen, QARecordStatusUnderstood, QARecordStatusFollowUp:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsQARecordContextTypeValid(contextType string) bool {
+	switch strings.TrimSpace(contextType) {
+	case QARecordContextKnowledgeItem, QARecordContextQuestion, QARecordContextLesson:
+		return true
+	default:
+		return false
+	}
+}
+
+func (record QARecord) Validate() error {
+	if strings.TrimSpace(record.ID) == "" {
+		return errors.New("qa record id is required")
+	}
+	if strings.TrimSpace(record.SessionID) == "" {
+		return errors.New("qa record session id is required")
+	}
+	if strings.TrimSpace(record.Subject) == "" {
+		return errors.New("qa record subject is required")
+	}
+	if !IsQARecordStatusValid(record.Status) {
+		return fmt.Errorf("qa record status %q is invalid", record.Status)
+	}
+	contextType := strings.TrimSpace(record.ContextType)
+	contextID := strings.TrimSpace(record.ContextID)
+	if (contextType == "") != (contextID == "") {
+		return errors.New("qa record context type and id must be provided together")
+	}
+	if contextType != "" && !IsQARecordContextTypeValid(contextType) {
+		return fmt.Errorf("qa record context type %q is invalid", record.ContextType)
+	}
+	return nil
+}
+
 // Question is a 题目 -- the thing that was asked. It outlives any single
 // attempt at it, because the same question gets attempted again after 订正.
 type Question struct {

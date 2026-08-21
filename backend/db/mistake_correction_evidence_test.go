@@ -21,8 +21,8 @@ func TestQuestionAttemptSchemaHeadStoresCorrectionEvidence(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	if db.SchemaVersion != 16 {
-		t.Fatalf("schema version = %d, want 16", db.SchemaVersion)
+	if db.SchemaVersion != 17 {
+		t.Fatalf("schema version = %d, want 17", db.SchemaVersion)
 	}
 	for _, column := range []string{"answer", "elapsed_ms", "is_correct"} {
 		var count int

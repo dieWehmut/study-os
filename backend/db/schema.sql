@@ -181,6 +181,24 @@ CREATE TABLE chat_messages (
 );
 CREATE INDEX chat_messages_subject_idx ON chat_messages(subject, created_at DESC);
 
+CREATE TABLE qa_records (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    context_type TEXT NOT NULL DEFAULT ''
+        CHECK (context_type IN ('', 'knowledge_item', 'question', 'lesson')),
+    context_id TEXT NOT NULL DEFAULT '',
+    original_understanding TEXT NOT NULL DEFAULT '',
+    corrected_model TEXT NOT NULL DEFAULT '',
+    mastery_evidence TEXT NOT NULL DEFAULT '',
+    unresolved TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL CHECK (status IN ('open', 'understood', 'follow_up')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK ((context_type = '' AND context_id = '') OR (context_type <> '' AND context_id <> ''))
+);
+CREATE UNIQUE INDEX qa_records_session_idx ON qa_records(session_id);
+
 CREATE TABLE integrated_notes (
     id TEXT PRIMARY KEY,
     subject TEXT NOT NULL DEFAULT '',

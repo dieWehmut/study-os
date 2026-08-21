@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 16
+const currentSchemaVersion = 17
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -457,6 +457,31 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				return fmt.Errorf("apply schema version %d: %w", version, err)
 			}
 		}
+	case 17:
+		statements := []string{
+			`CREATE TABLE IF NOT EXISTS qa_records (
+				id TEXT PRIMARY KEY,
+				session_id TEXT NOT NULL,
+				subject TEXT NOT NULL,
+				context_type TEXT NOT NULL DEFAULT ''
+					CHECK (context_type IN ('', 'knowledge_item', 'question', 'lesson')),
+				context_id TEXT NOT NULL DEFAULT '',
+				original_understanding TEXT NOT NULL DEFAULT '',
+				corrected_model TEXT NOT NULL DEFAULT '',
+				mastery_evidence TEXT NOT NULL DEFAULT '',
+				unresolved TEXT NOT NULL DEFAULT '',
+				status TEXT NOT NULL CHECK (status IN ('open', 'understood', 'follow_up')),
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL,
+				CHECK ((context_type = '' AND context_id = '') OR (context_type <> '' AND context_id <> ''))
+			)`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS qa_records_session_idx ON qa_records(session_id)`,
+		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -547,6 +572,25 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 		}
 		if !hasTable(ctx, tx, "error_causes") {
 			return errors.New("schema version 16 is recorded but error_causes is missing")
+		}
+	case 17:
+		if err := verifySchema(ctx, tx, 16); err != nil {
+			return err
+		}
+		if !hasTable(ctx, tx, "qa_records") {
+			return errors.New("schema version 17 is recorded but qa_records is missing")
+		}
+		for _, column := range []string{
+			"id", "session_id", "subject", "context_type", "context_id",
+			"original_understanding", "corrected_model", "mastery_evidence",
+			"unresolved", "status", "created_at", "updated_at",
+		} {
+			if !hasColumn(ctx, tx, "qa_records", column) {
+				return fmt.Errorf("schema version 17 is recorded but qa_records.%s is missing", column)
+			}
+		}
+		if !hasUniqueIndexOnColumn(ctx, tx, "qa_records", "qa_records_session_idx", "session_id") {
+			return errors.New("schema version 17 is recorded but qa_records_session_idx is missing or invalid")
 		}
 	}
 	return nil
@@ -640,4 +684,42 @@ func hasTable(ctx context.Context, tx *sql.Tx, table string) bool {
 		return false
 	}
 	return count > 0
+}
+
+func hasUniqueIndexOnColumn(ctx context.Context, tx *sql.Tx, table, index, column string) bool {
+	rows, err := tx.QueryContext(ctx, `PRAGMA index_list(`+table+`)`)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	foundUnique := false
+	for rows.Next() {
+		var sequence, unique, partial int
+		var name, origin string
+		if err := rows.Scan(&sequence, &name, &unique, &origin, &partial); err != nil {
+			return false
+		}
+		if name == index && unique == 1 {
+			foundUnique = true
+			break
+		}
+	}
+	if !foundUnique {
+		return false
+	}
+	indexRows, err := tx.QueryContext(ctx, `PRAGMA index_info(`+index+`)`)
+	if err != nil {
+		return false
+	}
+	defer indexRows.Close()
+	columns := make([]string, 0, 1)
+	for indexRows.Next() {
+		var sequence, cid int
+		var name string
+		if err := indexRows.Scan(&sequence, &cid, &name); err != nil {
+			return false
+		}
+		columns = append(columns, name)
+	}
+	return len(columns) == 1 && columns[0] == column
 }
