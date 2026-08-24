@@ -94,6 +94,19 @@ describe("Practice page", () => {
     expect(await screen.findByText(/还没有记录/)).toBeInTheDocument()
   })
 
+  it("shows a six-subject diagnostic overview and can focus a subject", async () => {
+    render(<Practice />)
+
+    expect(await screen.findByRole("heading", { name: "六科诊断总览" })).toBeInTheDocument()
+    const subjectRows = screen.getAllByTestId("subject-diagnostic-row")
+    expect(subjectRows).toHaveLength(6)
+
+    const mathRow = subjectRows.find((row) => row.dataset.subject === "math")
+    expect(mathRow).toBeDefined()
+    fireEvent.click(mathRow as HTMLElement)
+    await waitFor(() => expect(useSubjectStore.getState().subject).toBe("math"))
+  })
+
   it("files a mistake under the cause you picked", async () => {
     render(<Practice />)
     log("光合作用第 3 问", "看错题")

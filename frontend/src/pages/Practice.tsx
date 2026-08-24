@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import {
   CalendarPlus,
   CheckCheck,
@@ -31,6 +31,7 @@ import { LongSentenceBoard } from "@/features/english/LongSentenceBoard"
 import { ChainBoard } from "@/features/geography/ChainBoard"
 import { DerivationBoard } from "@/features/math/DerivationBoard"
 import { SubjectEvidenceEditor } from "@/features/mistake/SubjectEvidenceEditor"
+import { SubjectDiagnosticSummary } from "@/features/mistake/SubjectDiagnosticSummary"
 import { subjectEvidenceToolFor } from "@/features/mistake/subject-evidence"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
 import { MotionBoard } from "@/features/physics/MotionBoard"
@@ -46,6 +47,7 @@ import {
   type MistakeCauseSpec,
   type MistakeRecord,
 } from "@/lib/mistakes"
+import { summarizeMistakeDiagnostics } from "@/lib/mistake-diagnostics"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 function describe(error: unknown, fallback: string): string {
@@ -176,8 +178,11 @@ async function carryBrowserLogOver(): Promise<MistakeRecord[]> {
 
 export default function Practice() {
   const subject = useSubjectStore((state) => state.subject)
+  const setSubject = useSubjectStore((state) => state.setSubject)
   const [question, setQuestion] = useState("")
   const [records, setRecords] = useState<MistakeRecord[]>([])
+  const [diagnosticRecords, setDiagnosticRecords] = useState<MistakeRecord[]>([])
+  const pendingLocalRecords = useRef<MistakeRecord[]>([])
   const [taxonomy, setTaxonomy] = useState<MistakeCauseSpec[]>(MISTAKE_CAUSES)
   const [error, setError] = useState("")
   // Shared by every action that acts on one row -- 排进复习 and 订正 both fail
@@ -202,20 +207,50 @@ export default function Practice() {
   // left from landing on top of the one you switched to.
   useEffect(() => {
     let active = true
-    listMistakes(subject === "all" ? {} : { subject })
+    pendingLocalRecords.current = []
+    const currentSubjectRequest = subject === "all" ? {} : { subject }
+    const currentRecordsRequest = listMistakes(currentSubjectRequest)
+    const allRecordsRequest = subject === "all"
+      ? Promise.resolve<MistakeRecord[] | null>(null)
+      : listMistakes({}).catch(() => null)
+    currentRecordsRequest
       .then((loaded) => {
-        if (!active) return []
+        if (!active) return null
         setCorrectionID("")
         setEvidenceID("")
         setCorrectionAnswer("")
         setCorrectionStartedAt(null)
-        setRecords(loaded)
+        const pending = pendingLocalRecords.current
+        pendingLocalRecords.current = []
+        const merge = (base: MistakeRecord[]) => {
+          const loadedIDs = new Set(base.map((record) => record.id))
+          return [...pending.filter((record) => !loadedIDs.has(record.id)), ...base]
+        }
+        setRecords(merge(loaded))
+        setDiagnosticRecords(merge(loaded))
         setError("")
-        return carryBrowserLogOver()
+        void allRecordsRequest.then((allLoaded) => {
+          if (active && allLoaded) {
+            setDiagnosticRecords((current) => {
+              const merged = [...allLoaded, ...current]
+              const seen = new Set<string>()
+              return merged.filter((record) => {
+                if (seen.has(record.id)) return false
+                seen.add(record.id)
+                return true
+              })
+            })
+          }
+        })
+        return carryBrowserLogOver().then((carried) => ({ loaded, carried }))
       })
-      .then((carried) => {
-        if (!active || carried.length === 0) return
-        setRecords((current) => [...carried, ...current])
+      .then((result) => {
+        if (!active || !result || result.carried.length === 0) return
+        const visibleCarried = subject === "all"
+          ? result.carried
+          : result.carried.filter((record) => record.subject.trim().toLowerCase() === subject)
+        setRecords((current) => [...visibleCarried, ...current])
+        setDiagnosticRecords((current) => [...result.carried, ...current])
       })
       .catch((failure: unknown) => {
         if (active) setError(describe(failure, "读取错题失败"))
@@ -240,6 +275,7 @@ export default function Practice() {
   }, [subject])
 
   const summary = summarizeMistakes(records, taxonomy)
+  const diagnosticSummaries = summarizeMistakeDiagnostics(diagnosticRecords, taxonomy)
   const pending = question.trim()
 
   // Picking the cause is the save. A separate 保存 button would be a third
@@ -254,7 +290,9 @@ export default function Practice() {
     setBusy(true)
     try {
       const filed = await recordMistake({ subject, question: pending, cause })
+      pendingLocalRecords.current = [filed, ...pendingLocalRecords.current]
       setRecords((current) => [filed, ...current])
+      setDiagnosticRecords((current) => [filed, ...current])
       setQuestion("")
       setError("")
     } catch (failure) {
@@ -268,6 +306,8 @@ export default function Practice() {
     try {
       await deleteMistake(id)
       setRecords((current) => current.filter((entry) => entry.id !== id))
+      setDiagnosticRecords((current) => current.filter((entry) => entry.id !== id))
+      pendingLocalRecords.current = pendingLocalRecords.current.filter((entry) => entry.id !== id)
       if (correctionID === id) {
         setCorrectionID("")
         setCorrectionAnswer("")
@@ -298,6 +338,9 @@ export default function Practice() {
     try {
       const knowledgeItemId = await scheduleMistake(item.id)
       setRecords((current) =>
+        current.map((entry) => (entry.id === item.id ? { ...entry, knowledgeItemId } : entry)),
+      )
+      setDiagnosticRecords((current) =>
         current.map((entry) => (entry.id === item.id ? { ...entry, knowledgeItemId } : entry)),
       )
       setRowError("")
@@ -348,6 +391,13 @@ export default function Practice() {
     try {
       const fixed = await correctMistake(item.id, { answer, elapsedMs })
       setRecords((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, corrected: fixed.corrected, correction: fixed.correction }
+            : entry,
+        ),
+      )
+      setDiagnosticRecords((current) =>
         current.map((entry) =>
           entry.id === item.id
             ? { ...entry, corrected: fixed.corrected, correction: fixed.correction }
@@ -405,6 +455,18 @@ export default function Practice() {
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </CardContent>
       </Card>
+
+      {subject === "all" ? (
+        <Card>
+          <CardContent className="pt-4">
+            <SubjectDiagnosticSummary
+              summaries={diagnosticSummaries}
+              activeSubject={subject}
+              onSelectSubject={setSubject}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {summary.total > 0 ? (
         <Card>
@@ -571,6 +633,11 @@ export default function Practice() {
                           record={item}
                           onSaved={(saved) => {
                             setRecords((current) =>
+                              current.map((entry) =>
+                                entry.id === item.id ? { ...entry, evidence: saved.evidence } : entry,
+                              ),
+                            )
+                            setDiagnosticRecords((current) =>
                               current.map((entry) =>
                                 entry.id === item.id ? { ...entry, evidence: saved.evidence } : entry,
                               ),
