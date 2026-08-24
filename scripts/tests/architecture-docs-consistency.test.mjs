@@ -86,6 +86,8 @@ test("schema v18 records restorable six-subject diagnostic evidence", () => {
   assert.match(roadmap, /PATCH \/api\/mistakes\/\{attemptID\}\/evidence/)
   assert.match(roadmap, /GitHub Pages 静态适配器[\s\S]*同路径、状态码和校验/)
   assert.match(roadmap, /Pages 静态展示[\s\S]*保存相同证据/)
+  assert.match(roadmap, /六科诊断总览[\s\S]*首要错因[\s\S]*学科行动建议/)
+  assert.doesNotMatch(roadmap, /当前仍缺按错因聚合的诊断视图/)
 })
 
 test("lesson documentation describes the versioned write and preview contract", () => {
