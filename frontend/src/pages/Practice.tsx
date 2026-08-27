@@ -30,9 +30,11 @@ import { ScoringBoard } from "@/features/chinese/ScoringBoard"
 import { LongSentenceBoard } from "@/features/english/LongSentenceBoard"
 import { ChainBoard } from "@/features/geography/ChainBoard"
 import { DerivationBoard } from "@/features/math/DerivationBoard"
+import { MistakeCauseEditor } from "@/features/mistake/MistakeCauseEditor"
 import { SubjectEvidenceEditor } from "@/features/mistake/SubjectEvidenceEditor"
 import { SubjectDiagnosticSummary } from "@/features/mistake/SubjectDiagnosticSummary"
 import { subjectEvidenceToolFor } from "@/features/mistake/subject-evidence"
+import { SubjectPrescriptionPanel } from "@/features/subjects/SubjectPrescriptionPanel"
 import { FreeBodyBoard } from "@/features/physics/FreeBodyBoard"
 import { MotionBoard } from "@/features/physics/MotionBoard"
 import {
@@ -427,6 +429,8 @@ export default function Practice() {
         </p>
       </div>
 
+      <SubjectPrescriptionPanel subject={subject} onSelectSubject={setSubject} />
+
       <Card>
         <CardHeader className="gap-1.5">
           <CardTitle>记一笔</CardTitle>
@@ -621,6 +625,24 @@ export default function Practice() {
                     >
                       <Trash2 aria-hidden="true" />
                     </Button>
+                    <MistakeCauseEditor
+                      record={item}
+                      onSaved={(saved, cause) => {
+                        const update = (entry: MistakeRecord) =>
+                          entry.id === item.id ? { ...entry, cause: saved.cause } : entry
+                        setRecords((current) => current.map(update))
+                        setDiagnosticRecords((current) => current.map(update))
+                        setTaxonomy((current) => mergeMistakeCauses([
+                          ...current,
+                          {
+                            cause: cause.id,
+                            label: cause.label,
+                            reviewFixes: cause.reviewFixes,
+                            action: cause.action,
+                          },
+                        ]))
+                      }}
+                    />
                     {item.correction ? (
                       <div className="w-full text-xs text-emerald-600 dark:text-emerald-400">
                         答案：{item.correction.answer} · 用时：{item.correction.elapsedMs} ms
