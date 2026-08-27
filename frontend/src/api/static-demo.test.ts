@@ -35,6 +35,25 @@ describe("static Pages API fixtures", () => {
     expect(lookup.item.term).toBe("resilient")
   })
 
+  it("shows four independent English mastery dimensions in Pages mode", async () => {
+    const projection = await staticDemoRequest<{
+      knowledge_item_id: string
+      subject: string
+      dimensions: Array<{ dimension: string; state: string; prompt_types: string[] }>
+    }>("/knowledge/knowledge-last/mastery")
+
+    expect(projection).toMatchObject({ knowledge_item_id: "knowledge-last", subject: "english" })
+    expect(projection.dimensions.map((dimension) => dimension.dimension)).toEqual([
+      "recognition",
+      "comprehension",
+      "retrieval",
+      "use",
+    ])
+    expect(projection.dimensions[0]).toMatchObject({ state: "untested", prompt_types: ["en_to_zh"] })
+    expect(projection.dimensions.slice(1).every((dimension) => dimension.state === "missing")).toBe(true)
+    await expect(staticDemoRequest("/knowledge/not-found/mastery")).rejects.toMatchObject({ status: 404 })
+  })
+
   it("finishes a chat request in memory so polling can render an answer", async () => {
     const result = await staticDemoRequest<{ session_id: string; status: string }>("/chat", {
       method: "POST",
@@ -168,6 +187,70 @@ describe("static Pages API fixtures", () => {
       method: "POST",
       body: JSON.stringify({ answer: "6 N", elapsed_ms: -1 }),
     })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it("schedules a corrected static mistake with only the confirmed answer", async () => {
+    const created = await staticDemoRequest<{ attempt: { id: string } }>("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({
+        subject: "physics",
+        stem: "F = ma，m = 2 kg、a = 3 m/s²，求合力。",
+        cause: "recall",
+        answer: "5 N",
+        note: "先确认研究对象和正方向",
+      }),
+    })
+    await staticDemoRequest(`/mistakes/${created.attempt.id}/correct`, {
+      method: "POST",
+      body: JSON.stringify({ answer: "6 N", elapsed_ms: 1200 }),
+    })
+
+    const scheduled = await staticDemoRequest<{ knowledge_id: string }>(
+      `/mistakes/${created.attempt.id}/schedule`,
+      { method: "POST" },
+    )
+    const due = await staticDemoRequest<{
+      items: Array<{ prompt: { id: string; prompt_type: string }; knowledge: { id: string } }>
+    }>("/reviews/due")
+    const item = due.items.find((entry) => entry.knowledge.id === scheduled.knowledge_id)
+    expect(item?.prompt.prompt_type).toBe("mistake_redo")
+
+    const evaluated = await staticDemoRequest<{ expected_answers: string[] }>(
+      `/reviews/${item?.prompt.id}/answer`,
+      { method: "POST", body: JSON.stringify({ answer: "6 N" }) },
+    )
+    expect(evaluated.expected_answers).toEqual(["6 N"])
+    expect(evaluated.expected_answers).not.toContain("5 N")
+    expect(evaluated.expected_answers).not.toContain("先确认研究对象和正方向")
+  })
+
+  it("keeps static mistake accepted answers empty until a correction exists", async () => {
+    const created = await staticDemoRequest<{ attempt: { id: string } }>("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({
+        subject: "geography",
+        stem: "说明季风气候的成因。",
+        cause: "recall",
+        answer: "海陆热力差异不明显",
+        note: "先看海陆位置和季节",
+      }),
+    })
+
+    const scheduled = await staticDemoRequest<{ knowledge_id: string }>(
+      `/mistakes/${created.attempt.id}/schedule`,
+      { method: "POST" },
+    )
+    const due = await staticDemoRequest<{
+      items: Array<{ prompt: { id: string }; knowledge: { id: string } }>
+    }>("/reviews/due")
+    const item = due.items.find((entry) => entry.knowledge.id === scheduled.knowledge_id)
+    expect(item).toBeTruthy()
+
+    const evaluated = await staticDemoRequest<{ expected_answers: string[] }>(
+      `/reviews/${item?.prompt.id}/answer`,
+      { method: "POST", body: JSON.stringify({ answer: "任意答案" }) },
+    )
+    expect(evaluated.expected_answers).toEqual([])
   })
 
   it("persists subject evidence on static mistake creation and updates", async () => {

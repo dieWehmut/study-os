@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { listRelatedKnowledge, lookupVocabulary, saveKnowledgeWiki } from "./knowledge"
+import { getKnowledgeMastery, listRelatedKnowledge, lookupVocabulary, saveKnowledgeWiki } from "./knowledge"
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -65,6 +65,18 @@ describe("knowledge API", () => {
       method: "PUT",
       body: JSON.stringify({ detailed_markdown: "# 甲" }),
     })
+  })
+
+  it("reads the four-dimensional English mastery projection", async () => {
+    mocks.apiRequest.mockResolvedValue({
+      knowledge_item_id: "k-1",
+      subject: "english",
+      dimensions: [],
+    })
+
+    await getKnowledgeMastery("k/1")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/knowledge/k%2F1/mastery")
   })
 
   it("posts a contextual vocabulary lookup with its kind", async () => {

@@ -55,6 +55,31 @@ export function getKnowledge(id: string): Promise<KnowledgeItem> {
   return apiRequest<KnowledgeItem>(`/knowledge/${encodeURIComponent(id)}`)
 }
 
+export type EnglishMasteryDimension = "recognition" | "comprehension" | "retrieval" | "use"
+export type MasteryState = "missing" | "untested" | "self_reported" | "needs_work" | "partial" | "demonstrated"
+
+export interface EnglishMasteryDimensionEvidence {
+  dimension: EnglishMasteryDimension
+  prompt_types: string[]
+  state: MasteryState
+  evidence_kind: "none" | "self_report" | "answer"
+  prompt_count: number
+  attempt_count: number
+  latest_outcome?: string
+  last_attempt_at?: string
+  due_at?: string
+}
+
+export interface EnglishMasteryProjection {
+  knowledge_item_id: string
+  subject: string
+  dimensions: EnglishMasteryDimensionEvidence[]
+}
+
+export function getKnowledgeMastery(id: string): Promise<EnglishMasteryProjection> {
+  return apiRequest<EnglishMasteryProjection>(`/knowledge/${encodeURIComponent(id)}/mastery`)
+}
+
 export function listGroups(): Promise<KnowledgeGroupListResponse> {
   return apiRequest<KnowledgeGroupListResponse>("/groups")
 }

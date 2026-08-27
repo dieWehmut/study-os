@@ -3,6 +3,7 @@ import type { IntegratedNote } from "./integrate"
 import type { LessonPracticeAttempt, LessonPracticeEvaluation } from "./lesson-practice"
 import type { Lesson } from "./lessons"
 import type { KnowledgeGroup, KnowledgeListResponse } from "./knowledge"
+import type { EnglishMasteryProjection } from "./knowledge"
 import type { ChatMessage, DashboardData, DueReview, KnowledgeItem, ReviewEvaluation } from "./types"
 import { normalizeSubjectAttemptEvidence, type MistakeEvidence } from "@/lib/mistake-evidence"
 
@@ -175,6 +176,50 @@ function makeDue(knowledge: KnowledgeItem, index: number): DueReview {
     },
     due_at: DEMO_NOW,
   }
+}
+
+function makeMistakeDue(knowledge: KnowledgeItem): DueReview {
+  return {
+    prompt: {
+      id: newID("prompt-mistake"),
+      knowledge_item_id: knowledge.id,
+      prompt_type: "mistake_redo",
+      question: `重做这道错题，并说出这一步的依据：\n${knowledge.term}`,
+    },
+    knowledge: {
+      id: knowledge.id,
+      item_type: knowledge.item_type,
+      tags: knowledge.tags,
+    },
+    due_at: DEMO_NOW,
+  }
+}
+
+function staticKnowledgeMastery(knowledgeID: string): EnglishMasteryProjection {
+  const item = state.knowledge.find((entry) => entry.id === knowledgeID)
+  if (!item) throw new StaticDemoError("Static demo knowledge not found", 404)
+  const promptTypes: Record<EnglishMasteryProjection["dimensions"][number]["dimension"], string> = {
+    recognition: "en_to_zh",
+    comprehension: "context_cloze",
+    retrieval: "zh_to_en",
+    use: "make_sentence",
+  }
+  const dimensions = (Object.keys(promptTypes) as Array<keyof typeof promptTypes>).map((dimension) => {
+    const promptType = promptTypes[dimension]
+    const matching = state.due.filter((entry) =>
+      entry.knowledge.id === knowledgeID && entry.prompt.prompt_type === promptType,
+    )
+    return {
+      dimension,
+      prompt_types: [promptType],
+      state: matching.length > 0 ? "untested" as const : "missing" as const,
+      evidence_kind: "none" as const,
+      prompt_count: matching.length,
+      attempt_count: 0,
+      due_at: matching[0]?.due_at,
+    }
+  })
+  return { knowledge_item_id: item.id, subject: item.subject ?? "", dimensions }
 }
 
 function makeArticle(): EnglishArticle {
@@ -883,6 +928,9 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     const items = state.knowledge.filter((entry) => entry.id !== id && (entry.tags ?? []).some((tag) => tags.has(tag)))
     return responseFor({ items, groups: state.groups.filter((group) => tags.has(group.id) || tags.has(group.name.toLowerCase())) }) as T
   }
+  if (root === "knowledge" && id && action === "mastery" && method === "GET") {
+    return responseFor(staticKnowledgeMastery(id)) as T
+  }
   if (root === "knowledge" && id && action === "schedule" && method === "POST") {
     const item = state.knowledge.find((entry) => entry.id === id)
     if (!item) throw new StaticDemoError("Static demo knowledge item not found")
@@ -1149,8 +1197,30 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     if (!policy?.review_fixes) {
       throw new StaticDemoError("This error cause is not fixed by more review", 400)
     }
-    pair.question.knowledge_item_id = pair.question.knowledge_item_id ?? state.knowledge[0]?.id
-    return responseFor({ knowledge_id: pair.question.knowledge_item_id ?? "" }) as T
+    if (pair.question.knowledge_item_id) {
+      return responseFor({
+        status: "already_scheduled",
+        knowledge_id: pair.question.knowledge_item_id,
+        prompt_count: state.due.filter((entry) => entry.knowledge.id === pair.question.knowledge_item_id).length,
+      }) as T
+    }
+
+    const knowledgeID = newID("knowledge-mistake")
+    const acceptedAnswer = pair.correction?.answer.trim() ?? ""
+    const knowledge: KnowledgeItem = {
+      id: knowledgeID,
+      item_type: "mistake",
+      term: pair.question.stem,
+      concise_definition: acceptedAnswer,
+      detailed_markdown: pair.attempt.note?.trim() || undefined,
+      subject: pair.question.subject,
+      tags: ["mistake", pair.attempt.cause].filter(Boolean),
+    }
+    state.knowledge.unshift(knowledge)
+    state.scheduled.add(knowledgeID)
+    state.due.push(makeMistakeDue(knowledge))
+    pair.question.knowledge_item_id = knowledgeID
+    return responseFor({ status: "scheduled", knowledge_id: knowledgeID, prompt_count: 1 }) as T
   }
   if (root === "mistakes" && id && action === "cause" && method === "PATCH") {
     const pair = state.mistakes.find((entry) => entry.attempt.id === id)

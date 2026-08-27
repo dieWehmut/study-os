@@ -187,6 +187,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/knowledge/lookup", func(response http.ResponseWriter, request *http.Request) {
 			handleVocabularyLookup(response, request, application)
 		})
+		api.Get("/knowledge/{knowledgeID}/mastery", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeMastery(response, request, application)
+		})
 		api.Get("/knowledge/{knowledgeID}", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeGet(response, request, application)
 		})
