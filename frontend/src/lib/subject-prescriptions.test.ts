@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 
 import { SUBJECTS } from "./subjects"
 import {
-  SUBJECT_PRESCRIPTIONS,
   guidanceFor,
   prescriptionFor,
   type SubjectEvidenceToolId,
