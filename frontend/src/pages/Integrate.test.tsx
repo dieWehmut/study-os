@@ -104,4 +104,12 @@ describe("Integrate page", () => {
 
     expect(screen.getByRole("button", { name: /按结构生成/ })).toBeDisabled()
   })
+
+  it("keeps the whiteboard research catalogue beside the integration workbench", () => {
+    render(<Integrate />)
+
+    expect(screen.getByRole("heading", { name: "白板能力目录" })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "进阶能力" }))
+    expect(screen.getByText("知识图谱与路径回放")).toBeInTheDocument()
+  })
 })

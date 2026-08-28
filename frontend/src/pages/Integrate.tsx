@@ -14,6 +14,7 @@ import { markdownToMindMap } from "@/lib/mindmap"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { subjectName } from "@/lib/subjects"
 import { useSubjectStore } from "@/store/useSubjectStore"
+import { CapabilityCatalog } from "@/features/whiteboard/CapabilityCatalog"
 
 function cardTypeLabel(cardType: string): string {
   switch (cardType) {
@@ -146,6 +147,8 @@ export default function Integrate() {
         <h1 className="font-heading text-2xl font-semibold tracking-tight">整合</h1>
       </div>
       <SubjectChips subject={subject} onSelect={setSubject} />
+
+      <CapabilityCatalog />
 
       <Card>
         <CardHeader className="gap-1.5">
