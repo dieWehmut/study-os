@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SUBJECTS, subjectMeta } from "@/lib/subjects"
 import { prescriptionFor, type SubjectPrescription } from "@/lib/subject-prescriptions"
 import { cn } from "@/lib/utils"
+import { GeometrySceneBoard } from "@/features/math/GeometrySceneBoard"
+import { defaultTriangleScene } from "@/lib/geometry-scene"
 
 const subjectIcons: Record<string, typeof Languages> = {
   chinese: BookOpenText,
@@ -110,6 +112,12 @@ function DetailedPrescription({ prescription }: { prescription: SubjectPrescript
           <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">下一次验证</h3>
           <p className="text-sm">{prescription.nextStep}</p>
         </div>
+        {prescription.id === "math" ? (
+          <div className="grid gap-2 border-t pt-4">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">条件图预演</h3>
+            <GeometrySceneBoard scene={defaultTriangleScene} />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

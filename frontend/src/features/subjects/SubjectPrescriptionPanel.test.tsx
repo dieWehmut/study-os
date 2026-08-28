@@ -21,6 +21,8 @@ describe("SubjectPrescriptionPanel", () => {
     render(<SubjectPrescriptionPanel subject="math" />)
 
     expect(screen.getByRole("heading", { name: "数学学习处方" })).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: "任意解三角形：先看条件关系" })).toBeInTheDocument()
+    expect(screen.getByRole("slider", { name: "顶点 C 高度" })).toBeInTheDocument()
     expect(screen.getByText("列出已知、所求和限制")).toBeInTheDocument()
     expect(screen.getByText("保留条件清单、关键图形关系和首个错误步骤。")).toBeInTheDocument()
     expect(screen.getByText("只针对断点做一题变式，再验证策略是否迁移。")).toBeInTheDocument()
