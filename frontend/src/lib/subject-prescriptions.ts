@@ -73,6 +73,8 @@ export const SUBJECT_PRESCRIPTIONS: Record<string, SubjectPrescription> = {
       {
         cause: "careless",
         action: "把中间步骤写全：跳步省下的时间都赔在这里了",
+        tool: "derivation",
+        toolLabel: "补全中间步骤",
       },
     ],
   },

@@ -58,9 +58,9 @@ describe("mistake diagnostics", () => {
     expect(math).toMatchObject({
       total: 3,
       corrected: 1,
-      evidenceTotal: 2,
+      evidenceTotal: 3,
       evidenceCompleted: 1,
-      toolReadyCount: 2,
+      toolReadyCount: 3,
       topCause: "method",
       topCauseLabel: "思路不对",
     })

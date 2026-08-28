@@ -1,4 +1,5 @@
 import { normalizeSubjectAttemptEvidence, type MistakeEvidence } from "./mistake-evidence"
+import { guidanceFor, SUBJECT_PRESCRIPTIONS } from "./subject-prescriptions"
 
 // Stable taxonomy IDs come from the backend. The original six remain the
 // checked-in fallback, while free text stays readable until it is reclassified.
@@ -136,33 +137,18 @@ export const MISTAKE_CAUSES: MistakeCauseSpec[] = [
  * nobody reads. A missing pair is not a gap -- it means the shared sentence was
  * already the right one.
  */
-export const SUBJECT_CAUSE_ACTIONS: Record<string, Partial<Record<MistakeCause, string>>> = {
-  physics: {
-    method: "多半是模型选错了：重画受力图，先标接触面再标场力",
-    misread: "先把过程分段，写出每段的初末状态，再回头看问的是哪一段",
-    careless: "方向和单位各查一遍 —— 物理的手滑有一半是漏了负号",
-  },
-  chemistry: {
-    method: "先认题型：这道考的是守恒、过量判断，还是平衡移动？认错型比算错更常见",
-    careless: "配平系数和状态符号回查一遍，分数多半丢在这两处",
-  },
-  math: {
-    method: "定位到出错的那一步，而不是整题重做：从哪一行开始和标准解法分岔",
-    careless: "把中间步骤写全 —— 跳步省下的时间都赔在这里了",
-  },
-  geography: {
-    method: "把因果链一环一环写出来，从成因到表现，缺哪一环就是丢分点",
-    misread: "先看图例和比例尺，再回题干圈出限定词：时间、范围、程度",
-  },
-  chinese: {
-    method: "对着得分点拆答案：踩到几个点，缺的是哪一类",
-    unknown: "先照着范文标出得分点，再回头看自己缺的是哪一句",
-  },
-  english: {
-    recall: "排进复习队列；同词族的其他词一起过，比单背这一个划算",
-    method: "语法题看结构不看词义：先找主谓，再定从句",
-  },
-}
+/**
+ * Compatibility view for callers that still need a subject/cause -> sentence
+ * map. The prescription registry is the source of truth; deriving this view
+ * prevents the action copy from drifting away from the tool routing.
+ */
+export const SUBJECT_CAUSE_ACTIONS: Record<string, Partial<Record<MistakeCause, string>>> =
+  Object.fromEntries(
+    Object.entries(SUBJECT_PRESCRIPTIONS).map(([subject, prescription]) => [
+      subject,
+      Object.fromEntries(prescription.guidance.map((entry) => [entry.cause, entry.action])),
+    ]),
+  )
 
 /**
  * The sentence to show under one cause, for the subject in hand.
@@ -207,7 +193,7 @@ export function causeActionFor(
   cause: MistakeCause,
   taxonomy: MistakeCauseSpec[] = MISTAKE_CAUSES,
 ): string {
-  const tailored = SUBJECT_CAUSE_ACTIONS[subject]?.[cause]
+  const tailored = guidanceFor(subject, cause)?.action ?? SUBJECT_CAUSE_ACTIONS[subject.trim().toLowerCase()]?.[cause]
   if (tailored) return tailored
   return causeSpecFor(cause, taxonomy).action
 }

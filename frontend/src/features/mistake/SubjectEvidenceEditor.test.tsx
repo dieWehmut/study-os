@@ -125,8 +125,15 @@ describe("editing subject-specific mistake evidence", () => {
     expect(screen.getByText("末速度 10 m/s")).toBeInTheDocument()
   })
 
-  it("explains when this subject and cause have no dedicated tool", () => {
+  it("uses the derivation board when math carelessness skipped intermediate steps", () => {
     render(<SubjectEvidenceEditor record={record({ cause: "careless" })} />)
+
+    expect(screen.getByRole("heading", { name: "定位推导断点" })).toBeInTheDocument()
+    expect(screen.getByLabelText("把过程一行一行写下来")).toBeInTheDocument()
+  })
+
+  it("explains when this subject and cause have no dedicated tool", () => {
+    render(<SubjectEvidenceEditor record={record({ subject: "english", cause: "time" })} />)
 
     expect(screen.getByText("这个错因暂时没有适用的学科诊断工具。")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "保存诊断证据" })).not.toBeInTheDocument()

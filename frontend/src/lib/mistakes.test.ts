@@ -13,6 +13,7 @@ import {
   type MistakeCause,
   type MistakeRecord,
 } from "./mistakes"
+import { guidanceFor } from "./subject-prescriptions"
 
 function record(cause: MistakeCause, id: string = cause): MistakeRecord {
   return { id, subject: "biology", question: "题", cause, createdAt: "2026-08-08T00:00:00Z" }
@@ -243,6 +244,11 @@ describe("what to do about a cause, by subject", () => {
 
     expect(physics).not.toBe(genericAction("method"))
     expect(physics).toContain("受力图")
+  })
+
+  it("uses the same tailored action defined by the six-subject prescription", () => {
+    expect(causeActionFor("math", "careless")).toBe(guidanceFor("math", "careless")?.action)
+    expect(causeActionFor("geography", "method")).toBe(guidanceFor("geography", "method")?.action)
   })
 
   it("falls back to the shared advice where a subject has nothing of its own", () => {
