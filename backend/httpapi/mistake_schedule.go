@@ -72,15 +72,24 @@ func handleMistakeSchedule(response http.ResponseWriter, request *http.Request, 
 	// lose that race against the clock.
 	dueAt := now.Add(-time.Second)
 
-	// The stem becomes the term and the note the definition, which is what
-	// GenerateMistakePrompts reads. Filed as its own item type so the library
-	// can tell a 错题 from a 词条 -- they are read for different reasons.
+	// The stem becomes the term. Only a confirmed correction may become the
+	// accepted answer: the original attempt is known to be wrong, while a note
+	// is context rather than an answer contract. Without a correction the card
+	// deliberately stays free-text graded.
+	acceptedAnswer := ""
+	if mistake.Correction != nil {
+		acceptedAnswer = mistake.Correction.Answer
+	}
+	// Filed as its own item type so the library can tell a 错题 from a 词条 --
+	// they are read for different reasons. Keep the learner's note as readable
+	// context without letting it participate in deterministic grading.
 	item := models.KnowledgeItem{
 		ID:                newRequestID("k-mistake"),
 		ItemType:          "mistake",
 		Subject:           mistake.Question.Subject,
 		Term:              mistake.Question.Stem,
-		ConciseDefinition: mistake.Attempt.Note,
+		ConciseDefinition: acceptedAnswer,
+		DetailedMarkdown:  mistake.Attempt.Note,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}

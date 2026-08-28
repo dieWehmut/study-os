@@ -63,7 +63,7 @@ func TestAMistakeBecomesOneCardAskingTheQuestionAgain(t *testing.T) {
 		t.Fatalf("question = %q -- the card has to show the question you got wrong", prompts[0].Question)
 	}
 	if len(prompts[0].AcceptedAnswers) == 0 || prompts[0].AcceptedAnswers[0] != "动能定理" {
-		t.Fatalf("accepted = %#v -- the note you wrote is the only answer on file", prompts[0].AcceptedAnswers)
+		t.Fatalf("accepted = %#v -- the canonical answer should grade the retry", prompts[0].AcceptedAnswers)
 	}
 }
 

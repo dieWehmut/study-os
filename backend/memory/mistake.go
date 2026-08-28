@@ -39,9 +39,9 @@ func ReviewFixes(cause string) bool {
 // 题目: a question has one thing to ask, and asking it three ways would triple
 // the cost of the heaviest kind of review item there is.
 //
-// Term carries the stem and ConciseDefinition the note, matching how the
-// handler builds the item, so the card shows the question and grades against
-// whatever correction was written down.
+// Term carries the stem and ConciseDefinition the confirmed correction,
+// matching how the handler builds the item. Context notes live outside this
+// field so they cannot accidentally become accepted answers.
 func GenerateMistakePrompts(item KnowledgeItem) []Prompt {
 	stem := strings.TrimSpace(item.Term)
 	if stem == "" {

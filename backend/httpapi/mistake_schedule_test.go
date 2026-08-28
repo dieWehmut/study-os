@@ -1,11 +1,14 @@
 package httpapi_test
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 
 	"study-os/backend/config"
+	"study-os/backend/db"
 	"study-os/backend/httpapi"
 )
 
@@ -27,6 +30,23 @@ func fileMistake(t *testing.T, router http.Handler, body map[string]any) string 
 		t.Fatal("filed mistake has no attempt id")
 	}
 	return created.Attempt.ID
+}
+
+func scheduledAnswersForKnowledge(t *testing.T, store *db.Store, knowledgeID string) (string, []string) {
+	t.Helper()
+	var promptType, rawAnswers string
+	if err := store.SQL().QueryRowContext(context.Background(), `
+		SELECT prompt_type, accepted_answers_json
+		FROM prompts
+		WHERE knowledge_item_id = ?`, knowledgeID,
+	).Scan(&promptType, &rawAnswers); err != nil {
+		t.Fatalf("read scheduled prompt: %v", err)
+	}
+	var answers []string
+	if err := json.Unmarshal([]byte(rawAnswers), &answers); err != nil {
+		t.Fatalf("decode scheduled answers %q: %v", rawAnswers, err)
+	}
+	return promptType, answers
 }
 
 func TestMistakeScheduleEndpointPutsAForgottenQuestionIntoTheReviewQueue(t *testing.T) {
@@ -62,6 +82,71 @@ func TestMistakeScheduleEndpointPutsAForgottenQuestionIntoTheReviewQueue(t *test
 	dueBody := due.Body.String()
 	if due.Code != http.StatusOK || !strings.Contains(dueBody, "小球从斜面顶端滑下") {
 		t.Fatalf("due = %d, body = %s", due.Code, dueBody)
+	}
+}
+
+func TestMistakeScheduleUsesOnlyTheConfirmedCorrectionAsAnAcceptedAnswer(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+	attemptID := fileMistake(t, router, map[string]any{
+		"subject": "physics",
+		"stem":    "F = ma，m = 2 kg、a = 3 m/s²，求合力。",
+		"cause":   "recall",
+		"answer":  "5 N",
+		"note":    "先确认研究对象和正方向",
+	})
+
+	corrected := requestJSON(t, router, http.MethodPost, "/api/mistakes/"+attemptID+"/correct", map[string]any{
+		"answer": "6 N", "elapsed_ms": 1200,
+	})
+	if corrected.Code != http.StatusOK {
+		t.Fatalf("correct = %d, body = %s", corrected.Code, corrected.Body.String())
+	}
+
+	scheduled := requestJSON(t, router, http.MethodPost, "/api/mistakes/"+attemptID+"/schedule", nil)
+	if scheduled.Code != http.StatusCreated {
+		t.Fatalf("schedule = %d, body = %s", scheduled.Code, scheduled.Body.String())
+	}
+	var result struct {
+		KnowledgeID string `json:"knowledge_id"`
+	}
+	decodeJSON(t, scheduled, &result)
+	promptType, answers := scheduledAnswersForKnowledge(t, application.Store, result.KnowledgeID)
+	if promptType != "mistake_redo" {
+		t.Fatalf("prompt type = %q", promptType)
+	}
+	if len(answers) != 1 || answers[0] != "6 N" {
+		t.Fatalf("accepted answers = %#v, want only the confirmed correction", answers)
+	}
+	for _, forbidden := range []string{"5 N", "先确认研究对象和正方向"} {
+		if strings.Contains(strings.Join(answers, "\n"), forbidden) {
+			t.Fatalf("accepted answers leaked %q: %#v", forbidden, answers)
+		}
+	}
+}
+
+func TestMistakeScheduleWithoutACorrectionKeepsAcceptedAnswersEmpty(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+	attemptID := fileMistake(t, router, map[string]any{
+		"subject": "geography",
+		"stem":    "说明季风气候的成因。",
+		"cause":   "recall",
+		"answer":  "海陆热力差异不明显",
+		"note":    "先看海陆位置和季节",
+	})
+
+	scheduled := requestJSON(t, router, http.MethodPost, "/api/mistakes/"+attemptID+"/schedule", nil)
+	if scheduled.Code != http.StatusCreated {
+		t.Fatalf("schedule = %d, body = %s", scheduled.Code, scheduled.Body.String())
+	}
+	var result struct {
+		KnowledgeID string `json:"knowledge_id"`
+	}
+	decodeJSON(t, scheduled, &result)
+	_, answers := scheduledAnswersForKnowledge(t, application.Store, result.KnowledgeID)
+	if len(answers) != 0 {
+		t.Fatalf("accepted answers = %#v, want none before a confirmed correction", answers)
 	}
 }
 
