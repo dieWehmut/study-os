@@ -22,6 +22,7 @@ import { markdownToMindMap } from "@/lib/mindmap"
 import { VisualCard } from "@/features/card/VisualCard"
 import { MindMap } from "@/features/mindmap/MindMap"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
+import { EnglishMasteryPanel } from "@/features/english/EnglishMasteryPanel"
 import { renameOutlineLine } from "@/lib/wiki-edit"
 
 interface WikiPanelProps {
@@ -296,6 +297,7 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
                 <p className="leading-7">{item.example}</p>
               </section>
             ) : null}
+            <EnglishMasteryPanel item={item} />
           </TabsContent>
           <TabsContent value="detail" className="pt-5">
             {chunks.length > 0 ? (

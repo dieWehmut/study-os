@@ -6,6 +6,7 @@ import { WikiPanel } from "./WikiPanel"
 import type { KnowledgeItem } from "@/api/types"
 
 const mocks = vi.hoisted(() => ({
+  getKnowledgeMastery: vi.fn(),
   listRelatedKnowledge: vi.fn(),
   scheduleKnowledge: vi.fn(),
   saveKnowledgeWiki: vi.fn(),
@@ -56,6 +57,11 @@ describe("WikiPanel node renaming", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.getKnowledgeMastery.mockResolvedValue({
+      knowledge_item_id: "k1",
+      subject: "english",
+      dimensions: [],
+    })
   })
 
   it("writes a renamed node back into the wiki it was drawn from", async () => {
@@ -117,6 +123,35 @@ describe("WikiPanel node renaming", () => {
 
     expect(screen.queryByRole("button", { name: "重命名：光合作用" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "重命名：暗反应" })).toBeInTheDocument()
+  })
+})
+
+describe("WikiPanel English mastery", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.getKnowledgeMastery.mockResolvedValue({
+      knowledge_item_id: "word-last",
+      subject: "english",
+      dimensions: [],
+    })
+  })
+
+  it("places the four-dimensional check beside an English definition", async () => {
+    render(
+      <WikiPanel
+        item={{
+          id: "word-last",
+          item_type: "word_sense",
+          subject: "english",
+          term: "last",
+          concise_definition: "持续；最后的",
+        }}
+      />,
+    )
+
+    expect(await screen.findByRole("heading", { name: "英语掌握度" })).toBeInTheDocument()
+    expect(mocks.getKnowledgeMastery).toHaveBeenCalledWith("word-last")
   })
 })
 
