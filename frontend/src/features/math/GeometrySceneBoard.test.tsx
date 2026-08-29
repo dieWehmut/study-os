@@ -11,6 +11,11 @@ describe("GeometrySceneBoard", () => {
 
     const board = screen.getByTestId("geometry-scene-board")
     expect(board.querySelector("svg")).toBeInTheDocument()
+    expect(screen.getByTestId("geometry-segment-AB")).toHaveAttribute("x1", "58")
+    expect(screen.getByTestId("geometry-segment-AB")).toHaveAttribute("y1", "176")
+    expect(screen.getByTestId("geometry-segment-AB")).toHaveAttribute("x2", "262")
+    expect(screen.getByTestId("geometry-segment-AB")).toHaveAttribute("y2", "176")
+    expect(screen.getByTestId("geometry-segment-AB")).not.toHaveAttribute("points")
     expect(screen.getByText("已知 ∠C")).toBeInTheDocument()
 
     const slider = screen.getByRole("slider", { name: "顶点 C 高度" })

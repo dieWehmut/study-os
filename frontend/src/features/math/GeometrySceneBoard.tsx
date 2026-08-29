@@ -17,11 +17,11 @@ function pointMap(points: GeometryPoint[]) {
   return new Map(points.map((point) => [point.id, point]))
 }
 
-function linePoints(points: GeometryPoint[], from: string, to: string): string | null {
+function lineCoordinates(points: GeometryPoint[], from: string, to: string) {
   const byID = pointMap(points)
   const start = byID.get(from)
   const end = byID.get(to)
-  return start && end ? `${start.x},${start.y} ${end.x},${end.y}` : null
+  return start && end ? { start, end } : null
 }
 
 /** Render only validated primitives from a GeometryScene; no model code is executed. */
@@ -79,9 +79,17 @@ export function GeometrySceneBoard({ scene }: GeometrySceneBoardProps) {
       >
         <g stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
           {scene.segments.map((segment) => {
-            const coordinates = linePoints(points, segment.from, segment.to)
+            const coordinates = lineCoordinates(points, segment.from, segment.to)
             return coordinates ? (
-              <line key={segment.id} data-testid={`geometry-segment-${segment.id}`} points={coordinates} strokeDasharray={segment.dashed ? "5 4" : undefined} />
+              <line
+                key={segment.id}
+                data-testid={`geometry-segment-${segment.id}`}
+                x1={coordinates.start.x}
+                y1={coordinates.start.y}
+                x2={coordinates.end.x}
+                y2={coordinates.end.y}
+                strokeDasharray={segment.dashed ? "5 4" : undefined}
+              />
             ) : null
           })}
           {scene.circles.map((circle) => {
