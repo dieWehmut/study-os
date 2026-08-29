@@ -8,6 +8,7 @@ import { useSubjectStore } from "@/store/useSubjectStore"
 
 const mocks = vi.hoisted(() => ({
   getKnowledge: vi.fn(),
+  getKnowledgeMastery: vi.fn(),
   listKnowledge: vi.fn(),
   listGroups: vi.fn(),
   listRelatedKnowledge: vi.fn(),
@@ -62,6 +63,11 @@ describe("Knowledge page", () => {
       concise_definition: "放弃；抛弃",
       detailed_markdown: "## Usage\n\nTo leave something behind.",
       tags: ["core"],
+    })
+    mocks.getKnowledgeMastery.mockResolvedValue({
+      knowledge_item_id: "k1",
+      subject: "english",
+      dimensions: [],
     })
     mocks.listGroups.mockResolvedValue({
       count: 1,
