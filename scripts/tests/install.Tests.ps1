@@ -163,6 +163,15 @@ Describe 'Study OS release installer contracts' {
         $backupEntries.Count | Should Be 1
     }
 
+    It 'defaults to the published manifest so the one-line install needs no parameters' {
+        # The documented one-liner pipes install.ps1 into iex with no arguments,
+        # so it must resolve the newest release itself -- the same manifest the
+        # desktop updater follows.
+        $script = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'install.ps1')
+        $script | Should Match 'https://github\.com/\$ReleaseRepo/releases/latest/download/manifest\.json'
+        $script | Should Not Match 'ManifestLocation is required when running install\.ps1'
+    }
+
     It 'uses the stable launcher as the desktop shortcut target' {
         $installRoot = Join-Path $TestDrive 'shortcut'
         (Get-StudyOSShortcutTarget -InstallRoot $installRoot) | Should Be (Join-Path $installRoot 'StudyOS.cmd')

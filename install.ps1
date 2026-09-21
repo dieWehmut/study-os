@@ -4,12 +4,19 @@ param(
     [string]$ManifestLocation,
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'StudyOS'),
     [string]$Architecture,
+    [string]$ReleaseRepo = 'dieWehmut/study-os',
     [switch]$SkipShortcut,
     [switch]$DryRun
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
+
+# GitHub's /releases/latest/download/ alias always resolves to the newest
+# release, so the default install needs no API token and no rate-limit budget.
+# The desktop updater reads the same document, which keeps one published
+# manifest as the single source of truth for install and update.
+$script:DefaultManifestLocation = "https://github.com/$ReleaseRepo/releases/latest/download/manifest.json"
 
 function Get-StudyOSArchitecture {
     [CmdletBinding()]
@@ -595,7 +602,7 @@ function Install-StudyOSRelease {
 
 if (-not $ImportOnly) {
     if ([string]::IsNullOrWhiteSpace($ManifestLocation)) {
-        throw 'ManifestLocation is required when running install.ps1. Use -ImportOnly when dot-sourcing helpers.'
+        $ManifestLocation = $script:DefaultManifestLocation
     }
     Install-StudyOSRelease -ManifestLocation $ManifestLocation -InstallRoot $InstallRoot -Architecture $Architecture -SkipShortcut:$SkipShortcut -DryRun:$DryRun
 }
