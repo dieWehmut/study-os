@@ -576,6 +576,72 @@ func TestDesktopUpdateStatusReadsTheDesktopReleaseChannel(t *testing.T) {
 	}
 }
 
+// The apply route is registered unconditionally now that the desktop app owns
+// the updater, so its wiring has to be proved through HTTP: a request must
+// reach the service, stage the release, and flip the install pointer.
+func TestDesktopUpdateApplyStagesThroughTheRoute(t *testing.T) {
+	installRoot := t.TempDir()
+	application := testApplication(t, config.Config{
+		DataDir:    t.TempDir(),
+		UpdateRepo: "fake/study-os",
+	})
+	archive := desktopArchive(t, "StudyOS.exe")
+	assetName := "study-os-0.3.0-windows-x64.zip"
+	sum := sha256.Sum256(archive)
+	manifest := selfupdate.Manifest{
+		SchemaVersion: 1,
+		Version:       "0.3.0",
+		Assets: []selfupdate.AssetEntry{{
+			OS:         "windows",
+			Arch:       "x64",
+			URL:        assetName,
+			SHA256:     hex.EncodeToString(sum[:]),
+			Size:       int64(len(archive)),
+			Entrypoint: "StudyOS.exe",
+		}},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch filepath.Base(request.URL.Path) {
+		case "manifest.json":
+			_ = json.NewEncoder(response).Encode(manifest)
+		case assetName:
+			_, _ = response.Write(archive)
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	defer server.Close()
+
+	application.Updater.HTTPClient = server.Client()
+	application.Updater.ManifestURL = server.URL + "/releases/latest/download/manifest.json"
+	application.Updater.AssetArch = "x64"
+	application.Updater.InstallRoot = installRoot
+	staged := 0
+	application.Updater.OnStaged = func() { staged++ }
+
+	response := requestJSON(t, httpapi.NewRouter(application), http.MethodPost, "/api/update/apply", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("apply status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var decoded struct {
+		Status  string `json:"status"`
+		Version string `json:"version"`
+	}
+	decodeJSON(t, response, &decoded)
+	if decoded.Status != "updating" || decoded.Version != "0.3.0" {
+		t.Fatalf("apply body = %s", response.Body.String())
+	}
+	if staged != 1 {
+		t.Fatalf("staged callbacks = %d, want 1", staged)
+	}
+	if _, err := os.Stat(filepath.Join(installRoot, "versions", "0.3.0", "StudyOS.exe")); err != nil {
+		t.Fatalf("staged executable missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(installRoot, "restart.cmd")); err != nil {
+		t.Fatalf("restart script missing: %v", err)
+	}
+}
+
 // The PWA launcher is gone, so its routes must be gone with it. A desktop build
 // owns its own window lifetime and never serves the web app over HTTP.
 func TestRetiredLauncherRoutesAreNotFound(t *testing.T) {
