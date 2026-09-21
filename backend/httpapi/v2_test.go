@@ -552,6 +552,9 @@ func TestDesktopUpdateStatusReadsTheDesktopReleaseChannel(t *testing.T) {
 		}
 	}))
 	defer server.Close()
+	// Pin the running version instead of reading the build constant, so the fixture
+	// stays a newer release no matter what this checkout is versioned as.
+	application.Updater.Version = "0.2.0"
 	application.Updater.HTTPClient = server.Client()
 	application.Updater.ManifestURL = server.URL + "/releases/latest/download/manifest.json"
 	application.Updater.AssetArch = "x64"
@@ -612,6 +615,9 @@ func TestDesktopUpdateApplyStagesThroughTheRoute(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Same reason as the status test: keep the fixture newer than the running
+	// build without depending on the version this checkout carries.
+	application.Updater.Version = "0.2.0"
 	application.Updater.HTTPClient = server.Client()
 	application.Updater.ManifestURL = server.URL + "/releases/latest/download/manifest.json"
 	application.Updater.AssetArch = "x64"
