@@ -141,6 +141,40 @@ func TestNewUsesDatabaseOverrideWithoutDataDirectory(t *testing.T) {
 	}
 }
 
+// The updater is the only update path left once the PWA launcher is gone, so
+// it must exist on every application the desktop app constructs, must follow
+// the configured release channel and architecture, and must report a
+// development build as having no managed install root rather than offering an
+// update it would then refuse to apply.
+func TestNewAlwaysBuildsTheDesktopUpdater(t *testing.T) {
+	application, err := New(context.Background(), Options{Config: config.Config{
+		DataDir:            t.TempDir(),
+		UpdateRepo:         "example/study-os",
+		UpdateArchitecture: "arm64",
+	}})
+	if err != nil {
+		t.Fatalf("construct application: %v", err)
+	}
+	t.Cleanup(func() { _ = application.Close() })
+
+	if application.Updater == nil {
+		t.Fatal("updater missing: the desktop app would show no update surface")
+	}
+	if application.Updater.Repo != "example/study-os" {
+		t.Errorf("repo = %q", application.Updater.Repo)
+	}
+	if application.Updater.AssetArch != "arm64" {
+		t.Errorf("asset architecture = %q", application.Updater.AssetArch)
+	}
+	if application.Updater.Version == "" {
+		t.Error("current version is empty, so nothing could be compared")
+	}
+	// A test binary is not installed under <root>\versions\<version>, so the
+	// updater must stay off rather than overwrite a directory nobody owns.
+	if application.Updater.InstallRoot != "" {
+		t.Errorf("install root = %q, want empty for an unmanaged build", application.Updater.InstallRoot)
+	}
+}
 func TestConfigNeedsDefaultsDoesNotLoadOptionalProviderFieldsForMock(t *testing.T) {
 	cfg := config.Config{
 		ListenAddress:  "127.0.0.1:0",
