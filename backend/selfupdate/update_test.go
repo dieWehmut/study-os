@@ -140,7 +140,6 @@ func newTestService(t *testing.T, fixture *releaseFixture, dataDir string) *Serv
 	service := NewService(Options{
 		Repo:         "fake/study-os",
 		Version:      "0.2.0",
-		DataDir:      dataDir,
 		Architecture: "x64",
 		InstallRoot:  dataDir,
 		ManifestURL:  fixture.server.URL + "/releases/latest/download/manifest.json",
@@ -244,7 +243,7 @@ func TestUpdateCheckGivesUpOnAStalledServer(t *testing.T) {
 	t.Cleanup(func() { close(release) })
 
 	service := NewService(Options{
-		Repo: "fake/study-os", Version: "0.2.0", DataDir: t.TempDir(),
+		Repo: "fake/study-os", Version: "0.2.0",
 		Architecture: "x64", ManifestURL: stalled.URL + "/releases/latest/download/manifest.json",
 	})
 
@@ -317,6 +316,45 @@ func TestApplyStagesTheNewVersionAndFlipsThePointer(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(installRoot, "restart.cmd")); err != nil {
 		t.Fatalf("restart script missing: %v", err)
+	}
+}
+
+func TestRestartScriptPathFollowsTheManagedInstall(t *testing.T) {
+	service := NewService(Options{Repo: "fake/study-os", Version: "0.2.0"})
+	if got := service.RestartScriptPath(); got != "" {
+		t.Fatalf("portable install exposed a restart script: %q", got)
+	}
+
+	service.InstallRoot = filepath.Join("C:", "Users", "learner", "AppData", "Local", "StudyOS")
+	want := filepath.Join(service.InstallRoot, "restart.cmd")
+	if got := service.RestartScriptPath(); got != want {
+		t.Fatalf("restart script path = %q, want %q", got, want)
+	}
+}
+
+// The staged restart script is the only thing that can replace a running
+// executable on Windows, so it must exist and must relaunch the stable launcher
+// rather than the version directory it just replaced.
+func TestApplyWritesARestartScriptThatRelaunchesTheLauncher(t *testing.T) {
+	installRoot := t.TempDir()
+	archives := map[string][]byte{"study-os-0.3.0-windows-x64.zip": desktopZip(t, nil)}
+	fixture := newReleaseFixture(t, Manifest{}, archives)
+	fixture.manifest = desktopManifest("0.3.0", archives, fixture.server.URL+"/releases/download")
+
+	service := newTestService(t, fixture, installRoot)
+	if _, err := service.Apply(context.Background()); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	content, err := os.ReadFile(service.RestartScriptPath())
+	if err != nil {
+		t.Fatalf("read restart script: %v", err)
+	}
+	script := string(content)
+	if !strings.Contains(script, filepath.Join(installRoot, "StudyOS.cmd")) {
+		t.Fatalf("restart script does not relaunch the stable launcher:\n%s", script)
+	}
+	if strings.Contains(script, "versions") {
+		t.Fatalf("restart script targets a version directory instead of the launcher:\n%s", script)
 	}
 }
 

@@ -113,11 +113,10 @@ func TestFromLookupRejectsNonLoopbackListener(t *testing.T) {
 	}
 }
 
-func TestFromLookupParsesLauncherSettings(t *testing.T) {
+func TestFromLookupParsesUpdateChannelSettings(t *testing.T) {
 	values := map[string]string{
-		"STUDY_OS_LAUNCHER":    "true",
-		"STUDY_OS_STATIC_DIR":  "web-app",
 		"STUDY_OS_UPDATE_REPO": "me/study-os",
+		"STUDY_OS_UPDATE_ARCH": "arm64",
 	}
 	cfg, err := config.FromLookup(func(key string) (string, bool) {
 		value, ok := values[key]
@@ -126,20 +125,19 @@ func TestFromLookupParsesLauncherSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if !cfg.Launcher {
-		t.Fatal("launcher mode not enabled")
-	}
-	if cfg.StaticDir != "web-app" || cfg.UpdateRepo != "me/study-os" {
-		t.Fatalf("launcher settings = %#v", cfg)
+	if cfg.UpdateRepo != "me/study-os" || cfg.UpdateArchitecture != "arm64" {
+		t.Fatalf("update channel settings = %#v", cfg)
 	}
 }
 
-func TestFromLookupAppliesLauncherDefaults(t *testing.T) {
+func TestFromLookupAppliesUpdateChannelDefaults(t *testing.T) {
 	cfg, err := config.FromLookup(func(string) (string, bool) { return "", false })
 	if err != nil {
 		t.Fatalf("load defaults: %v", err)
 	}
-	if cfg.Launcher || cfg.StaticDir != "web" || cfg.UpdateRepo != "dieWehmut/study-os" {
-		t.Fatalf("launcher defaults = %#v", cfg)
+	// An unset architecture means "whatever architecture is running", so the
+	// service normalizes it rather than the loader guessing here.
+	if cfg.UpdateRepo != "dieWehmut/study-os" || cfg.UpdateArchitecture != "" {
+		t.Fatalf("update channel defaults = %#v", cfg)
 	}
 }

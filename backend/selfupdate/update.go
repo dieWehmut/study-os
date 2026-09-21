@@ -38,7 +38,6 @@ type Status struct {
 type Options struct {
 	Repo         string
 	Version      string
-	DataDir      string
 	Architecture string
 	InstallRoot  string
 	ManifestURL  string
@@ -50,7 +49,6 @@ type Options struct {
 type Service struct {
 	Repo        string
 	Version     string
-	DataDir     string
 	AssetArch   string
 	InstallRoot string
 	ManifestURL string
@@ -93,7 +91,6 @@ func NewService(options Options) *Service {
 	service := &Service{
 		Repo:        strings.TrimSpace(options.Repo),
 		Version:     options.Version,
-		DataDir:     options.DataDir,
 		AssetArch:   NormalizeArchitecture(options.Architecture),
 		InstallRoot: strings.TrimSpace(options.InstallRoot),
 		ManifestURL: strings.TrimSpace(options.ManifestURL),
@@ -557,11 +554,14 @@ func (s *Service) writeRestartScript() error {
 	return nil
 }
 
-// Restart asks the desktop app to exit so the staged build can take over.
-func (s *Service) Restart() {
-	if s.OnStaged != nil {
-		go s.OnStaged()
+// RestartScriptPath is the detached script that swaps in the staged build. The
+// desktop app must start it before it exits, because Windows will not let a
+// running process replace its own executable.
+func (s *Service) RestartScriptPath() string {
+	if s.InstallRoot == "" {
+		return ""
 	}
+	return filepath.Join(s.InstallRoot, "restart.cmd")
 }
 
 var versionPattern = regexp.MustCompile(`[0-9]+(?:\.[0-9]+)*`)

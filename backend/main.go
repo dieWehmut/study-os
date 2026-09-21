@@ -3,20 +3,15 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
-	"net"
 	"net/http"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"study-os/backend/app"
 	"study-os/backend/config"
 	"study-os/backend/httpapi"
-	"study-os/backend/launcher"
 )
 
 func main() {
@@ -26,23 +21,6 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load configuration: %v", err)
-	}
-
-	var listener net.Listener
-	if cfg.Launcher {
-		if live, address := launcher.LiveInstance(cfg.DataDir); live {
-			fmt.Println("学习系统已在运行：http://" + address)
-			return
-		}
-		listener, err = launcher.Listen(cfg.ListenAddress, launcher.DefaultPortSpan)
-		if err != nil {
-			log.Fatalf("listen %s: %v", cfg.ListenAddress, err)
-		}
-		cfg.ListenAddress = listener.Addr().String()
-		if err := launcher.WriteAddress(cfg.DataDir, cfg.ListenAddress); err != nil {
-			log.Fatalf("record launcher address: %v", err)
-		}
-		defer launcher.RemoveAddress(cfg.DataDir)
 	}
 
 	serverCtx, cancelServer := context.WithCancel(ctx)
@@ -58,18 +36,6 @@ func main() {
 		}
 	}()
 
-	if application.Launcher != nil {
-		application.Launcher.OnShutdown = func() {
-			cancelServer()
-		}
-		application.Launcher.OnRestart = func() {
-			restartScript := filepath.Join(cfg.DataDir, "restart.cmd")
-			_ = exec.Command("cmd", "/c", "start", "", "/b", restartScript).Start()
-			cancelServer()
-		}
-		go application.Launcher.RunWatchdog(serverCtx, 10*time.Minute)
-	}
-
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
 		Handler:           httpapi.NewRouter(application),
@@ -79,11 +45,7 @@ func main() {
 	serverErrors := make(chan error, 1)
 	go func() {
 		log.Printf("学习系统后端已启动：http://%s", cfg.ListenAddress)
-		if listener != nil {
-			serverErrors <- server.Serve(listener)
-		} else {
-			serverErrors <- server.ListenAndServe()
-		}
+		serverErrors <- server.ListenAndServe()
 	}()
 
 	select {

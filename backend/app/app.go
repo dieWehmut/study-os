@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -11,8 +12,8 @@ import (
 	"study-os/backend/backup"
 	"study-os/backend/config"
 	"study-os/backend/db"
-	"study-os/backend/launcher"
 	"study-os/backend/models"
+	"study-os/backend/selfupdate"
 	"study-os/backend/version"
 )
 
@@ -23,11 +24,11 @@ type Options struct {
 }
 
 type App struct {
-	Config   config.Config
-	Store    *db.Store
-	Backups  *backup.Service
-	Audio    *audio.Service
-	Launcher *launcher.Service
+	Config  config.Config
+	Store   *db.Store
+	Backups *backup.Service
+	Audio   *audio.Service
+	Updater *selfupdate.Service
 }
 
 func New(ctx context.Context, options Options) (*App, error) {
@@ -62,26 +63,25 @@ func New(ctx context.Context, options Options) (*App, error) {
 		_ = store.Close()
 		return nil, fmt.Errorf("create audio service: %w", err)
 	}
-	var launcherService *launcher.Service
-	if cfg.Launcher {
-		staticDir, err := filepath.Abs(cfg.StaticDir)
-		if err != nil {
-			_ = store.Close()
-			return nil, fmt.Errorf("resolve static directory: %w", err)
-		}
-		launcherService = launcher.NewService(launcher.Options{
-			StaticDir: staticDir,
-			Repo:      cfg.UpdateRepo,
-			Version:   version.Version,
-			DataDir:   cfg.DataDir,
-		})
+	// The updater is always present: it is the only update path now that the PWA
+	// launcher is gone, and it reports a portable build as un-updatable rather
+	// than pretending no update exists.
+	installRoot := ""
+	if executable, err := os.Executable(); err == nil {
+		installRoot, _ = selfupdate.InstalledRoot(executable)
 	}
+	updater := selfupdate.NewService(selfupdate.Options{
+		Repo:         cfg.UpdateRepo,
+		Version:      version.Version,
+		InstallRoot:  installRoot,
+		Architecture: cfg.UpdateArchitecture,
+	})
 	return &App{
-		Config:   cfg,
-		Store:    store,
-		Backups:  backup.NewService(filepath.Join(cfg.DataDir, "backups")),
-		Audio:    audioService,
-		Launcher: launcherService,
+		Config:  cfg,
+		Store:   store,
+		Backups: backup.NewService(filepath.Join(cfg.DataDir, "backups")),
+		Audio:   audioService,
+		Updater: updater,
 	}, nil
 }
 

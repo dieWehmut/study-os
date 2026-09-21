@@ -10,9 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	backendapp "study-os/backend/app"
 	"study-os/backend/config"
@@ -66,6 +69,17 @@ func (a *DesktopApp) Startup(ctx context.Context) {
 	if err != nil {
 		a.startErr = fmt.Errorf("create backend: %w", err)
 		return
+	}
+	// A staged update only takes effect once this process exits: the restart
+	// script waits for it to disappear, swaps in the staged build, and relaunches
+	// it. So start the script first, then quit a beat later -- late enough that
+	// the response to the update request still reaches the window that asked for
+	// it before the window closes.
+	application.Updater.OnStaged = func() {
+		if script := application.Updater.RestartScriptPath(); script != "" {
+			_ = exec.Command("cmd", "/c", "start", "", "/b", script).Start()
+		}
+		time.AfterFunc(time.Second, func() { runtime.Quit(ctx) })
 	}
 	backupService := application.Backups
 	result, _, err := backupService.CreateDailyIfNeeded(ctx, dbPath)

@@ -1,8 +1,11 @@
 package httpapi_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -18,6 +21,7 @@ import (
 	"study-os/backend/config"
 	"study-os/backend/httpapi"
 	"study-os/backend/models"
+	"study-os/backend/selfupdate"
 )
 
 func testApplication(t *testing.T, cfg config.Config) *app.App {
@@ -512,54 +516,95 @@ func TestDueReviewsFilterBySubject(t *testing.T) {
 	}
 }
 
-func TestLauncherServesSPAUpdateStatusAndClose(t *testing.T) {
-	staticDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<html>学习系统首页</html>"), 0o600); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+func TestDesktopUpdateStatusReadsTheDesktopReleaseChannel(t *testing.T) {
 	application := testApplication(t, config.Config{
 		DataDir:    t.TempDir(),
-		Launcher:   true,
-		StaticDir:  staticDir,
 		UpdateRepo: "fake/study-os",
 	})
-	if application.Launcher == nil {
-		t.Fatal("launcher service missing")
+	if application.Updater == nil {
+		t.Fatal("desktop updater service missing")
+	}
+	// A desktop archive: the published release carries StudyOS.exe, not the
+	// retired launcher's server binary plus web directory.
+	archive := desktopArchive(t, "StudyOS.exe")
+	assetName := "study-os-0.3.0-windows-x64.zip"
+	sum := sha256.Sum256(archive)
+	manifest := selfupdate.Manifest{
+		SchemaVersion: 1,
+		Version:       "0.3.0",
+		Assets: []selfupdate.AssetEntry{{
+			OS:         "windows",
+			Arch:       "x64",
+			URL:        assetName,
+			SHA256:     hex.EncodeToString(sum[:]),
+			Size:       int64(len(archive)),
+			Entrypoint: "StudyOS.exe",
+		}},
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/repos/fake/study-os/releases/latest" {
-			_, _ = response.Write([]byte(`{"tag_name":"v0.3.0","body":"更新说明","assets":[{"name":"study-os-pwa-windows-x64.zip","browser_download_url":"/download"}]}`))
-			return
+		switch filepath.Base(request.URL.Path) {
+		case "manifest.json":
+			_ = json.NewEncoder(response).Encode(manifest)
+		case assetName:
+			_, _ = response.Write(archive)
+		default:
+			http.NotFound(response, request)
 		}
-		http.NotFound(response, request)
 	}))
 	defer server.Close()
-	application.Launcher.HTTPClient = server.Client()
-	application.Launcher.DownloadBase = server.URL
-	application.Launcher.APIBase = server.URL
+	application.Updater.HTTPClient = server.Client()
+	application.Updater.ManifestURL = server.URL + "/releases/latest/download/manifest.json"
+	application.Updater.AssetArch = "x64"
 	router := httpapi.NewRouter(application)
 
 	status := requestJSON(t, router, http.MethodGet, "/api/update/status", nil)
-	if status.Code != http.StatusOK || !strings.Contains(status.Body.String(), `"update_available":true`) {
+	if status.Code != http.StatusOK {
 		t.Fatalf("update status = %d, body = %s", status.Code, status.Body.String())
 	}
-	spa := requestJSON(t, router, http.MethodGet, "/knowledge", nil)
-	if spa.Code != http.StatusOK || !strings.Contains(spa.Body.String(), "学习系统首页") {
-		t.Fatalf("spa fallback = %d, body = %s", spa.Code, spa.Body.String())
+	var decoded struct {
+		CurrentVersion  string `json:"current_version"`
+		LatestVersion   string `json:"latest_version"`
+		UpdateAvailable bool   `json:"update_available"`
+		AssetName       string `json:"asset_name"`
 	}
-	closed := false
-	application.Launcher.OnShutdown = func() { closed = true }
-	closeResponse := requestJSON(t, router, http.MethodPost, "/api/launcher/close", nil)
-	if closeResponse.Code != http.StatusOK {
-		t.Fatalf("close = %d, body = %s", closeResponse.Code, closeResponse.Body.String())
+	decodeJSON(t, status, &decoded)
+	if !decoded.UpdateAvailable || decoded.LatestVersion != "0.3.0" {
+		t.Fatalf("update status = %s", status.Body.String())
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for !closed && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
+	if decoded.AssetName != assetName {
+		t.Fatalf("asset name = %q", decoded.AssetName)
 	}
-	if !closed {
-		t.Fatal("launcher close callback was not invoked")
+}
+
+// The PWA launcher is gone, so its routes must be gone with it. A desktop build
+// owns its own window lifetime and never serves the web app over HTTP.
+func TestRetiredLauncherRoutesAreNotFound(t *testing.T) {
+	application := testApplication(t, config.Config{DataDir: t.TempDir()})
+	router := httpapi.NewRouter(application)
+
+	for _, route := range []string{"/api/launcher/close", "/api/launcher/status"} {
+		response := requestJSON(t, router, http.MethodPost, route, nil)
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("%s = %d, body = %s", route, response.Code, response.Body.String())
+		}
 	}
+}
+
+func desktopArchive(t *testing.T, entryName string) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	entry, err := writer.Create(entryName)
+	if err != nil {
+		t.Fatalf("create entry: %v", err)
+	}
+	if _, err := entry.Write([]byte("desktop executable")); err != nil {
+		t.Fatalf("write entry: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close archive: %v", err)
+	}
+	return buffer.Bytes()
 }
 
 func TestChatAsyncFlowAnswersInBackground(t *testing.T) {

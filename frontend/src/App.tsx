@@ -1,4 +1,3 @@
-import { useEffect } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 
 import { AppShell } from "@/components/layout/AppShell"
@@ -18,21 +17,8 @@ import EnglishArticleDetail from "@/pages/EnglishArticleDetail"
 import EnglishCorpora from "@/pages/EnglishCorpora"
 import Lessons from "@/pages/Lessons"
 import LessonDetail from "@/pages/LessonDetail"
-import { isStaticDemo } from "@/lib/runtime"
 
 export default function App() {
-  useEffect(() => {
-    if (isStaticDemo()) return undefined
-
-    function closeLauncher() {
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon("/api/launcher/close", "1")
-      }
-    }
-    window.addEventListener("pagehide", closeLauncher)
-    return () => window.removeEventListener("pagehide", closeLauncher)
-  }, [])
-
   return (
     <AppShell>
       <UpdateDialog />

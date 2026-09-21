@@ -11,11 +11,11 @@ import (
 )
 
 type Config struct {
-	ListenAddress   string
-	DataDir         string
-	DBPath          string
-	ActiveProvider  string
-	EnvFilePath     string
+	ListenAddress  string
+	DataDir        string
+	DBPath         string
+	ActiveProvider string
+	EnvFilePath    string
 	// AI holds per-vendor settings keyed by vendor id. Use Vendor(id) to read
 	// it so registry defaults are applied.
 	AI              map[string]VendorConfig
@@ -24,10 +24,12 @@ type Config struct {
 	// SpeechSettings holds the 语音合成 endpoint. Read it through Speech() so
 	// preset defaults are applied.
 	SpeechSettings SpeechConfig
-	Launcher        bool
-	StaticDir       string
-	UpdateRepo      string
-	SeedFixtures    bool
+	// UpdateRepo and UpdateArchitecture select the release channel the desktop
+	// updater follows. The architecture is normally the running process; the
+	// override exists so a release can be staged for the other edition.
+	UpdateRepo         string
+	UpdateArchitecture string
+	SeedFixtures       bool
 }
 
 // VendorStatus is the read-only vendor view exposed to settings UI. Key values
@@ -89,15 +91,15 @@ func LoadFromFile(path string, lookup func(string) (string, bool)) (Config, erro
 
 func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 	cfg := Config{
-		ListenAddress:   valueOr(lookup, "STUDY_OS_LISTEN_ADDRESS", "127.0.0.1:8080"),
-		DataDir:         valueOr(lookup, "STUDY_OS_DATA_DIR", "data"),
-		ActiveProvider:  valueOr(lookup, "AI_ACTIVE_PROVIDER", "mock"),
-		StaticDir:       valueOr(lookup, "STUDY_OS_STATIC_DIR", "web"),
-		UpdateRepo:      valueOr(lookup, "STUDY_OS_UPDATE_REPO", "dieWehmut/study-os"),
-		DashScopeAPIKey: envValue(lookup, "DASHSCOPE_API_KEY"),
-		DashScopeVoice:  valueOr(lookup, "DASHSCOPE_TTS_VOICE", "longxiaochun"),
-		AI:              loadVendors(lookup),
-		SpeechSettings:  loadSpeech(lookup),
+		ListenAddress:      valueOr(lookup, "STUDY_OS_LISTEN_ADDRESS", "127.0.0.1:8080"),
+		DataDir:            valueOr(lookup, "STUDY_OS_DATA_DIR", "data"),
+		ActiveProvider:     valueOr(lookup, "AI_ACTIVE_PROVIDER", "mock"),
+		UpdateRepo:         valueOr(lookup, "STUDY_OS_UPDATE_REPO", "dieWehmut/study-os"),
+		UpdateArchitecture: envValue(lookup, "STUDY_OS_UPDATE_ARCH"),
+		DashScopeAPIKey:    envValue(lookup, "DASHSCOPE_API_KEY"),
+		DashScopeVoice:     valueOr(lookup, "DASHSCOPE_TTS_VOICE", "longxiaochun"),
+		AI:                 loadVendors(lookup),
+		SpeechSettings:     loadSpeech(lookup),
 	}
 	cfg.DBPath = valueOr(lookup, "STUDY_OS_DB_PATH", filepath.Join(cfg.DataDir, "study.db"))
 
@@ -107,13 +109,6 @@ func fromLookup(lookup func(string) (string, bool)) (Config, error) {
 			return Config{}, fmt.Errorf("parse STUDY_OS_SEED_FIXTURES: %w", err)
 		}
 		cfg.SeedFixtures = seedFixtures
-	}
-	if value, ok := lookup("STUDY_OS_LAUNCHER"); ok && strings.TrimSpace(value) != "" {
-		launcher, err := strconv.ParseBool(strings.TrimSpace(value))
-		if err != nil {
-			return Config{}, fmt.Errorf("parse STUDY_OS_LAUNCHER: %w", err)
-		}
-		cfg.Launcher = launcher
 	}
 
 	if err := validateLoopbackAddress(cfg.ListenAddress); err != nil {
