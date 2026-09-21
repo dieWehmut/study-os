@@ -4,29 +4,16 @@ Study OS 是一个本地优先、可定制、Agent-native 的自学 Web 应用�
 v0.2 在英语记忆闭环（导入 → 去重 → 记忆 → 他评 → FSRS）之上补上了真实 AI
 接入、厂商化配置、词库清洗管线、云端发音与新的记忆题型。
 
-## 一键安装（PWA 版）
+## 安装（桌面版）
 
 在 PowerShell 中运行下面这一行，即可自动下载最新发布、校验并安装，同时在桌面生成「学习系统」图标：
 
 ```powershell
-irm https://raw.githubusercontent.com/dieWehmut/study-os/main/scripts/install-pwa.ps1 | iex
+irm https://raw.githubusercontent.com/dieWehmut/study-os/main/install.ps1 | iex
 ```
 
-之后双击桌面图标：自动启动后端并打开学习界面；关掉页面后后端空闲 10 分钟自动退出，更新在应用内完成。
-端口被占用时会自动向后顺延，图标打开的始终是后端实际监听的地址，不会停在 8080。
-
-安装包在落地之前会先过完这几道检查，任何一道不过就中止，安装目录不会被动过：
-
-- 只接受 https 的安装包与校验文件地址，并强制 TLS 1.2
-- 下载到临时目录后先比对 `.sha256`，再检查压缩包内有没有越界路径，才解压
-- 覆盖安装前把 `data/` 打包备份到 `<安装目录>\backups\pre-install\`（带校验值，保留最近 5 份）
-- 只结束安装目录里正在运行的旧后端，开发用的 `go run ./backend` 不受影响
-
-想装到别的目录、或者不要桌面图标，就把脚本存下来再带参数运行：
-
-```powershell
-scripts\install-pwa.ps1 -Folder D:\StudyOS -SkipShortcut
-```
+桌面版只发布两个 Windows 版本：**x64**（Intel / AMD）与 **arm64**，安装器按当前机器
+自动选择。之后双击桌面图标即可打开，更新在应用内完成。
 
 ## v0.2 已包含
 
@@ -46,8 +33,7 @@ scripts\install-pwa.ps1 -Folder D:\StudyOS -SkipShortcut
 - 英语词库清洗管线：按等级/标签过滤、词形还原分组、批量生成 Wiki
 - Wails v2 桌面壳：单实例、关窗即退、每日自动备份、可验证更新
 - 安装 / 发布流水线：PowerShell 安装与更新、x64/ARM64、SHA-256 校验、失败回滚，
-  桌面版与一键 PWA 两条安装路径各有 Pester 覆盖（越界压缩包、非 https 地址、
-  覆盖安装前备份学习数据）
+  桌面安装路径有 Pester 覆盖（越界压缩包、非 https 地址、覆盖安装前备份学习数据）
 
 ## 快速开始（浏览器开发）
 
@@ -136,30 +122,30 @@ wails build -clean
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
 Invoke-Pester -Script scripts\tests\install.Tests.ps1        # 桌面版安装器
-Invoke-Pester -Script scripts\tests\install-pwa.Tests.ps1    # 一键 PWA 安装器
 Invoke-Pester -Script scripts\tests\encoding.Tests.ps1       # 脚本编码约定（BOM）
 ```
 
 脚本的编码是有讲究的，改动前先看 `scripts\tests\encoding.Tests.ps1` 里的说明：
-`install-pwa.ps1` 必须**不带** BOM（否则 `irm | iex` 会把 U+FEFF 粘到第一条命令上），
-而带中文的 `package-pwa-release.ps1` 必须**带** BOM（否则 PowerShell 5.1 按 GBK 解码，
-中文在写进 start.vbs 之前就已经乱码）。这两条都不会在 diff 里显示出来。
+带中文的 `.ps1` 必须**带** BOM，否则 PowerShell 5.1 按 GBK 解码，中文在写出去之前就已经
+乱码。这条不会在 diff 里显示出来。
 
-## PWA 启动器（一键安装 + 自动更新）
+## 桌面版更新
 
-也可以把学习系统装成“浏览器里的 PWA”：
+桌面版自己完成更新，不需要启动器：
 
 1. 打包发布包（需要 Go 与 pnpm）：
    ```powershell
-   scripts\package-pwa-release.ps1 -Version 0.2.0
+   scripts\package-release.ps1 -Version 0.2.0
    ```
-   生成 `release/study-os-pwa-windows-x64.zip`（含服务程序、网页与启动脚本）和校验文件。
-2. 用户侧一键安装见上面的「一键安装（PWA 版）」；本地调试安装器时可直接指定目录：
+   生成 `study-os-<版本>-windows-x64.zip` 与 `-arm64.zip`、各自的校验文件和 `manifest.json`。
+2. 用户侧一键安装见上面的「安装（桌面版）」；本地调试安装器时可直接指定目录：
    ```powershell
-   scripts\install-pwa.ps1 -Folder D:\StudyOS
+   install.ps1 -ManifestLocation <manifest> -InstallRoot D:\StudyOS
    ```
-   之后双击桌面「学习系统」：自动启动本地后端并打开 PWA 界面；关掉页面后后端空闲 10 分钟自动退出，不常驻占用资源。
-3. 自动更新：后端启动后定期检查 GitHub Releases，发现新版本时前端弹出更新说明与「立即更新」；设置页也有「检查更新」按钮。更新仓库可用 `STUDY_OS_UPDATE_REPO` 配置（默认 `dieWehmut/study-os`）。
+3. 自动更新：应用启动后检查发布清单，发现新版本时前端弹出更新说明与「立即更新」；设置页也有
+   「检查更新」按钮。更新只作用于安装器创建的目录（`<安装目录>\versions\<版本>\StudyOS.exe`），
+   便携版会如实说明不可自动更新。更新仓库可用 `STUDY_OS_UPDATE_REPO` 配置
+   （默认 `dieWehmut/study-os`）。
 
 ## v0.2 明确不含
 

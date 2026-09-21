@@ -32,10 +32,12 @@ test("Pages artifact keeps every generated public reference under its base path"
   }
 })
 
-test("Pages manifest is relative and the static bundle has no backend startup artifact", () => {
-  const manifest = JSON.parse(read("manifest.webmanifest"))
-  assert.equal(manifest.start_url, "./")
-  assert.equal(manifest.scope, "./")
+test("the static bundle ships no PWA or backend startup artifact", () => {
+  // The PWA runtime is retired: the desktop builds are the shipping product and
+  // Pages is a plain static demo, so neither a service worker nor a web app
+  // manifest may reappear in the artifact.
+  assert.ok(!fs.existsSync(path.join(dist, "sw.js")), "artifact still carries a service worker")
+  assert.ok(!fs.existsSync(path.join(dist, "manifest.webmanifest")), "artifact still carries a web app manifest")
 
   const assetDirectory = path.join(dist, "assets")
   const javascript = fs.readdirSync(assetDirectory)

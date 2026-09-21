@@ -69,13 +69,5 @@ component stays hidden and the rest of the static site continues to work.
 - `src/features` — feature components (import wizard, knowledge Wiki, review session, settings panel).
 - `src/components/layout` — app shell, responsive navigation, theme toggle.
 - `src/store` — UI-only Zustand stores; learning state stays server-authoritative.
-- `src/lib` — theme, settings persistence, PWA registration, utilities.
-- `public` — PWA icons, manifest, service worker.
-
-## PWA
-
-`src/lib/pwa.ts` registers the service worker in production builds of the
-backend-backed app; Pages static mode intentionally skips it because the
-worker's root scope cannot provide useful backend or repository-subpath
-offline behavior. The manifest and icons live in `public/`. v0.1 intentionally
-does not advertise LAN/mobile sync.
+- `src/lib` — theme, settings persistence, utilities.
+- `public` — icons and other static assets.

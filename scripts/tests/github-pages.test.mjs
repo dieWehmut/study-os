@@ -53,14 +53,13 @@ test("Pages workflow builds and publishes only the static frontend", () => {
 
 test("frontend assets and routing are repository-subpath safe", () => {
   const index = read("frontend/index.html")
-  const manifest = read("frontend/public/manifest.webmanifest")
   const vite = read("frontend/vite.config.ts")
   const main = read("frontend/src/main.tsx")
 
   assert.match(index, /%BASE_URL%favicon\.svg/)
-  assert.match(index, /%BASE_URL%manifest\.webmanifest/)
-  assert.match(manifest, /"start_url":\s*"\.\/"/)
-  assert.match(manifest, /"scope":\s*"\.\/"/)
+  // The Pages demo has no PWA surface left to install or cache.
+  assert.doesNotMatch(index, /manifest\.webmanifest/)
+  assert.doesNotMatch(index, /mobile-web-app-capable/)
   assert.match(vite, /base:\s*normalizeBasePath\(process\.env\.VITE_BASE_PATH\)/)
   assert.match(vite, /VITE_STATIC_DEMO/)
   assert.match(main, /HashRouter/)
