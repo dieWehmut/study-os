@@ -6,8 +6,11 @@ import { fileURLToPath } from "node:url"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
+// Normalize CRLF so a Windows checkout reads the same as the LF checkout CI
+// uses. Slicing on a literal newline without this silently misses on Windows
+// and yields an empty result, which hides the very contract under test.
 function read(relativePath) {
-  return fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8")
+  return fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8").replace(/\r\n/g, "\n")
 }
 
 test("the release matrix ships exactly the two Windows desktop editions", () => {
