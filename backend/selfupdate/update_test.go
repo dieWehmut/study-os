@@ -148,6 +148,45 @@ func newTestService(t *testing.T, fixture *releaseFixture, dataDir string) *Serv
 	return service
 }
 
+// The release pipeline runs on Windows PowerShell 5.1, whose '-Encoding UTF8'
+// writes a byte order mark. encoding/json rejects a BOM, so a manifest produced
+// by our own packager would have failed to parse and every desktop build would
+// have reported "cannot parse update information".
+func TestCheckAcceptsAManifestWrittenWithAByteOrderMark(t *testing.T) {
+	archives := map[string][]byte{
+		"study-os-0.3.0-windows-x64.zip": desktopZip(t, nil),
+	}
+	fixture := newReleaseFixture(t, Manifest{}, archives)
+	fixture.manifest = desktopManifest("0.3.0", archives, fixture.server.URL+"/releases/download")
+
+	service := newTestService(t, fixture, t.TempDir())
+	// Re-serve the same release with a BOM in front of the manifest document.
+	withBom := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		name := filepath.Base(request.URL.Path)
+		if name == "manifest.json" {
+			_, _ = response.Write([]byte{0xEF, 0xBB, 0xBF})
+			_ = json.NewEncoder(response).Encode(fixture.manifest)
+			return
+		}
+		if content, ok := archives[name]; ok {
+			_, _ = response.Write(content)
+			return
+		}
+		http.NotFound(response, request)
+	}))
+	defer withBom.Close()
+	service.HTTPClient = withBom.Client()
+	service.ManifestURL = withBom.URL + "/releases/latest/download/manifest.json"
+
+	status := service.Status(context.Background())
+	if status.Error != "" {
+		t.Fatalf("BOM manifest was rejected: %q", status.Error)
+	}
+	if !status.UpdateAvailable || status.LatestVersion != "0.3.0" {
+		t.Fatalf("BOM manifest status = %#v", status)
+	}
+}
+
 func TestCheckFindsDesktopUpdateWhenRemoteIsNewer(t *testing.T) {
 	archives := map[string][]byte{
 		"study-os-0.3.0-windows-x64.zip": desktopZip(t, nil),

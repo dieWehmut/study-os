@@ -2,6 +2,7 @@ package selfupdate
 
 import (
 	"archive/zip"
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -237,13 +238,27 @@ func (s *Service) fetchManifest(ctx context.Context, location string) (Manifest,
 		return Manifest{}, fmt.Errorf("更新服务器返回 %d", response.StatusCode)
 	}
 	var manifest Manifest
-	if err := json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&manifest); err != nil {
+	// Release manifests may carry a byte order mark: Windows PowerShell 5.1
+	// writes one for '-Encoding UTF8' and the release pipeline runs on it, while
+	// encoding/json rejects a BOM. Skip it rather than refusing a valid release.
+	body := io.LimitReader(response.Body, 2<<20)
+	if err := json.NewDecoder(skipByteOrderMark(body)).Decode(&manifest); err != nil {
 		return Manifest{}, errors.New("无法解析更新信息")
 	}
 	if manifest.Version == "" {
 		return Manifest{}, errors.New("更新信息缺少版本号")
 	}
 	return manifest, nil
+}
+
+// skipByteOrderMark drops a leading UTF-8 byte order mark, which encoding/json
+// treats as an invalid character. Anything else is passed straight through.
+func skipByteOrderMark(reader io.Reader) io.Reader {
+	buffered := bufio.NewReader(reader)
+	if prefix, err := buffered.Peek(3); err == nil && prefix[0] == 0xEF && prefix[1] == 0xBB && prefix[2] == 0xBF {
+		_, _ = buffered.Discard(3)
+	}
+	return buffered
 }
 
 // SelectAsset picks the single Windows archive for one architecture.

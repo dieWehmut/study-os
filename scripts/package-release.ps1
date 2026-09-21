@@ -57,6 +57,10 @@ $manifest = [ordered]@{
 }
 $manifestJson = $manifest | ConvertTo-Json -Depth 8
 if (-not $DryRun) {
-    Set-Content -LiteralPath (Join-Path $OutputRoot 'manifest.json') -Value $manifestJson -Encoding UTF8
+    # Write the manifest without a byte order mark. Windows PowerShell 5.1 emits a
+    # BOM for '-Encoding UTF8' while PowerShell 7 does not, and Go's JSON decoder
+    # rejects a BOM-prefixed document -- so the published manifest would parse on
+    # one build host and break the updater on the other.
+    [IO.File]::WriteAllText((Join-Path $OutputRoot 'manifest.json'), $manifestJson, (New-Object Text.UTF8Encoding($false)))
 }
 $manifestJson
