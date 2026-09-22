@@ -54,6 +54,37 @@ function Assert-StudyOSChecksum {
     return $actual
 }
 
+# ConvertTo-StudyOSText normalizes an HTTP response body to text before it is
+# parsed. GitHub serves release assets -- the published manifest included -- as
+# application/octet-stream rather than application/json, and Windows PowerShell
+# 5.1 hands back the body of such a response as a byte[]. Piping those bytes
+# into ConvertFrom-Json parses a list of numbers instead of the document, and
+# under Set-StrictMode the one-line install then dies reading .assets. Decode to
+# UTF-8 first and drop the BOM when the publisher wrote one: Windows PowerShell
+# 5.1 emits a BOM for -Encoding UTF8 while PowerShell 7 does not, so both shapes
+# reach a reader.
+function ConvertTo-StudyOSText {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)]$Content)
+
+    $text = if ($Content -is [byte[]]) {
+        [Text.Encoding]::UTF8.GetString($Content)
+    } elseif ($Content -is [string]) {
+        $Content
+    } elseif ($Content -is [Array]) {
+        # A byte[] that PowerShell unrolled -- through '+' or a pipeline --
+        # arrives as an Object[] of boxed bytes. Decode it the same way rather
+        # than stringifying the numbers into a document no parser accepts.
+        [Text.Encoding]::UTF8.GetString([byte[]]$Content)
+    } else {
+        [string]$Content
+    }
+    if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) {
+        $text = $text.Substring(1)
+    }
+    return $text
+}
+
 function Get-StudyOSManifest {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][string]$Location)
@@ -62,7 +93,7 @@ function Get-StudyOSManifest {
         throw 'Release manifests must use HTTPS.'
     }
     $json = if ($Location -match '^https://') {
-        (Invoke-WebRequest -UseBasicParsing -Uri $Location).Content
+        ConvertTo-StudyOSText -Content (Invoke-WebRequest -UseBasicParsing -Uri $Location).Content
     } else {
         if (-not (Test-Path -LiteralPath $Location -PathType Leaf)) {
             throw "Release manifest does not exist: $Location"

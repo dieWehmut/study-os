@@ -172,6 +172,43 @@ Describe 'Study OS release installer contracts' {
         $script | Should Not Match 'ManifestLocation is required when running install\.ps1'
     }
 
+
+    It 'reads a manifest GitHub serves as an octet-stream' {
+        # GitHub serves release assets -- manifest.json included -- as
+        # application/octet-stream rather than application/json. Windows
+        # PowerShell 5.1 hands back the body of such a response as a byte[],
+        # and piping those bytes into ConvertFrom-Json parses them as a list of
+        # numbers instead of the document: .assets is then missing and, under
+        # Set-StrictMode, the documented one-line install dies on its first
+        # command. Decode the response body before parsing it.
+        $json = '{"schema_version":1,"version":"0.3.0","assets":[{"os":"windows","arch":"x64","url":"https://example.invalid/release.zip","sha256":"00","entrypoint":"StudyOS.exe"}]}'
+        $octetStreamBody = [Text.Encoding]::UTF8.GetBytes($json)
+
+        $decoded = ConvertTo-StudyOSText -Content $octetStreamBody
+        $decoded | Should Be $json
+        ([string]$decoded).GetType().FullName | Should Be 'System.String'
+
+        $manifest = $decoded | ConvertFrom-Json
+        [string]$manifest.version | Should Be '0.3.0'
+        $manifest.assets.Count | Should Be 1
+        [string]$manifest.assets[0].arch | Should Be 'x64'
+
+        # A publisher on Windows PowerShell 5.1 writes a BOM with
+        # '-Encoding UTF8'; PowerShell 7 does not. Both shapes get published,
+        # so the reader has to accept either one.
+        $bomBody = [Text.Encoding]::UTF8.GetPreamble() + [Text.Encoding]::UTF8.GetBytes($json)
+        $manifestFromBom = (ConvertTo-StudyOSText -Content $bomBody) | ConvertFrom-Json
+        [string]$manifestFromBom.version | Should Be '0.3.0'
+    }
+
+    It 'routes the HTTPS manifest through the decoder' {
+        # The regression is only closed if the HTTPS branch actually decodes the
+        # response body; a local file manifest would never exercise it, which is
+        # exactly how this shipped broken.
+        $script = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'install.ps1')
+        $script | Should Match 'ConvertTo-StudyOSText -Content \(Invoke-WebRequest -UseBasicParsing -Uri \$Location\)\.Content'
+        $script | Should Not Match '-Encoding UTF8\.\)\.Content'
+    }
     It 'uses the stable launcher as the desktop shortcut target' {
         $installRoot = Join-Path $TestDrive 'shortcut'
         (Get-StudyOSShortcutTarget -InstallRoot $installRoot) | Should Be (Join-Path $installRoot 'StudyOS.cmd')
