@@ -3,7 +3,6 @@ import { Waves } from "lucide-react"
 
 import { getDashboard } from "@/api/dashboard"
 import type { DashboardData } from "@/api/types"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -59,6 +58,12 @@ export default function Memory() {
             <h1 className="font-heading text-2xl font-semibold tracking-tight">记忆检测</h1>
           </div>
           <p className="text-sm text-muted-foreground">只做高频、快捷、无需逻辑思考的检测。</p>
+          {/* Said before the button is pressed, not after. "恢复模式" on its own
+              is a label with no promise attached, and the badge that explained
+              it only appeared once you had already committed to it. */}
+          <p className="text-xs text-muted-foreground">
+            恢复模式：脑雾时只推低阻力任务（看词回忆 / 四选一猜词）。
+          </p>
         </div>
         <Button
           type="button"
@@ -69,9 +74,6 @@ export default function Memory() {
           {recovery ? "恢复模式已开启" : "恢复模式"}
         </Button>
       </div>
-      {recovery ? (
-        <Badge variant="secondary" className="w-fit">脑雾时只推送低阻力任务（看词回忆 / 四选一猜词）</Badge>
-      ) : null}
       <SubjectChips subject={subject} onSelect={setSubject} />
       <div className="grid gap-3 sm:grid-cols-3">
         {[

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -135,5 +135,22 @@ describe("Memory page", () => {
 
     expect(await screen.findByText("待复习")).toBeInTheDocument()
     expect(screen.queryByText("接下来七天")).not.toBeInTheDocument()
+  })
+
+  it("says what 恢复模式 does before you press it", async () => {
+    // The explanation used to appear only after the toggle: a button labelled
+    // 恢复模式 with no promise attached, and a badge that turned up once you had
+    // already committed. Whoever needs it is the person least able to guess.
+    renderPage()
+
+    expect(await screen.findByText(/恢复模式：脑雾时只推低阻力任务/)).toBeInTheDocument()
+
+    const toggle = screen.getByRole("button", { name: "恢复模式" })
+    expect(toggle).toHaveAttribute("aria-pressed", "false")
+
+    fireEvent.click(toggle)
+
+    expect(screen.getByRole("button", { name: "恢复模式已开启" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByText(/恢复模式：脑雾时只推低阻力任务/)).toBeInTheDocument()
   })
 })
