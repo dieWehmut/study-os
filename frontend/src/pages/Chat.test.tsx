@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getQARecord: vi.fn(),
   saveQARecord: vi.fn(),
   listKnowledge: vi.fn(),
+  getKnowledge: vi.fn(),
   scheduleKnowledge: vi.fn(),
   listMistakes: vi.fn(),
   listLessons: vi.fn(),
@@ -53,7 +54,11 @@ vi.mock("@/api/chat", () => ({
   saveQARecord: mocks.saveQARecord,
 }))
 
-vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge, scheduleKnowledge: mocks.scheduleKnowledge }))
+vi.mock("@/api/knowledge", () => ({
+  listKnowledge: mocks.listKnowledge,
+  getKnowledge: mocks.getKnowledge,
+  scheduleKnowledge: mocks.scheduleKnowledge,
+}))
 vi.mock("@/api/mistakes", () => ({ listMistakes: mocks.listMistakes }))
 vi.mock("@/api/lessons", () => ({ listLessons: mocks.listLessons }))
 
@@ -66,6 +71,13 @@ describe("Chat page", () => {
     mocks.getQARecord.mockResolvedValue(null)
     mocks.saveQARecord.mockResolvedValue(null)
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
+    mocks.getKnowledge.mockResolvedValue({
+      id: "k-1",
+      item_type: "brain_dump",
+      term: "导数与变化率",
+      concise_definition: "导数描述变化率。",
+      scheduled: false,
+    })
     mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k-1", prompt_count: 1 })
     mocks.listMistakes.mockResolvedValue([])
     mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
@@ -365,6 +377,46 @@ describe("Chat page", () => {
 
     // A 错题 link has no review card behind it; the queue belongs on Practice.
     expect(screen.queryByRole("region", { name: "回流到复习计划" })).not.toBeInTheDocument()
+    // Nothing to ask about: the record points at a 错题, not a knowledge point.
+    expect(mocks.getKnowledge).not.toHaveBeenCalled()
+  })
+
+  it("names a linked point the 关联对象 page no longer carries", async () => {
+    // The list is capped and filtered by the subject chip, so a record saved
+    // earlier can point at an item that is not on it. Guessing from the page
+    // loses the name and offers 排进复习 for something already queued.
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.getQARecord.mockResolvedValueOnce({ ...savedRecord, context_type: "knowledge_item", context_id: "k-9" })
+    mocks.listKnowledge.mockResolvedValueOnce({
+      count: 1,
+      items: [{ id: "k-1", item_type: "brain_dump", term: "导数与变化率", concise_definition: "导数描述变化率。" }],
+      scheduled_ids: [],
+    })
+    mocks.getKnowledge.mockResolvedValueOnce({
+      id: "k-9",
+      item_type: "brain_dump",
+      term: "动能定理",
+      concise_definition: "只对合外力做功成立。",
+      scheduled: true,
+    })
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+
+    const flowBack = within(await screen.findByRole("region", { name: "回流到复习计划" }))
+    await waitFor(() => expect(mocks.getKnowledge).toHaveBeenCalledWith("k-9"))
+    await waitFor(() => expect(flowBack.getByRole("status")).toHaveTextContent("已经在复习计划里"))
+    expect(flowBack.queryByRole("button", { name: "排进复习" })).not.toBeInTheDocument()
   })
 
   it("says a knowledge point is already queued instead of offering it again", async () => {
@@ -487,6 +539,7 @@ describe("picking up a question left by 阅读", () => {
     mocks.getQARecord.mockResolvedValue(null)
     mocks.saveQARecord.mockResolvedValue(null)
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
+    mocks.getKnowledge.mockResolvedValue({ id: "k-1", item_type: "brain_dump", term: "知识点", concise_definition: "", scheduled: false })
     mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k-1", prompt_count: 1 })
     mocks.listMistakes.mockResolvedValue([])
     mocks.listLessons.mockResolvedValue({ items: [], count: 0 })

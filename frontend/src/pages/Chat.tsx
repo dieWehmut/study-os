@@ -13,7 +13,7 @@ import {
   type QARecord,
   type QARecordInput,
 } from "@/api/chat"
-import { listKnowledge, scheduleKnowledge } from "@/api/knowledge"
+import { getKnowledge, listKnowledge, scheduleKnowledge } from "@/api/knowledge"
 import { listLessons } from "@/api/lessons"
 import { listMistakes } from "@/api/mistakes"
 import type { ChatMessage } from "@/api/types"
@@ -107,6 +107,12 @@ export default function Chat() {
   // answered by the same list request that built the 关联对象 options.
   const [qaScheduled, setQAScheduled] = useState<string[]>([])
   const [qaQueue, setQAQueue] = useState<QAQueueState | null>(null)
+  /**
+   * The saved record's linked knowledge point, read by id. The 关联对象 list is
+   * a capped, subject-filtered page, so this is the only reliable answer for the
+   * item the record actually points at.
+   */
+  const [qaLinked, setQALinked] = useState<{ id: string; term: string; scheduled: boolean } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<number | null>(null)
   const conversationRequestRef = useRef(0)
@@ -162,6 +168,7 @@ export default function Chat() {
     setQAContextLoadedKey(null)
     setQAScheduled([])
     setQAQueue(null)
+    setQALinked(null)
   }
 
   function changeSubject(value: string) {
@@ -202,6 +209,7 @@ export default function Chat() {
     setQAContextLoadedKey(null)
     setQAScheduled([])
     setQAQueue(null)
+    setQALinked(null)
     listChatMessages(subject === "all" ? "" : subject, sessionId, 50)
       .then((result) => {
         if (conversationRequestRef.current === requestID) setMessages(result.items)
@@ -237,6 +245,7 @@ export default function Chat() {
     setQAContextLoadedKey(null)
     setQAScheduled([])
     setQAQueue(null)
+    setQALinked(null)
   }
 
   const completedTurn = useMemo(() => latestCompletedTurn(messages), [messages])
@@ -261,16 +270,22 @@ export default function Chat() {
   const qaQueueTarget = useMemo<QARecordQueueTarget | null>(() => {
     if (qaRecord?.context_type !== "knowledge_item" || !qaRecord.context_id) return null
     const knowledgeId = qaRecord.context_id
+    // The 关联对象 list is capped and filtered by the subject chip, so the item
+    // a record was saved against can easily be missing from it. The record's own
+    // id is what it points at, so ask the point itself rather than guessing from
+    // a page: without this, a queued item reads as not queued and shows the
+    // button again, and the copy loses its name.
+    const linked = qaLinked?.id === knowledgeId ? qaLinked : null
     const option = qaContextOptions.find((entry) => entry.value === qaContextValue("knowledge_item", knowledgeId))
     const justQueued = qaQueue?.key === qaKey
       && qaQueue.knowledgeId === knowledgeId
       && qaQueue.status === "queued"
     return {
       knowledgeId,
-      label: option ? option.label.replace(/^知识点：/, "") : "",
-      queued: justQueued || qaScheduled.includes(knowledgeId),
+      label: option ? option.label.replace(/^知识点：/, "") : linked?.term ?? "",
+      queued: justQueued || qaScheduled.includes(knowledgeId) || linked?.scheduled === true,
     }
-  }, [qaRecord, qaContextOptions, qaScheduled, qaQueue, qaKey])
+  }, [qaRecord, qaContextOptions, qaScheduled, qaQueue, qaKey, qaLinked])
 
   // A failure or a summary belongs to the target it happened for, on the turn it
   // happened for; a record that has since been re-linked, or a newer answer,
@@ -287,9 +302,26 @@ export default function Chat() {
 
     void getQARecord(sessionID)
       .then((record) => {
-        if (qaRequestRef.current === requestID) {
-          setQARecord(record)
-          setQAError("")
+        if (qaRequestRef.current !== requestID) return
+        setQARecord(record)
+        setQAError("")
+        // One item, read by id: its name and 复习状态 travel together, and
+        // neither is on the page of 关联对象 options when the item is not.
+        if (record?.context_type === "knowledge_item" && record.context_id) {
+          const linkedID = record.context_id
+          void getKnowledge(linkedID)
+            .then((item) => {
+              if (qaRequestRef.current === requestID) {
+                setQALinked({ id: linkedID, term: item.term, scheduled: item.scheduled === true })
+              }
+            })
+            .catch(() => {
+              // A missing or unreachable item leaves the panel with what the
+              // list offered; it must not block the record itself.
+              if (qaRequestRef.current === requestID) setQALinked(null)
+            })
+        } else {
+          setQALinked(null)
         }
       })
       .catch(() => {
