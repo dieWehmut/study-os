@@ -19,11 +19,30 @@ export interface QARecordPanelProps {
   contextLoading?: boolean
   savedAt?: string
   onSave: (input: QARecordInput) => void | Promise<void>
+  /**
+   * The saved record's linked knowledge point, when the server-side record has
+   * one. Absent means "nothing here can be queued" -- a record linked to a 错题
+   * or a 课程 has no review card to make, and an empty 回流 block would just be
+   * a permanent reminder of something that is not on offer.
+   */
+  queueTarget?: QARecordQueueTarget | null
+  queueScheduling?: boolean
+  queuePromptCount?: number
+  queueError?: string | null
+  onSchedule?: (knowledgeId: string) => void | Promise<void>
 }
 
 export interface QAContextOption {
   value: string
   label: string
+}
+
+export interface QARecordQueueTarget {
+  knowledgeId: string
+  /** The item's own name, when the page could resolve it. */
+  label: string
+  /** The item already contributes cards: the server says so, or it just did. */
+  queued: boolean
 }
 
 interface Draft {
@@ -70,6 +89,11 @@ export default function QARecordPanel({
   contextLoading = false,
   savedAt = "",
   onSave,
+  queueTarget = null,
+  queueScheduling = false,
+  queuePromptCount = 0,
+  queueError = "",
+  onSchedule,
 }: QARecordPanelProps) {
   const [draft, setDraft] = useState<Draft>(() => draftFrom(initialRecord, prefill))
   // The parent changes `key` when the server record identity/version changes.
@@ -212,6 +236,45 @@ export default function QARecordPanel({
         ) : (
           <Button type="button" disabled>保存记录</Button>
         )}
+        {/* Queued only when you ask. A 学习记录 is your own account of what you
+            now understand; turning that into scheduled cards without
+            confirmation would let a half-written note decide what you review
+            next week. The invitation disappears once it has been accepted --
+            telling you to 排进复习 above 已排进复习 would be arguing with itself. */}
+        {hasSession && queueTarget && onSchedule ? (
+          <section
+            aria-label="回流到复习计划"
+            className="mt-4 grid gap-2 rounded-xl border border-dashed px-3 py-3"
+          >
+            <div className="grid gap-1">
+              <span className="text-sm font-medium">回流</span>
+              {queueTarget.queued ? null : (
+                <p className="text-xs text-muted-foreground">
+                  把关联的知识点{queueTarget.label ? `「${queueTarget.label}」` : ""}排进复习计划，让调度去考你。
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {queueTarget.queued ? (
+                <span role="status" className="text-xs text-muted-foreground">
+                  {queuePromptCount > 0 ? `已排进复习 · ${queuePromptCount} 张卡` : "已经在复习计划里"}
+                </span>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label="排进复习"
+                  disabled={queueScheduling}
+                  onClick={() => void onSchedule(queueTarget.knowledgeId)}
+                >
+                  {queueScheduling ? "正在排进…" : "排进复习"}
+                </Button>
+              )}
+            </div>
+            {queueError ? <p role="alert" className="text-xs text-destructive">{queueError}</p> : null}
+          </section>
+        ) : null}
       </CardContent>
     </Card>
   )

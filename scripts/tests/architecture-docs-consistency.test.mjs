@@ -69,7 +69,11 @@ test("ROADMAP records question-attempt evidence at the schema head", () => {
   assert.match(roadmap, /schema v17[\s\S]*qa_records[\s\S]*chat_messages\.session_id/)
   assert.match(roadmap, /GET\/PUT \/api\/chat\/records\/\{sessionID\}/)
   assert.match(roadmap, /Pages[\s\S]*答疑页单列编辑面板/)
-  assert.match(roadmap, /显式回流[\s\S]*不做未经用户确认的自动写入/)
+  // The flow-back shipped, so this no longer reads as a pending step -- but the
+  // constraint it recorded (no card is scheduled without a click) still has to
+  // stay written down, or the next change has nothing stopping it from
+  // scheduling off a half-written record.
+  assert.match(roadmap, /回流[\s\S]*不做未经用户确认的自动写入[\s\S]*保存记录本身不会排卡/)
   assert.doesNotMatch(roadmap, /答疑记录 Q&A[^\n]*交互待落地/)
   assert.doesNotMatch(roadmap, /待接入 API、Pages 与答疑页/)
   assert.match(roadmap, /POST \/api\/error-causes[\s\S]*PATCH \/api\/error-causes/)

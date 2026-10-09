@@ -123,3 +123,112 @@ describe("QARecordPanel", () => {
     expect(screen.getByRole("textbox", { name: "原本理解" })).toBeDisabled()
   })
 })
+
+describe("回流 to the review queue", () => {
+  const linked: QARecord = { ...record, context_type: "knowledge_item", context_id: "k-1" }
+
+  it("says nothing about the queue until a saved record points at a knowledge point", () => {
+    // The common case: this record is linked to a 错题, or to nothing at all.
+    // Either way there is no card to make, and an empty block would read as a
+    // broken feature rather than as an inapplicable action.
+    render(
+      <QARecordPanel sessionId="session-1" subject="physics" initialRecord={record} onSave={vi.fn()} onSchedule={vi.fn()} />,
+    )
+
+    expect(screen.queryByRole("region", { name: "回流到复习计划" })).not.toBeInTheDocument()
+  })
+
+  it("queues nothing until the button is pressed", () => {
+    // A 学习记录 is your own account of what you now understand. Letting a
+    // half-written note schedule next week's reviews without asking is the one
+    // thing this section must not do.
+    const onSchedule = vi.fn()
+    render(
+      <QARecordPanel
+        sessionId="session-1"
+        subject="physics"
+        initialRecord={linked}
+        queueTarget={{ knowledgeId: "k-1", label: "速度与加速度", queued: false }}
+        onSave={vi.fn()}
+        onSchedule={onSchedule}
+      />,
+    )
+
+    expect(onSchedule).not.toHaveBeenCalled()
+    expect(screen.getByRole("region", { name: "回流到复习计划" })).toHaveTextContent("速度与加速度")
+
+    fireEvent.click(screen.getByRole("button", { name: "排进复习" }))
+    expect(onSchedule).toHaveBeenCalledWith("k-1")
+  })
+
+  it("replaces the button with what the queue already holds", () => {
+    render(
+      <QARecordPanel
+        sessionId="session-1"
+        subject="physics"
+        initialRecord={linked}
+        queueTarget={{ knowledgeId: "k-1", label: "速度与加速度", queued: true }}
+        onSave={vi.fn()}
+        onSchedule={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole("status")).toHaveTextContent("已经在复习计划里")
+    expect(screen.queryByRole("button", { name: "排进复习" })).not.toBeInTheDocument()
+    // The invitation has to go with the button: 排进复习 above 已排进复习 is the
+    // control arguing with its own result.
+    expect(screen.queryByText(/排进复习计划/)).not.toBeInTheDocument()
+  })
+
+  it("reports the cards the queue just accepted", () => {
+    render(
+      <QARecordPanel
+        sessionId="session-1"
+        subject="physics"
+        initialRecord={linked}
+        queueTarget={{ knowledgeId: "k-1", label: "速度与加速度", queued: true }}
+        queuePromptCount={3}
+        onSave={vi.fn()}
+        onSchedule={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole("status")).toHaveTextContent("已排进复习 · 3 张卡")
+  })
+
+  it("holds the button while the queue request is in flight", () => {
+    render(
+      <QARecordPanel
+        sessionId="session-1"
+        subject="physics"
+        initialRecord={linked}
+        queueTarget={{ knowledgeId: "k-1", label: "速度与加速度", queued: false }}
+        queueScheduling
+        onSave={vi.fn()}
+        onSchedule={vi.fn()}
+      />,
+    )
+
+    // Same accessible name: the label carries the state, the name stays put so
+    // a second press cannot sneak through mid-request.
+    expect(screen.getByRole("button", { name: "排进复习" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "排进复习" })).toHaveTextContent("正在排进…")
+  })
+
+  it("leaves the button pressable again after a failure", () => {
+    render(
+      <QARecordPanel
+        sessionId="session-1"
+        subject="physics"
+        initialRecord={linked}
+        queueTarget={{ knowledgeId: "k-1", label: "速度与加速度", queued: false }}
+        queueError="排进复习失败，请重试。"
+        onSave={vi.fn()}
+        onSchedule={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole("alert")).toHaveTextContent("排进复习失败")
+    expect(screen.getByRole("button", { name: "排进复习" })).toBeEnabled()
+  })
+})

@@ -13,14 +13,14 @@ import {
   type QARecord,
   type QARecordInput,
 } from "@/api/chat"
-import { listKnowledge } from "@/api/knowledge"
+import { listKnowledge, scheduleKnowledge } from "@/api/knowledge"
 import { listLessons } from "@/api/lessons"
 import { listMistakes } from "@/api/mistakes"
 import type { ChatMessage } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
-import QARecordPanel, { type QAContextOption } from "@/features/chat/QARecordPanel"
+import QARecordPanel, { type QAContextOption, type QARecordQueueTarget } from "@/features/chat/QARecordPanel"
 import { qaContextValue } from "@/features/chat/qa-record"
 import { takeAskDraft } from "@/lib/ask-draft"
 import { subjectName } from "@/lib/subjects"
@@ -47,6 +47,21 @@ interface CompletedTurn {
   id: string
   question: string
   answer: string
+}
+
+/**
+ * What happened the last time this record's knowledge point was sent to the
+ * review queue. Held here rather than in the panel so that saving the record --
+ * which remounts the panel -- does not throw away the answer the server gave.
+ * It carries the turn it belongs to, so a result can never be read against a
+ * later record without anything having to be cleared on the way in.
+ */
+interface QAQueueState {
+  key: string
+  knowledgeId: string
+  status: "scheduling" | "queued" | "failed"
+  promptCount: number
+  error: string
 }
 
 function latestCompletedTurn(items: ChatMessage[]): CompletedTurn | null {
@@ -88,11 +103,16 @@ export default function Chat() {
   const [qaContextOptions, setQAContextOptions] = useState<QAContextOption[]>([])
   const [qaLoadedKey, setQALoadedKey] = useState<string | null>(null)
   const [qaContextLoadedKey, setQAContextLoadedKey] = useState<string | null>(null)
+  // Which of the knowledge points on offer already carry review cards, as
+  // answered by the same list request that built the 关联对象 options.
+  const [qaScheduled, setQAScheduled] = useState<string[]>([])
+  const [qaQueue, setQAQueue] = useState<QAQueueState | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<number | null>(null)
   const conversationRequestRef = useRef(0)
   const qaRequestRef = useRef(0)
   const qaSaveRequestRef = useRef(0)
+  const qaQueueRequestRef = useRef(0)
   const activeSessionRef = useRef<string | null>(null)
   const sendRequestRef = useRef(0)
   const localMessageCounterRef = useRef(0)
@@ -123,6 +143,7 @@ export default function Chat() {
     conversationRequestRef.current += 1
     qaRequestRef.current += 1
     qaSaveRequestRef.current += 1
+    qaQueueRequestRef.current += 1
     sendRequestRef.current += 1
     stopPolling()
     sentRef.current = false
@@ -139,6 +160,8 @@ export default function Chat() {
     setQAContextOptions([])
     setQALoadedKey(null)
     setQAContextLoadedKey(null)
+    setQAScheduled([])
+    setQAQueue(null)
   }
 
   function changeSubject(value: string) {
@@ -160,6 +183,7 @@ export default function Chat() {
     const requestID = ++conversationRequestRef.current
     qaRequestRef.current += 1
     qaSaveRequestRef.current += 1
+    qaQueueRequestRef.current += 1
     sendRequestRef.current += 1
     stopPolling()
     sentRef.current = true
@@ -176,6 +200,8 @@ export default function Chat() {
     setQAContextOptions([])
     setQALoadedKey(null)
     setQAContextLoadedKey(null)
+    setQAScheduled([])
+    setQAQueue(null)
     listChatMessages(subject === "all" ? "" : subject, sessionId, 50)
       .then((result) => {
         if (conversationRequestRef.current === requestID) setMessages(result.items)
@@ -192,6 +218,7 @@ export default function Chat() {
     conversationRequestRef.current += 1
     qaRequestRef.current += 1
     qaSaveRequestRef.current += 1
+    qaQueueRequestRef.current += 1
     sendRequestRef.current += 1
     stopPolling()
     sentRef.current = false
@@ -208,6 +235,8 @@ export default function Chat() {
     setQAContextOptions([])
     setQALoadedKey(null)
     setQAContextLoadedKey(null)
+    setQAScheduled([])
+    setQAQueue(null)
   }
 
   const completedTurn = useMemo(() => latestCompletedTurn(messages), [messages])
@@ -223,6 +252,32 @@ export default function Chat() {
     : ""
   const qaLoading = Boolean(qaKey && qaLoadedKey !== qaKey)
   const qaContextLoading = Boolean(qaKey && qaContextLoadedKey !== qaKey)
+
+  // 回流 can only act on what the server already holds: a saved record whose
+  // link is a knowledge point. A 错题 or 课程 link has no review card behind it,
+  // and the draft's current selection is not a decision until it is saved --
+  // queueing a card the record does not actually point at would be worse than
+  // offering nothing.
+  const qaQueueTarget = useMemo<QARecordQueueTarget | null>(() => {
+    if (qaRecord?.context_type !== "knowledge_item" || !qaRecord.context_id) return null
+    const knowledgeId = qaRecord.context_id
+    const option = qaContextOptions.find((entry) => entry.value === qaContextValue("knowledge_item", knowledgeId))
+    const justQueued = qaQueue?.key === qaKey
+      && qaQueue.knowledgeId === knowledgeId
+      && qaQueue.status === "queued"
+    return {
+      knowledgeId,
+      label: option ? option.label.replace(/^知识点：/, "") : "",
+      queued: justQueued || qaScheduled.includes(knowledgeId),
+    }
+  }, [qaRecord, qaContextOptions, qaScheduled, qaQueue, qaKey])
+
+  // A failure or a summary belongs to the target it happened for, on the turn it
+  // happened for; a record that has since been re-linked, or a newer answer,
+  // must not wear the previous result.
+  const qaQueueForTarget = qaQueue && qaQueue.key === qaKey && qaQueue.knowledgeId === qaQueueTarget?.knowledgeId
+    ? qaQueue
+    : null
 
   useEffect(() => {
     const sessionID = activeSession
@@ -268,6 +323,7 @@ export default function Chat() {
         }
       }
       setQAContextOptions(options)
+      setQAScheduled(knowledge.status === "fulfilled" ? knowledge.value.scheduled_ids ?? [] : [])
       setQAContextLoadedKey(currentKey)
     })
   }, [activeSession, completedQuestion, completedAnswer, completedTurnID, subject])
@@ -288,6 +344,27 @@ export default function Chat() {
       if (activeSessionRef.current === sessionID && qaSaveRequestRef.current === requestID) setQAError("保存学习记录失败，请重试。")
     } finally {
       if (activeSessionRef.current === sessionID && qaSaveRequestRef.current === requestID) setQASaving(false)
+    }
+  }
+
+  /**
+   * Send the record's knowledge point to the review queue -- only ever because
+   * the learner pressed the button. Nothing here runs on save: a half-finished
+   * record must not decide what next week's reviews contain.
+   */
+  async function handleQASchedule(knowledgeID: string) {
+    const sessionID = activeSession
+    if (!sessionID) return
+    const requestID = ++qaQueueRequestRef.current
+    setQAQueue({ key: qaKey, knowledgeId: knowledgeID, status: "scheduling", promptCount: 0, error: "" })
+    try {
+      const result = await scheduleKnowledge(knowledgeID)
+      if (activeSessionRef.current !== sessionID || qaQueueRequestRef.current !== requestID) return
+      setQAQueue({ key: qaKey, knowledgeId: knowledgeID, status: "queued", promptCount: result.prompt_count, error: "" })
+    } catch {
+      if (activeSessionRef.current === sessionID && qaQueueRequestRef.current === requestID) {
+        setQAQueue({ key: qaKey, knowledgeId: knowledgeID, status: "failed", promptCount: 0, error: "排进复习失败，请重试。" })
+      }
     }
   }
 
@@ -501,6 +578,11 @@ export default function Chat() {
               contextOptions={qaContextOptions}
               contextLoading={qaContextLoading}
               onSave={handleQASave}
+              queueTarget={qaQueueTarget}
+              queueScheduling={qaQueueForTarget?.status === "scheduling"}
+              queuePromptCount={qaQueueForTarget?.status === "queued" ? qaQueueForTarget.promptCount : 0}
+              queueError={qaQueueForTarget?.error ?? ""}
+              onSchedule={handleQASchedule}
             />
           ) : null}
 

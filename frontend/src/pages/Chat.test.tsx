@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getQARecord: vi.fn(),
   saveQARecord: vi.fn(),
   listKnowledge: vi.fn(),
+  scheduleKnowledge: vi.fn(),
   listMistakes: vi.fn(),
   listLessons: vi.fn(),
 }))
@@ -52,7 +53,7 @@ vi.mock("@/api/chat", () => ({
   saveQARecord: mocks.saveQARecord,
 }))
 
-vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge }))
+vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge, scheduleKnowledge: mocks.scheduleKnowledge }))
 vi.mock("@/api/mistakes", () => ({ listMistakes: mocks.listMistakes }))
 vi.mock("@/api/lessons", () => ({ listLessons: mocks.listLessons }))
 
@@ -65,6 +66,7 @@ describe("Chat page", () => {
     mocks.getQARecord.mockResolvedValue(null)
     mocks.saveQARecord.mockResolvedValue(null)
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k-1", prompt_count: 1 })
     mocks.listMistakes.mockResolvedValue([])
     mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
     mocks.sendChatMessage.mockResolvedValue({ session_id: "s1", message_id: "ai-1", status: "pending" })
@@ -274,6 +276,114 @@ describe("Chat page", () => {
     expect(original).toHaveValue("我把导数当成函数值了")
   })
 
+  it("returns a saved record's knowledge point to the review queue only when asked", async () => {
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.getQARecord.mockResolvedValueOnce({ ...savedRecord, context_type: "knowledge_item", context_id: "k-1" })
+    mocks.listKnowledge.mockResolvedValueOnce({
+      count: 1,
+      items: [{ id: "k-1", item_type: "brain_dump", term: "导数与变化率", concise_definition: "导数描述变化率。" }],
+      scheduled_ids: [],
+    })
+    mocks.scheduleKnowledge.mockResolvedValueOnce({ status: "scheduled", knowledge_id: "k-1", prompt_count: 3 })
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    const queue = await screen.findByRole("button", { name: "排进复习" })
+
+    // Reading the record is not consent to schedule a card from it.
+    expect(mocks.scheduleKnowledge).not.toHaveBeenCalled()
+    expect(screen.getByRole("region", { name: "回流到复习计划" })).toHaveTextContent("导数与变化率")
+
+    fireEvent.click(queue)
+
+    await waitFor(() => expect(mocks.scheduleKnowledge).toHaveBeenCalledWith("k-1"))
+    const queued = within(await screen.findByRole("region", { name: "回流到复习计划" }))
+    await waitFor(() => expect(queued.getByRole("status")).toHaveTextContent("已排进复习 · 3 张卡"))
+    expect(screen.queryByRole("button", { name: "排进复习" })).not.toBeInTheDocument()
+  })
+
+  it("leaves a record linked to a 错题 without a queue button", async () => {
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.getQARecord.mockResolvedValueOnce(savedRecord)
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "原本理解" })).toHaveValue(savedRecord.original_understanding))
+
+    // A 错题 link has no review card behind it; the queue belongs on Practice.
+    expect(screen.queryByRole("region", { name: "回流到复习计划" })).not.toBeInTheDocument()
+  })
+
+  it("says a knowledge point is already queued instead of offering it again", async () => {
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.getQARecord.mockResolvedValueOnce({ ...savedRecord, context_type: "knowledge_item", context_id: "k-1" })
+    mocks.listKnowledge.mockResolvedValueOnce({
+      count: 1,
+      items: [{ id: "k-1", item_type: "brain_dump", term: "导数与变化率", concise_definition: "导数描述变化率。" }],
+      scheduled_ids: ["k-1"],
+    })
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+
+    const region = await screen.findByRole("region", { name: "回流到复习计划" })
+    await waitFor(() => expect(within(region).getByRole("status")).toHaveTextContent("已经在复习计划里"))
+    expect(screen.queryByRole("button", { name: "排进复习" })).not.toBeInTheDocument()
+  })
+
+  it("keeps the queue button retryable when the request fails", async () => {
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.getQARecord.mockResolvedValueOnce({ ...savedRecord, context_type: "knowledge_item", context_id: "k-1" })
+    mocks.scheduleKnowledge.mockRejectedValueOnce(new Error("offline"))
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    fireEvent.click(await screen.findByRole("button", { name: "排进复习" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("排进复习失败，请重试。")
+    expect(screen.getByRole("button", { name: "排进复习" })).toBeEnabled()
+  })
+
   it("ignores a send response after the learner starts a new conversation", async () => {
     const pendingSend = deferred<{ session_id: string; message_id: string; status: string }>()
     mocks.sendChatMessage.mockReturnValueOnce(pendingSend.promise)
@@ -344,6 +454,7 @@ describe("picking up a question left by 阅读", () => {
     mocks.getQARecord.mockResolvedValue(null)
     mocks.saveQARecord.mockResolvedValue(null)
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k-1", prompt_count: 1 })
     mocks.listMistakes.mockResolvedValue([])
     mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
   })
