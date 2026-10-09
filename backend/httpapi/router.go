@@ -56,6 +56,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/system/status", func(response http.ResponseWriter, request *http.Request) {
 			handleSystemStatus(response, request, application)
 		})
+		api.Post("/system/reveal", func(response http.ResponseWriter, request *http.Request) {
+			handleSystemReveal(response, request, application)
+		})
 		api.Patch("/settings", func(response http.ResponseWriter, request *http.Request) {
 			handleSettingsPatch(response, request, application)
 		})
