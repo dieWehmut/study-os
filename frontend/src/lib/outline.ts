@@ -236,6 +236,10 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
   // List depth is measured from the enclosing heading, not from the stack top,
   // so a nested list under a deep heading keeps its own relative shape.
   let headingDepth = 0
+  // The level of an opening heading that was taken for the document's name, and
+  // only when no name was handed in. A second heading at that same level later
+  // on says the heading was a section after all -- see the demotion below.
+  let claimedNameDepth = 0
 
   const source = markdown.split("\n")
   for (let index = 0; index < source.length; index += 1) {
@@ -285,6 +289,10 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
         // from `options.title`, because the document repeats that title here.
         root.line = index
         headingDepth = depth
+        // Only the unclaimed case can turn out to have been a section. When the
+        // heading merely repeated a name we were handed, the name is the
+        // caller's and a later sibling heading is just another section.
+        if (!options.title) claimedNameDepth = depth
         continue
       }
       const section = emptyNode(title, depth, "heading", index)
@@ -357,8 +365,41 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
     stack[stack.length - 1].node.body.push(line.trim())
   }
 
+  demoteClaimedName(root, claimedNameDepth)
+
   assignIds(root, "n0")
   return root
+}
+
+/**
+ * Put back a section that was mistaken for the document's name.
+ *
+ * The opening heading is read as the document's own name when nothing was
+ * handed in, which is right for `# 光合作用` + `## 光反应`: the name, then its
+ * sections. It is wrong the moment a heading at that *same* level follows --
+ * `# 第一节` / prose / `- 重力` / `# 第二节` is three siblings, and reading 第一节
+ * as the name made it the parent of 第二节 and 第三节 and scattered its bullets
+ * among them. Both the map and the 信息图 then showed a shape the document does
+ * not have, on exactly the paste format 阅读 recommends (`用 # 标题分节`).
+ *
+ * The list items that followed the opening heading are already its children, so
+ * the fix is to wrap the name and that prefix back into a section at the level
+ * it was written at.
+ */
+function demoteClaimedName(root: OutlineNode, claimedNameDepth: number): void {
+  if (claimedNameDepth === 0) return
+  const sibling = root.children.findIndex(
+    (child) => child.kind === "heading" && child.depth === claimedNameDepth,
+  )
+  if (sibling === -1) return
+
+  const section = emptyNode(root.title, claimedNameDepth, "heading", root.line)
+  section.body = root.body
+  section.children = root.children.slice(0, sibling)
+  root.children = [section, ...root.children.slice(sibling)]
+  root.title = ""
+  root.body = []
+  root.line = -1
 }
 
 /** Depth-first, so the sequence matches the order the document reads in. */

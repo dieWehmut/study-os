@@ -28,6 +28,44 @@ describe("markdown outline parser", () => {
     expect(root.children.map((child) => child.title)).toEqual(["小节"])
   })
 
+  it("keeps the opening heading a section when its siblings follow at the same level", () => {
+    // 阅读's own advice is 用 # 标题分节, and this is that paste. Reading 第一节 as
+    // the document's name made it the parent of 第二节 and scattered its bullets
+    // among them: a shape the document does not have, in both the map and the
+    // 信息图.
+    const root = parseOutline([
+      "# 第一节 受力分析",
+      "先把研究对象隔离出来。",
+      "- 重力",
+      "- 支持力",
+      "# 第二节 牛顿第二定律",
+      "F = ma。",
+    ].join("\n"))
+
+    expect(root.title).toBe("")
+    expect(root.children.map((child) => child.title)).toEqual(["第一节 受力分析", "第二节 牛顿第二定律"])
+    expect(root.children[0].body).toEqual(["先把研究对象隔离出来。"])
+    expect(root.children[0].children.map((child) => child.title)).toEqual(["重力", "支持力"])
+    // Still on the line it was written on, so ✎ can rename it.
+    expect(root.children[0].line).toBe(0)
+    expect(flattenOutline(root).map((node) => node.title)).toEqual([
+      "",
+      "第一节 受力分析",
+      "重力",
+      "支持力",
+      "第二节 牛顿第二定律",
+    ])
+  })
+
+  it("does not re-open a branch for a heading that only repeated the title we handed in", () => {
+    // A wiki entry opens "## <term>" and the caller already knows the term.
+    // Demoting there would draw <term> twice, one under the other.
+    const root = parseOutline(["## 光合作用", "## 暗反应"].join("\n"), { title: "光合作用" })
+
+    expect(root.title).toBe("光合作用")
+    expect(root.children.map((child) => child.title)).toEqual(["暗反应"])
+  })
+
   it("turns list items into children and nests them by indentation", () => {
     const root = parseOutline(["# 标题", "## 条件", "- 光照", "  - 强度", "- 温度"].join("\n"))
 
