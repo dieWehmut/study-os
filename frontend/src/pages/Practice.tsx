@@ -187,6 +187,9 @@ export default function Practice() {
   const pendingLocalRecords = useRef<MistakeRecord[]>([])
   const [taxonomy, setTaxonomy] = useState<MistakeCauseSpec[]>(MISTAKE_CAUSES)
   const [error, setError] = useState("")
+  // What the last 记一笔 actually filed. Clearing the box is the same signal
+  // whether the write landed or you backspaced it yourself.
+  const [filedNotice, setFiledNotice] = useState("")
   // Shared by every action that acts on one row -- 排进复习 and 订正 both fail
   // the same way, and one line under the list is where you are already looking.
   const [rowError, setRowError] = useState("")
@@ -297,6 +300,7 @@ export default function Practice() {
       setDiagnosticRecords((current) => [filed, ...current])
       setQuestion("")
       setError("")
+      setFiledNotice(filed.question)
     } catch (failure) {
       setError(describe(failure, "记录错题失败"))
     } finally {
@@ -440,7 +444,10 @@ export default function Practice() {
           <Input
             aria-label="错题"
             value={question}
-            onChange={(event) => setQuestion(event.target.value)}
+            onChange={(event) => {
+              setQuestion(event.target.value)
+              setFiledNotice("")
+            }}
             placeholder="哪道题？一句话就够"
           />
           <div className="flex flex-wrap gap-2">
@@ -457,6 +464,11 @@ export default function Practice() {
             ))}
           </div>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {filedNotice ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              已记下「{filedNotice}」，在下面「记录」里订正或排进复习。
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

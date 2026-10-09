@@ -128,6 +128,19 @@ describe("Practice page", () => {
     await waitFor(() => expect(screen.getByLabelText("错题")).toHaveValue(""))
   })
 
+  it("says what it filed instead of leaving an empty box as the only sign", async () => {
+    // An emptied input looks the same whether the write landed or you cleared
+    // it yourself, and the row it created is far below this form.
+    render(<Practice />)
+    log("速度与加速度", "想不起来")
+
+    expect(await screen.findByRole("status")).toHaveTextContent("已记下「速度与加速度」")
+
+    // Typing the next one is a new thought; the old confirmation has to go.
+    fireEvent.change(screen.getByLabelText("错题"), { target: { value: "下一题" } })
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
+  })
+
   it("has nothing to file while the box is empty", async () => {
     render(<Practice />)
 
