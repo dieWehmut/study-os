@@ -252,7 +252,11 @@ export default function Home() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="relative overflow-hidden lg:col-span-2">
+        {/* The stats column next to it is three cards tall, so this one is
+            stretched to that height whatever it holds. Centred, the space reads
+            as the hero it is; top-aligned it read as a card whose content had
+            failed to load. */}
+        <Card className="relative justify-center overflow-hidden lg:col-span-2">
           <CardHeader className="gap-3">
             <CardTitle className="text-sm font-normal text-muted-foreground">今天要巩固</CardTitle>
             <p className="font-heading text-5xl font-semibold tracking-tight sm:text-6xl">
