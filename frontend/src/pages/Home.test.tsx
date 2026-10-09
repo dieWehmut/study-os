@@ -143,6 +143,24 @@ describe("Today page", () => {
     fireEvent.click(screen.getByRole("button", { name: "暂存" }))
     await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledWith("半句话的念头"))
     expect(await screen.findByText("已暂存到知识库，稍后可以整理。")).toBeInTheDocument()
+    // 「稍后可以整理」needs an address: a dumped thought carries no cards, which
+    // is precisely what this filter lists.
+    expect(screen.getByRole("link", { name: "去整理" })).toHaveAttribute("href", "/knowledge?scheduled=no")
+  })
+
+  it("does not offer 去整理 for a thought that was never filed", async () => {
+    mocks.dumpThought.mockRejectedValue(new Error("offline"))
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(screen.getByLabelText("脑暴收集箱"), { target: { value: "掉线的念头" } })
+    fireEvent.click(screen.getByRole("button", { name: "暂存" }))
+
+    expect(await screen.findByText("暂存失败，请重试。")).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "去整理" })).not.toBeInTheDocument()
   })
 
   it("offers a way into reading, not only into reviewing", async () => {

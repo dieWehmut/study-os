@@ -44,6 +44,9 @@ export default function Home() {
   const [dumpText, setDumpText] = useState("")
   const [dumping, setDumping] = useState(false)
   const [dumpNotice, setDumpNotice] = useState("")
+  // A filed thought is the clearest case of "in the library, not in the queue":
+  // 暂存 files it and stops. The notice points at the filter that shows those.
+  const [dumpFiled, setDumpFiled] = useState(false)
   // Read and summarized once, on the way in. Nothing on this page edits the
   // reading session, so recomputing it per render would only re-chunk the same
   // document to reach the same answer.
@@ -125,10 +128,12 @@ export default function Home() {
     if (!text || dumping) return
     setDumping(true)
     setDumpNotice("")
+    setDumpFiled(false)
     try {
       await dumpThought(text)
       setDumpText("")
       setDumpNotice("已暂存到知识库，稍后可以整理。")
+      setDumpFiled(true)
     } catch {
       setDumpNotice("暂存失败，请重试。")
     } finally {
@@ -184,7 +189,18 @@ export default function Home() {
             <Button disabled={!dumpText.trim() || dumping} onClick={() => void saveDump()}>
               {dumping ? "暂存中…" : "暂存"}
             </Button>
-            {dumpNotice ? <p aria-live="polite" className="text-sm text-muted-foreground">{dumpNotice}</p> : null}
+            {dumpNotice ? (
+              <p aria-live="polite" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                {dumpNotice}
+                {/* 「稍后可以整理」is a promise with no address. A filed thought
+                    carries no cards, which is exactly what this filter shows. */}
+                {dumpFiled ? (
+                  <Link className="underline underline-offset-4" to="/knowledge?scheduled=no">
+                    去整理
+                  </Link>
+                ) : null}
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>
