@@ -36,6 +36,13 @@ interface WikiPanelProps {
    * caller has to be able to answer for a word it is not currently showing.
    */
   onSelectRelated?: (id: string) => void
+  /**
+   * The list is empty because of the filters, not because the library is. The
+   * placeholder then has to stop telling you to pick something: there is
+   * nothing to pick, and the way out is to drop the filters.
+   */
+  unmatched?: boolean
+  onClearFilters?: () => void
 }
 
 // What the last 排进复习 press actually did. "known" is not a failure: the
@@ -82,7 +89,14 @@ function familyLabel(groups: RelatedKnowledge["groups"]): string {
     : "同组知识点"
 }
 
-export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated }: WikiPanelProps) {
+export function WikiPanel({
+  item,
+  scheduled = false,
+  onUpdated,
+  onSelectRelated,
+  unmatched = false,
+  onClearFilters,
+}: WikiPanelProps) {
   const [tagOverride, setTagOverride] = useState<string[] | null>(null)
   const [chunkIndex, setChunkIndex] = useState(0)
   const [tagPending, setTagPending] = useState("")
@@ -222,9 +236,20 @@ export function WikiPanel({ item, scheduled = false, onUpdated, onSelectRelated 
   if (!item) {
     return (
       <Card className="grid min-h-64 place-items-center border-dashed">
-        <CardContent className="grid justify-items-center gap-2 text-center text-sm text-muted-foreground">
+        <CardContent className="grid justify-items-center gap-3 text-center text-sm text-muted-foreground">
           <BookOpenText aria-hidden="true" className="size-6 text-primary/50" />
-          <span>选择一个知识点查看百科</span>
+          {unmatched ? (
+            <>
+              <span>当前筛选下没有知识点</span>
+              {onClearFilters ? (
+                <Button variant="outline" size="sm" onClick={onClearFilters}>
+                  清除筛选
+                </Button>
+              ) : null}
+            </>
+          ) : (
+            <span>选择一个知识点查看百科</span>
+          )}
         </CardContent>
       </Card>
     )

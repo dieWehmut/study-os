@@ -139,6 +139,9 @@ function KnowledgePage({
   const selectedQueued = selected
     ? scheduledIds.has(selected.id) || (selectedDetail?.id === selected.id && selectedDetail.scheduled === true)
     : false
+  // Every filter the page can narrow by, except the subject chip: that one is
+  // the learner's own lens across pages, not something this page set.
+  const filtersActive = Boolean(query.trim() || group || tag || scheduled)
 
   useEffect(() => {
     if (!selectedId || typeof getKnowledge !== "function") return
@@ -185,6 +188,17 @@ function KnowledgePage({
     setLoading(true)
     setError("")
     setQuery(value)
+  }
+
+  // The filters that emptied the list are the ones that can bring it back. The
+  // subject chip is left alone: it is the learner's lens across pages.
+  function clearFilters() {
+    setLoading(true)
+    setError("")
+    setQuery("")
+    setGroup("")
+    setTag("")
+    onScheduledChange("")
   }
 
   async function runCompare() {
@@ -352,6 +366,8 @@ function KnowledgePage({
               key={selected?.id ?? "none"}
               item={selected}
               scheduled={selectedQueued}
+              unmatched={items.length === 0 && filtersActive}
+              onClearFilters={clearFilters}
               onUpdated={(updated) => {
                 setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)))
                 // 复习状态 is not part of a write response; keep the answer we

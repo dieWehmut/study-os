@@ -691,6 +691,25 @@ describe("showing what is already in the review queue", () => {
     await waitFor(() => expect(screen.getByLabelText("current location")).not.toHaveTextContent("scheduled="))
   })
 
+  it("stops asking you to pick from a list the filters emptied", async () => {
+    // The panel's placeholder said 选择一个知识点查看百科 while the filter had
+    // left nothing to pick -- arriving from 记忆 with ?scheduled=no and every
+    // point already queued is exactly that page.
+    mocks.listKnowledge.mockResolvedValue({ count: 0, items: [], scheduled_ids: [] })
+    render(<Knowledge />, ["/knowledge?scheduled=no"])
+
+    expect(await screen.findByText("当前筛选下没有知识点")).toBeInTheDocument()
+    expect(screen.queryByText("选择一个知识点查看百科")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }))
+
+    await waitFor(() => {
+      const last = mocks.listKnowledge.mock.calls.at(-1)?.[0] as Record<string, unknown>
+      expect(last.scheduled).toBeUndefined()
+    })
+    expect(await screen.findByText("选择一个知识点查看百科")).toBeInTheDocument()
+  })
+
   it("asks for the whole library again when the review filter is cleared", async () => {
     // A filter that cannot be undone is a trap: the page would keep hiding
     // rows after the learner stopped asking it to.
