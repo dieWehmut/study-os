@@ -385,8 +385,18 @@ export default function Reading() {
               keptIds={keptIds}
             />
             {keepError ? (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive">
                 {keepError}
+                {/* The filing half worked, so the item is there to be found: this
+                    is the one failure that still has somewhere to point. */}
+                {keepItemID ? (
+                  <Link
+                    className="underline underline-offset-4"
+                    to={`/knowledge?item=${encodeURIComponent(keepItemID)}`}
+                  >
+                    看看这条
+                  </Link>
+                ) : null}
               </p>
             ) : null}
             {keepNote ? (

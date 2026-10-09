@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -673,7 +673,24 @@ describe("a kept section reaching the review queue", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/安排复习/)
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(/安排复习/)
+    // 「可以在知识库里再排一次」is a fix you cannot reach from here. The filing
+    // half worked, so this is one failure that still has somewhere to point.
+    expect(within(alert).getByRole("link", { name: "看看这条" }))
+      .toHaveAttribute("href", "/knowledge?item=k-kept")
+  })
+
+  it("points nowhere when the filing itself failed", async () => {
+    // Nothing was written, so a link would lead to an item that does not exist.
+    mocks.dumpThought.mockRejectedValueOnce(new Error("offline"))
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).queryByRole("link", { name: "看看这条" })).not.toBeInTheDocument()
   })
 
   it("does not try to schedule a section that was never filed", async () => {
