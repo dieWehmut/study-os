@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import SettingsPanel from "./SettingsPanel"
 
 const mocks = vi.hoisted(() => ({
   getSystemStatus: vi.fn(),
+  revealDataDirectory: vi.fn(),
   listBackups: vi.fn(),
   updateSettings: vi.fn(),
   createBackup: vi.fn(),
@@ -83,6 +84,7 @@ describe("SettingsPanel", () => {
     vi.clearAllMocks()
     localStorage.clear()
     mocks.getSystemStatus.mockResolvedValue(status)
+    mocks.revealDataDirectory.mockResolvedValue({ status: "opened", directory: "D:/StudyOS/data" })
     mocks.listBackups.mockResolvedValue({
       count: 1,
       items: [{ id: "daily-1", category: "daily", path: "D:/StudyOS/data/backups/daily.db", sha256: "abc", size_bytes: 10, created_at: status.backup.last_created_at }],
@@ -196,6 +198,21 @@ describe("SettingsPanel", () => {
 
     expect((await screen.findByRole("alert")).textContent).toContain("无法读取系统设置：offline")
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument()
+  })
+
+  it("opens the data directory, and says what to do when it cannot", async () => {
+    // The page promises 学习记录默认留在当前设备; this is how you go and look.
+    render(<SettingsPanel />)
+    const card = (await screen.findByText("本地数据")).closest('[data-slot="card"]') as HTMLElement
+
+    fireEvent.click(within(card).getByRole("button", { name: "打开目录" }))
+    await waitFor(() => expect(mocks.revealDataDirectory).toHaveBeenCalled())
+    expect(await within(card).findByRole("status")).toHaveTextContent("已在文件管理器里打开")
+
+    // A failure still has a next step: the path is on screen.
+    mocks.revealDataDirectory.mockRejectedValueOnce(new Error("offline"))
+    fireEvent.click(within(card).getByRole("button", { name: "打开目录" }))
+    await waitFor(() => expect(within(card).getByRole("status")).toHaveTextContent("可以复制上面的路径手动打开"))
   })
 
   it("saves an API key and model through the vendor config form without echoing the key", async () => {

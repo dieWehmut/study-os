@@ -5,6 +5,7 @@ import {
   getSystemStatus,
   listBackups,
   normalizeSystemStatus,
+  revealDataDirectory,
   updateSettings,
 } from "./system"
 
@@ -76,5 +77,14 @@ describe("system API boundary", () => {
   it("turns a malformed backup payload into an empty list", async () => {
     mocks.apiRequest.mockResolvedValueOnce(null)
     await expect(listBackups()).resolves.toEqual({ items: [], count: 0 })
+  })
+
+  it("opens the data directory by asking, not by sending a path", async () => {
+    // No body: the server opens the directory it is configured with, so this
+    // cannot be aimed at somewhere the settings page does not show.
+    mocks.apiRequest.mockResolvedValueOnce({ status: "opened", directory: "D:/StudyOS/data" })
+
+    await expect(revealDataDirectory()).resolves.toEqual({ status: "opened", directory: "D:/StudyOS/data" })
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/system/reveal", { method: "POST" })
   })
 })

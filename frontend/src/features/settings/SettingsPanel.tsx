@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { AudioLines, Bot, Database, Download, HardDrive, Loader2, RefreshCw, Save, ShieldCheck, Square, UploadCloud, Users, Volume2 } from "lucide-react"
+import { AudioLines, Bot, Database, Download, FolderOpen, HardDrive, Loader2, RefreshCw, Save, ShieldCheck, Square, UploadCloud, Users, Volume2 } from "lucide-react"
 
 import type { VendorConfigInput } from "@/api/agent"
 import {
@@ -9,6 +9,7 @@ import {
   type VoiceRole,
   type VoiceRolePatch,
 } from "@/api/speech"
+import { revealDataDirectory } from "@/api/system"
 import { applyUpdate, getUpdateStatus, type UpdateStatus } from "@/api/update"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -109,6 +110,10 @@ export default function SettingsPanel() {
   const [roleModelDraft, setRoleModelDraft] = useState("")
   const [roleBaseURLDraft, setRoleBaseURLDraft] = useState("")
   const [avatarVersions, setAvatarVersions] = useState<Record<string, number>>({})
+  // The data directory is the one thing on this page you may want to look at
+  // rather than change, so its result is kept here beside the button.
+  const [revealing, setRevealing] = useState(false)
+  const [revealNotice, setRevealNotice] = useState("")
   // 试听：同一时刻只允许一个角色在响，所以状态是「哪个角色」而不是「是否在响」。
   const [previewRoleId, setPreviewRoleId] = useState<string | null>(null)
   const [previewPhase, setPreviewPhase] = useState<"loading" | "playing">("loading")
@@ -173,6 +178,26 @@ export default function SettingsPanel() {
     setModelDraft("")
     setReasoningModelDraft("")
     setBaseURLDraft("")
+  }
+
+  /**
+   * Open the data directory, and say so when that does not work.
+   *
+   * The path is right there on screen, so a failure still has a next step:
+   * copy it. Silence would leave the button looking like it did nothing.
+   */
+  async function openDataDirectory() {
+    if (revealing) return
+    setRevealing(true)
+    setRevealNotice("")
+    try {
+      await revealDataDirectory()
+      setRevealNotice("已在文件管理器里打开")
+    } catch {
+      setRevealNotice("打不开文件管理器，可以复制上面的路径手动打开")
+    } finally {
+      setRevealing(false)
+    }
   }
 
   async function saveVendorSettings(vendorID: string) {
@@ -889,6 +914,12 @@ export default function SettingsPanel() {
             <CardDescription>学习记录默认留在当前设备。</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" disabled={revealing} onClick={() => void openDataDirectory()}>
+                <FolderOpen data-icon="inline-start" />{revealing ? "正在打开…" : "打开目录"}
+              </Button>
+              {revealNotice ? <span role="status" aria-live="polite" className="text-xs text-muted-foreground">{revealNotice}</span> : null}
+            </div>
             <div className="grid gap-1 rounded-lg bg-muted/45 px-3 py-2"><span className="text-muted-foreground">数据目录</span><code className="break-all text-xs">{status.data.directory}</code></div>
             <div className="grid gap-1 rounded-lg bg-muted/45 px-3 py-2"><span className="text-muted-foreground">数据库</span><code className="break-all text-xs">{status.data.database_path}</code></div>
             <p className="text-xs text-muted-foreground">学习系统 {status.app.version} · {platformLabel(status.app.platform)}</p>

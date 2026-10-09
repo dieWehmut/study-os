@@ -114,6 +114,21 @@ export async function getSystemStatus(): Promise<SystemStatus> {
   return normalizeSystemStatus(await apiRequest<unknown>("/system/status"))
 }
 
+/**
+ * Open the data directory in the file manager.
+ *
+ * No path is sent: the server opens the one it is already configured with, so
+ * this cannot be aimed at a directory the settings page does not show.
+ */
+export async function revealDataDirectory(): Promise<{ status: string; directory: string }> {
+  const response = await apiRequest<unknown>("/system/reveal", { method: "POST" })
+  const record = response && typeof response === "object" ? (response as Record<string, unknown>) : {}
+  return {
+    status: typeof record.status === "string" ? record.status : "",
+    directory: typeof record.directory === "string" ? record.directory : "",
+  }
+}
+
 export async function listBackups(limit = 10): Promise<BackupListResponse> {
   const raw = await apiRequest<unknown>(`/backups?limit=${Math.max(1, Math.trunc(limit))}`)
   const response = recordValue(raw) as Partial<BackupListResponse>
