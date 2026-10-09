@@ -381,6 +381,48 @@ describe("Chat page", () => {
     expect(mocks.getKnowledge).not.toHaveBeenCalled()
   })
 
+  it("finds a knowledge point the first page of 关联对象 never had", async () => {
+    // The options are one page of the newest items, so an older word is not
+    // merely hard to find -- it cannot be linked at all. Searching asks the
+    // server by text and the answer joins the same list.
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.listKnowledge.mockImplementation((options?: { query?: string }) =>
+      Promise.resolve(
+        options?.query
+          ? {
+              count: 1,
+              items: [{ id: "k-77", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+              scheduled_ids: [],
+            }
+          : {
+              count: 1,
+              items: [{ id: "k-1", item_type: "brain_dump", term: "导数与变化率", concise_definition: "导数描述变化率。" }],
+              scheduled_ids: [],
+            },
+      ),
+    )
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    const box = await screen.findByLabelText("搜索知识点")
+    fireEvent.change(box, { target: { value: "动能" } })
+    fireEvent.click(screen.getByRole("button", { name: "搜索" }))
+
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ query: "动能" })))
+    expect(await screen.findByRole("option", { name: "知识点：动能定理" })).toBeInTheDocument()
+    expect(await screen.findByRole("status")).toHaveTextContent("找到 1 条")
+  })
+
   it("names a linked point the 关联对象 page no longer carries", async () => {
     // The list is capped and filtered by the subject chip, so a record saved
     // earlier can point at an item that is not on it. Guessing from the page

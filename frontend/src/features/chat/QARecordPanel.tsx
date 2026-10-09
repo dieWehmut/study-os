@@ -3,6 +3,7 @@ import { useState } from "react"
 import type { QARecord, QARecordContextType, QARecordInput, QARecordStatus } from "@/api/chat"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { parseQAContextValue, qaContextValue } from "./qa-record"
 
@@ -19,6 +20,14 @@ export interface QARecordPanelProps {
   contextLoading?: boolean
   savedAt?: string
   onSave: (input: QARecordInput) => void | Promise<void>
+  /**
+   * Search the library for something to link. The options list is one page of
+   * the newest items, so without this a word that fell off that page can never
+   * be linked at all -- not just hard to find.
+   */
+  onSearchContexts?: (query: string) => void | Promise<void>
+  searchingContexts?: boolean
+  contextSearchNote?: string
   /**
    * The saved record's linked knowledge point, when the server-side record has
    * one. Absent means "nothing here can be queued" -- a record linked to a 错题
@@ -89,6 +98,9 @@ export default function QARecordPanel({
   contextLoading = false,
   savedAt = "",
   onSave,
+  onSearchContexts,
+  searchingContexts = false,
+  contextSearchNote = "",
   queueTarget = null,
   queueScheduling = false,
   queuePromptCount = 0,
@@ -96,6 +108,7 @@ export default function QARecordPanel({
   onSchedule,
 }: QARecordPanelProps) {
   const [draft, setDraft] = useState<Draft>(() => draftFrom(initialRecord, prefill))
+  const [contextQuery, setContextQuery] = useState("")
   // The parent changes `key` when the server record identity/version changes.
   // Keeping initialization here avoids overwriting an in-progress draft from
   // an unrelated prop update.
@@ -170,6 +183,41 @@ export default function QARecordPanel({
                 ))}
               </select>
             </label>
+            {onSearchContexts ? (
+              <div className="grid gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Input
+                    aria-label="搜索知识点"
+                    value={contextQuery}
+                    placeholder="不在上面这一批？搜词或释义"
+                    onChange={(event) => setContextQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      // Enter belongs to this search, not to the form: the
+                      // nearest submit button would save a half-written record.
+                      if (event.key !== "Enter") return
+                      event.preventDefault()
+                      if (contextQuery.trim()) void onSearchContexts(contextQuery)
+                    }}
+                    disabled={disabled || contextLoading}
+                    className="h-9"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label="搜索"
+                    disabled={disabled || contextLoading || searchingContexts || !contextQuery.trim()}
+                    onClick={() => void onSearchContexts(contextQuery)}
+                    className="shrink-0"
+                  >
+                    {searchingContexts ? "搜索中…" : "搜索"}
+                  </Button>
+                </div>
+                {contextSearchNote ? (
+                  <p role="status" className="text-xs text-muted-foreground">{contextSearchNote}</p>
+                ) : null}
+              </div>
+            ) : null}
             <label className="grid gap-1.5 text-sm" htmlFor="qa-original-understanding">
               <span>原本理解</span>
               <Textarea

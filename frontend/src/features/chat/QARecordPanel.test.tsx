@@ -232,3 +232,58 @@ describe("回流 to the review queue", () => {
     expect(screen.getByRole("button", { name: "排进复习" })).toBeEnabled()
   })
 })
+
+describe("looking past the first page of the library", () => {
+  it("offers no search when the page has nothing to search", () => {
+    render(<QARecordPanel sessionId="session-1" subject="physics" onSave={vi.fn()} />)
+
+    expect(screen.queryByLabelText("搜索知识点")).not.toBeInTheDocument()
+  })
+
+  it("searches on demand rather than on every keystroke", () => {
+    const onSearchContexts = vi.fn()
+    render(
+      <QARecordPanel sessionId="session-1" subject="physics" onSave={vi.fn()} onSearchContexts={onSearchContexts} />,
+    )
+
+    fireEvent.change(screen.getByLabelText("搜索知识点"), { target: { value: "动能" } })
+    expect(onSearchContexts).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("button", { name: "搜索" }))
+    expect(onSearchContexts).toHaveBeenCalledWith("动能")
+  })
+
+  it("keeps Enter in the search box away from the save button", () => {
+    // The box sits inside the record form; the submit button next to it would
+    // otherwise save a half-written record on every search.
+    const onSearchContexts = vi.fn()
+    const onSave = vi.fn()
+    render(
+      <QARecordPanel sessionId="session-1" subject="physics" onSave={onSave} onSearchContexts={onSearchContexts} />,
+    )
+
+    const box = screen.getByLabelText("搜索知识点")
+    fireEvent.change(box, { target: { value: "动能" } })
+    fireEvent.keyDown(box, { key: "Enter" })
+
+    expect(onSearchContexts).toHaveBeenCalledWith("动能")
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it("holds the search while it runs and reports what came back", () => {
+    render(
+      <QARecordPanel
+        sessionId="session-1"
+        subject="physics"
+        onSave={vi.fn()}
+        onSearchContexts={vi.fn()}
+        searchingContexts
+        contextSearchNote="没有匹配「动能」的知识点"
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText("搜索知识点"), { target: { value: "动能" } })
+    expect(screen.getByRole("button", { name: "搜索" })).toBeDisabled()
+    expect(screen.getByRole("status")).toHaveTextContent("没有匹配「动能」的知识点")
+  })
+})

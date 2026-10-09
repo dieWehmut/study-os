@@ -113,12 +113,15 @@ export default function Chat() {
    * item the record actually points at.
    */
   const [qaLinked, setQALinked] = useState<{ id: string; term: string; scheduled: boolean } | null>(null)
+  const [qaContextSearching, setQAContextSearching] = useState(false)
+  const [qaContextSearchNote, setQAContextSearchNote] = useState("")
   const bottomRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<number | null>(null)
   const conversationRequestRef = useRef(0)
   const qaRequestRef = useRef(0)
   const qaSaveRequestRef = useRef(0)
   const qaQueueRequestRef = useRef(0)
+  const qaContextSearchRef = useRef(0)
   const activeSessionRef = useRef<string | null>(null)
   const sendRequestRef = useRef(0)
   const localMessageCounterRef = useRef(0)
@@ -164,6 +167,7 @@ export default function Chat() {
     setQAError("")
     setQASavedAt("")
     setQAContextOptions([])
+    setQAContextSearchNote("")
     setQALoadedKey(null)
     setQAContextLoadedKey(null)
     setQAScheduled([])
@@ -205,6 +209,7 @@ export default function Chat() {
     setQAError("")
     setQASavedAt("")
     setQAContextOptions([])
+    setQAContextSearchNote("")
     setQALoadedKey(null)
     setQAContextLoadedKey(null)
     setQAScheduled([])
@@ -241,6 +246,7 @@ export default function Chat() {
     setQAError("")
     setQASavedAt("")
     setQAContextOptions([])
+    setQAContextSearchNote("")
     setQALoadedKey(null)
     setQAContextLoadedKey(null)
     setQAScheduled([])
@@ -376,6 +382,46 @@ export default function Chat() {
       if (activeSessionRef.current === sessionID && qaSaveRequestRef.current === requestID) setQAError("保存学习记录失败，请重试。")
     } finally {
       if (activeSessionRef.current === sessionID && qaSaveRequestRef.current === requestID) setQASaving(false)
+    }
+  }
+
+  /**
+   * Find a knowledge point the 关联对象 list never offered.
+   *
+   * That list is one subject-filtered page of the newest items, so in a real
+   * library most words are simply absent from it. Searching asks the server by
+   * text and appends what comes back, which is what makes an older word
+   * linkable at all.
+   */
+  async function searchContexts(query: string) {
+    const trimmed = query.trim()
+    if (!trimmed) return
+    const requestID = ++qaContextSearchRef.current
+    setQAContextSearching(true)
+    setQAContextSearchNote("")
+    try {
+      const result = await listKnowledge({ query: trimmed, limit: 20, offset: 0 })
+      if (qaContextSearchRef.current !== requestID) return
+      setQAContextOptions((current) => {
+        const seen = new Set(current.map((option) => option.value))
+        const merged = [...current]
+        for (const item of result.items) {
+          const value = qaContextValue("knowledge_item", item.id)
+          if (seen.has(value)) continue
+          seen.add(value)
+          merged.push({ value, label: `知识点：${item.term}` })
+        }
+        return merged
+      })
+      setQAContextSearchNote(
+        result.items.length === 0
+          ? `没有匹配「${trimmed}」的知识点`
+          : `找到 ${result.items.length} 条，已加到上面的列表里`,
+      )
+    } catch {
+      if (qaContextSearchRef.current === requestID) setQAContextSearchNote("搜索失败，请重试")
+    } finally {
+      if (qaContextSearchRef.current === requestID) setQAContextSearching(false)
     }
   }
 
@@ -622,6 +668,9 @@ export default function Chat() {
               contextOptions={qaContextOptions}
               contextLoading={qaContextLoading}
               onSave={handleQASave}
+              onSearchContexts={searchContexts}
+              searchingContexts={qaContextSearching}
+              contextSearchNote={qaContextSearchNote}
               queueTarget={qaQueueTarget}
               queueScheduling={qaQueueForTarget?.status === "scheduling"}
               queuePromptCount={qaQueueForTarget?.status === "queued" ? qaQueueForTarget.promptCount : 0}
