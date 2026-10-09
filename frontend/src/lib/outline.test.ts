@@ -452,3 +452,44 @@ describe("markdown outline parser", () => {
     })
   })
 })
+
+describe("YAML front matter", () => {
+  it("is metadata, not the document's first section", () => {
+    // Left in, its bullets are list items beside the real sections: four files
+    // in the sample corpus drew their own `tags:` as top-level branches.
+    const root = parseOutline([
+      "---",
+      "title: 《单点卡的制作流程》",
+      "tags:",
+      "  - 卡片笔记",
+      "  - 单点卡",
+      "---",
+      "# 《单点卡的制作流程》",
+      "## 一、完整转写",
+      "正文。",
+    ].join("\n"))
+
+    expect(root.title).toBe("《单点卡的制作流程》")
+    expect(root.children.map((child) => child.title)).toEqual(["一、完整转写"])
+    expect(root.body).toEqual([])
+    expect(flattenOutline(root).map((node) => node.title)).toEqual(["《单点卡的制作流程》", "一、完整转写"])
+  })
+
+  it("leaves a document that opens with a horizontal rule alone", () => {
+    // 总结：… is prose, not `key:` -- the block is read as the prose it is, and
+    // prose before the first heading makes that heading a section.
+    const root = parseOutline(["---", "总结：这节课只讲受力分析。", "---", "# 标题", "## 小节"].join("\n"))
+
+    expect(root.body).toEqual(["---", "总结：这节课只讲受力分析。", "---"])
+    expect(root.children.map((child) => child.title)).toEqual(["标题"])
+    expect(root.children[0].children.map((child) => child.title)).toEqual(["小节"])
+  })
+
+  it("only reads a block at the very top", () => {
+    // A `---` between sections is a rule, which is punctuation.
+    const root = parseOutline(["# 标题", "## 甲", "正文。", "---", "key: 值", "---", "## 乙"].join("\n"))
+
+    expect(root.children.map((child) => child.title)).toEqual(["甲", "乙"])
+    expect(root.children[0].body).toEqual(["正文。", "---", "key: 值", "---"])
+  })
+})

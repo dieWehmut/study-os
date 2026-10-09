@@ -137,6 +137,31 @@ interface OpenNode {
 }
 
 /**
+ * A YAML front matter block: `---`, at least one `key: value`, then `---`.
+ *
+ * Metadata is not structure. Left in, its bullets (`tags:` + `  - 卡片笔记`) are
+ * read as list items beside the document's real sections -- four `analysis/*.md`
+ * files in the sample corpus drew their `tags` as top-level branches. The block
+ * is skipped rather than stripped: the parser only ever derives a map or a card,
+ * and the reader's own 原文 pane still holds every line of it.
+ *
+ * The key has to be ASCII, which is what keeps an ordinary document that opens
+ * with a horizontal rule (`---` / 总结：… / `---`) out of this branch: CJK prose
+ * does not match `key:`, so it is read as the prose it is.
+ */
+const frontMatterKey = /^[A-Za-z_][A-Za-z0-9_-]*\s*:/
+const ruleLine = /^-{3,}\s*$/
+
+function frontMatterEnd(source: string[], start: number): number {
+  if (!ruleLine.test(source[start].trimEnd())) return -1
+  if (start + 1 >= source.length || !frontMatterKey.test(source[start + 1].trimEnd())) return -1
+  for (let cursor = start + 1; cursor < source.length; cursor += 1) {
+    if (ruleLine.test(source[cursor].trimEnd()) || source[cursor].trimEnd() === "...") return cursor
+  }
+  return -1
+}
+
+/**
  * How many characters still read as a name rather than as a sentence.
  *
  * A label is drawn on one line and every descendant column is pushed right by
@@ -245,6 +270,16 @@ export function parseOutline(markdown: string, options: ParseOutlineOptions = {}
   for (let index = 0; index < source.length; index += 1) {
     const line = source[index].trimEnd()
     if (line.trim() === "") continue
+
+    // Only at the top: a `---` block further down is a horizontal rule between
+    // sections, which is punctuation, not metadata.
+    if (root.body.length === 0 && root.children.length === 0) {
+      const frontMatter = frontMatterEnd(source, index)
+      if (frontMatter !== -1) {
+        index = frontMatter
+        continue
+      }
+    }
 
     // A fence is a hole in the syntax. Inside it "#" opens a Python comment,
     // "-" is a YAML sequence and "|" draws a table nobody wrote -- none of them
