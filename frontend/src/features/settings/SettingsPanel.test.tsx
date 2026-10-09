@@ -215,6 +215,21 @@ describe("SettingsPanel", () => {
     await waitFor(() => expect(within(card).getByRole("status")).toHaveTextContent("可以复制上面的路径手动打开"))
   })
 
+  it("says the demo has no local directory instead of failing at it", async () => {
+    vi.resetModules()
+    vi.doMock("@/lib/runtime", () => ({ isStaticDemo: () => true }))
+    const { default: StaticPanel } = await import("./SettingsPanel")
+    render(<StaticPanel />)
+    const card = (await screen.findByText("本地数据")).closest('[data-slot="card"]') as HTMLElement
+
+    fireEvent.click(within(card).getByRole("button", { name: "打开目录" }))
+
+    expect(await within(card).findByRole("status")).toHaveTextContent("展示模式没有本地数据目录")
+    expect(mocks.revealDataDirectory).not.toHaveBeenCalled()
+    vi.doUnmock("@/lib/runtime")
+    vi.resetModules()
+  })
+
   it("saves an API key and model through the vendor config form without echoing the key", async () => {
     render(<SettingsPanel />)
 

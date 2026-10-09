@@ -188,6 +188,12 @@ export default function SettingsPanel() {
    */
   async function openDataDirectory() {
     if (revealing) return
+    // Same rule as 立即更新: the Pages demo has no local directory to open, and
+    // saying so beats a button that fails into a generic message.
+    if (isStaticDemo()) {
+      setRevealNotice("GitHub Pages 展示模式没有本地数据目录")
+      return
+    }
     setRevealing(true)
     setRevealNotice("")
     try {
