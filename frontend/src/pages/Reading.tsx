@@ -40,6 +40,9 @@ export default function Reading() {
   // What the last keep achieved. Separate from the error so a scheduling
   // failure can say the filing worked in the same breath.
   const [keepNote, setKeepNote] = useState("")
+  // The item the last keep created, so the note can point at what was written
+  // instead of only claiming it happened.
+  const [keepItemID, setKeepItemID] = useState("")
   // The session as it stands right now, for callbacks that resolve after an
   // await. save is the only writer, so this cannot drift from the state.
   const sessionRef = useRef(session)
@@ -139,6 +142,7 @@ export default function Reading() {
 
     setKeepError("")
     setKeepNote("")
+    setKeepItemID("")
     let filed: { id: string }
     try {
       filed = await dumpThought(buildSectionNote(chunk))
@@ -154,6 +158,7 @@ export default function Reading() {
     // the same section twice -- and read off the ref rather than closing over
     // `session`, which is the draft as it stood when the click happened.
     save({ ...sessionRef.current, keptIds: [...sessionRef.current.keptIds, id] })
+    setKeepItemID(filed.id)
 
     try {
       const scheduled = await scheduleKnowledge(filed.id)
@@ -384,7 +389,22 @@ export default function Reading() {
                 {keepError}
               </p>
             ) : null}
-            {keepNote ? <p className="text-sm text-primary">{keepNote}</p> : null}
+            {keepNote ? (
+              <p className="flex flex-wrap items-center gap-2 text-sm text-primary">
+                {keepNote}
+                {/* The item on the other end is invisible from here: it has a
+                    wiki you did not write and cards you cannot see. One link,
+                    or the note is a promise you have to take on trust. */}
+                {keepItemID ? (
+                  <Link
+                    className="underline underline-offset-4"
+                    to={`/knowledge?item=${encodeURIComponent(keepItemID)}`}
+                  >
+                    看看这条
+                  </Link>
+                ) : null}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>

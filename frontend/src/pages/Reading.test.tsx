@@ -642,6 +642,18 @@ describe("a kept section reaching the review queue", () => {
     expect(await screen.findByText(/3 张卡/)).toBeInTheDocument()
   })
 
+  it("points at the item it filed instead of only claiming it did", async () => {
+    // What landed is a wiki nobody wrote plus cards nobody can see from here.
+    // Without a link the note is a promise you have to take on trust.
+    renderReading()
+    paste(source)
+
+    fireEvent.click(screen.getByRole("button", { name: /收进知识库/ }))
+
+    expect(await screen.findByRole("link", { name: "看看这条" }))
+      .toHaveAttribute("href", "/knowledge?item=k-kept")
+  })
+
   it("still counts the section kept when only the scheduling failed", async () => {
     // The item is in the library either way. Rolling the mark back would offer
     // 收进知识库 again and file the same section twice, which has no undo.
