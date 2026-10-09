@@ -427,16 +427,13 @@ export default function Chat() {
         return
       }
       setQAContextOptions((current) => {
-        const seen = new Set(current.map((option) => option.value))
-        const merged = [...current]
-        for (const option of found) {
-          if (seen.has(option.value)) continue
-          seen.add(option.value)
-          merged.push(option)
-        }
-        return merged
+        // Matches go to the front. The list is three pages of a hundred plus
+        // whatever was searched before, and a native select opens at the top:
+        // appending the answer is the same as hiding it.
+        const known = new Set(found.map((option) => option.value))
+        return [...found, ...current.filter((option) => !known.has(option.value))]
       })
-      setQAContextSearchNote(`找到 ${found.length} 条，已加到上面的列表里`)
+      setQAContextSearchNote(`找到 ${found.length} 条，已排到列表最前面`)
     } catch {
       if (qaContextSearchRef.current === requestID) setQAContextSearchNote("搜索失败，请重试")
     } finally {
