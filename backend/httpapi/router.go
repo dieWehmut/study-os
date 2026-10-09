@@ -533,6 +533,18 @@ func parseScheduledFilter(raw string) (*bool, bool) {
 	}
 }
 
+// knowledgeItemResponse is the item plus the one thing the list cannot answer
+// for it: whether it already carries review cards.
+//
+// The list reports 复习状态 as `scheduled_ids`, and only for the page you asked
+// for -- a caller holding an id (答疑 links a point by id) may well be looking
+// at an item on another page, or another subject's page, and that reads as
+// "nothing is scheduled" for something that is.
+type knowledgeItemResponse struct {
+	models.KnowledgeItem
+	Scheduled bool `json:"scheduled"`
+}
+
 func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
@@ -543,7 +555,12 @@ func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, app
 		writeStoreError(response, err)
 		return
 	}
-	writeJSON(response, http.StatusOK, item)
+	queued, err := scheduledPromptCount(request.Context(), application.Store, item.ID)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习状态失败"})
+		return
+	}
+	writeJSON(response, http.StatusOK, knowledgeItemResponse{KnowledgeItem: item, Scheduled: queued > 0})
 }
 
 // handleKnowledgeRelated answers with the other items sharing a group with

@@ -455,6 +455,11 @@ describe("static Pages API fixtures", () => {
     )
     expect(scheduled.status).toBe("scheduled")
     expect(scheduled.prompt_count).toBeGreaterThan(0)
+
+    // The single-item read has to keep up with the queue: the 答疑 page links a
+    // point by id and cannot tell from any list page whether it was scheduled.
+    const detail = await staticDemoRequest<{ scheduled?: boolean }>(`/knowledge/${dumped.id}`)
+    expect(detail.scheduled).toBe(true)
   })
 
   it("persists vendor and speech settings without retaining API keys", async () => {

@@ -10,6 +10,13 @@ export interface KnowledgeItem {
   level?: string
   subject?: string
   tags?: string[]
+  /**
+   * Only the single-item read answers this. The list reports 复习状态 through
+   * `scheduled_ids`, and only for the page it returned, so a caller holding an
+   * id has to ask about that item -- absent means "not answered", which must
+   * not be read as "not scheduled".
+   */
+  scheduled?: boolean
 }
 
 export interface ImportInspection {
