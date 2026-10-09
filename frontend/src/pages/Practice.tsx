@@ -190,6 +190,10 @@ export default function Practice() {
   // What the last 记一笔 actually filed. Clearing the box is the same signal
   // whether the write landed or you backspaced it yourself.
   const [filedNotice, setFiledNotice] = useState("")
+  // The query the log is filtered by, and the box you type in. The log is one
+  // page of the newest mistakes, so without this the rest are unreachable.
+  const [recordQuery, setRecordQuery] = useState("")
+  const [recordDraft, setRecordDraft] = useState("")
   // Shared by every action that acts on one row -- 排进复习 and 订正 both fail
   // the same way, and one line under the list is where you are already looking.
   const [rowError, setRowError] = useState("")
@@ -214,8 +218,14 @@ export default function Practice() {
     let active = true
     pendingLocalRecords.current = []
     const currentSubjectRequest = subject === "all" ? {} : { subject }
-    const currentRecordsRequest = listMistakes(currentSubjectRequest)
-    const allRecordsRequest = subject === "all"
+    const currentRecordsRequest = listMistakes({
+      ...currentSubjectRequest,
+      ...(recordQuery ? { query: recordQuery } : {}),
+    })
+    // The 六科诊断总览 counts every mistake, not the search result: 搜索 finds a
+    // row, it does not redefine what "每科保留自己的错因" is counting. So the
+    // whole library is read whenever the visible list is narrowed at all.
+    const allRecordsRequest = subject === "all" && !recordQuery
       ? Promise.resolve<MistakeRecord[] | null>(null)
       : listMistakes({}).catch(() => null)
     currentRecordsRequest
@@ -263,7 +273,7 @@ export default function Practice() {
     return () => {
       active = false
     }
-  }, [subject])
+  }, [subject, recordQuery])
 
   useEffect(() => {
     let active = true
@@ -555,13 +565,56 @@ export default function Practice() {
       ) : null}
 
       <Card>
-        <CardHeader className="gap-1.5">
+        <CardHeader className="gap-2">
           <CardTitle>记录</CardTitle>
+          {/* The list is one page of the newest mistakes, so an older one is not
+              hard to find here -- it is not in the list at all. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              aria-label="搜索错题内容"
+              value={recordDraft}
+              onChange={(event) => setRecordDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return
+                event.preventDefault()
+                setRecordQuery(recordDraft.trim())
+              }}
+              placeholder="搜题干里的词"
+              className="h-9 max-w-xs"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="搜索错题"
+              disabled={!recordDraft.trim() || recordDraft.trim() === recordQuery}
+              onClick={() => setRecordQuery(recordDraft.trim())}
+            >
+              搜索
+            </Button>
+            {recordQuery ? (
+              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                只显示题干提到「{recordQuery}」的错题
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  onClick={() => {
+                    setRecordDraft("")
+                    setRecordQuery("")
+                  }}
+                >
+                  清除
+                </button>
+              </span>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent>
           {records.length === 0 ? (
             <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              还没有记录。做错一题就来记一笔，比考前翻整本书管用。
+              {recordQuery
+                ? `没有错题提到「${recordQuery}」。`
+                : "还没有记录。做错一题就来记一笔，比考前翻整本书管用。"}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">

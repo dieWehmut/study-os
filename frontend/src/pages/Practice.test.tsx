@@ -147,6 +147,31 @@ describe("Practice page", () => {
     expect(await screen.findByRole("button", { name: "想不起来" })).toBeDisabled()
   })
 
+  it("finds an older mistake the first page of the log never carried", async () => {
+    // The log is one page of the newest mistakes. Past that page the rest are
+    // not hard to find -- they are not in the list at all.
+    mocks.listMistakes.mockImplementation((options?: { query?: string }) =>
+      Promise.resolve(
+        options?.query
+          ? [{ id: "qa-old", subject: "math", question: "求函数极值", cause: "method", createdAt: "2026-08-01T00:00:00Z" }]
+          : [],
+      ),
+    )
+    render(<Practice />)
+    await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalled())
+
+    fireEvent.change(screen.getByLabelText("搜索错题内容"), { target: { value: "极值" } })
+    fireEvent.click(screen.getByRole("button", { name: "搜索错题" }))
+
+    await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalledWith(expect.objectContaining({ query: "极值" })))
+    expect(await screen.findByText("求函数极值")).toBeInTheDocument()
+    expect(screen.getByText(/只显示题干提到「极值」的错题/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "清除" }))
+
+    await waitFor(() => expect(screen.getByText(/还没有记录/)).toBeInTheDocument())
+  })
+
   it("says how much of the log review can actually fix", async () => {
     // The rest of the app answers every wrong answer with "see it again
     // sooner". This is the number that says when that answer is wrong.
