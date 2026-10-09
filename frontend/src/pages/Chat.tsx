@@ -360,7 +360,19 @@ export default function Chat() {
     try {
       const result = await scheduleKnowledge(knowledgeID)
       if (activeSessionRef.current !== sessionID || qaQueueRequestRef.current !== requestID) return
-      setQAQueue({ key: qaKey, knowledgeId: knowledgeID, status: "queued", promptCount: result.prompt_count, error: "" })
+      // The server answers 200 either way and says which happened. Reporting
+      // "已排进复习 · N 张卡" for cards it did not write would claim a fresh
+      // schedule for an item that was already in the plan -- which is what you
+      // get whenever the linked point sits outside the page of knowledge items
+      // this panel loaded its 复习状态 from.
+      const alreadyScheduled = result.status === "already_scheduled"
+      setQAQueue({
+        key: qaKey,
+        knowledgeId: knowledgeID,
+        status: "queued",
+        promptCount: alreadyScheduled ? 0 : result.prompt_count,
+        error: "",
+      })
     } catch {
       if (activeSessionRef.current === sessionID && qaQueueRequestRef.current === requestID) {
         setQAQueue({ key: qaKey, knowledgeId: knowledgeID, status: "failed", promptCount: 0, error: "排进复习失败，请重试。" })

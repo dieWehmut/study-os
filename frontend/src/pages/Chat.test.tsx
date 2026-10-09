@@ -312,6 +312,39 @@ describe("Chat page", () => {
     expect(screen.queryByRole("button", { name: "排进复习" })).not.toBeInTheDocument()
   })
 
+  it("does not claim a fresh schedule for a point the plan already held", async () => {
+    // The linked point can be queued without this panel knowing: it may sit
+    // outside the page of knowledge items that answered 复习状态, or another
+    // device may have scheduled it. The server says which of the two happened,
+    // and "已排进复习 · 2 张卡" for cards it did not write is a lie.
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.getQARecord.mockResolvedValueOnce({ ...savedRecord, context_type: "knowledge_item", context_id: "k-1" })
+    mocks.listKnowledge.mockResolvedValueOnce({
+      count: 1,
+      items: [{ id: "k-1", item_type: "brain_dump", term: "导数与变化率", concise_definition: "导数描述变化率。" }],
+      scheduled_ids: [],
+    })
+    mocks.scheduleKnowledge.mockResolvedValueOnce({ status: "already_scheduled", knowledge_id: "k-1", prompt_count: 2 })
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    fireEvent.click(await screen.findByRole("button", { name: "排进复习" }))
+
+    const queued = within(await screen.findByRole("region", { name: "回流到复习计划" }))
+    await waitFor(() => expect(queued.getByRole("status")).toHaveTextContent("已经在复习计划里"))
+    expect(queued.queryByText(/已排进复习/)).not.toBeInTheDocument()
+  })
+
   it("leaves a record linked to a 错题 without a queue button", async () => {
     mocks.listChatConversations.mockResolvedValueOnce({
       items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
