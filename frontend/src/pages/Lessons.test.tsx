@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -67,5 +67,44 @@ describe("lessons page", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("课程暂时无法读取")
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument()
+  })
+
+  it("finds an older course the first page never carried", async () => {
+    // The page holds 100 courses; past that the rest are not hard to find --
+    // they are not in the list at all.
+    mocks.listLessons.mockImplementation((options?: { query?: string }) =>
+      Promise.resolve(
+        options?.query ? { items: [{ ...lesson, id: "lesson-old", title: "受力图入门" }], count: 1 } : { items: [], count: 0 },
+      ),
+    )
+    renderPage()
+    await waitFor(() => expect(mocks.listLessons).toHaveBeenCalled())
+
+    fireEvent.change(screen.getByLabelText("搜索课程标题"), { target: { value: "受力图" } })
+    fireEvent.click(screen.getByRole("button", { name: "搜索课程" }))
+
+    await waitFor(() => expect(mocks.listLessons).toHaveBeenCalledWith(expect.objectContaining({ query: "受力图" })))
+    expect(await screen.findByRole("link", { name: /受力图入门/ })).toBeInTheDocument()
+    expect(screen.getByText(/只显示标题含「受力图」的课程/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "清除" }))
+
+    // Back to the unfiltered page, which is empty here -- and says so as a
+    // library with no courses rather than a search that matched nothing.
+    expect(await screen.findByText("还没有课程")).toBeInTheDocument()
+  })
+
+  it("does not tell you the library is empty when only the search is", async () => {
+    mocks.listLessons.mockImplementation((options?: { query?: string }) =>
+      Promise.resolve(options?.query ? { items: [], count: 0 } : { items: [lesson], count: 1 }),
+    )
+    renderPage()
+    await screen.findByRole("link", { name: /Newton's second law/ })
+
+    fireEvent.change(screen.getByLabelText("搜索课程标题"), { target: { value: "不存在" } })
+    fireEvent.click(screen.getByRole("button", { name: "搜索课程" }))
+
+    expect(await screen.findByText(/没有标题含「不存在」的课程/)).toBeInTheDocument()
+    expect(screen.queryByText("还没有课程")).not.toBeInTheDocument()
   })
 })

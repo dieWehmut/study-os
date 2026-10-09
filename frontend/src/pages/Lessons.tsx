@@ -6,6 +6,7 @@ import { listLessons, type Lesson } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { subjectName } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
@@ -37,6 +38,10 @@ export default function Lessons() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
+  // The list is one page of the newest courses, so an older one is not hard to
+  // find here -- it is not in the list at all.
+  const [query, setQuery] = useState("")
+  const [draft, setDraft] = useState("")
 
   useEffect(() => {
     let active = true
@@ -46,6 +51,7 @@ export default function Lessons() {
       try {
         const result = await listLessons({
           subject: subject === "all" ? undefined : subject,
+          query: query || undefined,
           limit: 100,
           offset: 0,
         })
@@ -62,7 +68,7 @@ export default function Lessons() {
     return () => {
       active = false
     }
-  }, [subject, requestVersion])
+  }, [subject, requestVersion, query])
 
   function retry() {
     setRequestVersion((value) => value + 1)
@@ -84,6 +90,46 @@ export default function Lessons() {
           先看目标、结构和一题小练习，再决定今天要深入哪一节。
         </p>
         <SubjectChips subject={subject} onSelect={setSubject} />
+        {/* 100 courses is the page; past it the rest are unreachable. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            aria-label="搜索课程标题"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return
+              event.preventDefault()
+              setQuery(draft.trim())
+            }}
+            placeholder="搜标题里的词"
+            className="h-9 max-w-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label="搜索课程"
+            disabled={!draft.trim() || draft.trim() === query}
+            onClick={() => setQuery(draft.trim())}
+          >
+            搜索
+          </Button>
+          {query ? (
+            <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              只显示标题含「{query}」的课程
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => {
+                  setDraft("")
+                  setQuery("")
+                }}
+              >
+                清除
+              </button>
+            </span>
+          ) : null}
+        </div>
       </header>
 
       {error ? (
@@ -96,18 +142,26 @@ export default function Lessons() {
       ) : null}
 
       {!loading && !error && items.length === 0 ? (
-        <Card>
-          <CardContent className="grid justify-items-center gap-3 py-14 text-center">
-            <BookOpenCheck aria-hidden="true" className="size-8 text-muted-foreground" />
-            <h2 className="font-heading text-xl font-semibold">还没有课程</h2>
-            <p className="max-w-md text-sm leading-6 text-muted-foreground">
-              把一段资料先整合成结构，之后就能在这里按固定顺序预习。
-            </p>
-            <Link className={buttonVariants({ variant: "outline", size: "sm" })} to="/integrate">
-              去整合资料<ArrowRight data-icon="inline-end" />
-            </Link>
-          </CardContent>
-        </Card>
+        query ? (
+          <Card>
+            <CardContent className="py-14 text-center text-sm text-muted-foreground">
+              没有标题含「{query}」的课程。
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="grid justify-items-center gap-3 py-14 text-center">
+              <BookOpenCheck aria-hidden="true" className="size-8 text-muted-foreground" />
+              <h2 className="font-heading text-xl font-semibold">还没有课程</h2>
+              <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                把一段资料先整合成结构，之后就能在这里按固定顺序预习。
+              </p>
+              <Link className={buttonVariants({ variant: "outline", size: "sm" })} to="/integrate">
+                去整合资料<ArrowRight data-icon="inline-end" />
+              </Link>
+            </CardContent>
+          </Card>
+        )
       ) : null}
 
       {items.length > 0 ? (
