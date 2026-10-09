@@ -39,6 +39,19 @@ import {
   type PersistedSettings,
 } from "@/lib/settings"
 
+/**
+ * A confirmation that knows where it came from.
+ *
+ * The page is three screens tall, and one shared "设置已保存" pinned to the
+ * bottom was off-screen for every card above it: 保存设置 and 切换服务商 both
+ * reported success somewhere the reader was not. The kind is what lets each card
+ * show its own, next to the control that was pressed.
+ */
+export interface SettingsNotice {
+  kind: "daily" | "backup" | "provider"
+  text: string
+}
+
 interface SettingsStore {
   settings: PersistedSettings
   status: SystemStatus | null
@@ -52,7 +65,8 @@ interface SettingsStore {
   isSaving: boolean
   isBackingUp: boolean
   error: string | null
-  notice: string | null
+  /** Which card the confirmation belongs to, so it can be shown in that card. */
+  notice: SettingsNotice | null
   speech: SpeechStatus | null
   voiceRoles: VoiceRole[]
   activeVoiceRoleId: string
@@ -135,7 +149,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const settings = { dailyLimit: savedLimit }
       writePersistedSettings(settings)
       const status = get().status
-      set({ settings, status: status ? { ...status, review: { ...status.review, daily_limit: savedLimit } } : status, isSaving: false, notice: "设置已保存" })
+      set({ settings, status: status ? { ...status, review: { ...status.review, daily_limit: savedLimit } } : status, isSaving: false, notice: { kind: "daily", text: "设置已保存" } })
     } catch (error) {
       set({ isSaving: false, error: `设置保存失败：${errorMessage(error, "服务不可用")}` })
     }
@@ -147,7 +161,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       await createBackup("daily")
       const backupResponse = await listBackups(10)
       const status = get().status
-      set({ backups: backupResponse.items, status: status ? { ...status, backup: { ...status.backup, count: backupResponse.count } } : status, isBackingUp: false, notice: "备份已创建" })
+      set({ backups: backupResponse.items, status: status ? { ...status, backup: { ...status.backup, count: backupResponse.count } } : status, isBackingUp: false, notice: { kind: "backup", text: "备份已创建" } })
     } catch (error) {
       set({ isBackingUp: false, error: `备份失败：${errorMessage(error, "服务不可用")}` })
     }
@@ -166,7 +180,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         vendors,
         activeProvider: response.active_provider,
         status: status ? { ...status, provider: { ...status.provider, name: response.active_provider, configured: true, available: true } } : status,
-        notice: "AI 服务商已切换",
+        notice: { kind: "provider", text: "AI 服务商已切换" },
       })
     } catch (error) {
       set({ error: `服务商切换失败：${errorMessage(error, "无法写入 .env.local")}` })
@@ -210,7 +224,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         vendors: vendorResponse.items,
         activeProvider: vendorResponse.active_provider,
         status: nextStatus,
-        notice: "AI 配置已保存",
+        notice: { kind: "provider", text: "AI 配置已保存" },
       })
     } catch (error) {
       set({ isSavingConfig: false, error: `配置保存失败：${errorMessage(error, "无法写入 .env.local")}` })

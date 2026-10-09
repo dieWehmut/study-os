@@ -845,6 +845,9 @@ export default function SettingsPanel() {
               )
             })}
             {providerTestNotice ? <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-primary">{providerTestNotice}</p> : null}
+            {notice?.kind === "provider" ? (
+              <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-primary">{notice.text}</p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -870,6 +873,11 @@ export default function SettingsPanel() {
               </label>
               <p className="text-xs text-muted-foreground">允许范围：{MIN_DAILY_LIMIT}–{MAX_DAILY_LIMIT} 个。</p>
               <Button type="submit" className="w-fit" disabled={isSaving}>{isSaving ? "保存中…" : "保存设置"}</Button>
+              {/* In the card the button is in. The page's one shared notice sat
+                  at the bottom, three screens below this form. */}
+              {notice?.kind === "daily" ? (
+                <p role="status" aria-live="polite" className="text-sm text-primary">{notice.text}</p>
+              ) : null}
             </form>
           </CardContent>
         </Card>
@@ -909,6 +917,9 @@ export default function SettingsPanel() {
               </div>
             ))}
             <p className="text-xs text-muted-foreground">位置：{status.backup.directory}</p>
+            {notice?.kind === "backup" ? (
+              <p role="status" aria-live="polite" className="text-sm text-primary">{notice.text}</p>
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -919,7 +930,6 @@ export default function SettingsPanel() {
           <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw data-icon="inline-start" />重试</Button>
         </div>
       ) : null}
-      {notice ? <p aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</p> : null}
     </div>
   )
 }

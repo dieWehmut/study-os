@@ -171,7 +171,10 @@ describe("SettingsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存设置" }))
 
     await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalledWith({ daily_limit: 30 }))
-    expect(await screen.findByText("设置已保存")).toBeInTheDocument()
+    // In the card the button is in: the page's one shared notice used to sit at
+    // the bottom, three screens below this form.
+    const saved = await screen.findByText("设置已保存")
+    expect(saved.closest('[data-slot="card"]')).toHaveTextContent("记忆节奏")
   })
 
   it("creates a manual daily backup and exposes recoverable error state", async () => {
@@ -179,6 +182,8 @@ describe("SettingsPanel", () => {
     await screen.findByText("备份记录")
     fireEvent.click(screen.getByRole("button", { name: "立即备份" }))
     await waitFor(() => expect(mocks.createBackup).toHaveBeenCalledWith("daily"))
+    const created = await screen.findByText("备份已创建")
+    expect(created.closest('[data-slot="card"]')).toHaveTextContent("备份记录")
 
     mocks.createBackup.mockRejectedValueOnce(new Error("offline"))
     fireEvent.click(screen.getByRole("button", { name: "立即备份" }))
@@ -210,6 +215,10 @@ describe("SettingsPanel", () => {
       reasoning_model: "deepseek-v4-pro",
     }))
     expect(await screen.findByText("AI 配置已保存")).toBeInTheDocument()
+    // The 服务商 card holds the form that saved it, three screens above where
+    // the page's shared notice used to appear.
+    const aiSaved = screen.getByText("AI 配置已保存")
+    expect(aiSaved.closest('[data-slot="card"]')).toHaveTextContent("AI 服务商")
     expect(screen.queryByDisplayValue("sk-live-secret")).not.toBeInTheDocument()
   })
 
