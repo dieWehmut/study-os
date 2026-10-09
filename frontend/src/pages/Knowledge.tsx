@@ -16,12 +16,28 @@ import { WikiPanel } from "@/features/knowledge/WikiPanel"
 import { insightTagsFor } from "@/lib/insights"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
+/** Only the two values the server accepts; anything else means "either". */
+function scheduledFromSearch(value: string | null): "" | "yes" | "no" {
+  return value === "yes" || value === "no" ? value : ""
+}
+
 export default function Knowledge() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedId = searchParams.get("item")
+  const scheduled = scheduledFromSearch(searchParams.get("scheduled"))
   return (
     <KnowledgePage
       requestedId={requestedId}
+      // In the link, not just in state: "what still needs scheduling?" is a
+      // question another page can now send you here to answer, and the answer
+      // has to survive the trip.
+      scheduled={scheduled}
+      onScheduledChange={(value) => {
+        const next = new URLSearchParams(searchParams)
+        if (value) next.set("scheduled", value)
+        else next.delete("scheduled")
+        setSearchParams(next)
+      }}
       onSelectId={(id) => {
         const next = new URLSearchParams(searchParams)
         next.set("item", id)
@@ -31,7 +47,17 @@ export default function Knowledge() {
   )
 }
 
-function KnowledgePage({ requestedId, onSelectId }: { requestedId: string | null; onSelectId(id: string): void }) {
+function KnowledgePage({
+  requestedId,
+  scheduled,
+  onScheduledChange,
+  onSelectId,
+}: {
+  requestedId: string | null
+  scheduled: "" | "yes" | "no"
+  onScheduledChange(value: "" | "yes" | "no"): void
+  onSelectId(id: string): void
+}) {
   const [query, setQuery] = useState("")
   const [groups, setGroups] = useState<KnowledgeGroup[]>([])
   const [group, setGroup] = useState("")
@@ -46,9 +72,6 @@ function KnowledgePage({ requestedId, onSelectId }: { requestedId: string | null
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
   const [tag, setTag] = useState("")
-  // "" means either. scheduled_ids only describes the page in hand, so the
-  // question "what still needs scheduling?" has to be asked of the server.
-  const [scheduled, setScheduled] = useState<"" | "yes" | "no">("")
   const [compareA, setCompareA] = useState("")
   const [compareB, setCompareB] = useState("")
   const [compareResult, setCompareResult] = useState<CompareOutput | null>(null)
@@ -239,7 +262,9 @@ function KnowledgePage({ requestedId, onSelectId }: { requestedId: string | null
                   ariaLabel="复习状态"
                   value={scheduled}
                   onValueChange={(value) => {
-                    setScheduled(value as "" | "yes" | "no")
+                    // "" means either; scheduled_ids only describes the page in
+                    // hand, so the question has to reach the server.
+                    onScheduledChange(value as "" | "yes" | "no")
                     setLoading(true)
                     setError("")
                   }}

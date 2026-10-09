@@ -652,6 +652,45 @@ describe("showing what is already in the review queue", () => {
     })
   })
 
+  it("opens already narrowed when the link asks for it", async () => {
+    // "What still needs scheduling?" is a question another page sends you here
+    // to answer, so the filter has to be in the link rather than only in state.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+    })
+
+    render(<Knowledge />, ["/knowledge?scheduled=no"])
+
+    await waitFor(() => {
+      expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ scheduled: "no" }))
+    })
+    expect(await screen.findByRole("combobox", { name: "复习状态" })).toHaveTextContent("还没排复习")
+  })
+
+  it("writes the chosen filter back into the link so a reload keeps it", async () => {
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "brain_dump", term: "动能定理", concise_definition: "只对合外力做功成立。" }],
+    })
+    render(<Knowledge />)
+    await screen.findByRole("heading", { name: "动能定理" })
+
+    fireEvent.click(screen.getByRole("combobox", { name: "复习状态" }))
+    const queued = await screen.findByRole("option", { name: "已排进复习" })
+    fireEvent.pointerDown(queued)
+    fireEvent.click(queued)
+
+    await waitFor(() => expect(screen.getByLabelText("current location")).toHaveTextContent("scheduled=yes"))
+
+    fireEvent.click(screen.getByRole("combobox", { name: "复习状态" }))
+    const all = await screen.findByRole("option", { name: "全部" })
+    fireEvent.pointerDown(all)
+    fireEvent.click(all)
+
+    await waitFor(() => expect(screen.getByLabelText("current location")).not.toHaveTextContent("scheduled="))
+  })
+
   it("asks for the whole library again when the review filter is cleared", async () => {
     // A filter that cannot be undone is a trap: the page would keep hiding
     // rows after the learner stopped asking it to.
