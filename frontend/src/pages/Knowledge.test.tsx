@@ -605,6 +605,32 @@ describe("showing what is already in the review queue", () => {
     expect(await screen.findByRole("button", { name: /^排进复习/ })).toBeEnabled()
   })
 
+  it("reads the 复习状态 of a linked item the page does not carry", async () => {
+    // A 词族 link or an ?item= deep link selects a word the current search,
+    // subject or 复习状态 filter had every right to exclude -- and scheduled_ids
+    // only describes the page in hand. The panel then offered 排进复习 for
+    // something already queued, which is the one state it must not get wrong.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "word_sense", term: "abandon", concise_definition: "放弃" }],
+      scheduled_ids: [],
+    })
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.getKnowledge.mockResolvedValue({
+      id: "k9",
+      item_type: "word_sense",
+      term: "resilient",
+      concise_definition: "有韧性的",
+      scheduled: true,
+    })
+
+    render(<Knowledge />, ["/knowledge?item=k9"])
+
+    await waitFor(() => expect(mocks.getKnowledge).toHaveBeenCalledWith("k9"))
+    expect(await screen.findByRole("button", { name: /已排进复习/ })).toBeDisabled()
+    expect(screen.queryByRole("button", { name: /^排进复习/ })).not.toBeInTheDocument()
+  })
+
   it("can narrow the library to the items that carry no review cards", async () => {
     // scheduled_ids only covers the page in hand. With 500 items behind a
     // limit of 100, filtering in the browser would answer "3 need scheduling"

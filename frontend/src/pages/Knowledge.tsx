@@ -108,6 +108,14 @@ function KnowledgePage({ requestedId, onSelectId }: { requestedId: string | null
   // current search, subject or 复习状态 filter has every right to exclude, and
   // a link that dead-ends on the empty panel is a broken link.
   const selected = selectedDetail?.id === selectedId ? selectedDetail : selectedSummary
+  // scheduled_ids only describes the page in hand. A 词族 link or an ?item=
+  // deep link routinely selects an item that page never carried -- the filter
+  // that hid it is the reason the link exists -- and the panel then offered
+  // 排进复习 for something already queued. The detail read is by id and answers
+  // for that item, so it decides whenever the page has nothing to say.
+  const selectedQueued = selected
+    ? scheduledIds.has(selected.id) || (selectedDetail?.id === selected.id && selectedDetail.scheduled === true)
+    : false
 
   useEffect(() => {
     if (!selectedId || typeof getKnowledge !== "function") return
@@ -318,10 +326,15 @@ function KnowledgePage({ requestedId, onSelectId }: { requestedId: string | null
             <WikiPanel
               key={selected?.id ?? "none"}
               item={selected}
-              scheduled={selected ? scheduledIds.has(selected.id) : false}
+              scheduled={selectedQueued}
               onUpdated={(updated) => {
                 setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)))
-                setSelectedDetail(updated)
+                // 复习状态 is not part of a write response; keep the answer we
+                // already had for this item instead of dropping to "unknown".
+                setSelectedDetail((current) => ({
+                  ...updated,
+                  scheduled: updated.scheduled ?? (current?.id === updated.id ? current.scheduled : undefined),
+                }))
               }}
               onSelectRelated={selectItem}
             />
