@@ -197,6 +197,9 @@ describe("ReviewSession", () => {
 
     expect(await screen.findByText("今天的到期内容已经完成")).toBeInTheDocument()
     expect(screen.queryByRole("link", { name: "去导入" })).not.toBeInTheDocument()
+    // 完成不是终点：没有卡的知识点根本不会出现在这里，所以把下一件事说清楚。
+    expect(screen.getByRole("link", { name: "去整理还没排复习的知识点" }))
+      .toHaveAttribute("href", "/knowledge?scheduled=no")
   })
 
   it("loads reviews and the library for the active subject", async () => {

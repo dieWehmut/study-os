@@ -142,8 +142,16 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
           <CheckCircle2 aria-hidden="true" className="size-12 text-primary" />
           <div>
             <h2 className="font-heading text-lg font-semibold">今天的到期内容已经完成</h2>
-            <p className="mt-1 text-sm text-muted-foreground">新导入或新学的知识会自动进入这里。</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              新导入或新学的知识会自动进入这里；还没排复习的知识点不会自己进来。
+            </p>
           </div>
+          {/* Finishing today's cards is the moment the gap is visible: an item
+              carrying no cards can never surface here, so point at the ones
+              that are not in the plan at all instead of stopping at "done". */}
+          <Link to="/knowledge?scheduled=no" className={buttonVariants({ variant: "outline" })}>
+            去整理还没排复习的知识点
+          </Link>
         </CardContent>
       </Card>
     )
