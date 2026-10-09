@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -147,5 +148,87 @@ func TestAnswerRejectsOutOfRangeSelfRating(t *testing.T) {
 		if response.Code != http.StatusBadRequest {
 			t.Errorf("body %s: status = %d, want %d", body, response.Code, http.StatusBadRequest)
 		}
+	}
+}
+
+// newAnswerlessPromptApp files one card of the kind that has no reference
+// answers at all: 默写公式, 造句 and 上下句背诵 are graded without any.
+func newAnswerlessPromptApp(t *testing.T) *app.App {
+	t.Helper()
+	application, err := app.New(context.Background(), app.Options{
+		DBPath: filepath.Join(t.TempDir(), "study.db"),
+	})
+	if err != nil {
+		t.Fatalf("construct application: %v", err)
+	}
+	t.Cleanup(func() { _ = application.Close() })
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	if err := application.Store.CreateKnowledgeItem(ctx, models.KnowledgeItem{
+		ID:                "bare-item",
+		ItemType:          "brain_dump",
+		Term:              "动能定理",
+		ConciseDefinition: "只对合外力做功成立。",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}); err != nil {
+		t.Fatalf("create knowledge item: %v", err)
+	}
+	if err := application.Store.CreatePrompt(ctx, models.Prompt{
+		ID:              "bare-prompt",
+		KnowledgeItemID: "bare-item",
+		PromptType:      "formula_recall",
+		Question:        "默写/复述：「动能定理」，并说出适用条件或易错点。",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("create prompt: %v", err)
+	}
+
+	card := fsrs.NewCard()
+	card.Due = now.Add(-time.Hour)
+	cardJSON, err := json.Marshal(card)
+	if err != nil {
+		t.Fatalf("marshal card: %v", err)
+	}
+	if err := application.Store.UpsertReviewState(ctx, models.ReviewState{
+		PromptID:  "bare-prompt",
+		CardJSON:  cardJSON,
+		DueAt:     card.Due,
+		UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("upsert review state: %v", err)
+	}
+
+	return application
+}
+
+func TestAnswerReportsAnEmptyReferenceListAsAList(t *testing.T) {
+	// Go marshals a nil slice as `null`. A card with no accepted answers used to
+	// answer with `"expected_answers":null`, and 记忆 indexes that field, so the
+	// learner lost the whole page instead of seeing a verdict. The wire shape has
+	// to be the list the clients read it as.
+	application := newAnswerlessPromptApp(t)
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"http://127.0.0.1/api/reviews/bare-prompt/answer",
+		bytes.NewReader([]byte(`{"answer":"合外力做的功等于动能变化"}`)),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	httpapi.NewRouter(application).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	body := response.Body.String()
+	if strings.Contains(body, `"expected_answers":null`) {
+		t.Fatalf("expected_answers = null, want []; body = %s", body)
+	}
+	if !strings.Contains(body, `"expected_answers":[]`) {
+		t.Fatalf("expected_answers missing as an empty list; body = %s", body)
 	}
 }

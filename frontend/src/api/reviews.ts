@@ -30,33 +30,53 @@ export function getReviewForecast(
   )
 }
 
-export function answerReview(
+/**
+ * The wire can say `null` where the type says list.
+ *
+ * A backend that marshals a nil Go slice sends `null` for `expected_answers`,
+ * and the 记忆 panels index that field -- a card with no reference answers
+ * (默写公式, 造句, 上下句背诵) used to blank the whole app when answered.
+ * `listRelatedKnowledge` set the precedent: a missing list has to read as
+ * "none" at the boundary, not travel inward as a crash waiting to happen.
+ */
+type AnswerPayload = Omit<ReviewEvaluation, "expected_answers"> & {
+  expected_answers?: string[] | null
+}
+
+function withExpectedAnswers(evaluation: AnswerPayload): ReviewEvaluation {
+  return { ...evaluation, expected_answers: evaluation.expected_answers ?? [] }
+}
+
+export async function answerReview(
   promptId: string,
   answer: string,
   familiarity?: number,
 ): Promise<ReviewEvaluation> {
-  return apiRequest<ReviewEvaluation>(`/reviews/${promptId}/answer`, {
+  const evaluation = await apiRequest<AnswerPayload>(`/reviews/${promptId}/answer`, {
     method: "POST",
     body: JSON.stringify({ answer, familiarity }),
   })
+  return withExpectedAnswers(evaluation)
 }
 
-export function overrideAttempt(
+export async function overrideAttempt(
   attemptId: string,
   rating: 1 | 2 | 3,
 ): Promise<ReviewEvaluation> {
-  return apiRequest<ReviewEvaluation>(`/attempts/${attemptId}/override`, {
+  const evaluation = await apiRequest<AnswerPayload>(`/attempts/${attemptId}/override`, {
     method: "POST",
     body: JSON.stringify({ rating }),
   })
+  return withExpectedAnswers(evaluation)
 }
 
-export function submitSelfRating(
+export async function submitSelfRating(
   promptId: string,
   rating: 1 | 2 | 3,
 ): Promise<ReviewEvaluation> {
-  return apiRequest<ReviewEvaluation>(`/reviews/${promptId}/answer`, {
+  const evaluation = await apiRequest<AnswerPayload>(`/reviews/${promptId}/answer`, {
     method: "POST",
     body: JSON.stringify({ self_rating: rating }),
   })
+  return withExpectedAnswers(evaluation)
 }

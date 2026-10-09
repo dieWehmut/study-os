@@ -39,6 +39,19 @@ test("returns a learning record's knowledge point to the review queue", async ({
   await expect(flowBack.getByRole("status")).toHaveText(/已排进复习 · \d+ 张卡/, { timeout: 15_000 })
   await expect(flowBack.getByRole("button", { name: "排进复习" })).toHaveCount(0)
 
+  // Queueing a 暂存 point makes 默写公式 cards, which carry no registered answer.
+  // Answering one of those returned `"expected_answers":null` and took the whole
+  // page down -- no sidebar, no verdict, nothing to press. The card has to be
+  // answerable, not just scheduled.
+  await page.goto("/memory")
+  await expect(page.getByText("记忆检测")).toBeVisible()
+  await page.getByLabel("你的答案").fill("先确认研究对象和正方向")
+  await page.getByRole("button", { name: "提交答案" }).click()
+  await expect(page.getByText(/正确|部分正确|需要重学/).first()).toBeVisible({ timeout: 15_000 })
+  await page.getByRole("button", { name: "改判为掌握" }).click()
+  await expect(page.getByText(/系统他评/)).toBeVisible()
+  await page.getByRole("button", { name: "下一题" }).click()
+
   // And it survives leaving the page: the item the record pointed at now
   // carries review cards, which is the same state 排进复习 leaves everywhere.
   await page.goto("/knowledge")

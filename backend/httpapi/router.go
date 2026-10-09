@@ -689,6 +689,20 @@ type answerResponse struct {
 	ExpectedAnswers []string  `json:"expected_answers"`
 }
 
+// nonNilStrings keeps a JSON list a list.
+//
+// Go marshals a nil slice as `null`, and this response is not read as "the
+// reference answers, if any" -- the 记忆 panels index it. A card that has no
+// accepted answers (默写公式, 造句, 上下句背诵) therefore sent `null`, and
+// answering one took the whole page down: the same bug a learner hits as a
+// blank screen with no way back.
+func nonNilStrings(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
+}
+
 // evaluationFromSelfRating converts a learner's 1-3 self-report into the same
 // Evaluation shape that EvaluateAnswer produces, so the scheduler and the
 // attempt history stay on one code path.
@@ -1014,7 +1028,7 @@ func handleAnswer(response http.ResponseWriter, request *http.Request, applicati
 		Rating:          int(evaluation.Rating),
 		Feedback:        evaluation.Feedback,
 		DueAt:           after.Due,
-		ExpectedAnswers: prompt.AcceptedAnswers,
+		ExpectedAnswers: nonNilStrings(prompt.AcceptedAnswers),
 	})
 }
 
@@ -1093,7 +1107,7 @@ func handleOverride(response http.ResponseWriter, request *http.Request, applica
 		Rating:          input.Rating,
 		Feedback:        feedback,
 		DueAt:           after.Due,
-		ExpectedAnswers: prompt.AcceptedAnswers,
+		ExpectedAnswers: nonNilStrings(prompt.AcceptedAnswers),
 	})
 }
 
