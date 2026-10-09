@@ -1,5 +1,6 @@
-import { Navigate, Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
+import ErrorBoundary from "@/components/ErrorBoundary"
 import { AppShell } from "@/components/layout/AppShell"
 import { UpdateDialog } from "@/features/update/UpdateDialog"
 import Home from "@/pages/Home"
@@ -19,27 +20,33 @@ import Lessons from "@/pages/Lessons"
 import LessonDetail from "@/pages/LessonDetail"
 
 export default function App() {
+  // Keying the boundary on the route means a crashed page is left behind when
+  // you navigate: the shell stays up, so you can always get somewhere else.
+  const location = useLocation()
+
   return (
     <AppShell>
       <UpdateDialog />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/knowledge" element={<Knowledge />} />
-        <Route path="/reading" element={<Reading />} />
-        <Route path="/reading/articles" element={<EnglishArticles />} />
-        <Route path="/reading/articles/new" element={<EnglishArticleNew />} />
-        <Route path="/reading/articles/:id" element={<EnglishArticleDetail />} />
-        <Route path="/reading/english-corpora" element={<EnglishCorpora />} />
-        <Route path="/lessons" element={<Lessons />} />
-        <Route path="/lessons/:id" element={<LessonDetail />} />
-        <Route path="/import" element={<Import />} />
-        <Route path="/memory" element={<Memory />} />
-        <Route path="/integrate" element={<Integrate />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/practice" element={<Practice />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <ErrorBoundary key={location.pathname}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/knowledge" element={<Knowledge />} />
+          <Route path="/reading" element={<Reading />} />
+          <Route path="/reading/articles" element={<EnglishArticles />} />
+          <Route path="/reading/articles/new" element={<EnglishArticleNew />} />
+          <Route path="/reading/articles/:id" element={<EnglishArticleDetail />} />
+          <Route path="/reading/english-corpora" element={<EnglishCorpora />} />
+          <Route path="/lessons" element={<Lessons />} />
+          <Route path="/lessons/:id" element={<LessonDetail />} />
+          <Route path="/import" element={<Import />} />
+          <Route path="/memory" element={<Memory />} />
+          <Route path="/integrate" element={<Integrate />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/practice" element={<Practice />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ErrorBoundary>
     </AppShell>
   )
 }
