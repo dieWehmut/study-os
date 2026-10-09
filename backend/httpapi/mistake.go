@@ -140,6 +140,7 @@ func handleMistakeList(response http.ResponseWriter, request *http.Request, appl
 	}
 	mistakes, err := application.Store.ListMistakes(request.Context(), models.MistakeListOptions{
 		Subject: strings.ToLower(strings.TrimSpace(request.URL.Query().Get("subject"))),
+		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
 		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 200),
 	})
 	if err != nil {

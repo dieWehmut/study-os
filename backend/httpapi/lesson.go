@@ -25,6 +25,7 @@ func handleLessonList(response http.ResponseWriter, request *http.Request, appli
 	items, err := application.Store.ListLessons(request.Context(), models.LessonListOptions{
 		Subject: strings.TrimSpace(request.URL.Query().Get("subject")),
 		Status:  status,
+		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
 		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 100),
 		Offset:  parseOffset(request.URL.Query().Get("offset")),
 	})

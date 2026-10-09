@@ -246,7 +246,7 @@ describe("looking past the first page of the library", () => {
       <QARecordPanel sessionId="session-1" subject="physics" onSave={vi.fn()} onSearchContexts={onSearchContexts} />,
     )
 
-    fireEvent.change(screen.getByLabelText("搜索知识点"), { target: { value: "动能" } })
+    fireEvent.change(screen.getByLabelText("搜索关联对象"), { target: { value: "动能" } })
     expect(onSearchContexts).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole("button", { name: "搜索" }))
@@ -262,7 +262,7 @@ describe("looking past the first page of the library", () => {
       <QARecordPanel sessionId="session-1" subject="physics" onSave={onSave} onSearchContexts={onSearchContexts} />,
     )
 
-    const box = screen.getByLabelText("搜索知识点")
+    const box = screen.getByLabelText("搜索关联对象")
     fireEvent.change(box, { target: { value: "动能" } })
     fireEvent.keyDown(box, { key: "Enter" })
 
@@ -282,7 +282,7 @@ describe("looking past the first page of the library", () => {
       />,
     )
 
-    fireEvent.change(screen.getByLabelText("搜索知识点"), { target: { value: "动能" } })
+    fireEvent.change(screen.getByLabelText("搜索关联对象"), { target: { value: "动能" } })
     expect(screen.getByRole("button", { name: "搜索" })).toBeDisabled()
     expect(screen.getByRole("status")).toHaveTextContent("没有匹配「动能」的知识点")
   })

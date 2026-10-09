@@ -25,7 +25,9 @@ test("returns a learning record's knowledge point to the review queue", async ({
   // The 学习记录 panel only exists once the background answer has landed.
   const save = page.getByRole("button", { name: "保存记录" })
   await expect(save).toBeVisible({ timeout: 60_000 })
-  await page.getByLabel("关联对象").selectOption({ label: `知识点：${term}` })
+  // exact, because the search box next to it is named 搜索关联对象 and Playwright
+  // matches accessible names by substring.
+  await page.getByLabel("关联对象", { exact: true }).selectOption({ label: `知识点：${term}` })
   await save.click()
 
   const flowBack = page.getByRole("region", { name: "回流到复习计划" })

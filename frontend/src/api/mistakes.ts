@@ -41,6 +41,8 @@ interface MistakeListResponse {
 
 export interface ListMistakesOptions {
   subject?: string
+  /** Narrows by the question as it was written down. The list is capped. */
+  query?: string
   limit?: number
 }
 
@@ -91,6 +93,7 @@ function toRecord(pair: MistakePair): MistakeRecord {
 export async function listMistakes(options: ListMistakesOptions = {}): Promise<MistakeRecord[]> {
   const params = new URLSearchParams()
   if (options.subject !== undefined) params.set("subject", options.subject)
+  if (options.query !== undefined) params.set("q", options.query)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   const suffix = params.toString()
   const page = await apiRequest<MistakeListResponse>(`/mistakes${suffix ? `?${suffix}` : ""}`)

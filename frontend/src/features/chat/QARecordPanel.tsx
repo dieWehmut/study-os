@@ -187,9 +187,9 @@ export default function QARecordPanel({
               <div className="grid gap-1.5">
                 <div className="flex items-center gap-2">
                   <Input
-                    aria-label="搜索知识点"
+                    aria-label="搜索关联对象"
                     value={contextQuery}
-                    placeholder="不在上面这一批？搜词或释义"
+                    placeholder="不在上面这一批？搜词、释义或题干"
                     onChange={(event) => setContextQuery(event.target.value)}
                     onKeyDown={(event) => {
                       // Enter belongs to this search, not to the form: the

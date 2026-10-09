@@ -65,6 +65,8 @@ export interface Lesson {
 export interface LessonListOptions {
   subject?: string
   status?: LessonStatus
+  /** Narrows by title. The list is capped, so an older course needs this. */
+  query?: string
   limit?: number
   offset?: number
 }
@@ -181,6 +183,7 @@ export function listLessons(options: LessonListOptions = {}): Promise<LessonList
   const params = new URLSearchParams()
   if (options.subject) params.set("subject", options.subject)
   if (options.status) params.set("status", options.status)
+  if (options.query) params.set("q", options.query)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   if (options.offset !== undefined) params.set("offset", String(options.offset))
   const query = params.toString()

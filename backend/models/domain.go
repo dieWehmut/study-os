@@ -226,7 +226,11 @@ type MistakeCorrectionInput struct {
 
 type MistakeListOptions struct {
 	Subject string
-	Limit   int
+	// Query narrows by the question as it was written down. The list is capped,
+	// so without it an older mistake is reachable only by scrolling a page that
+	// no longer holds it.
+	Query string
+	Limit int
 }
 
 // ErrorCause is one structured explanation for why an answer failed. Global
@@ -485,8 +489,10 @@ type LessonSection struct {
 type LessonListOptions struct {
 	Subject string
 	Status  string
-	Limit   int
-	Offset  int
+	// Query narrows by title, for the same reason mistakes take one.
+	Query  string
+	Limit  int
+	Offset int
 }
 
 const (

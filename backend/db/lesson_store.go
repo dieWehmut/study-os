@@ -217,6 +217,10 @@ func (s *Store) ListLessons(ctx context.Context, options models.LessonListOption
 		where = append(where, "status = ?")
 		arguments = append(arguments, status)
 	}
+	if query := strings.TrimSpace(options.Query); query != "" {
+		where = append(where, `title LIKE ? ESCAPE '\'`)
+		arguments = append(arguments, "%"+escapeLike(query)+"%")
+	}
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}

@@ -386,12 +386,12 @@ export default function Chat() {
   }
 
   /**
-   * Find a knowledge point the 关联对象 list never offered.
+   * Find something the 关联对象 list never offered.
    *
-   * That list is one subject-filtered page of the newest items, so in a real
-   * library most words are simply absent from it. Searching asks the server by
-   * text and appends what comes back, which is what makes an older word
-   * linkable at all.
+   * That list is one subject-filtered page of the newest items of each kind, so
+   * in a real library most words, mistakes and courses are simply absent from
+   * it. Searching asks every list by text and appends what comes back, which is
+   * what makes an older one linkable at all.
    */
   async function searchContexts(query: string) {
     const trimmed = query.trim()
@@ -400,24 +400,43 @@ export default function Chat() {
     setQAContextSearching(true)
     setQAContextSearchNote("")
     try {
-      const result = await listKnowledge({ query: trimmed, limit: 20, offset: 0 })
+      const [knowledge, mistakes, lessons] = await Promise.allSettled([
+        listKnowledge({ query: trimmed, limit: 20, offset: 0 }),
+        listMistakes({ query: trimmed, limit: 20 }),
+        listLessons({ query: trimmed, limit: 20, offset: 0 }),
+      ])
       if (qaContextSearchRef.current !== requestID) return
+      const found: QAContextOption[] = []
+      if (knowledge.status === "fulfilled") {
+        for (const item of knowledge.value.items) {
+          found.push({ value: qaContextValue("knowledge_item", item.id), label: `知识点：${item.term}` })
+        }
+      }
+      if (mistakes.status === "fulfilled") {
+        for (const item of mistakes.value) {
+          if (item.questionId) found.push({ value: qaContextValue("question", item.questionId), label: `错题：${item.question}` })
+        }
+      }
+      if (lessons.status === "fulfilled") {
+        for (const item of lessons.value.items) {
+          found.push({ value: qaContextValue("lesson", item.id), label: `课程：${item.title}` })
+        }
+      }
+      if (found.length === 0) {
+        setQAContextSearchNote(`没有匹配「${trimmed}」的知识点、错题或课程`)
+        return
+      }
       setQAContextOptions((current) => {
         const seen = new Set(current.map((option) => option.value))
         const merged = [...current]
-        for (const item of result.items) {
-          const value = qaContextValue("knowledge_item", item.id)
-          if (seen.has(value)) continue
-          seen.add(value)
-          merged.push({ value, label: `知识点：${item.term}` })
+        for (const option of found) {
+          if (seen.has(option.value)) continue
+          seen.add(option.value)
+          merged.push(option)
         }
         return merged
       })
-      setQAContextSearchNote(
-        result.items.length === 0
-          ? `没有匹配「${trimmed}」的知识点`
-          : `找到 ${result.items.length} 条，已加到上面的列表里`,
-      )
+      setQAContextSearchNote(`找到 ${found.length} 条，已加到上面的列表里`)
     } catch {
       if (qaContextSearchRef.current === requestID) setQAContextSearchNote("搜索失败，请重试")
     } finally {

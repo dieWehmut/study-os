@@ -131,6 +131,10 @@ func (s *Store) ListMistakes(ctx context.Context, options models.MistakeListOpti
 		query += ` AND q.subject = ?`
 		arguments = append(arguments, subject)
 	}
+	if needle := strings.TrimSpace(options.Query); needle != "" {
+		query += ` AND q.stem LIKE ? ESCAPE '\'`
+		arguments = append(arguments, "%"+escapeLike(needle)+"%")
+	}
 	query += ` ORDER BY a.occurred_at DESC, a.id DESC LIMIT ?`
 	arguments = append(arguments, limit)
 

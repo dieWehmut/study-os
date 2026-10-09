@@ -414,13 +414,54 @@ describe("Chat page", () => {
     render(<Chat />)
 
     fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
-    const box = await screen.findByLabelText("搜索知识点")
+    const box = await screen.findByLabelText("搜索关联对象")
     fireEvent.change(box, { target: { value: "动能" } })
     fireEvent.click(screen.getByRole("button", { name: "搜索" }))
 
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ query: "动能" })))
     expect(await screen.findByRole("option", { name: "知识点：动能定理" })).toBeInTheDocument()
     expect(await screen.findByRole("status")).toHaveTextContent("找到 1 条")
+  })
+
+  it("looks in mistakes and courses too, not only the knowledge library", async () => {
+    // The select offers 知识点 / 错题 / 课程. A search that only ever answered
+    // for the first of the three made the others look unfindable, which is the
+    // one thing a search box must not do.
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.listMistakes.mockImplementation((options?: { query?: string }) =>
+      Promise.resolve(
+        options?.query
+          ? [{ id: "attempt-9", questionId: "question-9", subject: "math", question: "求函数极值", cause: "method", createdAt: "2026-08-04T00:00:00Z" }]
+          : [],
+      ),
+    )
+    mocks.listLessons.mockImplementation((options?: { query?: string }) =>
+      Promise.resolve(
+        options?.query
+          ? { items: [{ id: "lesson-9", title: "极值一节课", subject: "math", status: "draft" }], count: 1 }
+          : { items: [], count: 0 },
+      ),
+    )
+    render(<Chat />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    const box = await screen.findByLabelText("搜索关联对象")
+    fireEvent.change(box, { target: { value: "极值" } })
+    fireEvent.click(screen.getByRole("button", { name: "搜索" }))
+
+    expect(await screen.findByRole("option", { name: "错题：求函数极值" })).toBeInTheDocument()
+    expect(screen.getByRole("option", { name: "课程：极值一节课" })).toBeInTheDocument()
+    expect(await screen.findByRole("status")).toHaveTextContent("找到 2 条")
   })
 
   it("names a linked point the 关联对象 page no longer carries", async () => {
