@@ -233,6 +233,15 @@ type MistakeListOptions struct {
 	Limit int
 }
 
+// ChatConversationListOptions lists the conversations themselves, not their
+// messages. The list is the newest page, so 问答 from a week ago need `q` to be
+// reachable at all.
+type ChatConversationListOptions struct {
+	Subject string
+	Query   string
+	Limit   int
+}
+
 // ErrorCause is one structured explanation for why an answer failed. Global
 // rows have an empty Subject; subject rows refine the taxonomy without making
 // the same ID mean different things in different courses.

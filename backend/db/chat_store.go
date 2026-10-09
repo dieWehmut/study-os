@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"study-os/backend/models"
 )
@@ -126,10 +127,22 @@ func (s *Store) GetChatAttachment(ctx context.Context, id string) (models.ChatAt
 	return attachment, nil
 }
 
-func (s *Store) ListChatConversations(ctx context.Context, subject string, limit int) ([]models.ChatConversation, error) {
+func (s *Store) ListChatConversations(ctx context.Context, options models.ChatConversationListOptions) ([]models.ChatConversation, error) {
+	limit := options.Limit
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
+	arguments := []any{strings.TrimSpace(options.Subject)}
+	// A conversation matches on any of its messages, not only on the two the row
+	// happens to show: the thing you remember saying is often neither the first
+	// question nor the last answer.
+	match := ""
+	if needle := strings.TrimSpace(options.Query); needle != "" {
+		match = ` AND EXISTS (SELECT 1 FROM chat_messages m
+			WHERE m.session_id = c.session_id AND m.content LIKE ? ESCAPE '\')`
+		arguments = append(arguments, "%"+escapeLike(needle)+"%")
+	}
+	arguments = append(arguments, limit)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT c.session_id, c.subject, COUNT(*),
 			MAX(c.created_at),
@@ -140,10 +153,10 @@ func (s *Store) ListChatConversations(ctx context.Context, subject string, limit
 				WHERE p.session_id = c.session_id AND p.status = 'done' AND p.content <> ''
 				ORDER BY p.created_at DESC LIMIT 1), '')
 		FROM chat_messages c
-		WHERE c.subject = ?
+		WHERE c.subject = ?`+match+`
 		GROUP BY c.session_id, c.subject
 		ORDER BY MAX(c.created_at) DESC
-		LIMIT ?`, subject, limit)
+		LIMIT ?`, arguments...)
 	if err != nil {
 		return nil, err
 	}

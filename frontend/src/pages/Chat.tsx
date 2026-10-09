@@ -19,6 +19,7 @@ import { listMistakes } from "@/api/mistakes"
 import type { ChatMessage } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import QARecordPanel, { type QAContextOption, type QARecordQueueTarget } from "@/features/chat/QARecordPanel"
 import { qaContextValue } from "@/features/chat/qa-record"
@@ -85,6 +86,11 @@ export default function Chat() {
   const subject = useSubjectStore((state) => state.subject)
   const setSubject = useSubjectStore((state) => state.setSubject)
   const [conversations, setConversations] = useState<ChatConversation[]>([])
+  // The query the list is currently filtered by, and the box you type in. They
+  // are separate so the list does not re-ask the server on every keystroke and
+  // so 清除 can put back what the box no longer holds.
+  const [conversationQuery, setConversationQuery] = useState("")
+  const [conversationDraft, setConversationDraft] = useState("")
   const [activeSession, setActiveSession] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   // Read once, in the initializer, and cleared in the same breath: arriving
@@ -136,13 +142,13 @@ export default function Chat() {
   }, [])
 
   const refreshConversations = useCallback(() => {
-    return listChatConversations(subject === "all" ? "" : subject, 50)
+    return listChatConversations(subject === "all" ? "" : subject, 50, conversationQuery)
       .then((result) => setConversations(result.items))
       .catch(() => {
         // 对话列表加载失败不阻塞提问。
       })
       .finally(() => setLoading(false))
-  }, [subject])
+  }, [subject, conversationQuery])
 
   useEffect(() => {
     void refreshConversations()
@@ -585,11 +591,53 @@ export default function Chat() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">{subject === "all" ? "综合" : subjectName(subject)} 的对话列表</p>
+            {/* Only the newest page of conversations is listed, so an older 问答
+                is not hard to find here -- it is not in the list at all. */}
+            <div className="flex items-center gap-2">
+              <Input
+                aria-label="搜索对话内容"
+                value={conversationDraft}
+                onChange={(event) => setConversationDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return
+                  event.preventDefault()
+                  setConversationQuery(conversationDraft.trim())
+                }}
+                placeholder="搜对话里说过的词"
+                className="h-9"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label="搜索对话"
+                disabled={!conversationDraft.trim() || conversationDraft.trim() === conversationQuery}
+                onClick={() => setConversationQuery(conversationDraft.trim())}
+                className="shrink-0"
+              >
+                搜索
+              </Button>
+            </div>
+            {conversationQuery ? (
+              <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                只显示提到「{conversationQuery}」的对话
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  onClick={() => {
+                    setConversationDraft("")
+                    setConversationQuery("")
+                  }}
+                >
+                  清除
+                </button>
+              </p>
+            ) : null}
           </CardHeader>
           <CardContent className="grid gap-2">
             {conversations.length === 0 ? (
               <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                还没有对话，点击「新对话」开始。
+                {conversationQuery ? `没有对话提到「${conversationQuery}」。` : "还没有对话，点击「新对话」开始。"}
               </p>
             ) : (
               conversations.map((conversation) => (

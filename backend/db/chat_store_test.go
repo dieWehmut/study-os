@@ -61,7 +61,7 @@ func TestChatConversationsAndAttachments(t *testing.T) {
 			t.Fatalf("create message: %v", err)
 		}
 	}
-	conversations, err := store.ListChatConversations(ctx, "math", 10)
+	conversations, err := store.ListChatConversations(ctx, models.ChatConversationListOptions{Subject: "math", Limit: 10})
 	if err != nil {
 		t.Fatalf("list conversations: %v", err)
 	}
@@ -73,6 +73,29 @@ func TestChatConversationsAndAttachments(t *testing.T) {
 	}
 	if conversations[1].MessageCount != 2 || conversations[1].Preview != "导数是变化率。" {
 		t.Fatalf("second conversation = %#v", conversations[1])
+	}
+
+	// A conversation matches on any of its messages. "sess-a" answers 导数是变化率
+	// -- the row's preview, but never its title -- while "sess-b" does not.
+	narrowed, err := store.ListChatConversations(ctx, models.ChatConversationListOptions{
+		Subject: "math", Query: "变化率", Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search conversations: %v", err)
+	}
+	if len(narrowed) != 1 || narrowed[0].SessionID != "sess-a" {
+		t.Fatalf("search conversations = %#v", narrowed)
+	}
+
+	// `%` is a character, not a wildcard, or every search would match everything.
+	escaped, err := store.ListChatConversations(ctx, models.ChatConversationListOptions{
+		Subject: "math", Query: "%", Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search conversations for %%: %v", err)
+	}
+	if len(escaped) != 0 {
+		t.Fatalf("search for %% = %#v, want none", escaped)
 	}
 
 	attachment := models.ChatAttachment{

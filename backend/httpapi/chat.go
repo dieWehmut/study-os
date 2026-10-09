@@ -159,8 +159,11 @@ func handleChatConversations(response http.ResponseWriter, request *http.Request
 	if subject == "" {
 		subject = "all"
 	}
-	conversations, err := application.Store.ListChatConversations(request.Context(), subject,
-		parseLimit(request.URL.Query().Get("limit"), 50, 200))
+	conversations, err := application.Store.ListChatConversations(request.Context(), models.ChatConversationListOptions{
+		Subject: subject,
+		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
+		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 200),
+	})
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取对话列表失败"})
 		return

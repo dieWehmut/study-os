@@ -74,9 +74,20 @@ export function listChatMessages(subject: string, sessionId?: string, limit = 50
   return apiRequest<{ items: ChatMessage[]; count: number }>(`/chat/messages?${params.toString()}`)
 }
 
-export function listChatConversations(subject: string, limit = 50): Promise<{ items: ChatConversation[]; count: number }> {
+/**
+ * The newest page of conversations, or the ones whose messages mention `query`.
+ *
+ * The list is capped, so a 问答 from a week ago is not merely hard to find
+ * without the query -- it is not in the answer at all.
+ */
+export function listChatConversations(
+  subject: string,
+  limit = 50,
+  query = "",
+): Promise<{ items: ChatConversation[]; count: number }> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (subject) params.set("subject", subject)
+  if (query) params.set("q", query)
   return apiRequest<{ items: ChatConversation[]; count: number }>(`/chat/conversations?${params.toString()}`)
 }
 

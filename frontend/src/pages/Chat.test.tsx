@@ -141,6 +141,38 @@ describe("Chat page", () => {
     expect((await screen.findAllByText("导数是变化率。")).length).toBeGreaterThan(0)
   })
 
+  it("finds an older conversation by something said inside it", async () => {
+    // The list is the newest 50 conversations, so a 问答 from last week is not
+    // merely hard to find here -- it is not in the answer at all.
+    mocks.listChatConversations.mockImplementation((_subject: string, _limit: number, query = "") =>
+      Promise.resolve(
+        query
+          ? {
+              items: [{ session_id: "s9", subject: "math", message_count: 2, last_at: "2026-08-01T00:00:00Z", title: "极值", preview: "先求导，再令它等于 0。" }],
+              count: 1,
+            }
+          : {
+              items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+              count: 1,
+            },
+      ),
+    )
+    render(<Chat />)
+    await screen.findByRole("button", { name: /导数/ })
+
+    fireEvent.change(screen.getByLabelText("搜索对话内容"), { target: { value: "极值" } })
+    fireEvent.click(screen.getByRole("button", { name: "搜索对话" }))
+
+    await waitFor(() => expect(mocks.listChatConversations).toHaveBeenCalledWith("", 50, "极值"))
+    expect(await screen.findByRole("button", { name: /极值/ })).toBeInTheDocument()
+    expect(screen.getByText(/只显示提到「极值」的对话/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "清除" }))
+
+    await waitFor(() => expect(mocks.listChatConversations).toHaveBeenCalledWith("", 50, ""))
+    expect(await screen.findByRole("button", { name: /导数/ })).toBeInTheDocument()
+  })
+
   it("uploads an attachment and shows it before sending", async () => {
     render(<Chat />)
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
