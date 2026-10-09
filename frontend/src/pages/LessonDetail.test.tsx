@@ -81,6 +81,34 @@ describe("lesson detail page", () => {
     ])
   })
 
+  it("keeps an empty draft scannable instead of repeating a placeholder per section", async () => {
+    // Every lesson in the app right now is a draft skeleton, so this is the
+    // common page, not an edge case: ten identical panels of "还没有内容" hid
+    // the one thing worth seeing -- the shape of the lesson.
+    const skeleton: Lesson = {
+      id: "lesson-empty",
+      title: "还没写的课",
+      subject: "physics",
+      status: "draft",
+      sections: [
+        { id: "diagnostic", kind: "diagnostic", title: "诊断", required: true },
+        { id: "objectives", kind: "objectives", title: "目标", required: true },
+        { id: "concept", kind: "concept", title: "核心概念", required: true },
+      ],
+      created_at: "2026-08-19T00:00:00Z",
+      updated_at: "2026-08-19T00:00:00Z",
+    }
+    mocks.getLesson.mockResolvedValue(skeleton)
+    renderPage()
+
+    expect(await screen.findByText(/这门课程还是一份空草稿/)).toBeInTheDocument()
+    // The outline survives: every section is still named...
+    expect(screen.getByRole("heading", { name: "核心概念" })).toBeInTheDocument()
+    // ...and the sentence is said once, not once per section.
+    expect(screen.queryByText("这一节还没有内容。")).not.toBeInTheDocument()
+    expect(document.querySelectorAll("[data-section-empty='true']")).toHaveLength(3)
+  })
+
   it("renders a retryable error state", async () => {
     mocks.getLesson.mockRejectedValueOnce(new Error("offline"))
     renderPage()

@@ -72,6 +72,12 @@ function contentItems(section: LessonSection): string[] {
   return []
 }
 
+/** Does this section carry anything a learner can read? */
+function sectionHasContent(section: LessonSection): boolean {
+  if (contentText(sectionContent(section)).trim()) return true
+  return contentItems(section).length > 0
+}
+
 function objectivesForLesson(lesson: Lesson): string[] {
   if (lesson.objectives?.length) return lesson.objectives
 
@@ -112,11 +118,31 @@ function SectionView({ lessonID, section }: { lessonID: string; section: LessonS
   const text = contentText(sectionContent(section))
   const items = contentItems(section)
   const isQuiz = type === "practice" || type === "quiz"
+  const title = section.title || sectionLabels[type] || type
+
+  // An empty section is one line of the outline, not a card of its own. A draft
+  // is ten of them at once, and ten identical "还没有内容" panels pushed the one
+  // thing worth seeing -- the shape of the lesson -- off the screen.
+  if (!sectionHasContent(section)) {
+    return (
+      <article
+        data-section-kind={type}
+        data-section-empty="true"
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-border/70 px-4 py-2.5"
+      >
+        <CheckCircle2 aria-hidden="true" className="size-4 text-muted-foreground" />
+        <h2 className="font-heading text-base font-medium text-muted-foreground">{title}</h2>
+        {section.required ? <Badge variant="outline">必看</Badge> : null}
+        <span className="ml-auto text-xs text-muted-foreground">还没有内容</span>
+      </article>
+    )
+  }
+
   return (
     <article data-section-kind={type} className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
         {isQuiz ? <CircleHelp aria-hidden="true" className="size-4 text-primary" /> : <CheckCircle2 aria-hidden="true" className="size-4 text-primary" />}
-        <h2 className="font-heading text-lg font-semibold">{section.title || sectionLabels[type] || type}</h2>
+        <h2 className="font-heading text-lg font-semibold">{title}</h2>
         {section.required ? <Badge variant="outline">必看</Badge> : null}
       </div>
       {text ? <p className="whitespace-pre-wrap text-sm leading-7 text-foreground/90">{text}</p> : null}
@@ -125,7 +151,6 @@ function SectionView({ lessonID, section }: { lessonID: string; section: LessonS
           {items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
         </ol>
       ) : null}
-      {!text && items.length === 0 ? <p className="text-sm text-muted-foreground">这一节还没有内容。</p> : null}
     </article>
   )
 }
@@ -159,6 +184,7 @@ export default function LessonDetail() {
 
   const sections = useMemo(() => (lesson ? sortSections(lesson.sections) : []), [lesson])
   const objectives = useMemo(() => (lesson ? objectivesForLesson(lesson) : []), [lesson])
+  const hasAnyContent = useMemo(() => sections.some(sectionHasContent), [sections])
 
   if (loading) {
     return <section aria-busy="true" className="grid gap-4"><p className="text-sm text-muted-foreground">正在打开课程…</p></section>
@@ -201,6 +227,11 @@ export default function LessonDetail() {
       ) : null}
 
       <div className="grid gap-3" aria-label="课程环节">
+        {sections.length > 0 && !hasAnyContent ? (
+          <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+            这门课程还是一份空草稿：下面是固定十段的骨架，内容还没有写进来。
+          </p>
+        ) : null}
         {sections.length > 0 ? sections.map((section) => <SectionView key={section.id} lessonID={lesson.id} section={section} />) : (
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">这门课程还没有可预习的环节。</CardContent></Card>
         )}

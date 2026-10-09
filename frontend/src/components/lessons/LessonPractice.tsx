@@ -231,7 +231,9 @@ function LegacyPractice({ section }: LessonPracticeProps) {
           {items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
         </ol>
       ) : null}
-      {!text && items.length === 0 ? <p className="text-sm text-muted-foreground">这一节还没有内容。</p> : null}
+      {/* One sentence, not two: when the section is empty this line already
+          says it, and the generic "这一节还没有内容" above it said the same
+          thing in different words. */}
       <p className="text-xs text-muted-foreground">这道练习暂时没有可交互的选项。</p>
     </>
   )
