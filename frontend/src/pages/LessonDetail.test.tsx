@@ -267,4 +267,40 @@ describe("lesson detail page", () => {
     // thing here that cannot be undone.
     expect(screen.getByLabelText("核心概念内容")).toHaveValue("改到一半的内容")
   })
+
+  it("renames the course and files it, alongside its sections", async () => {
+    // A course made from a note arrives called 整合笔记 and filed as 草稿; the name
+    // and the filing are as editable as the ten sections.
+    mocks.getLesson.mockResolvedValue({ ...lesson, version: 3, subject: "all", status: "draft" })
+    mocks.updateLesson.mockResolvedValue({
+      ...lesson, version: 4, title: "牛顿第二定律", status: "published", subject: "physics",
+    })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    const title = screen.getByLabelText("课程标题")
+    expect(title).toHaveValue("Newton's second law")
+    fireEvent.change(title, { target: { value: "牛顿第二定律" } })
+
+    fireEvent.click(screen.getByRole("combobox", { name: "课程状态" }))
+    const published = await screen.findByRole("option", { name: "已发布" })
+    fireEvent.pointerDown(published)
+    fireEvent.click(published)
+    fireEvent.click(screen.getByRole("combobox", { name: "所属学科" }))
+    const physics = await screen.findByRole("option", { name: "物理" })
+    fireEvent.pointerDown(physics)
+    fireEvent.click(physics)
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+
+    await waitFor(() => expect(mocks.updateLesson).toHaveBeenCalled())
+    const [, input] = mocks.updateLesson.mock.calls[0]
+    expect(input.version).toBe(3)
+    expect(input.title).toBe("牛顿第二定律")
+    expect(input.status).toBe("published")
+    expect(input.subject).toBe("physics")
+    // Back to reading: the page shows what was saved rather than the old name.
+    expect(await screen.findByRole("heading", { name: "牛顿第二定律" })).toBeInTheDocument()
+    expect(screen.getByText("已发布")).toBeInTheDocument()
+  })
 })

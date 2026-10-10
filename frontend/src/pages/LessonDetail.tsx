@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import LessonPractice from "@/components/lessons/LessonPractice"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import {
   isEditableSection,
   sectionContentFromText,
@@ -17,7 +19,7 @@ import {
   sectionItems,
   sectionText,
 } from "@/lib/lesson-content"
-import { subjectName } from "@/lib/subjects"
+import { subjectName, SUBJECTS } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
 
 const sectionLabels: Record<string, string> = {
@@ -171,6 +173,9 @@ export default function LessonDetail() {
   const [requestVersion, setRequestVersion] = useState(0)
   const [editing, setEditing] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [draftTitle, setDraftTitle] = useState("")
+  const [draftStatus, setDraftStatus] = useState("draft")
+  const [draftSubject, setDraftSubject] = useState("")
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState("")
 
@@ -179,6 +184,12 @@ export default function LessonDetail() {
     setDrafts(Object.fromEntries(
       lesson.sections.map((section) => [section.id, sectionEditorText(section)]),
     ))
+    // The title and the filing of the lesson are as editable as its sections: a
+    // course made from a note arrives called 整合笔记, and 草稿 until someone
+    // says otherwise.
+    setDraftTitle(lesson.title)
+    setDraftStatus(lesson.status)
+    setDraftSubject(lesson.subject === "all" ? "" : lesson.subject)
     setNotice("")
     setEditing(true)
   }
@@ -209,6 +220,11 @@ export default function LessonDetail() {
       ))
       const updated = await updateLesson(lesson.id, {
         version: lesson.version ?? 1,
+        // The title is trimmed, and an empty one is refused rather than saved:
+        // a nameless course is one nothing can be found by.
+        ...(draftTitle.trim() && draftTitle.trim() !== lesson.title ? { title: draftTitle.trim() } : {}),
+        ...(draftStatus !== lesson.status ? { status: draftStatus } : {}),
+        ...(draftSubject !== (lesson.subject === "all" ? "" : lesson.subject) ? { subject: draftSubject } : {}),
         document: { schema_version: lesson.document?.schema_version ?? 1, sections },
       })
       setLesson(updated)
@@ -271,8 +287,30 @@ export default function LessonDetail() {
       <header className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <BookOpenCheck aria-hidden="true" className="size-5 text-primary" />
-          <Badge variant={lesson.status === "published" ? "default" : "secondary"}>{statusLabel(lesson.status)}</Badge>
-          <span className="text-sm text-muted-foreground">{subjectName(lesson.subject)}</span>
+          {editing ? (
+            <>
+              <Select
+                ariaLabel="课程状态"
+                value={draftStatus}
+                onValueChange={setDraftStatus}
+                options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
+              />
+              <Select
+                ariaLabel="所属学科"
+                value={draftSubject}
+                onValueChange={setDraftSubject}
+                options={[
+                  { value: "", label: "综合" },
+                  ...SUBJECTS.map((subject) => ({ value: subject.id, label: subject.name })),
+                ]}
+              />
+            </>
+          ) : (
+            <>
+              <Badge variant={lesson.status === "published" ? "default" : "secondary"}>{statusLabel(lesson.status)}</Badge>
+              <span className="text-sm text-muted-foreground">{subjectName(lesson.subject)}</span>
+            </>
+          )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {editing ? (
               <>
@@ -287,7 +325,18 @@ export default function LessonDetail() {
           </div>
         </div>
         {notice ? <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</p> : null}
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">{lesson.title}</h1>
+        {editing ? (
+          <label className="grid gap-1 text-sm font-medium">
+            课程标题
+            <Input
+              aria-label="课程标题"
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+            />
+          </label>
+        ) : (
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{lesson.title}</h1>
+        )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5"><FileText aria-hidden="true" className="size-4" />来源：{sourceLabel(lesson)}</span>
           {lesson.estimated_minutes ? <span className="inline-flex items-center gap-1.5"><Clock3 aria-hidden="true" className="size-4" />预计 {lesson.estimated_minutes} 分钟</span> : null}
