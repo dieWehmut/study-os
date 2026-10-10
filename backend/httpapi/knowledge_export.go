@@ -89,6 +89,18 @@ func handleKnowledgeExport(response http.ResponseWriter, request *http.Request, 
 		Scheduled: scheduledFilter,
 		Limit:     exportPageSize,
 	}
+	// 知识分组 is a filter the list can be narrowed by, and an export that ignored
+	// it would hand someone the whole library while they are looking at one group
+	// -- the same mistake the search box made until it was wired through.
+	groupID := strings.TrimSpace(request.URL.Query().Get("group"))
+	readPage := func(offset int) ([]models.KnowledgeItem, error) {
+		if groupID != "" {
+			groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Limit: exportPageSize, Offset: offset}
+			return application.Store.ListItemsByGroup(request.Context(), groupID, groupOptions)
+		}
+		options.Offset = offset
+		return application.Store.ListKnowledgeItems(request.Context(), options)
+	}
 
 	// The reader is about to save this, so it is not JSON and it is not rendered
 	// in a tab. The name carries the day: two exports in one afternoon are the
@@ -104,9 +116,11 @@ func handleKnowledgeExport(response http.ResponseWriter, request *http.Request, 
 		time.Now().UTC().Format("20060102"), extension,
 	))
 
-	// A CSV writer buffers, so a write error surfaces at the next write or at
-	// Flush; both are checked rather than ignored, and the answer is already
-	// partly sent by then, which is why nothing is written to the body on error.
+	// A CSV writer buffers and reports a bad line at the Write that produced it,
+	// which is what is checked below; a failure that only shows up when the buffer is
+	// pushed out cannot be reported at all -- the status and part of the file are
+	// already on the wire. Stopping there leaves a file that is visibly short, which
+	// is the most a streamed export can promise.
 	var writer *csv.Writer
 	if format == "csv" {
 		writer = csv.NewWriter(response)
@@ -117,8 +131,7 @@ func handleKnowledgeExport(response http.ResponseWriter, request *http.Request, 
 	encoder := json.NewEncoder(response)
 
 	for offset := 0; ; offset += exportPageSize {
-		options.Offset = offset
-		items, err := application.Store.ListKnowledgeItems(request.Context(), options)
+		items, err := readPage(offset)
 		if err != nil {
 			// Nothing useful can be said in the middle of a file; stop here and
 			// let the short file be visibly short.

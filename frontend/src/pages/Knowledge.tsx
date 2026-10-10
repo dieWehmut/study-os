@@ -262,6 +262,9 @@ function KnowledgePage({
       const text = await exportKnowledge({
         format: "csv",
         query: query.trim() || undefined,
+        // Every filter the list is narrowed by, 知识分组 included: an export that
+        // ignored one would hand over the whole library from inside a group view.
+        group: group || undefined,
         subject: subject === "all" ? undefined : subject,
         tag: tag || undefined,
         scheduled: scheduled || undefined,

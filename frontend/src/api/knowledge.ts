@@ -63,15 +63,17 @@ export function getKnowledge(id: string): Promise<KnowledgeItem> {
  * expects. The same filters as the list, so what leaves matches what is on screen.
  */
 export async function exportKnowledge(
-  options: { format?: "csv" | "jsonl"; query?: string; subject?: string; tag?: string; scheduled?: "yes" | "no" } = {},
+  options: { format?: "csv" | "jsonl"; query?: string; group?: string; subject?: string; tag?: string; scheduled?: "yes" | "no" } = {},
 ): Promise<string> {
   const params = new URLSearchParams({ format: options.format ?? "csv" })
   if (options.query) params.set("q", options.query)
+  if (options.group) params.set("group", options.group)
   if (options.subject) params.set("subject", options.subject)
   if (options.tag) params.set("tag", options.tag)
   if (options.scheduled) params.set("scheduled", options.scheduled)
-  // apiRequestText rather than a bare fetch: the desktop shell authenticates with
-  // a token, and a request built from resolveApiBase alone arrives without it.
+  // apiRequestText, so this shares the client's one file-request path: the error
+  // envelope is unwrapped, the desktop token travels with it, and the demo build
+  // refuses here instead of at the button.
   return apiRequestText(`/knowledge/export?${params.toString()}`)
 }
 

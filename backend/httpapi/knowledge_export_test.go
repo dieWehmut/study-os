@@ -12,6 +12,7 @@ import (
 
 	"study-os/backend/app"
 	"study-os/backend/config"
+	"study-os/backend/db"
 	"study-os/backend/httpapi"
 	"study-os/backend/models"
 )
@@ -114,5 +115,24 @@ func TestKnowledgeExportNarrowsWithTheListFilters(t *testing.T) {
 	}
 	if badScheduled := exportRequest(t, router, "?scheduled=maybe"); badScheduled.Code != http.StatusBadRequest {
 		t.Fatalf("bad scheduled = %d", badScheduled.Code)
+	}
+
+	// 知识分组 narrows the list, so it has to narrow the file: an export taken
+	// from inside a group view used to contain the whole library.
+	group := models.KnowledgeGroup{
+		ID: "group-mechanics", Name: "力学", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := application.Store.CreateKnowledgeGroup(context.Background(), group); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if err := application.Store.WithTx(context.Background(), func(tx *db.TxStore) error {
+		_, err := tx.LinkKnowledgeItemsToGroup(context.Background(), []string{"k-velocity"}, group.ID)
+		return err
+	}); err != nil {
+		t.Fatalf("link item to group: %v", err)
+	}
+	inGroup := exportRequest(t, router, "?group=group-mechanics")
+	if !strings.Contains(inGroup.Body.String(), "velocity") || strings.Contains(inGroup.Body.String(), "abandon") {
+		t.Fatalf("group filter leaked: %s", inGroup.Body.String())
 	}
 }
