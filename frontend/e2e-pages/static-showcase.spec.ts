@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test"
 
+// Reading the clipboard back is the only way to check what a 复制链接 button really
+// put there; the page itself needs the permission for that.
+test.use({ permissions: ["clipboard-read", "clipboard-write"] })
+
 test("renders deep links from static fixtures without a backend", async ({ page }) => {
   const apiRequests: string[] = []
   const runtimeErrors: string[] = []
@@ -87,6 +91,19 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   await expect(page.getByRole("button", { name: "\u7acb\u5373\u5907\u4efd" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "\u6821\u9a8c" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "\u4e0b\u8f7d", exact: true })).toHaveCount(0)
+
+  // Copying a link is client-side and works here -- and this build keeps the route
+  // inside the hash, which is the branch a link written from window.location gets
+  // wrong: it would land on the site root with the item missing.
+  await page.goto("#/knowledge")
+  await expect(page.locator("main")).toBeVisible()
+  const copyLink = page.getByRole("button", { name: "\u590d\u5236\u94fe\u63a5" }).first()
+  await expect(copyLink).toBeVisible()
+  await copyLink.click()
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  console.log("DEMO COPIED", copied)
+  expect(copied).toContain("#/knowledge?item=")
+  expect(copied).not.toMatch(/\/#?knowledge\?item=.*#\/knowledge/)
 
   // The course export is pure client-side, so it works here too.
   await page.goto("#/lessons/lesson-newton")
