@@ -11,8 +11,7 @@ import (
 	"study-os/backend/models"
 )
 
-// startWith creates and closes an application over one data directory, returning
-// the store's view of a term. Closing first is what a restart looks like.
+// How many items the store holds, which is what a restore visibly changes.
 func itemCount(t *testing.T, application *App) int {
 	t.Helper()
 	items, err := application.Store.ListKnowledgeItems(context.Background(), models.KnowledgeListOptions{})
@@ -22,12 +21,25 @@ func itemCount(t *testing.T, application *App) int {
 	return len(items)
 }
 
+// restoreConfig is spelled out in full on purpose. A config with a field missing
+// makes app.New load the ambient configuration (and its .env), which points at a
+// shared data directory -- and a test that writes there is not a test: the second
+// run collided with the first on the item id, which is how this was noticed.
+func restoreConfig(dataDir string) config.Config {
+	return config.Config{
+		ListenAddress:  "127.0.0.1:0",
+		DataDir:        dataDir,
+		DBPath:         filepath.Join(dataDir, "study.db"),
+		ActiveProvider: "mock",
+	}
+}
+
 // The restore happens at the only moment nobody holds the database: before it is
 // opened. This is that moment.
 func TestNewAppliesAPendingRestoreBeforeOpening(t *testing.T) {
 	dataDir := t.TempDir()
 	ctx := context.Background()
-	cfg := config.Config{DataDir: dataDir}
+	cfg := restoreConfig(dataDir)
 
 	first, err := New(ctx, Options{Config: cfg})
 	if err != nil {
@@ -82,7 +94,7 @@ func TestNewAppliesAPendingRestoreBeforeOpening(t *testing.T) {
 func TestNewStartsAnywayWhenTheRequestedBackupIsUnusable(t *testing.T) {
 	dataDir := t.TempDir()
 	ctx := context.Background()
-	cfg := config.Config{DataDir: dataDir}
+	cfg := restoreConfig(dataDir)
 
 	broken := filepath.Join(dataDir, "broken.db")
 	if err := os.WriteFile(broken, []byte("SQLite format 3\x00truncated"), 0o600); err != nil {
