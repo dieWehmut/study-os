@@ -317,5 +317,82 @@ func (s *Store) ListLessons(ctx context.Context, options models.LessonListOption
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if err := s.attachPracticeQuestionCounts(ctx, items); err != nil {
+		return nil, err
+	}
 	return items, nil
+}
+
+// attachPracticeQuestionCounts fills in how many questions each lesson asks.
+//
+// One query for the page, not one per lesson: the count is the reader's answer to
+// "how much practice is in here", and a local app that hits its own database
+// fifty times to draw one list is still fifty queries.
+func (s *Store) attachPracticeQuestionCounts(ctx context.Context, items []models.LessonSummary) error {
+	if len(items) == 0 {
+		return nil
+	}
+	ids := make([]any, 0, len(items))
+	placeholders := make([]string, 0, len(items))
+	index := make(map[string]int, len(items))
+	for position, item := range items {
+		ids = append(ids, item.ID)
+		placeholders = append(placeholders, "?")
+		index[item.ID] = position
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT v.lesson_id, v.document_json
+		FROM lesson_versions v
+		JOIN lessons l ON l.id = v.lesson_id AND l.current_version = v.version
+		WHERE v.lesson_id IN (`+strings.Join(placeholders, ", ")+`)`, ids...)
+	if err != nil {
+		return fmt.Errorf("read lesson documents for practice counts: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var lessonID, documentJSON string
+		if err := rows.Scan(&lessonID, &documentJSON); err != nil {
+			return fmt.Errorf("scan lesson document: %w", err)
+		}
+		position, ok := index[lessonID]
+		if !ok {
+			continue
+		}
+		items[position].PracticeQuestions = practiceQuestionCount(documentJSON)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate lesson documents: %w", err)
+	}
+	return nil
+}
+
+// practiceQuestionCount reads the 即时练习 section of a stored document.
+//
+// A document that will not parse counts as zero rather than failing the list: the
+// reader is browsing titles, and one bad document must not empty the page.
+func practiceQuestionCount(documentJSON string) int {
+	var document models.LessonDocument
+	if err := json.Unmarshal([]byte(documentJSON), &document); err != nil {
+		return 0
+	}
+	for _, section := range document.Sections {
+		if strings.TrimSpace(section.Type) != "practice" {
+			continue
+		}
+		var content struct {
+			Question  string            `json:"question"`
+			Questions []json.RawMessage `json:"questions"`
+		}
+		if err := json.Unmarshal(section.Content, &content); err != nil {
+			return 0
+		}
+		if len(content.Questions) > 0 {
+			return len(content.Questions)
+		}
+		if strings.TrimSpace(content.Question) != "" {
+			return 1
+		}
+		return 0
+	}
+	return 0
 }

@@ -57,6 +57,8 @@ export interface Lesson {
   objectives?: string[]
   estimated_minutes?: number
   sections_count?: number
+  /** How many questions the 即时练习 section asks, on list rows. */
+  practice_questions?: number
   version?: number
   created_at?: string
   updated_at?: string
@@ -101,6 +103,7 @@ interface RawLesson {
   objectives?: unknown
   estimated_minutes?: unknown
   sections_count?: unknown
+  practice_questions?: unknown
   version?: unknown
   created_at?: unknown
   updated_at?: unknown
@@ -160,6 +163,7 @@ export function normalizeLesson(value: unknown): Lesson {
   if (Array.isArray(raw.objectives)) lesson.objectives = raw.objectives.filter((item): item is string => typeof item === "string")
   if (typeof raw.estimated_minutes === "number") lesson.estimated_minutes = raw.estimated_minutes
   if (typeof raw.version === "number") lesson.version = raw.version
+  if (typeof raw.practice_questions === "number") lesson.practice_questions = raw.practice_questions
   if (typeof raw.created_at === "string") lesson.created_at = raw.created_at
   if (typeof raw.updated_at === "string") lesson.updated_at = raw.updated_at
   lesson.sections_count = typeof raw.sections_count === "number" ? raw.sections_count : sections.length

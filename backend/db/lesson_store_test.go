@@ -25,6 +25,60 @@ func openLessonStore(t *testing.T) (*db.Store, context.Context) {
 	return store, ctx
 }
 
+// The list is where a reader decides what to open, so it says how much practice a
+// lesson holds -- for both document shapes, without one query per lesson.
+func TestListLessonsCountsPracticeQuestions(t *testing.T) {
+	store, ctx := openLessonStore(t)
+
+	practice := func(content string) models.LessonDocument {
+		document := models.NewLessonDocument()
+		for index := range document.Sections {
+			if document.Sections[index].Type == "practice" {
+				document.Sections[index].Content = json.RawMessage(content)
+			}
+		}
+		return document
+	}
+	for _, lesson := range []models.Lesson{
+		{ID: "lesson-flat", Title: "一题", Document: practice(`{"question":"速度单位?","options":["m/s","N"]}`)},
+		{ID: "lesson-many", Title: "三题", Document: practice(`{"questions":[{"id":"q1","question":"a?"},{"id":"q2","question":"b?"},{"id":"q3","question":"c?"}]}`)},
+		{ID: "lesson-empty", Title: "没题", Document: practice(`{}`)},
+	} {
+		if err := store.CreateLesson(ctx, lesson); err != nil {
+			t.Fatalf("create %s: %v", lesson.ID, err)
+		}
+	}
+
+	items, err := store.ListLessons(ctx, models.LessonListOptions{})
+	if err != nil {
+		t.Fatalf("list lessons: %v", err)
+	}
+	counts := make(map[string]int, len(items))
+	for _, item := range items {
+		counts[item.ID] = item.PracticeQuestions
+	}
+	if counts["lesson-flat"] != 1 || counts["lesson-many"] != 3 || counts["lesson-empty"] != 0 {
+		t.Fatalf("practice counts = %#v, want flat 1 / many 3 / empty 0", counts)
+	}
+
+	// A lesson whose stored document cannot be read must not empty the list.
+	if _, err := store.SQL().ExecContext(ctx, `UPDATE lesson_versions SET document_json = 'not json' WHERE lesson_id = 'lesson-many'`); err != nil {
+		t.Fatalf("corrupt document: %v", err)
+	}
+	after, err := store.ListLessons(ctx, models.LessonListOptions{})
+	if err != nil {
+		t.Fatalf("list after corruption: %v", err)
+	}
+	if len(after) != 3 {
+		t.Fatalf("lessons after corruption = %d, want all three listed", len(after))
+	}
+	for _, item := range after {
+		if item.ID == "lesson-many" && item.PracticeQuestions != 0 {
+			t.Fatalf("corrupt document counted %d questions", item.PracticeQuestions)
+		}
+	}
+}
+
 func TestLessonCreateNormalizesTemplateAndPreservesSource(t *testing.T) {
 	store, ctx := openLessonStore(t)
 	lesson := models.Lesson{

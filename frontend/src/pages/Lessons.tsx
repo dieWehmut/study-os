@@ -315,6 +315,9 @@ export default function Lessons() {
               <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5"><FileText aria-hidden="true" className="size-3.5" />来源：{sourceLabel(lesson)}</span>
                 <span>{lesson.sections_count ?? lesson.sections.length} 个环节</span>
+                {/* How much practice is in here is part of deciding whether to open
+                    it; the section count alone does not say. */}
+                {lesson.practice_questions ? <span>{lesson.practice_questions} 道练习题</span> : null}
                 {lesson.estimated_minutes ? <span className="inline-flex items-center gap-1.5"><Clock3 aria-hidden="true" className="size-3.5" />约 {lesson.estimated_minutes} 分钟</span> : null}
                 <Link className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "ml-auto text-primary")} to={`/lessons/${encodeURIComponent(lesson.id)}`}>
                   查看预习<ArrowRight data-icon="inline-end" />

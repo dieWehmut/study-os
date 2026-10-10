@@ -370,15 +370,19 @@ type Lesson struct {
 // not need to download every section body. Details are available from GET by
 // id (or by the version query parameter).
 type LessonSummary struct {
-	ID             string    `json:"id"`
-	Subject        string    `json:"subject,omitempty"`
-	Title          string    `json:"title"`
-	SourceType     string    `json:"source_type,omitempty"`
-	SourceID       string    `json:"source_id,omitempty"`
-	Status         string    `json:"status"`
-	CurrentVersion int       `json:"version"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             string `json:"id"`
+	Subject        string `json:"subject,omitempty"`
+	Title          string `json:"title"`
+	SourceType     string `json:"source_type,omitempty"`
+	SourceID       string `json:"source_id,omitempty"`
+	Status         string `json:"status"`
+	CurrentVersion int    `json:"version"`
+	// PracticeQuestions is how many questions the 即时练习 section asks. The list is
+	// where a reader decides whether to open a lesson, and "how much practice" is
+	// part of that.
+	PracticeQuestions int       `json:"practice_questions,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // LessonVersion is an immutable document revision. The API exposes this shape

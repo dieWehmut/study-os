@@ -62,6 +62,23 @@ describe("lessons page", () => {
     expect(screen.getByText("已审核")).toBeInTheDocument()
   })
 
+  it("says how much practice a lesson holds before it is opened", async () => {
+    // The section count says nothing about practice, and that is part of deciding
+    // whether to open one.
+    mocks.listLessons.mockResolvedValue({ items: [{ ...lesson, practice_questions: 3 }], count: 1 })
+    renderPage()
+
+    expect(await screen.findByText("3 道练习题")).toBeInTheDocument()
+  })
+
+  it("stays quiet when a lesson holds no practice", async () => {
+    mocks.listLessons.mockResolvedValue({ items: [{ ...lesson, practice_questions: 0 }], count: 1 })
+    renderPage()
+
+    expect(await screen.findByRole("link", { name: /Newton's second law/ })).toBeInTheDocument()
+    expect(screen.queryByText(/道练习题/)).not.toBeInTheDocument()
+  })
+
   it("shows an actionable empty state", async () => {
     mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
     renderPage()
