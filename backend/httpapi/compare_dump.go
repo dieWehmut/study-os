@@ -87,7 +87,15 @@ func handleDump(response http.ResponseWriter, request *http.Request, application
 }
 
 func dumpTerm(text string) string {
-	runes := []rune(text)
+	// The first line is the name; what follows it is the prose the card should be
+	// asking *for*. Counting 40 runes across the line break dragged the opening of
+	// that prose into the term, so a note written as 问题 + 回答 produced a card
+	// whose question was the start of its own answer.
+	line := text
+	if index := strings.IndexByte(text, '\n'); index >= 0 {
+		line = text[:index]
+	}
+	runes := []rune(strings.TrimSpace(line))
 	if len(runes) > 40 {
 		runes = runes[:40]
 	}

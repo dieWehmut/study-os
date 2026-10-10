@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { QARecord } from "@/api/chat"
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   uploadChatAttachment: vi.fn(),
   getQARecord: vi.fn(),
   saveQARecord: vi.fn(),
+  dumpThought: vi.fn(),
   listKnowledge: vi.fn(),
   getKnowledge: vi.fn(),
   scheduleKnowledge: vi.fn(),
@@ -53,6 +55,7 @@ vi.mock("@/api/chat", () => ({
   uploadChatAttachment: mocks.uploadChatAttachment,
   getQARecord: mocks.getQARecord,
   saveQARecord: mocks.saveQARecord,
+  dumpThought: mocks.dumpThought,
 }))
 
 vi.mock("@/api/knowledge", () => ({
@@ -80,6 +83,7 @@ describe("Chat page", () => {
       scheduled: false,
     })
     mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k-1", prompt_count: 1 })
+    mocks.dumpThought.mockResolvedValue({ id: "dump-1", term: "导数是什么？" })
     mocks.listMistakes.mockResolvedValue([])
     mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
     mocks.sendChatMessage.mockResolvedValue({ session_id: "s1", message_id: "ai-1", status: "pending" })
@@ -260,6 +264,66 @@ describe("Chat page", () => {
     expect(await screen.findByText("学习记录")).toBeInTheDocument()
     expect(screen.getByRole("textbox", { name: "原本理解" })).toHaveValue("导数是什么？")
     expect(screen.getByRole("textbox", { name: "纠正后的模型" })).toHaveValue("导数是变化率。")
+  })
+
+  it("files the answer as a card, with the question as the prompt", async () => {
+    // An answer that never comes back is a conversation, not learning. The
+    // question leads so the library names the card by it -- an answer usually
+    // opens with 因为, which is a terrible thing to be asked.
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.dumpThought.mockResolvedValueOnce({ id: "dump-1", term: "导数是什么？" })
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    fireEvent.click(await screen.findByRole("button", { name: "收进知识库" }))
+
+    await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledTimes(1))
+    expect(mocks.dumpThought.mock.calls[0][0]).toBe("导数是什么？\n\n导数是变化率。")
+    // Filed *and* queued: the point is that it comes back tomorrow.
+    await waitFor(() => expect(mocks.scheduleKnowledge).toHaveBeenCalledWith("dump-1"))
+    expect(await screen.findByRole("button", { name: /已收进知识库/ })).toBeDisabled()
+    expect(screen.getByRole("link", { name: "去记忆" })).toHaveAttribute("href", "/memory")
+  })
+
+  it("says so when the answer cannot be filed", async () => {
+    mocks.listChatConversations.mockResolvedValueOnce({
+      items: [{ session_id: "s1", subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title: "导数", preview: "导数是变化率。" }],
+      count: 1,
+    })
+    mocks.listChatMessages.mockResolvedValueOnce({
+      items: [
+        { id: "u1", role: "user", content: "导数是什么？", status: "done", created_at: "2026-08-04T00:00:00Z" },
+        { id: "a1", role: "assistant", content: "导数是变化率。", status: "done", created_at: "2026-08-04T00:00:01Z" },
+      ],
+      count: 2,
+    })
+    mocks.dumpThought.mockRejectedValueOnce(new ApiError(500, "保存念头失败"))
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
+    fireEvent.click(await screen.findByRole("button", { name: "收进知识库" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("收进知识库失败：保存念头失败")
+    // Still clickable, because nothing was saved.
+    expect(screen.getByRole("button", { name: "收进知识库" })).toBeEnabled()
   })
 
   it("does not show the evidence panel for a pending or failed reply", async () => {

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowUp, MessageSquarePlus, Paperclip, Sparkles } from "lucide-react"
+import { ArrowUp, CheckCircle2, LibraryBig, MessageSquarePlus, Paperclip, Sparkles } from "lucide-react"
+import { Link } from "react-router-dom"
 
 import { ApiError } from "@/api/client"
 import { failureMessage } from "@/lib/errors"
 import {
+  dumpThought,
   getQARecord,
   listChatConversations,
   listChatMessages,
@@ -19,7 +21,7 @@ import { getKnowledge, listKnowledge, scheduleKnowledge } from "@/api/knowledge"
 import { listLessons } from "@/api/lessons"
 import { listMistakes } from "@/api/mistakes"
 import type { ChatMessage } from "@/api/types"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
@@ -82,6 +84,17 @@ function latestCompletedTurn(items: ChatMessage[]): CompletedTurn | null {
     return null
   }
   return null
+}
+
+/**
+ * The question and its answer as one note to remember.
+ *
+ * The question goes first and the answer under it: the library names an item by
+ * the opening of its text, so the card is asked by the question rather than by
+ * the first line of prose, which is where an answer usually opens with "因为".
+ */
+function answerNote(turn: CompletedTurn): string {
+  return `${turn.question.trim()}\n\n${turn.answer.trim()}`
 }
 
 export default function Chat() {
@@ -322,6 +335,31 @@ export default function Chat() {
     : ""
   const qaLoading = Boolean(qaKey && qaLoadedKey !== qaKey)
   const qaContextLoading = Boolean(qaKey && qaContextLoadedKey !== qaKey)
+
+  // 存进知识库: an answer is worth keeping only if it comes back. The same
+  // one-click path exists on a 阅读 section; here the question is the prompt and
+  // the answer is the model to recall.
+  const [intakeKey, setIntakeKey] = useState("")
+  const [intakePending, setIntakePending] = useState(false)
+  const [intakeError, setIntakeError] = useState("")
+
+  async function fileAnswer() {
+    if (!completedTurn || intakePending) return
+    const turn = completedTurn
+    setIntakePending(true)
+    setIntakeError("")
+    try {
+      const item = await dumpThought(answerNote(turn))
+      // Filing without queueing is a library you never look at again; this button
+      // is about the answer coming back tomorrow.
+      await scheduleKnowledge(item.id)
+      setIntakeKey(turn.id)
+    } catch (reason) {
+      setIntakeError(failureMessage(reason, "收进知识库失败"))
+    } finally {
+      setIntakePending(false)
+    }
+  }
 
   // 回流 can only act on what the server already holds: a saved record whose
   // link is a knowledge point. A 错题 or 课程 link has no review card behind it,
@@ -812,6 +850,52 @@ export default function Chat() {
               queueError={qaQueueForTarget?.error ?? ""}
               onSchedule={handleQASchedule}
             />
+          ) : null}
+
+          {/* The other way out of an answer: into 复习 rather than into a record.
+              Both are one click from here because neither is obviously the right
+              one -- a solved question is evidence, and a explained concept is a
+              card. */}
+          {activeSession && completedTurn ? (
+            <Card>
+              <CardHeader className="gap-1.5">
+                <CardTitle className="text-base">把这段回答收进知识库</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  问题作为题干、回答作为答案，并直接排进复习——明天它会作为一张卡回来。
+                </p>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-3">
+                <Button
+                  disabled={intakePending || intakeKey === completedTurn.id}
+                  onClick={() => void fileAnswer()}
+                >
+                  {intakeKey === completedTurn.id ? (
+                    <>
+                      <CheckCircle2 data-icon="inline-start" />已收进知识库
+                    </>
+                  ) : (
+                    <>
+                      <LibraryBig data-icon="inline-start" />{intakePending ? "正在保存…" : "收进知识库"}
+                    </>
+                  )}
+                </Button>
+                {intakeKey === completedTurn.id ? (
+                  <>
+                    <Link to="/memory" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                      去记忆
+                    </Link>
+                    <Link to="/knowledge" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                      去知识库
+                    </Link>
+                  </>
+                ) : null}
+                {intakeError ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {intakeError}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
           ) : null}
 
           <div className="grid gap-2">
