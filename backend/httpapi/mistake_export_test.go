@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -86,6 +87,15 @@ func TestMistakeExportWritesAReadableRow(t *testing.T) {
 	other := mistakeExport(t, router, "?subject=chemistry")
 	if lines := strings.Count(strings.TrimSpace(other.Body.String()), "\n"); lines != 0 {
 		t.Fatalf("chemistry export has %d data lines: %s", lines, other.Body.String())
+	}
+	// The search box narrows the list, so it has to narrow the file as well.
+	searched := mistakeExport(t, router, "?q="+url.QueryEscape("木块"))
+	if !strings.Contains(searched.Body.String(), "斜面上的木块受力") {
+		t.Fatalf("search dropped the matching row: %s", searched.Body.String())
+	}
+	missed := mistakeExport(t, router, "?q="+url.QueryEscape("电磁感应"))
+	if strings.Contains(missed.Body.String(), "斜面上的木块受力") {
+		t.Fatalf("search did not narrow the file: %s", missed.Body.String())
 	}
 }
 

@@ -80,7 +80,13 @@ func handleMistakeExport(response http.ResponseWriter, request *http.Request, ap
 	if err := writer.Write(mistakeExportColumns); err != nil {
 		return
 	}
-	options := models.MistakeListOptions{Subject: subject, Limit: exportPageSize}
+	options := models.MistakeListOptions{
+		Subject: subject,
+		// The search box narrows the list; the file has to mean the same thing as
+		// the list, or the reader exports "everything" while looking at three rows.
+		Query: strings.TrimSpace(request.URL.Query().Get("q")),
+		Limit: exportPageSize,
+	}
 	for offset := 0; ; offset += exportPageSize {
 		options.Offset = offset
 		mistakes, err := application.Store.ListMistakes(request.Context(), options)

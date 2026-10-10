@@ -123,9 +123,10 @@ export async function listMistakePage(
  * spreadsheet or handed to someone, and the columns are headings a person reads
  * (题干 / 错因 / 订正答案), not field names.
  */
-export async function exportMistakes(options: { subject?: string } = {}): Promise<string> {
+export async function exportMistakes(options: { subject?: string; query?: string } = {}): Promise<string> {
   const params = new URLSearchParams()
   if (options.subject) params.set("subject", options.subject)
+  if (options.query) params.set("q", options.query)
   const suffix = params.toString()
   const response = await fetch(`${resolveApiBase()}/mistakes/export${suffix ? `?${suffix}` : ""}`)
   if (!response.ok) {

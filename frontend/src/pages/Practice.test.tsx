@@ -985,7 +985,7 @@ describe("taking apart the 长难句 英语 keeps being told to look at structur
       render(<Practice />)
       fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
 
-      await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith({ subject: undefined }))
+      await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith({ subject: undefined, query: undefined }))
       expect(downloads[0]).toMatch(/错题.*\.csv$/)
       await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mistakes"))
     } finally {
