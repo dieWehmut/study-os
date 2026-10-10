@@ -1,14 +1,19 @@
 import { CircleHelp } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { Link } from "react-router-dom"
 
+import { dumpThought } from "@/api/chat"
 import {
   listLessonPracticeAttempts,
   submitLessonPracticeAttempt,
   type LessonPracticeAttempt,
 } from "@/api/lesson-practice"
+import { scheduleKnowledge } from "@/api/knowledge"
 import type { LessonSection } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { failureMessage } from "@/lib/errors"
+import { practiceNote } from "@/lib/practice-note"
 import { cn } from "@/lib/utils"
 
 interface PracticeContent {
@@ -246,6 +251,10 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
   const [submitted, setSubmitted] = useState(false)
   const [result, setResult] = useState<PracticeResult | null>(null)
   const [evidenceState, setEvidenceState] = useState<"idle" | "saving" | "saved" | "failed">("idle")
+  // 收进知识库: a wrong answer that only leaves an attempt behind is a mistake the
+  // reader will make again. Filing it puts the question back in front of them.
+  const [intakeState, setIntakeState] = useState<"idle" | "saving" | "saved">("idle")
+  const [intakeError, setIntakeError] = useState("")
   const [historyState, setHistoryState] = useState<PracticeHistoryState>(lessonID ? "loading" : "empty")
   const [historyCount, setHistoryCount] = useState(0)
   const [latestAttempt, setLatestAttempt] = useState<LessonPracticeAttempt | null>(null)
@@ -299,6 +308,8 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
     const optimisticResult = resultFor(content, selected)
     setResult(optimisticResult)
     setSubmitted(true)
+    setIntakeState("idle")
+    setIntakeError("")
     if (!lessonID) return
 
     setEvidenceState("saving")
@@ -321,6 +332,28 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
   const questionID = `${articleID}-question`
   const groupName = `${articleID}-options`
   const visibleResult = result ?? (!submitted && latestAttempt ? resultFromAttempt(latestAttempt) : null)
+
+  async function fileMistake() {
+    if (!content || selected === null || intakeState === "saving") return
+    setIntakeState("saving")
+    setIntakeError("")
+    try {
+      const item = await dumpThought(
+        practiceNote({
+          question: content.question,
+          answerLabel: content.answerLabel,
+          picked: content.options[selected] ?? "",
+          explanation: content.explanation,
+        }),
+      )
+      // Queued as well as filed: a mistake that never comes back is just a record.
+      await scheduleKnowledge(item.id)
+      setIntakeState("saved")
+    } catch (reason) {
+      setIntakeState("idle")
+      setIntakeError(failureMessage(reason, "收进知识库失败"))
+    }
+  }
 
   return (
     <article
@@ -398,6 +431,39 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
               <p className="leading-6">{visibleResult.feedback}</p>
               {visibleResult.referenceAnswer ? (
                 <p className="text-muted-foreground">参考答案：{visibleResult.referenceAnswer}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {/* Only after a wrong answer: a card for something already known is
+              noise in the queue. */}
+          {submitted && visibleResult?.kind === "incorrect" ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">
+                收进知识库会把这道题作为卡片排进复习——答错的题，明天再问一次。
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={intakeState === "saving" || intakeState === "saved"}
+                onClick={() => void fileMistake()}
+              >
+                {intakeState === "saved" ? "已收进知识库" : intakeState === "saving" ? "正在保存…" : "收进知识库"}
+              </Button>
+              {intakeState === "saved" ? (
+                <>
+                  <Link to="/memory" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    去记忆
+                  </Link>
+                  <Link to="/knowledge" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    去知识库
+                  </Link>
+                </>
+              ) : null}
+              {intakeError ? (
+                <p role="alert" className="text-xs text-destructive">
+                  {intakeError}
+                </p>
               ) : null}
             </div>
           ) : null}

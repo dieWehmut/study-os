@@ -1,18 +1,24 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { ApiError } from "@/api/client"
 import type { LessonSection } from "@/api/lessons"
 import LessonPractice from "./LessonPractice"
 
 const mocks = vi.hoisted(() => ({
   submitLessonPracticeAttempt: vi.fn(),
   listLessonPracticeAttempts: vi.fn(),
+  dumpThought: vi.fn(),
+  scheduleKnowledge: vi.fn(),
 }))
 
 vi.mock("@/api/lesson-practice", () => ({
   submitLessonPracticeAttempt: mocks.submitLessonPracticeAttempt,
   listLessonPracticeAttempts: mocks.listLessonPracticeAttempts,
 }))
+vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
+vi.mock("@/api/knowledge", () => ({ scheduleKnowledge: mocks.scheduleKnowledge }))
 
 function renderPractice(content: unknown, overrides: Partial<LessonSection> = {}, lessonID?: string) {
   const section: LessonSection = {
@@ -22,14 +28,22 @@ function renderPractice(content: unknown, overrides: Partial<LessonSection> = {}
     content,
     ...overrides,
   }
-  return render(<LessonPractice lessonID={lessonID} section={section} />)
+  return render(
+    <MemoryRouter>
+      <LessonPractice lessonID={lessonID} section={section} />
+    </MemoryRouter>,
+  )
 }
 
 describe("LessonPractice", () => {
   beforeEach(() => {
     mocks.submitLessonPracticeAttempt.mockReset()
     mocks.listLessonPracticeAttempts.mockReset()
+    mocks.dumpThought.mockReset()
+    mocks.scheduleKnowledge.mockReset()
     mocks.listLessonPracticeAttempts.mockResolvedValue({ count: 0, items: [] })
+    mocks.dumpThought.mockResolvedValue({ id: "dump-1", term: "水的沸点是多少？" })
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "dump-1", prompt_count: 3 })
   })
 
   it("lets a learner choose and submit a structured question", () => {
@@ -175,5 +189,68 @@ describe("LessonPractice", () => {
     const submit = screen.getByRole("button", { name: "提交答案" })
     fireEvent.click(screen.getByRole("radio", { name: "4" }))
     expect(submit).toBeEnabled()
+  })
+
+  it("files a wrong answer as a card, question first", async () => {
+    // A wrong answer that leaves only an attempt behind is a mistake the reader
+    // will make again; the card puts the same question back in front of them.
+    mocks.submitLessonPracticeAttempt.mockResolvedValue({
+      id: "lesson-attempt-2",
+      lesson_id: "lesson-1",
+      section_id: "practice-1",
+      answer: "90 °C",
+      evaluation: "incorrect",
+      reference_answer: "100 °C",
+      feedback: "再查一下标准大气压下的沸点。",
+      elapsed_ms: 20,
+      created_at: "2026-08-20T00:00:01Z",
+    })
+    renderPractice(
+      {
+        question: "水的沸点在标准大气压下是多少？",
+        options: ["90 °C", "100 °C"],
+        correct_answer: "100 °C",
+        explanation: "标准大气压下，水在 100 °C 沸腾。",
+      },
+      {},
+      "lesson-1",
+    )
+
+    fireEvent.click(screen.getByRole("radio", { name: "90 °C" }))
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+    fireEvent.click(await screen.findByRole("button", { name: "收进知识库" }))
+
+    await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledTimes(1))
+    const note = mocks.dumpThought.mock.calls[0][0] as string
+    expect(note.split("\n")[0]).toBe("水的沸点在标准大气压下是多少？")
+    expect(note).toContain("正确答案：100 °C")
+    expect(note).toContain("当时选的：90 °C")
+    expect(note).toContain("解析：标准大气压下，水在 100 °C 沸腾。")
+    await waitFor(() => expect(mocks.scheduleKnowledge).toHaveBeenCalledWith("dump-1"))
+    expect(screen.getByRole("button", { name: "已收进知识库" })).toBeDisabled()
+    expect(screen.getByRole("link", { name: "去记忆" })).toHaveAttribute("href", "/memory")
+  })
+
+  it("offers nothing to file when the answer was right", () => {
+    renderPractice({ question: "2 + 2 = ?", options: ["3", "4"], correct_answer: "4" }, {}, "lesson-1")
+
+    fireEvent.click(screen.getByRole("radio", { name: "4" }))
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+
+    expect(screen.getByRole("status")).toHaveTextContent("回答正确")
+    expect(screen.queryByRole("button", { name: "收进知识库" })).not.toBeInTheDocument()
+  })
+
+  it("says so when the wrong answer cannot be filed, and stays clickable", async () => {
+    mocks.dumpThought.mockRejectedValueOnce(new ApiError(500, "保存念头失败"))
+    renderPractice({ question: "2 + 2 = ?", options: ["3", "4"], correct_answer: "4" }, {}, "lesson-1")
+
+    fireEvent.click(screen.getByRole("radio", { name: "3" }))
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+    fireEvent.click(await screen.findByRole("button", { name: "收进知识库" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("收进知识库失败：保存念头失败")
+    expect(screen.getByRole("button", { name: "收进知识库" })).toBeEnabled()
+    expect(mocks.scheduleKnowledge).not.toHaveBeenCalled()
   })
 })
