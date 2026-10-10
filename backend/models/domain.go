@@ -597,6 +597,11 @@ func NormalizeLessonDocument(document LessonDocument) (LessonDocument, error) {
 		} else if !json.Valid(section.Content) {
 			return LessonDocument{}, fmt.Errorf("lesson section %q content is not valid JSON", section.Type)
 		}
+		if section.Type == "practice" {
+			if err := validatePracticeQuestions(section.Content); err != nil {
+				return LessonDocument{}, err
+			}
+		}
 		provided[section.Type] = section
 	}
 	// Canonical ordering also makes a partial update safe: omitted sections are
@@ -617,6 +622,68 @@ func NormalizeLessonDocument(document LessonDocument) (LessonDocument, error) {
 		normalized.Sections[position] = section
 	}
 	return normalized, nil
+}
+
+// MaxLessonPracticeQuestions is the cap on how many questions one 即时练习 section
+// may hold. A lesson is one sitting, and a refusal that names the limit is better
+// than a document that quietly holds two hundred.
+const MaxLessonPracticeQuestions = 20
+
+// validatePracticeQuestions checks the `questions` shape of a practice section.
+//
+// Deliberately quiet about everything the single-question shape already allowed:
+// a section with no `questions` is simply the one-question document, and a
+// question's own fields are the reader's business, not the store's. What it
+// refuses is what would break later -- more questions than a sitting can hold, and
+// two questions claiming the same id, which would merge their answers.
+func validatePracticeQuestions(content json.RawMessage) error {
+	if len(content) == 0 {
+		return nil
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(content, &raw); err != nil {
+		// Not an object: the section is text or something else this layer does not
+		// judge. Reading it is the practice route's problem.
+		return nil
+	}
+	items, ok := raw["questions"]
+	if !ok || items == nil {
+		return nil
+	}
+	list, ok := items.([]any)
+	if !ok {
+		return errors.New("lesson practice questions must be a list")
+	}
+	if len(list) > MaxLessonPracticeQuestions {
+		return fmt.Errorf("lesson practice section holds at most %d questions", MaxLessonPracticeQuestions)
+	}
+	seen := make(map[string]struct{}, len(list))
+	for index, item := range list {
+		question, ok := item.(map[string]any)
+		if !ok {
+			return fmt.Errorf("lesson practice question %d must be an object", index+1)
+		}
+		stem := ""
+		for _, key := range []string{"question", "stem", "prompt"} {
+			if text, ok := question[key].(string); ok && strings.TrimSpace(text) != "" {
+				stem = strings.TrimSpace(text)
+				break
+			}
+		}
+		if stem == "" {
+			return fmt.Errorf("lesson practice question %d has no text", index+1)
+		}
+		id, _ := question["id"].(string)
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, duplicate := seen[id]; duplicate {
+			return fmt.Errorf("lesson practice question id %q appears twice", id)
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
 }
 
 func lessonSectionDefinition(sectionType string) (struct {
