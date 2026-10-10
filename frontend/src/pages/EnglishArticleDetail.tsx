@@ -16,7 +16,7 @@ import { exportArticlePdf } from "@/features/english-articles/export-pdf"
 import { articleSectionID, sectionHash } from "@/features/english-articles/article-sections"
 import { useArticleSectionRoute } from "@/features/english-articles/useArticleSectionRoute"
 import { saveTextFile } from "@/lib/download"
-import { routerMode } from "@/lib/runtime"
+import { appUrlWithHash, copyUrl } from "@/lib/link"
 import { cn } from "@/lib/utils"
 
 function metadata(article: EnglishArticle) {
@@ -142,17 +142,13 @@ export default function EnglishArticleDetail() {
    * the section onto the site root.
    */
   async function copySectionLink(sectionID: string) {
-    const path = `${routeLocation.pathname}${routeLocation.search}`
-    const url = routerMode() === "hash"
-      ? `${window.location.origin}${window.location.pathname}#${path}${sectionHash(sectionID)}`
-      : `${window.location.origin}${path}${sectionHash(sectionID)}`
-    try {
-      await navigator.clipboard.writeText(url)
-      setLinkCopied(sectionID)
-      window.setTimeout(() => setLinkCopied((current) => (current === sectionID ? "" : current)), 1500)
-    } catch {
+    const url = appUrlWithHash(routeLocation.pathname, routeLocation.search, sectionHash(sectionID))
+    if (!(await copyUrl(url))) {
       setError("复制链接失败，请从地址栏复制。")
+      return
     }
+    setLinkCopied(sectionID)
+    window.setTimeout(() => setLinkCopied((current) => (current === sectionID ? "" : current)), 1500)
   }
 
   if (loading) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
-import { Download, GitCompareArrows, LibraryBig, RotateCcw, Search } from "lucide-react"
-import { useSearchParams } from "react-router-dom"
+import { Download, GitCompareArrows, LibraryBig, Link2, RotateCcw, Search } from "lucide-react"
+import { useLocation, useSearchParams } from "react-router-dom"
 
 import { compareKnowledge } from "@/api/chat"
 import { exportKnowledge, getKnowledge, listGroups, listKnowledge, type KnowledgeGroup } from "@/api/knowledge"
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
+import { appUrl, copyUrl } from "@/lib/link"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
@@ -82,9 +83,30 @@ function KnowledgePage({
   const [comparing, setComparing] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState("")
+  // Which item's link was just copied, so the button can say so and then stop.
+  const [linkCopied, setLinkCopied] = useState("")
   const subject = useSubjectStore((state) => state.subject)
   const setSubject = useSubjectStore((state) => state.setSubject)
   const selectedId = requestedId ?? fallbackSelectedId
+  const routeLocation = useLocation()
+
+  /**
+   * Copy the address of the item on screen.
+   *
+   * The page already opens on `?item=`, so this is the link a reader can hand to
+   * someone or keep. Composed from the route, not from the address bar: from the
+   * Pages build, whose route lives in the hash, `window.location` would drop it.
+   */
+  async function copyItemLink(id: string) {
+    if (!id) return
+    const copied = await copyUrl(appUrl(routeLocation.pathname, `?item=${encodeURIComponent(id)}`))
+    if (!copied) {
+      setError("复制链接失败，请从地址栏复制。")
+      return
+    }
+    setLinkCopied(id)
+    window.setTimeout(() => setLinkCopied((current) => (current === id ? "" : current)), 1500)
+  }
 
   /** The filters in hand, as the request they become -- one page at `offset`. */
   const listOptions = useCallback((offset: number): Parameters<typeof listKnowledge>[0] => {
@@ -441,6 +463,21 @@ function KnowledgePage({
             <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/35 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               <span>{error}</span>
               <Button variant="outline" size="sm" onClick={retry}><RotateCcw data-icon="inline-start" />重试</Button>
+            </div>
+          ) : null}
+          {/* The detail panel is where a link is worth having: the page opens on
+              `?item=`, so this is the address of what is on screen. */}
+          {selected?.id ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void copyItemLink(selected.id)}
+              >
+                <Link2 data-icon="inline-start" />
+                {linkCopied === selected.id ? "已复制链接" : "复制链接"}
+              </Button>
             </div>
           ) : null}
           <div className="grid gap-4 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">

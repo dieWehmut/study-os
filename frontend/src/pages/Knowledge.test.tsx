@@ -101,6 +101,22 @@ describe("Knowledge page", () => {
     expect(await screen.findByText("To leave something behind.")).toBeInTheDocument()
   })
 
+  it("copies the address of the item on screen", async () => {
+    // The page opens on ?item=, so this is the link a reader can keep.
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    render(<Knowledge />)
+    await screen.findByRole("heading", { name: "abandon" })
+
+    fireEvent.click(screen.getByRole("button", { name: /复制链接/ }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0]).toContain("/knowledge?item=k1")
+
+    // And it says so, rather than leaving the reader wondering if it worked.
+    expect(await screen.findByRole("button", { name: /已复制链接/ })).toBeInTheDocument()
+  })
+
   it("opens an item requested by the query even when the current list omits it", async () => {
     mocks.listKnowledge.mockResolvedValueOnce({ count: 0, items: [] })
     mocks.getKnowledge.mockResolvedValueOnce({

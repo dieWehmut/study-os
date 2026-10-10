@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   saveTextFile: vi.fn(),
   // The Pages build keeps the route inside the hash; the page composes the copied
   // link differently there, and that branch is worth pinning.
-  routerMode: vi.fn(() => "browser" as const),
+  routerMode: vi.fn((): "browser" | "hash" => "browser"),
 }))
 
 vi.mock("@/api/english-articles", () => mocks)
