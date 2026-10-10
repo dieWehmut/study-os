@@ -53,11 +53,8 @@ import {
 } from "@/lib/mistakes"
 import { summarizeMistakeDiagnostics } from "@/lib/mistake-diagnostics"
 import { saveTextFile } from "@/lib/download"
+import { failureMessage } from "@/lib/errors"
 import { useSubjectStore } from "@/store/useSubjectStore"
-
-function describe(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
 
 function taxonomySpecs(causes: ErrorCause[]): MistakeCauseSpec[] {
   return mergeMistakeCauses(
@@ -284,7 +281,7 @@ export default function Practice() {
         setDiagnosticRecords((current) => [...result.carried, ...current])
       })
       .catch((failure: unknown) => {
-        if (active) setError(describe(failure, "读取错题失败"))
+        if (active) setError(failureMessage(failure, "读取错题失败"))
       })
     return () => {
       active = false
@@ -328,7 +325,7 @@ export default function Practice() {
       setError("")
       setFiledNotice(filed.question)
     } catch (failure) {
-      setError(describe(failure, "记录错题失败"))
+      setError(failureMessage(failure, "记录错题失败"))
     } finally {
       setBusy(false)
     }
@@ -387,7 +384,7 @@ export default function Practice() {
       const text = await exportMistakes({ subject: subject === "all" ? undefined : subject })
       saveTextFile(text, `study-os-错题-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8")
     } catch (failure) {
-      setExportError(describe(failure, "导出错题失败"))
+      setExportError(failureMessage(failure, "导出错题失败"))
     } finally {
       setExporting(false)
     }
@@ -412,7 +409,7 @@ export default function Practice() {
       if (evidenceID === id) setEvidenceID("")
       setError("")
     } catch (failure) {
-      setError(describe(failure, "删除错题失败"))
+      setError(failureMessage(failure, "删除错题失败"))
     }
   }
 
@@ -441,7 +438,7 @@ export default function Practice() {
       )
       setRowError("")
     } catch (failure) {
-      setRowError(describe(failure, "排进复习失败"))
+      setRowError(failureMessage(failure, "排进复习失败"))
     } finally {
       setQueueing("")
     }
@@ -505,7 +502,7 @@ export default function Practice() {
       setCorrectionStartedAt(null)
       setRowError("")
     } catch (failure) {
-      setRowError(describe(failure, "订正失败"))
+      setRowError(failureMessage(failure, "订正失败"))
     } finally {
       setCorrecting("")
     }

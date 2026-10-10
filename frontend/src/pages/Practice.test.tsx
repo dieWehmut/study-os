@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { ApiError } from "@/api/client"
 import Practice from "./Practice"
 import { mistakesStorageKey } from "@/lib/mistakes"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -324,6 +325,22 @@ describe("Practice page", () => {
     expect(await screen.findByText(/网络断了/)).toBeInTheDocument()
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument()
     expect(screen.getByLabelText("错题")).toHaveValue("写不进去的题")
+  })
+
+  it("shows the server's own reason rather than a guess about the backend", async () => {
+    // 记录错题失败 is the same sentence either way; what differs is whether the
+    // server answered. Asking the reader to check a backend that just replied
+    // would be false, and it hides the reason the server sent.
+    mocks.recordMistake.mockRejectedValueOnce(new ApiError(500, "保存错题失败"))
+    render(<Practice />)
+    await screen.findByText(/还没有记录/)
+
+    fireEvent.change(screen.getByLabelText("错题"), { target: { value: "写不进去的题" } })
+    fireEvent.click(screen.getByRole("button", { name: "看错题" }))
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("记录错题失败：保存错题失败")
+    expect(alert).not.toHaveTextContent("请确认本地后端正在运行")
   })
 
   it("carries a log left in the browser into the database, once", async () => {
