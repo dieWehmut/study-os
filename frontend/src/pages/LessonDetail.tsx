@@ -20,12 +20,16 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import {
   isEditableSection,
+  practiceContentFromDraft,
+  practiceDraftFromSection,
+  practiceOptions,
   sectionContentFromText,
   sectionContentKind,
   sectionEditorText,
   sectionHasContent,
   sectionItems,
   sectionText,
+  type LessonPracticeDraft,
 } from "@/lib/lesson-content"
 import { changedSections, compareLessonSections, describeChange, type LessonSectionDiff } from "@/lib/lesson-diff"
 import { subjectName, SUBJECTS } from "@/lib/subjects"
@@ -180,6 +184,97 @@ function SectionView({
   )
 }
 
+/**
+ * 即时练习 as fields.
+ *
+ * The answer key is a select over the options, not a text box: a key that matches
+ * no option grades every attempt wrong while looking finished. A question with no
+ * key is allowed -- the server marks those 未评分 rather than pretending.
+ */
+function PracticeSectionEditor({
+  section,
+  draft,
+  onChange,
+}: {
+  section: LessonSection
+  draft: LessonPracticeDraft
+  onChange: (draft: LessonPracticeDraft) => void
+}) {
+  const options = practiceOptions(draft)
+  const field = "min-h-24 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm leading-6 outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
+  return (
+    <article data-section-kind="practice" className="grid gap-3 rounded-xl border border-primary/35 bg-card p-4 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <CircleHelp aria-hidden="true" className="size-4 text-primary" />
+        <h2 className="font-heading text-lg font-semibold">{section.title || "即时练习"}</h2>
+        {section.required ? <Badge variant="outline">必看</Badge> : null}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {options.length > 0 ? `${options.length} 个选项` : "一行一个选项"}
+        </span>
+      </div>
+
+      <label className="grid gap-1 text-sm font-medium">
+        题干
+        <textarea
+          aria-label="练习题干"
+          value={draft.question}
+          onChange={(event) => onChange({ ...draft, question: event.target.value })}
+          placeholder="若 m = 4 kg、a = 2 m/s²，F 是多少？"
+          className={field}
+        />
+      </label>
+
+      <label className="grid gap-1 text-sm font-medium">
+        选项（一行一个）
+        <textarea
+          aria-label="练习选项"
+          value={draft.optionsText}
+          onChange={(event) => {
+            const optionsText = event.target.value
+            // Retyping the options can leave the key naming nothing: drop it and
+            // say so, rather than saving a key that cannot be matched.
+            const stillThere = optionsText.split("\n").map((line) => line.trim()).includes(draft.correctAnswer)
+            onChange({ ...draft, optionsText, correctAnswer: stillThere ? draft.correctAnswer : "" })
+          }}
+          placeholder={"2 N\n6 N\n8 N"}
+          className={field}
+        />
+      </label>
+
+      <div className="grid gap-1 text-sm font-medium">
+        标准答案
+        {options.length === 0 ? (
+          <p className="text-xs text-muted-foreground">先写上选项，才能选标准答案。</p>
+        ) : (
+          <Select
+            ariaLabel="练习标准答案"
+            value={draft.correctAnswer}
+            onValueChange={(value) => onChange({ ...draft, correctAnswer: value })}
+            options={[
+              { value: "", label: "未评分（不给答案）" },
+              ...options.map((option) => ({ value: option, label: option })),
+            ]}
+          />
+        )}
+        {options.length > 0 && draft.correctAnswer === "" ? (
+          <p className="text-xs text-muted-foreground">不给答案时，这门课的练习会按「未评分」处理。</p>
+        ) : null}
+      </div>
+
+      <label className="grid gap-1 text-sm font-medium">
+        解析（可选）
+        <textarea
+          aria-label="练习解析"
+          value={draft.explanation}
+          onChange={(event) => onChange({ ...draft, explanation: event.target.value })}
+          placeholder="F = ma，所以 8 N。"
+          className={field}
+        />
+      </label>
+    </article>
+  )
+}
+
 export default function LessonDetail() {
   const { id = "" } = useParams()
   const [lesson, setLesson] = useState<Lesson | null>(null)
@@ -188,6 +283,7 @@ export default function LessonDetail() {
   const [requestVersion, setRequestVersion] = useState(0)
   const [editing, setEditing] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [practiceDrafts, setPracticeDrafts] = useState<Record<string, LessonPracticeDraft>>({})
   const [draftTitle, setDraftTitle] = useState("")
   const [draftStatus, setDraftStatus] = useState("draft")
   const [draftSubject, setDraftSubject] = useState("")
@@ -281,6 +377,13 @@ export default function LessonDetail() {
     setDrafts(Object.fromEntries(
       lesson.sections.map((section) => [section.id, sectionEditorText(section)]),
     ))
+    setPracticeDrafts(Object.fromEntries(
+      lesson.sections
+        // Only the template's own practice section: a quiz-typed section may hold
+        // content this editor does not understand, and rewriting it would lose it.
+        .filter((section) => sectionType(section) === "practice")
+        .map((section) => [section.id, practiceDraftFromSection(section)]),
+    ))
     // The title and the filing of the lesson are as editable as its sections: a
     // course made from a note arrives called 整合笔记, and 草稿 until someone
     // says otherwise.
@@ -294,6 +397,7 @@ export default function LessonDetail() {
   function cancelEditing() {
     setEditing(false)
     setDrafts({})
+    setPracticeDrafts({})
     setNotice("")
   }
 
@@ -310,11 +414,15 @@ export default function LessonDetail() {
     setSaving(true)
     setNotice("")
     try {
-      const sections = lesson.sections.map((section) => (
-        drafts[section.id] !== undefined && isEditableSection(section)
+      const sections = lesson.sections.map((section) => {
+        const practice = practiceDrafts[section.id]
+        if (practice && sectionType(section) === "practice") {
+          return { ...section, content: practiceContentFromDraft(practice) }
+        }
+        return drafts[section.id] !== undefined && isEditableSection(section)
           ? { ...section, content: sectionContentFromText(section, drafts[section.id]) }
           : section
-      ))
+      })
       const updated = await updateLesson(lesson.id, {
         version: lesson.version ?? 1,
         // The title is trimmed, and an empty one is refused rather than saved:
@@ -328,6 +436,7 @@ export default function LessonDetail() {
       setCurrentVersion(updated.version ?? 0)
       setEditing(false)
       setDrafts({})
+      setPracticeDrafts({})
       setNotice(updated.version ? `已保存 · 版本 ${updated.version}` : "已保存")
       // Only when the history is already on screen: saving should not pop it open.
       if (historyOpen) void refreshHistory()
@@ -378,12 +487,22 @@ export default function LessonDetail() {
    */
   const dirty = useMemo(() => {
     if (!lesson) return false
-    return lesson.sections.some((section) =>
-      drafts[section.id] !== undefined && drafts[section.id] !== sectionEditorText(section))
+    const practiceMoved = lesson.sections.some((section) => {
+      const draft = practiceDrafts[section.id]
+      if (!draft) return false
+      const original = practiceDraftFromSection(section)
+      return draft.question !== original.question
+        || draft.optionsText !== original.optionsText
+        || draft.correctAnswer !== original.correctAnswer
+        || draft.explanation !== original.explanation
+    })
+    return practiceMoved
+      || lesson.sections.some((section) =>
+        drafts[section.id] !== undefined && drafts[section.id] !== sectionEditorText(section))
       || draftTitle.trim() !== lesson.title
       || draftStatus !== lesson.status
       || draftSubject !== (lesson.subject === "all" ? "" : lesson.subject)
-  }, [lesson, drafts, draftTitle, draftStatus, draftSubject])
+  }, [lesson, drafts, practiceDrafts, draftTitle, draftStatus, draftSubject])
 
   /**
    * Warn before a reload or a closed tab throws the edits away.
@@ -600,14 +719,23 @@ export default function LessonDetail() {
           </p>
         ) : null}
         {sections.length > 0 ? sections.map((section) => (
-          <SectionView
-            key={section.id}
-            lessonID={lesson.id}
-            section={section}
-            editing={editing}
-            draft={drafts[section.id] ?? ""}
-            onDraftChange={(value) => setDrafts((current) => ({ ...current, [section.id]: value }))}
-          />
+          editing && practiceDrafts[section.id] ? (
+            <PracticeSectionEditor
+              key={section.id}
+              section={section}
+              draft={practiceDrafts[section.id]}
+              onChange={(draft) => setPracticeDrafts((current) => ({ ...current, [section.id]: draft }))}
+            />
+          ) : (
+            <SectionView
+              key={section.id}
+              lessonID={lesson.id}
+              section={section}
+              editing={editing}
+              draft={drafts[section.id] ?? ""}
+              onDraftChange={(value) => setDrafts((current) => ({ ...current, [section.id]: value }))}
+            />
+          )
         )) : (
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">这门课程还没有可预习的环节。</CardContent></Card>
         )}

@@ -398,6 +398,63 @@ describe("lesson detail page", () => {
     expect(screen.queryByRole("list", { name: "第 3 版的变化" })).not.toBeInTheDocument()
   })
 
+  it("fills in a practice question, choosing the key from the options", async () => {
+    // A course made from a note arrives with an empty practice section, so without
+    // this the section said 这道练习暂时没有可交互的选项 forever.
+    mocks.getLesson.mockResolvedValue({
+      ...lesson,
+      version: 3,
+      sections: [...lesson.sections, { id: "practice", type: "practice", title: "即时练习", content: {} }],
+    })
+    mocks.updateLesson.mockResolvedValue({ ...lesson, version: 4 })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    fireEvent.change(screen.getByLabelText("练习题干"), {
+      target: { value: "若 m = 4 kg、a = 2 m/s²，F 是多少？" },
+    })
+    fireEvent.change(screen.getByLabelText("练习选项"), { target: { value: "2 N\n6 N\n8 N" } })
+    fireEvent.change(screen.getByLabelText("练习解析"), { target: { value: "F = ma。" } })
+    // Until a key is chosen, the editor says what saving without one means.
+    expect(screen.getByText(/按「未评分」处理/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("combobox", { name: "练习标准答案" }))
+    const answer = await screen.findByRole("option", { name: "8 N" })
+    fireEvent.pointerDown(answer)
+    fireEvent.click(answer)
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+
+    await waitFor(() => expect(mocks.updateLesson).toHaveBeenCalled())
+    const [, input] = mocks.updateLesson.mock.calls[0]
+    const practice = input.document.sections.find((section: { type: string }) => section.type === "practice")
+    expect(practice.content).toEqual({
+      question: "若 m = 4 kg、a = 2 m/s²，F 是多少？",
+      options: ["2 N", "6 N", "8 N"],
+      correct_answer: "8 N",
+      explanation: "F = ma。",
+    })
+  })
+
+  it("leaves a quiz-typed section alone rather than rewriting content it cannot read", async () => {
+    // The fixture's 先试一题 is a legacy shape; the practice editor must not touch it.
+    mocks.getLesson.mockResolvedValue({ ...lesson, version: 3 })
+    mocks.updateLesson.mockResolvedValue({ ...lesson, version: 4 })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    expect(screen.queryByLabelText("练习题干")).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText("核心概念内容"), { target: { value: "F = ma" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+
+    await waitFor(() => expect(mocks.updateLesson).toHaveBeenCalled())
+    const [, input] = mocks.updateLesson.mock.calls[0]
+    const quiz = input.document.sections.find((section: { id: string }) => section.id === "quiz")
+    expect(quiz.body).toBe("若 m=2、a=3，F 是多少？")
+    expect(quiz.items).toEqual(["6 N", "5 N"])
+  })
+
   it("warns before a reload throws unsaved edits away", async () => {
     mocks.getLesson.mockResolvedValue({ ...lesson, version: 3 })
     renderPage()

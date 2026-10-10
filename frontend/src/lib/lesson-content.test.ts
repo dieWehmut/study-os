@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest"
 import type { LessonSection } from "@/api/lessons"
 import {
   isEditableSection,
+  practiceContentFromDraft,
+  practiceDraftComplete,
+  practiceDraftFromSection,
+  practiceOptions,
   sectionContentFromText,
   sectionEditorText,
   sectionHasContent,
@@ -57,5 +61,47 @@ describe("lesson content", () => {
     expect(isEditableSection(section({ type: "concept" }))).toBe(true)
     // The options are still readable as items, which is what the page shows.
     expect(sectionItems(practice)).toEqual(["1 N", "8 N"])
+  })
+
+  it("edits 即时练习 as fields, and only writes a key that is one of the options", () => {
+    // A course made from a note arrives with an empty practice section: without
+    // this the section said 这道练习暂时没有可交互的选项 forever.
+    const empty = { id: "practice", type: "practice", title: "即时练习", content: {} }
+    const draft = practiceDraftFromSection(empty)
+    expect(draft).toEqual({ question: "", optionsText: "", correctAnswer: "", explanation: "" })
+    expect(practiceDraftComplete(draft)).toBe(false)
+
+    const filled = { ...draft, question: "若 m = 4 kg、a = 2 m/s²，F 是多少？", optionsText: "2 N\n6 N\n8 N", correctAnswer: "8 N", explanation: "F = ma。" }
+    expect(practiceDraftComplete(filled)).toBe(true)
+    expect(practiceOptions(filled)).toEqual(["2 N", "6 N", "8 N"])
+    expect(practiceContentFromDraft(filled)).toEqual({
+      question: "若 m = 4 kg、a = 2 m/s²，F 是多少？",
+      options: ["2 N", "6 N", "8 N"],
+      correct_answer: "8 N",
+      explanation: "F = ma。",
+    })
+
+    // Options were retyped, so the old key no longer names one: writing it anyway
+    // would grade every attempt wrong while looking finished.
+    const stale = { ...filled, optionsText: "2 N\n6 N", correctAnswer: "8 N" }
+    expect(practiceContentFromDraft(stale)).toEqual({
+      question: "若 m = 4 kg、a = 2 m/s²，F 是多少？",
+      options: ["2 N", "6 N"],
+      explanation: "F = ma。",
+    })
+  })
+
+  it("reads a practice section written by the generator back into the fields", () => {
+    const practice = section({
+      type: "practice",
+      content: { question: "合力是多少？", options: ["4 N", "8 N"], correct_answer: "8 N", explanation: "F = ma。" },
+    })
+
+    expect(practiceDraftFromSection(practice)).toEqual({
+      question: "合力是多少？",
+      optionsText: "4 N\n8 N",
+      correctAnswer: "8 N",
+      explanation: "F = ma。",
+    })
   })
 })
