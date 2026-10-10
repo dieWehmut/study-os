@@ -43,6 +43,7 @@ export default function Reading() {
   // The item the last keep created, so the note can point at what was written
   // instead of only claiming it happened.
   const [keepItemID, setKeepItemID] = useState("")
+  const [keepingStuck, setKeepingStuck] = useState(false)
   // The session as it stands right now, for callbacks that resolve after an
   // await. save is the only writer, so this cannot drift from the state.
   const sessionRef = useRef(session)
@@ -65,6 +66,7 @@ export default function Reading() {
     () => chunks.filter((chunk) => stuckIds.has(chunk.id)),
     [chunks, stuckIds],
   )
+  const unkeptStuck = useMemo(() => stuck.filter((chunk) => !keptIds.has(chunk.id)).length, [stuck, keptIds])
 
   // Each row is what the shelf can say about a document without opening it:
   // its own title, and how far the reading got. Summarized here rather than in
@@ -107,7 +109,8 @@ export default function Reading() {
     save(restored)
   }
 
-  function toggleStuck(id: string) {    // No page turn, unlike 读完: this says the stop did not land, and moving
+  function toggleStuck(id: string) {
+    // No page turn, unlike 读完: this says the stop did not land, and moving
     // you would carry you away from the paragraph you just flagged.
     save({
       ...session,
@@ -168,6 +171,61 @@ export default function Reading() {
       // section that is already filed.
       setKeepError("已收进知识库，但安排复习没成功。可以在知识库里再排一次。")
     }
+  }
+
+  /**
+   * File every 卡住 section that is not filed yet.
+   *
+   * Marking stops as 卡住 is how this page says what is in the way, and the way
+   * out of that list was one section at a time -- each one needing a trip back to
+   * it. The reader has already said which ones; this is that decision, carried
+   * out. Sequential rather than parallel: each write records itself in the
+   * session, and two in flight would race on the same list.
+   */
+  async function keepStuckSections() {
+    const pending = stuck.filter((chunk) => !keptIds.has(chunk.id))
+    if (pending.length === 0 || keepingStuck) return
+    setKeepingStuck(true)
+    setKeepError("")
+    setKeepNote("")
+    setKeepItemID("")
+    let filed = 0
+    let cards = 0
+    let unscheduled = 0
+    let failed = 0
+    for (const chunk of pending) {
+      let item: { id: string }
+      try {
+        item = await dumpThought(buildSectionNote(chunk))
+      } catch {
+        failed += 1
+        continue
+      }
+      filed += 1
+      // Marked kept before the second write and never rolled back by it, exactly
+      // as the single-section path does: the item exists from here on, so
+      // re-offering 收进知识库 would file the same section twice.
+      save({ ...sessionRef.current, keptIds: [...sessionRef.current.keptIds, chunk.id] })
+      setKeepItemID(item.id)
+      try {
+        cards += (await scheduleKnowledge(item.id)).prompt_count
+      } catch {
+        unscheduled += 1
+      }
+    }
+    setKeepingStuck(false)
+    if (filed > 0 && failed === 0 && unscheduled === 0) {
+      setKeepNote(`已收进知识库 ${filed} 节 · ${cards} 张卡等着复习`)
+      return
+    }
+    if (filed > 0) {
+      const parts = [`已收进 ${filed} 节`]
+      if (unscheduled > 0) parts.push(`${unscheduled} 节没排上复习（可在知识库里再排一次）`)
+      if (failed > 0) parts.push(`${failed} 节没成功，再点一次只会补上没进去的`)
+      setKeepError(parts.join("，"))
+      return
+    }
+    setKeepError("没能把这些节收进知识库，等会儿再试。")
   }
 
   function toggleRead(id: string) {
@@ -464,6 +522,21 @@ export default function Reading() {
             >
               <MessagesSquare data-icon="inline-start" />带这 {stuck.length} 节去问
             </Link>
+            {/* The other thing a stuck section is worth: something to be asked
+                again tomorrow. One button rather than a trip back to each. */}
+            {unkeptStuck > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                disabled={keepingStuck}
+                onClick={() => void keepStuckSections()}
+              >
+                {keepingStuck ? "正在收进知识库…" : `把这 ${unkeptStuck} 节收进知识库`}
+              </Button>
+            ) : (
+              <span className="self-start text-xs text-muted-foreground">这几节都已经收进知识库了</span>
+            )}
           </CardContent>
         </Card>
       ) : null}

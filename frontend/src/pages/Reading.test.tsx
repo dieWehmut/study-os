@@ -704,3 +704,54 @@ describe("a kept section reaching the review queue", () => {
     expect(mocks.scheduleKnowledge).not.toHaveBeenCalled()
   })
 })
+
+describe("keeping the sections that did not land", () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+    mocks.dumpThought.mockImplementation((note: string) => Promise.resolve({ id: `k-${note.slice(0, 2)}`, term: note }))
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k", prompt_count: 2 })
+  })
+
+  /** Paste a document, mark two of its sections 卡住, and open the list. */
+  function stickTwoSections() {
+    renderReading()
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: "没看懂" }))
+    fireEvent.click(screen.getByRole("button", { name: /下一节/ }))
+    fireEvent.click(screen.getByRole("button", { name: "没看懂" }))
+    return screen.getByRole("button", { name: /把这 2 节收进知识库/ })
+  }
+
+  it("files every 卡住 section from the one list", async () => {
+    // The reader already said which sections are in the way; making them walk
+    // back to each one turns that decision into a chore.
+    const batch = stickTwoSections()
+    fireEvent.click(batch)
+
+    await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledTimes(2))
+    expect(mocks.scheduleKnowledge).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText(/已收进知识库 2 节/)).toBeInTheDocument()
+    expect(screen.getByText("这几节都已经收进知识库了")).toBeInTheDocument()
+  })
+
+  it("only files the ones that did not get in", async () => {
+    const batch = stickTwoSections()
+    fireEvent.click(batch)
+    await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledTimes(2))
+
+    // Nothing left to file, so the control is a sentence rather than a button.
+    expect(screen.queryByRole("button", { name: /收进知识库/ })).not.toBeInTheDocument()
+    expect(mocks.dumpThought).toHaveBeenCalledTimes(2)
+  })
+
+  it("says which half failed instead of a flat failure", async () => {
+    mocks.scheduleKnowledge.mockRejectedValue(new Error("offline"))
+    const batch = stickTwoSections()
+    fireEvent.click(batch)
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("已收进 2 节")
+    expect(alert).toHaveTextContent("2 节没排上复习")
+  })
+})
