@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   revealDataDirectory: vi.fn(),
   listBackups: vi.fn(),
   requestBackupRestore: vi.fn(),
+  cancelBackupRestore: vi.fn(),
   updateSettings: vi.fn(),
   createBackup: vi.fn(),
   getVendors: vi.fn(),
@@ -580,5 +581,20 @@ describe("SettingsPanel", () => {
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent("上次恢复没有成功")
     expect(alert).toHaveTextContent("数据保持原样")
+  })
+
+  it("lets the reader take a scheduled restore back", async () => {
+    // Picking the wrong file must be undoable before the next start acts on it.
+    mocks.cancelBackupRestore.mockResolvedValue({ status: "cancelled" })
+    mocks.getSystemStatus
+      .mockResolvedValueOnce({ ...status, restore: { pending: true, last_recorded: false, last_ok: false } })
+      .mockResolvedValue(status)
+    render(<SettingsPanel />)
+
+    expect(await screen.findByText(/已安排恢复/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "取消安排" }))
+
+    await waitFor(() => expect(mocks.cancelBackupRestore).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByText(/已安排恢复/)).not.toBeInTheDocument())
   })
 })

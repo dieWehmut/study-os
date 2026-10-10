@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -77,5 +78,51 @@ func TestBackupRestoreRequestRefusesABackupThatCannotWork(t *testing.T) {
 	}
 	if _, err := os.Stat(dataDir + string(os.PathSeparator) + "restore-request.json"); !os.IsNotExist(err) {
 		t.Fatalf("a refused backup still left a request behind: %v", err)
+	}
+}
+
+// A scheduled restore has to be takeable back: the reader may have picked the
+// wrong file, and finding out after the next start replaced their data is too late.
+func TestBackupRestoreRequestCanBeCancelled(t *testing.T) {
+	dataDir := t.TempDir()
+	application := testApplication(t, config.Config{DataDir: dataDir})
+	router := httpapi.NewRouter(application)
+
+	created := requestJSON(t, router, http.MethodPost, "/api/backups", map[string]any{"category": "daily"})
+	var body struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, created, &body)
+	if scheduled := backupRestore(t, router, body.ID); scheduled.Code != http.StatusAccepted {
+		t.Fatalf("schedule = %d", scheduled.Code)
+	}
+
+	cancel := httptest.NewRequest(http.MethodDelete, "/api/backups/restore", nil)
+	cancel.Host = "127.0.0.1:8080"
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, cancel)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("cancel = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+
+	status := requestJSON(t, router, http.MethodGet, "/api/system/status", nil)
+	var decoded struct {
+		Restore struct {
+			Pending bool `json:"pending"`
+		} `json:"restore"`
+	}
+	if err := json.Unmarshal(status.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if decoded.Restore.Pending {
+		t.Fatalf("status still reports a pending restore: %s", status.Body.String())
+	}
+	// Cancelling twice is fine: pressing it again is not an error.
+	again := httptest.NewRecorder()
+	retry := httptest.NewRequest(http.MethodDelete, "/api/backups/restore", nil)
+	retry.Host = "127.0.0.1:8080"
+	router.ServeHTTP(again, retry)
+	if again.Code != http.StatusOK {
+		t.Fatalf("second cancel = %d", again.Code)
 	}
 }

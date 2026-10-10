@@ -64,3 +64,23 @@ func handleBackupRestoreRequest(response http.ResponseWriter, request *http.Requ
 		"message": "已记下这份备份：下次启动学习系统时用它替换当前数据。",
 	})
 }
+
+// handleBackupRestoreCancel forgets a scheduled restore.
+//
+// A request that cannot be taken back is a trap: the reader picks the wrong file,
+// sees the banner, and has no way to say so before the next start replaces their
+// data with it. Idempotent -- nothing pending is not an error.
+func handleBackupRestoreCancel(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	if err := backup.ClearRestoreRequest(application.Config.DataDir); err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "取消恢复请求失败"})
+		return
+	}
+	// An outcome left over from an earlier restore is a stale claim once the
+	// reader acts again, so it goes with the request.
+	_ = backup.ClearRestoreOutcome(application.Config.DataDir)
+	writeJSON(response, http.StatusOK, map[string]any{"status": "cancelled"})
+}

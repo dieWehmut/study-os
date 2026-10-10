@@ -217,3 +217,13 @@ export function verifyBackup(id: string): Promise<BackupVerification> {
 export function requestBackupRestore(id: string): Promise<{ status: string; message: string }> {
   return apiRequest<{ status: string; message: string }>(`/backups/${encodeURIComponent(id)}/restore`, { method: "POST" })
 }
+
+/**
+ * Take a scheduled restore back.
+ *
+ * The reader may have picked the wrong file, and there is no undoing a restore
+ * once the next start has replaced the data with it.
+ */
+export function cancelBackupRestore(): Promise<{ status: string }> {
+  return apiRequest<{ status: string }>("/backups/restore", { method: "DELETE" })
+}

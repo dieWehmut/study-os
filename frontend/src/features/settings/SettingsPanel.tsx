@@ -9,7 +9,7 @@ import {
   type VoiceRole,
   type VoiceRolePatch,
 } from "@/api/speech"
-import { downloadBackup, requestBackupRestore, revealDataDirectory, verifyBackup } from "@/api/system"
+import { cancelBackupRestore, downloadBackup, requestBackupRestore, revealDataDirectory, verifyBackup } from "@/api/system"
 import { saveBlobFile } from "@/lib/download"
 import { failureMessage } from "@/lib/errors"
 import { applyUpdate, getUpdateStatus, type UpdateStatus } from "@/api/update"
@@ -292,6 +292,21 @@ export default function SettingsPanel() {
       await load()
     } catch (reason) {
       setRestoreError(failureMessage(reason, "安排恢复失败"))
+    } finally {
+      setRestoring(false)
+    }
+  }
+
+  /** Take a scheduled restore back, before the next start can act on it. */
+  async function cancelRestore() {
+    if (restoring) return
+    setRestoring(true)
+    setRestoreError("")
+    try {
+      await cancelBackupRestore()
+      await load()
+    } catch (reason) {
+      setRestoreError(failureMessage(reason, "取消恢复失败"))
     } finally {
       setRestoring(false)
     }
@@ -1115,9 +1130,16 @@ export default function SettingsPanel() {
                 for the next start, and how the last one went. Without the second,
                 a failed restore is indistinguishable from one nobody asked for. */}
             {restoreStatus.pending ? (
-              <p role="status" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">
-                已安排恢复：下次启动学习系统时，会用选中的那份备份替换当前数据。
-              </p>
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+                <p role="status" className="text-sm text-primary">
+                  已安排恢复：下次启动学习系统时，会用选中的那份备份替换当前数据。
+                </p>
+                {/* A request that cannot be taken back is a trap: picking the wrong
+                    file must be undoable before the next start acts on it. */}
+                <Button type="button" variant="outline" size="sm" disabled={restoring} onClick={() => void cancelRestore()}>
+                  {restoring ? "取消中…" : "取消安排"}
+                </Button>
+              </div>
             ) : null}
             {restoreStatus.last_recorded ? (
               <p
