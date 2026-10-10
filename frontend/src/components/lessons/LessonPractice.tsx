@@ -266,23 +266,12 @@ function LegacyPractice({ section }: LessonPracticeProps) {
 export default function LessonPractice({ section, lessonID }: LessonPracticeProps) {
   const type = sectionType(section)
   const questions = practiceQuestions(section)
-  // One question is answered here for now. Rendering all of them is a per-question
-  // version of this component's whole state machine, and doing that badly would be
-  // worse than naming the limit: a section that asks four questions and shows one
-  // with no hint would read as a section that asks one.
-  const content = questions[0] ?? null
-  const [selected, setSelected] = useState<number | null>(null)
-  const [submitted, setSubmitted] = useState(false)
-  const [result, setResult] = useState<PracticeResult | null>(null)
-  const [evidenceState, setEvidenceState] = useState<"idle" | "saving" | "saved" | "failed">("idle")
-  // 收进知识库: a wrong answer that only leaves an attempt behind is a mistake the
-  // reader will make again. Filing it puts the question back in front of them.
-  const [intakeState, setIntakeState] = useState<"idle" | "saving" | "saved">("idle")
-  const [intakeError, setIntakeError] = useState("")
   const [historyState, setHistoryState] = useState<PracticeHistoryState>(lessonID ? "loading" : "empty")
   const [historyCount, setHistoryCount] = useState(0)
   const [latestAttempt, setLatestAttempt] = useState<LessonPracticeAttempt | null>(null)
-  const startedAt = useRef(clockNow())
+  // One verdict per question, filled in as each is answered: the section's own
+  // tally, which the single-question case never needed to draw.
+  const [verdicts, setVerdicts] = useState<Record<number, PracticeResult["kind"]>>({})
   const historyRequest = useRef(0)
 
   useEffect(() => {
@@ -326,49 +315,150 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
     }
   }, [lessonID, section.id])
 
+  const articleID = `lesson-practice-${section.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`
+  const answered = Object.keys(verdicts).length
+  const correct = Object.values(verdicts).filter((kind) => kind === "correct").length
+
+  return (
+    <article
+      data-section-kind={type}
+      data-practice-mode={questions.length > 0 ? "interactive" : "legacy"}
+      data-practice-history={historyState}
+      data-practice-question-count={questions.length}
+      className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <CircleHelp aria-hidden="true" className="size-4 text-primary" />
+        <h2 className="font-heading text-lg font-semibold">{section.title || sectionLabels[type] || type}</h2>
+        {section.required ? <Badge variant="outline">必看</Badge> : null}
+      </div>
+
+      {questions.length > 0 ? (
+        <div className="grid gap-4">
+          {lessonID && historyState === "loading" ? (
+            <p className="text-xs text-muted-foreground">正在读取练习记录…</p>
+          ) : null}
+          {lessonID && historyState === "ready" && historyCount > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              <span>{`已作答 ${historyCount} 次`}</span>
+              {latestAttempt && latestAttempt.elapsed_ms > 0
+                ? ` · 最近一次用时 ${Math.max(1, Math.round(latestAttempt.elapsed_ms / 1000))} 秒`
+                : null}
+            </p>
+          ) : null}
+          {questions.map((question, index) => (
+            <PracticeQuestionForm
+              key={question.id || `question-${index}`}
+              question={question}
+              index={index}
+              total={questions.length}
+              articleID={articleID}
+              lessonID={lessonID}
+              sectionID={section.id}
+              // Only the single-question case can show it: the history list is one
+              // list for the section, so it does not say which question it belongs
+              // to once there are several.
+              latestAttempt={questions.length === 1 ? latestAttempt : null}
+              onSettled={(kind) => {
+                setVerdicts((current) => ({ ...current, [index]: kind }))
+                setHistoryCount((count) => count + 1)
+                setHistoryState("ready")
+              }}
+            />
+          ))}
+          {questions.length > 1 && answered > 0 ? (
+            <p role="status" className="text-xs text-muted-foreground">
+              {`本节已作答 ${answered}/${questions.length} 道，答对 ${correct} 道。`}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <LegacyPractice section={section} />
+      )}
+    </article>
+  )
+}
+
+/**
+ * One question of a practice section, with its own answer, verdict and evidence.
+ *
+ * Extracted from the section component so a section can ask several: the state was
+ * one answer's worth (selected, submitted, result…), and sharing it across
+ * questions would have the second overwrite the first.
+ */
+function PracticeQuestionForm({
+  question,
+  index,
+  total,
+  articleID,
+  lessonID,
+  sectionID,
+  latestAttempt,
+  onSettled,
+}: {
+  question: PracticeContent
+  index: number
+  total: number
+  articleID: string
+  lessonID?: string
+  sectionID: string
+  latestAttempt?: LessonPracticeAttempt | null
+  onSettled: (kind: PracticeResult["kind"]) => void
+}) {
+  const [selected, setSelected] = useState<number | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const [result, setResult] = useState<PracticeResult | null>(null)
+  const [evidenceState, setEvidenceState] = useState<"idle" | "saving" | "saved" | "failed">("idle")
+  // 收进知识库: a wrong answer that only leaves an attempt behind is a mistake the
+  // reader will make again. Filing it puts the question back in front of them.
+  const [intakeState, setIntakeState] = useState<"idle" | "saving" | "saved">("idle")
+  const [intakeError, setIntakeError] = useState("")
+  const startedAt = useRef(clockNow())
+
+  const suffix = total > 1 ? `-q${index + 1}` : ""
+  const questionID = `${articleID}-question${suffix}`
+  const groupName = `${articleID}-options${suffix}`
+  const visibleResult = result ?? (!submitted && latestAttempt ? resultFromAttempt(latestAttempt) : null)
+
   async function submit() {
     if (selected === null || submitted) return
-    if (!content) return
-    const optimisticResult = resultFor(content, selected)
+    const optimisticResult = resultFor(question, selected)
     setResult(optimisticResult)
     setSubmitted(true)
     setIntakeState("idle")
     setIntakeError("")
+    // The tally counts this question as soon as the reader sees a verdict; the
+    // server's answer replaces it below if the two disagree.
+    onSettled(optimisticResult.kind)
     if (!lessonID) return
 
     setEvidenceState("saving")
     try {
-      const attempt = await submitLessonPracticeAttempt(lessonID, section.id, {
-        answer: content.options[selected],
-        questionId: content.id,
+      const attempt = await submitLessonPracticeAttempt(lessonID, sectionID, {
+        answer: question.options[selected],
+        questionId: question.id,
         elapsedMs: Math.max(0, Math.round(clockNow() - startedAt.current)),
       })
-      setResult(resultFromAttempt(attempt))
-      historyRequest.current += 1
-      setLatestAttempt(attempt)
-      setHistoryCount((count) => count + 1)
-      setHistoryState("ready")
+      const settled = resultFromAttempt(attempt)
+      setResult(settled)
+      onSettled(settled.kind)
       setEvidenceState("saved")
     } catch {
       setEvidenceState("failed")
     }
   }
-  const articleID = `lesson-practice-${section.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`
-  const questionID = `${articleID}-question`
-  const groupName = `${articleID}-options`
-  const visibleResult = result ?? (!submitted && latestAttempt ? resultFromAttempt(latestAttempt) : null)
 
   async function fileMistake() {
-    if (!content || selected === null || intakeState === "saving") return
+    if (selected === null || intakeState === "saving") return
     setIntakeState("saving")
     setIntakeError("")
     try {
       const item = await dumpThought(
         practiceNote({
-          question: content.question,
-          answerLabel: content.answerLabel,
-          picked: content.options[selected] ?? "",
-          explanation: content.explanation,
+          question: question.question,
+          answerLabel: question.answerLabel,
+          picked: question.options[selected] ?? "",
+          explanation: question.explanation,
         }),
       )
       // Queued as well as filed: a mistake that never comes back is just a record.
@@ -381,63 +471,36 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
   }
 
   return (
-    <article
-      data-section-kind={type}
-      data-practice-mode={content ? "interactive" : "legacy"}
-      data-practice-history={historyState}
-      data-practice-question-count={questions.length}
-      className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5"
+    <form
+      className="grid gap-4 rounded-lg border border-border/70 bg-background/40 p-3"
+      data-practice-question={index + 1}
+      onSubmit={(event) => {
+        event.preventDefault()
+        void submit()
+      }}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <CircleHelp aria-hidden="true" className="size-4 text-primary" />
-        <h2 className="font-heading text-lg font-semibold">{section.title || sectionLabels[type] || type}</h2>
-        {section.required ? <Badge variant="outline">必看</Badge> : null}
-      </div>
-
-      {questions.length > 1 ? (
-        <p role="status" className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-          本节共 {questions.length} 道题，这里作答第 1 道；其余 {questions.length - 1} 道尚未在此显示。
-        </p>
-      ) : null}
-
-      {content ? (
-        <form
-          className="grid gap-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void submit()
-          }}
-        >
-          <p id={questionID} className="text-sm leading-7 text-foreground/90">{content.question}</p>
-          {lessonID && historyState === "loading" ? (
-            <p className="text-xs text-muted-foreground">正在读取练习记录…</p>
-          ) : null}
-          {lessonID && historyState === "ready" && historyCount > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              <span>{`已作答 ${historyCount} 次`}</span>
-              {latestAttempt && latestAttempt.elapsed_ms > 0
-                ? ` · 最近一次用时 ${Math.max(1, Math.round(latestAttempt.elapsed_ms / 1000))} 秒`
-                : null}
-            </p>
-          ) : null}
-          <fieldset className="grid gap-2" aria-describedby={questionID}>
+      <p id={questionID} className="text-sm leading-7 text-foreground/90">
+        {total > 1 ? <span className="mr-1 text-xs text-muted-foreground">{`第 ${index + 1} 题`}</span> : null}
+        {question.question}
+      </p>
+      <fieldset className="grid gap-2" aria-describedby={questionID}>
             <legend className="sr-only">选择答案</legend>
-            {content.options.map((option, index) => (
+            {question.options.map((option, optionIndex) => (
               <label
-                key={`${option}-${index}`}
+                key={`${option}-${optionIndex}`}
                 className={cn(
                   "flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/70",
-                  selected === index && "border-primary bg-primary/5",
+                  selected === optionIndex && "border-primary bg-primary/5",
                   submitted && "cursor-default opacity-80",
                 )}
               >
                 <input
                   type="radio"
                   name={groupName}
-                  value={String(index)}
-                  checked={selected === index}
+                  value={String(optionIndex)}
+                  checked={selected === optionIndex}
                   disabled={submitted}
-                  onChange={() => setSelected(index)}
+                  onChange={() => setSelected(optionIndex)}
                   className="size-4 accent-primary"
                 />
                 <span>{option}</span>
@@ -514,9 +577,5 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
             </p>
           ) : null}
         </form>
-      ) : (
-        <LegacyPractice section={section} />
-      )}
-    </article>
   )
 }

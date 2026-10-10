@@ -111,24 +111,30 @@ describe("LessonPractice", () => {
     expect(screen.queryByRole("button", { name: "提交答案" })).not.toBeInTheDocument()
   })
 
-  // A section that asks several questions used to render as if it asked none: the
-// panel only read the flat `question` field. It now answers the first one and says
-// how many are left, which is less than a full multi-question panel but is not a
-// silent lie about the document.
-it("answers the first question of a section that holds several, and says so", () => {
+  // A section that asks several questions renders all of them, each with its own
+// answer, and the section keeps the tally. It used to render the first and say the
+// rest were missing -- less than useful, but at least not silent.
+it("asks every question of a section and counts the round", () => {
   renderPractice({
     questions: [
       { id: "q1", question: "速度的单位是什么？", options: ["m/s", "N"], correct_answer: "m/s" },
-      { id: "q2", question: "力的单位是什么？", options: ["m/s", "N"], correct_answer: "N" },
+      { id: "q2", question: "力的单位是什么？", options: ["N", "J"], correct_answer: "N" },
       { id: "q3", question: "功的单位是什么？", options: ["J", "N"], correct_answer: "J" },
     ],
   })
 
   expect(screen.getByText("速度的单位是什么？")).toBeInTheDocument()
-  expect(screen.queryByText("力的单位是什么？")).not.toBeInTheDocument()
-  expect(screen.getByRole("status")).toHaveTextContent("本节共 3 道题")
-  expect(screen.getByRole("status")).toHaveTextContent("其余 2 道")
+  expect(screen.getByText("力的单位是什么？")).toBeInTheDocument()
+  expect(screen.getByText("功的单位是什么？")).toBeInTheDocument()
+  expect(screen.getAllByRole("button", { name: "提交答案" })).toHaveLength(3)
   expect(screen.getByRole("article")).toHaveAttribute("data-practice-question-count", "3")
+
+  // Answering one question must not answer another: each form has its own answer.
+  fireEvent.click(screen.getAllByRole("radio", { name: "m/s" })[0]!)
+  fireEvent.click(screen.getAllByRole("button", { name: "提交答案" })[0]!)
+  expect(screen.getAllByRole("button", { name: "提交答案" })[1]).toBeDisabled()
+
+  expect(screen.getByText(/本节已作答 1\/3 道/)).toHaveTextContent("答对 1 道")
 })
 
 it("names the question it submits, and leaves the field out when there is only one", async () => {
