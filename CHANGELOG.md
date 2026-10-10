@@ -2,6 +2,22 @@
 
 ## 未发布
 
+### 一节多题：把形状定下来（`docs/lesson-multiple-questions.md`）
+
+- 「一门课只有一题」我拖了很久，理由是「要先定文档形状」。这轮去读代码把**到底是什么挡着**写清楚了，
+  并给出可照着实现的方案：
+  1. `NewLessonDocument` 每种类型一节，且 `LessonSection.ID` 就等于类型名（`practice`），
+     「再来一节练习」会撞 id；
+  2. 作答的键是 `(lesson_id, section_id)`——**一节只能有一条作答**，第二题会覆盖第一题；
+  3. 迁移有流程：`lesson_attempts` 加列要动 schema 版本，ROADMAP 要同步（写这行时是 18）；
+  4. 前端 `PracticePanel` 只读 `content.question`。
+- 选定形状 **B：练习节 content 里加 `questions[]`**（而不是「多节练习」），因为目录、深链接、
+  Markdown 导出都不用动，只有作答表加一列。旧文档不需要迁移（`questions` 缺省即单题），
+  上限 20 题，超出报 400 而不是静默截断。
+- 过程中修正了自己一处事实错误：初稿把表名写成 `lesson_practice_attempts`，实际是
+  `lesson_attempts`，且它已有一行 `(lesson_id, section_id, …)` 索引——文章里已改成正确的名字与
+  迁移语句（加列 + 重建索引）。**设计文档里的表名写错，比没有文档更坏。**
+
 ### 备份卡片：把「什么时候会生成」也说了
 
 - 上一轮写了保留规则（什么会被删），这轮补上同一问题的另一半：**什么会让一份备份出现**。
