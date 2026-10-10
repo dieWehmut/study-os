@@ -250,6 +250,8 @@ function PracticeSectionEditor({
             ariaLabel="练习标准答案"
             value={draft.correctAnswer}
             onValueChange={(value) => onChange({ ...draft, correctAnswer: value })}
+            // An unanswered key is a choice of its own, not an empty field.
+            placeholder="未评分（不给答案）"
             options={[
               { value: "", label: "未评分（不给答案）" },
               ...options.map((option) => ({ value: option, label: option })),

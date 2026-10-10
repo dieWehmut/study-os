@@ -167,4 +167,36 @@ describe("lessons page", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("给这门课起个标题")
     expect(mocks.createLesson).not.toHaveBeenCalled()
   })
+
+  it("narrows the list to one status", async () => {
+    mocks.listLessons.mockResolvedValue({ items: [lesson], count: 1 })
+    renderPage()
+    await screen.findByRole("link", { name: /Newton's second law/ })
+
+    fireEvent.click(screen.getByRole("combobox", { name: "按状态筛选课程" }))
+    const draftOption = await screen.findByRole("option", { name: "草稿" })
+    fireEvent.pointerDown(draftOption)
+    fireEvent.click(draftOption)
+
+    await waitFor(() => expect(mocks.listLessons).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "draft", offset: 0 }),
+    ))
+  })
+
+  it("says the filter emptied the page, not the library", async () => {
+    // The same lie the search-only empty state used to tell.
+    mocks.listLessons.mockImplementation((options?: { status?: string }) =>
+      Promise.resolve(options?.status ? { items: [], count: 0 } : { items: [lesson], count: 1 }),
+    )
+    renderPage()
+    await screen.findByRole("link", { name: /Newton's second law/ })
+
+    fireEvent.click(screen.getByRole("combobox", { name: "按状态筛选课程" }))
+    const archived = await screen.findByRole("option", { name: "已归档" })
+    fireEvent.pointerDown(archived)
+    fireEvent.click(archived)
+
+    expect(await screen.findByText(/没有状态为「已归档」的课程/)).toBeInTheDocument()
+    expect(screen.queryByText("还没有课程")).not.toBeInTheDocument()
+  })
 })

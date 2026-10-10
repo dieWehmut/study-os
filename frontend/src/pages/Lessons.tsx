@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { ArrowRight, BookOpenCheck, Clock3, FileText, Plus, RotateCcw } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 
-import { createLesson, listLessons, type Lesson } from "@/api/lessons"
+import { createLesson, listLessons, type Lesson, type LessonStatus } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,6 +44,9 @@ export default function Lessons() {
   // find here -- it is not in the list at all.
   const [query, setQuery] = useState("")
   const [draft, setDraft] = useState("")
+  // 草稿 is a real state now that a course can be created and filed by hand: with
+  // a growing library, "only the drafts" is the question worth asking.
+  const [status, setStatus] = useState<LessonStatus | "">("")
   // A course written by hand rather than handed over by 整合. The ten-section
   // template is created empty and filled in on its own page.
   const [drafting, setDrafting] = useState(false)
@@ -77,9 +80,10 @@ export default function Lessons() {
   const listOptions = useCallback((offset: number): Parameters<typeof listLessons>[0] => ({
     subject: subject === "all" ? undefined : subject,
     query: query || undefined,
+    status: status || undefined,
     limit: 100,
     offset,
-  }), [subject, query])
+  }), [subject, query, status])
 
   /**
    * The next page, appended.
@@ -186,6 +190,21 @@ export default function Lessons() {
               </button>
             </span>
           ) : null}
+          <span className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">只看</span>
+            <Select
+              ariaLabel="按状态筛选课程"
+              value={status}
+              onValueChange={(value) => setStatus(value as LessonStatus | "")}
+              // The empty value means "every status", so the control says that
+              // rather than the default 请选择.
+              placeholder="全部状态"
+              options={[
+                { value: "", label: "全部状态" },
+                ...Object.entries(statusLabels).map(([value, label]) => ({ value, label })),
+              ]}
+            />
+          </span>
           <Button
             type="button"
             size="sm"
@@ -246,10 +265,14 @@ export default function Lessons() {
       ) : null}
 
       {!loading && !error && items.length === 0 ? (
-        query ? (
+        query || status ? (
           <Card>
             <CardContent className="py-14 text-center text-sm text-muted-foreground">
-              没有标题含「{query}」的课程。
+              {/* The filter emptied the page, not the library: saying 还没有课程
+                  here would be the same lie the search-only version told. */}
+              {query
+                ? `没有标题含「${query}」${status ? `、且状态为「${statusLabel(status)}」` : ""}的课程。`
+                : `没有状态为「${statusLabel(status)}」的课程。`}
             </CardContent>
           </Card>
         ) : (
@@ -258,11 +281,16 @@ export default function Lessons() {
               <BookOpenCheck aria-hidden="true" className="size-8 text-muted-foreground" />
               <h2 className="font-heading text-xl font-semibold">还没有课程</h2>
               <p className="max-w-md text-sm leading-6 text-muted-foreground">
-                把一段资料先整合成结构，之后就能在这里按固定顺序预习。
+                把一段资料先整合成结构，或者自己起一个标题从十节骨架写起。
               </p>
-              <Link className={buttonVariants({ variant: "outline", size: "sm" })} to="/integrate">
-                去整合资料<ArrowRight data-icon="inline-end" />
-              </Link>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Link className={buttonVariants({ variant: "outline", size: "sm" })} to="/integrate">
+                  去整合资料<ArrowRight data-icon="inline-end" />
+                </Link>
+                <Button variant="outline" size="sm" onClick={() => setDrafting(true)}>
+                  <Plus data-icon="inline-start" />新建课程
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )
