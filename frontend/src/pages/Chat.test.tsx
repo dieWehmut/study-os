@@ -173,6 +173,34 @@ describe("Chat page", () => {
     expect(await screen.findByRole("button", { name: /导数/ })).toBeInTheDocument()
   })
 
+  it("loads conversations past the newest page", async () => {
+    // The sidebar holds the newest 50 and now knows how many there are, so an
+    // older 问答 is reachable by browsing, not only by remembering a word in it.
+    const conversation = (id: string, title: string) => ({
+      session_id: id,
+      subject: "math",
+      message_count: 2,
+      last_at: "2026-08-04T00:00:00Z",
+      title,
+      preview: title,
+    })
+    mocks.listChatConversations.mockImplementation((_subject: string, _limit: number, _query: string, offset = 0) =>
+      Promise.resolve(
+        offset === 0
+          ? { items: [conversation("s1", "导数"), conversation("s2", "积分")], count: 3 }
+          : { items: [conversation("s3", "极值")], count: 3 },
+      ),
+    )
+    render(<Chat />)
+    await screen.findByRole("button", { name: /导数/ })
+
+    fireEvent.click(screen.getByRole("button", { name: "加载更多（还有 1 段）" }))
+
+    await waitFor(() => expect(mocks.listChatConversations).toHaveBeenCalledWith("", 50, "", 2))
+    expect(await screen.findByRole("button", { name: /极值/ })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
+  })
+
   it("uploads an attachment and shows it before sending", async () => {
     render(<Chat />)
     const input = document.querySelector('input[type="file"]') as HTMLInputElement

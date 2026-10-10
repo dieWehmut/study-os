@@ -240,6 +240,7 @@ type ChatConversationListOptions struct {
 	Subject string
 	Query   string
 	Limit   int
+	Offset  int
 }
 
 // ErrorCause is one structured explanation for why an answer failed. Global

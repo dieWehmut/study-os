@@ -159,16 +159,25 @@ func handleChatConversations(response http.ResponseWriter, request *http.Request
 	if subject == "" {
 		subject = "all"
 	}
-	conversations, err := application.Store.ListChatConversations(request.Context(), models.ChatConversationListOptions{
+	options := models.ChatConversationListOptions{
 		Subject: subject,
 		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
 		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 200),
-	})
+		Offset:  parseOffset(request.URL.Query().Get("offset")),
+	}
+	conversations, err := application.Store.ListChatConversations(request.Context(), options)
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取对话列表失败"})
 		return
 	}
-	writeJSON(response, http.StatusOK, map[string]any{"items": conversations, "count": len(conversations)})
+	// The total, not the page: the sidebar says "N 段对话" and decides from it
+	// whether there is a next page to ask for.
+	total, err := application.Store.CountChatConversations(request.Context(), options)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "统计对话列表失败"})
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"items": conversations, "count": total})
 }
 
 func handleChatAttachmentUpload(response http.ResponseWriter, request *http.Request, application *app.App) {

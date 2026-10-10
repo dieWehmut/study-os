@@ -91,6 +91,9 @@ export default function Chat() {
   // so 清除 can put back what the box no longer holds.
   const [conversationQuery, setConversationQuery] = useState("")
   const [conversationDraft, setConversationDraft] = useState("")
+  // How many conversations there are, when that is more than are in hand.
+  const [conversationTotal, setConversationTotal] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [activeSession, setActiveSession] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   // Read once, in the initializer, and cleared in the same breath: arriving
@@ -143,12 +146,44 @@ export default function Chat() {
 
   const refreshConversations = useCallback(() => {
     return listChatConversations(subject === "all" ? "" : subject, 50, conversationQuery)
-      .then((result) => setConversations(result.items))
+      .then((result) => {
+        setConversations(result.items)
+        setConversationTotal(result.count)
+      })
       .catch(() => {
         // 对话列表加载失败不阻塞提问。
       })
       .finally(() => setLoading(false))
   }, [subject, conversationQuery])
+
+  /**
+   * The next page of conversations, appended.
+   *
+   * The list is the newest 50 and the count is how many there are, so without
+   * this an older 问答 is unreachable by browsing -- only by remembering a word
+   * from it.
+   */
+  async function loadMoreConversations() {
+    if (loadingMore) return
+    setLoadingMore(true)
+    try {
+      const result = await listChatConversations(
+        subject === "all" ? "" : subject,
+        50,
+        conversationQuery,
+        conversations.length,
+      )
+      setConversations((current) => {
+        const seen = new Set(current.map((item) => item.session_id))
+        return [...current, ...result.items.filter((item) => !seen.has(item.session_id))]
+      })
+      setConversationTotal(result.count)
+    } catch {
+      // The loaded page stays on screen; the attempt costs nothing but a click.
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     void refreshConversations()
@@ -662,6 +697,17 @@ export default function Chat() {
                 </button>
               ))
             )}
+            {conversations.length > 0 && conversationTotal > conversations.length ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={loadingMore}
+                onClick={() => void loadMoreConversations()}
+              >
+                {loadingMore ? "正在读取…" : `加载更多（还有 ${conversationTotal - conversations.length} 段）`}
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
 

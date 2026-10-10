@@ -127,22 +127,49 @@ func (s *Store) GetChatAttachment(ctx context.Context, id string) (models.ChatAt
 	return attachment, nil
 }
 
-func (s *Store) ListChatConversations(ctx context.Context, options models.ChatConversationListOptions) ([]models.ChatConversation, error) {
-	limit := options.Limit
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	arguments := []any{strings.TrimSpace(options.Subject)}
+// conversationScope is the WHERE every read of the conversation list shares, so
+// a page and its total cannot be about different sets.
+func conversationScope(options models.ChatConversationListOptions) (string, []any) {
 	// A conversation matches on any of its messages, not only on the two the row
 	// happens to show: the thing you remember saying is often neither the first
 	// question nor the last answer.
 	match := ""
+	arguments := []any{strings.TrimSpace(options.Subject)}
 	if needle := strings.TrimSpace(options.Query); needle != "" {
 		match = ` AND EXISTS (SELECT 1 FROM chat_messages m
 			WHERE m.session_id = c.session_id AND m.content LIKE ? ESCAPE '\')`
 		arguments = append(arguments, "%"+escapeLike(needle)+"%")
 	}
-	arguments = append(arguments, limit)
+	return ` WHERE c.subject = ?` + match, arguments
+}
+
+// CountChatConversations answers how many conversations match, not how many fit
+// on a page -- the sidebar says "N 段对话" and offers a next page from it.
+func (s *Store) CountChatConversations(ctx context.Context, options models.ChatConversationListOptions) (int, error) {
+	scope, arguments := conversationScope(options)
+	var total int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM (
+			SELECT c.session_id FROM chat_messages c`+scope+`
+			GROUP BY c.session_id, c.subject
+		)`, arguments...).Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("count chat conversations: %w", err)
+	}
+	return total, nil
+}
+
+func (s *Store) ListChatConversations(ctx context.Context, options models.ChatConversationListOptions) ([]models.ChatConversation, error) {
+	limit := options.Limit
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	offset := options.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	scope, arguments := conversationScope(options)
+	arguments = append(arguments, limit, offset)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT c.session_id, c.subject, COUNT(*),
 			MAX(c.created_at),
@@ -152,11 +179,10 @@ func (s *Store) ListChatConversations(ctx context.Context, options models.ChatCo
 			COALESCE((SELECT p.content FROM chat_messages p
 				WHERE p.session_id = c.session_id AND p.status = 'done' AND p.content <> ''
 				ORDER BY p.created_at DESC LIMIT 1), '')
-		FROM chat_messages c
-		WHERE c.subject = ?`+match+`
+		FROM chat_messages c`+scope+`
 		GROUP BY c.session_id, c.subject
 		ORDER BY MAX(c.created_at) DESC
-		LIMIT ?`, arguments...)
+		LIMIT ? OFFSET ?`, arguments...)
 	if err != nil {
 		return nil, err
 	}
