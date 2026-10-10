@@ -480,7 +480,10 @@ describe("Chat page", () => {
 
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ query: "动能" })))
     expect(await screen.findByRole("option", { name: "知识点：动能定理" })).toBeInTheDocument()
-    expect(await screen.findByRole("status")).toHaveTextContent("找到 1 条")
+    // By its text, not by role: this panel has two other role=status regions
+    // (the empty note and the 回流 queue), so "status" alone is ambiguous enough
+    // that the full suite failed here under load and passed on its own.
+    expect(await screen.findByText(/找到 1 条/)).toBeInTheDocument()
     // A native select opens at the top, so the answer has to be at the top:
     // appending it behind three hundred loaded options is the same as hiding it.
     const options = within(screen.getByLabelText("关联对象")).getAllByRole("option")
@@ -524,8 +527,8 @@ describe("Chat page", () => {
     fireEvent.click(screen.getByRole("button", { name: "搜索" }))
 
     expect(await screen.findByRole("option", { name: "错题：求函数极值" })).toBeInTheDocument()
-    expect(screen.getByRole("option", { name: "课程：极值一节课" })).toBeInTheDocument()
-    expect(await screen.findByRole("status")).toHaveTextContent("找到 2 条")
+    expect(await screen.findByRole("option", { name: "课程：极值一节课" })).toBeInTheDocument()
+    expect(await screen.findByText(/找到 2 条/)).toBeInTheDocument()
     const options = within(screen.getByLabelText("关联对象")).getAllByRole("option")
     expect(options[1]).toHaveTextContent("错题：求函数极值")
     expect(options[2]).toHaveTextContent("课程：极值一节课")
