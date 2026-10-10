@@ -168,7 +168,10 @@ func inspectSQLite(ctx context.Context, path, table string) (Inspection, error) 
 		return Inspection{}, fmt.Errorf("iterate sqlite tables: %w", err)
 	}
 	if len(tables) == 0 {
-		return Inspection{}, errors.New("sqlite import has no user tables")
+		// Two different situations look identical here, and both are worth naming:
+		// an empty database, and one whose main file is still empty because the
+		// program that owns it keeps its rows in a write-ahead log next to it.
+		return Inspection{}, errors.New("这个 SQLite 文件里没有可导入的表：它可能是空的，也可能正被别的程序打开（数据还在旁边的 -wal 文件里），先关闭那个程序或改用它的备份文件。")
 	}
 	if table == "" {
 		table = tables[0]

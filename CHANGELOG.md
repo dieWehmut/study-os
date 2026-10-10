@@ -2,6 +2,22 @@
 
 ## 未发布
 
+### 导入：被拒的文件自己说明原因（顺带修掉一个分类 bug）
+
+- 用真实文件走了一遍导入向导（JSONL 与 SQLite 此前没有 e2e 覆盖）：JSONL 的字段自动识别正常
+  （`term`/`definition`/`subject` 直接对上）；用应用自己写的备份文件走 SQLite，22 张表的挑选与
+  10 个字段映射都正常。
+- 两条被拒路径原本在说英文，其中一句还难懂：`.txt` 显示 `unsupported import extension ".txt"`；
+  把「正在运行的本应用主库文件」传进去（开启 WAL 时主文件只有 4KB，表都在 -wal 里）显示
+  `sqlite import has no user tables`。现在分别是「不支持的文件类型「.txt」：请上传 CSV、JSONL 或
+  SQLite 文件。」与「这个 SQLite 文件里没有可导入的表：它可能是空的，也可能正被别的程序打开
+  （数据还在旁边的 -wal 文件里），先关闭那个程序或改用它的备份文件。」
+- 顺带发现并修掉一个**分类 bug**：HTTP 层是拿「消息里有没有某段英文」判断该回 400 还是 500 的。
+  我改写消息之后，`sqlite import has no user tables` 失去了它的 400，变成通用的
+  `import operation failed`——文案原来是**可承载行为**的。已补上新的中文标记，并新增
+  `TestImportRejectionsExplainThemselves` 把这两条路径的「400 + 说明」钉住：以后再改文案，
+  失败会出现在 CI 里，而不是读者面前。
+
 ### 信息图：长图会先说自己有多长
 
 - 把悬了几轮的取舍定下来：卡片**不裁也不缩**（裁掉内容，或缩到读不清，都比长图更糟），但当它超过

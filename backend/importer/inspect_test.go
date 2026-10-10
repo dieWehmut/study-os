@@ -79,6 +79,36 @@ func TestInspectCSVRejectsDuplicateHeaders(t *testing.T) {
 	}
 }
 
+// The reader sees this message when the picker's `accept` list was bypassed --
+// chosen by drag, renamed, or picked in another window -- so it has to name the
+// file and what would work, in the language the rest of the page is in.
+func TestUploadNamesTheFormatsItAccepts(t *testing.T) {
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	store, err := db.Open(ctx, filepath.Join(dataDir, "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	service := NewService(store, dataDir)
+
+	_, err = service.Upload(ctx, strings.NewReader("term,definition\nrace,condition\n"), "notes.txt", "")
+	if err == nil {
+		t.Fatal("expected a .txt upload to be rejected")
+	}
+	for _, want := range []string{".txt", "CSV", "JSONL", "SQLite"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not mention %q", err.Error(), want)
+		}
+	}
+
+	// A name with no extension at all says that instead of quoting an empty one.
+	_, err = service.Upload(ctx, strings.NewReader("term,definition\nrace,condition\n"), "notes", "")
+	if err == nil || !strings.Contains(err.Error(), "没有扩展名") {
+		t.Fatalf("extensionless upload: %v", err)
+	}
+}
+
 func TestPreviewCannotRollBackCommittedJob(t *testing.T) {
 	ctx := context.Background()
 	dataDir := t.TempDir()

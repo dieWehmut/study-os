@@ -116,7 +116,13 @@ func (s *Service) Upload(ctx context.Context, source io.Reader, originalName, se
 	}
 	ext := strings.ToLower(filepath.Ext(originalName))
 	if ext != ".csv" && ext != ".jsonl" && ext != ".ndjson" && ext != ".sqlite" && ext != ".sqlite3" && ext != ".db" {
-		return UploadResult{}, fmt.Errorf("unsupported import extension %q", ext)
+		// Shown to the reader as-is, so it names the file and what would work --
+		// the picker's `accept` list is not enforced once a file is chosen another
+		// way (a drag, a second window, a renamed file).
+		if ext == "" {
+			return UploadResult{}, errors.New("这个文件没有扩展名：请上传 CSV、JSONL 或 SQLite 文件。")
+		}
+		return UploadResult{}, fmt.Errorf("不支持的文件类型「%s」：请上传 CSV、JSONL 或 SQLite 文件。", ext)
 	}
 	jobID := newImportID("import")
 	root := s.DataDir

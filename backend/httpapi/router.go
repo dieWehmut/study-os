@@ -656,6 +656,12 @@ func writeImportError(response http.ResponseWriter, err error) {
 	writeJSON(response, status, map[string]string{"error": err.Error()})
 }
 
+// Which errors the reader can act on, and which are ours.
+//
+// This matches on the message text, which makes the wording load-bearing: a
+// message reworded and not listed here silently becomes a generic 500 instead of
+// a 400 that explains itself. The list is pinned by TestImportRejectionsExplain
+// Themselves, so that mistake fails in CI rather than in front of a reader.
 func isImportClientError(message string) bool {
 	for _, marker := range []string{
 		"unsupported import extension",
@@ -674,6 +680,10 @@ func isImportClientError(message string) bool {
 		"term and definition are required",
 		"item_type",
 		"import preview has no rows",
+		// The reader-facing messages these replaced.
+		"不支持的文件类型",
+		"没有扩展名",
+		"没有可导入的表",
 	} {
 		if strings.Contains(message, marker) {
 			return true
