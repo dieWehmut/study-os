@@ -456,7 +456,11 @@ describe("lesson detail page", () => {
     expect(screen.getByText("本节共 2 道题")).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText("第 2 题题干"), { target: { value: "力的单位？" } })
     fireEvent.change(screen.getByLabelText("第 2 题选项"), { target: { value: "m/s\nN" } })
-    fireEvent.change(screen.getByLabelText("第 2 题标准答案"), { target: { value: "N" } })
+    // The answer is picked from that question's own options, exactly like the first.
+    fireEvent.click(screen.getByRole("combobox", { name: "第 2 题标准答案" }))
+    const secondAnswer = await screen.findByRole("option", { name: "N" })
+    fireEvent.pointerDown(secondAnswer)
+    fireEvent.click(secondAnswer)
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }))
 

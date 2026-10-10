@@ -313,11 +313,18 @@ function PracticeSectionEditor({
           </label>
           <label className="grid gap-1 text-sm font-medium">
             标准答案
-            <Input
-              aria-label={`第 ${index + 2} 题标准答案`}
+            {/* The same picker as the first question: typing the exact option text by
+                hand is how an answer silently stops matching an option. */}
+            <Select
+              ariaLabel={`第 ${index + 2} 题标准答案`}
               value={question.correctAnswer}
-              onChange={(event) => onChange(updateExtraQuestion(draft, index, { ...question, correctAnswer: event.target.value }))}
-              placeholder="留空即未评分"
+              onValueChange={(value) => onChange(updateExtraQuestion(draft, index, { ...question, correctAnswer: value }))}
+              placeholder="未评分（不给答案）"
+              options={[
+                { value: "", label: "未评分（不给答案）" },
+                ...question.optionsText.split("\n").map((line) => line.trim()).filter((line) => line !== "")
+                  .map((option) => ({ value: option, label: option })),
+              ]}
             />
           </label>
           <label className="grid gap-1 text-sm font-medium">
