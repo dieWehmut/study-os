@@ -9,7 +9,7 @@ import {
   type VoiceRole,
   type VoiceRolePatch,
 } from "@/api/speech"
-import { downloadBackup, revealDataDirectory, verifyBackup } from "@/api/system"
+import { downloadBackup, requestBackupRestore, revealDataDirectory, verifyBackup } from "@/api/system"
 import { saveBlobFile } from "@/lib/download"
 import { failureMessage } from "@/lib/errors"
 import { applyUpdate, getUpdateStatus, type UpdateStatus } from "@/api/update"
@@ -122,6 +122,14 @@ export default function SettingsPanel() {
   // restored. Choosing between dated files is guesswork without it.
   const [verifiedBackups, setVerifiedBackups] = useState<Record<string, string>>({})
   const [verifyingBackup, setVerifyingBackup] = useState("")
+  // Restoring destroys the current data, so the first press only arms the row;
+  // the second one, on the same row, is the decision.
+  const [armingRestore, setArmingRestore] = useState("")
+  const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState("")
+  // A status payload from an older backend carries no restore field, and a banner
+  // about restore is not worth a crashed settings page.
+  const restoreStatus = status?.restore ?? { pending: false, last_recorded: false, last_ok: false }
   // 试听：同一时刻只允许一个角色在响，所以状态是「哪个角色」而不是「是否在响」。
   const [previewRoleId, setPreviewRoleId] = useState<string | null>(null)
   const [previewPhase, setPreviewPhase] = useState<"loading" | "playing">("loading")
@@ -258,6 +266,34 @@ export default function SettingsPanel() {
       setVerifiedBackups((current) => ({ ...current, [id]: failureMessage(reason, "这份备份无法恢复") }))
     } finally {
       setVerifyingBackup("")
+    }
+  }
+
+  /**
+   * Arm or carry out a restore.
+   *
+   * Two presses on the same row, because this is the one action in the app that
+   * throws data away: a stray click must not be able to. The request itself only
+   * schedules the work -- the app cannot replace its own database while it is
+   * open -- and then reloads the status so the waiting banner appears.
+   */
+  async function restoreBackup(id: string) {
+    if (restoring) return
+    if (armingRestore !== id) {
+      setArmingRestore(id)
+      setRestoreError("")
+      return
+    }
+    setRestoring(true)
+    setArmingRestore("")
+    setRestoreError("")
+    try {
+      await requestBackupRestore(id)
+      await load()
+    } catch (reason) {
+      setRestoreError(failureMessage(reason, "安排恢复失败"))
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -1040,6 +1076,29 @@ export default function SettingsPanel() {
                         {downloadingBackup === backup.id ? "下载中…" : "下载"}
                       </Button>
                     )}
+                    {/* Two presses on the same row: this is the one action here
+                        that throws data away, so a stray click must not reach it. */}
+                    {isStaticDemo() ? null : armingRestore === backup.id ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        disabled={restoring}
+                        onClick={() => void restoreBackup(backup.id)}
+                      >
+                        {restoring ? "安排中…" : "确认恢复这一份"}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={restoring}
+                        onClick={() => void restoreBackup(backup.id)}
+                      >
+                        恢复
+                      </Button>
+                    )}
                   </span>
                 </div>
                 <span className="text-xs text-muted-foreground">{formatDate(backup.created_at)}</span>
@@ -1052,8 +1111,29 @@ export default function SettingsPanel() {
               </div>
             ))}
             <p className="text-xs text-muted-foreground">位置：{status.backup.directory}</p>
+            {/* Both halves of a restore that cannot happen now: the request waiting
+                for the next start, and how the last one went. Without the second,
+                a failed restore is indistinguishable from one nobody asked for. */}
+            {restoreStatus.pending ? (
+              <p role="status" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">
+                已安排恢复：下次启动学习系统时，会用选中的那份备份替换当前数据。
+              </p>
+            ) : null}
+            {restoreStatus.last_recorded ? (
+              <p
+                role={restoreStatus.last_ok ? "status" : "alert"}
+                className={restoreStatus.last_ok ? "text-sm text-muted-foreground" : "text-sm text-destructive"}
+              >
+                {restoreStatus.last_ok
+                  ? "上次恢复已完成。"
+                  : `上次恢复没有成功，数据保持原样：${failureMessage(new Error(restoreStatus.last_detail ?? ""), "原因不明")}`}
+              </p>
+            ) : null}
             {backupDownloadError ? (
               <p role="alert" className="text-sm text-destructive">{backupDownloadError}</p>
+            ) : null}
+            {restoreError ? (
+              <p role="alert" className="text-sm text-destructive">{restoreError}</p>
             ) : null}
             {notice?.kind === "backup" ? (
               <p role="status" aria-live="polite" className="text-sm text-primary">{notice.text}</p>

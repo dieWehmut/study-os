@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getSystemStatus: vi.fn(),
   revealDataDirectory: vi.fn(),
   listBackups: vi.fn(),
+  requestBackupRestore: vi.fn(),
   updateSettings: vi.fn(),
   createBackup: vi.fn(),
   getVendors: vi.fn(),
@@ -56,6 +57,7 @@ const status = {
   review: { daily_limit: 20 },
   backup: { directory: "D:/StudyOS/data/backups", count: 1, last_created_at: "2026-08-02T00:00:00Z" },
   app: { version: "0.1.0", platform: "windows" },
+  restore: { pending: false, last_recorded: false, last_ok: false },
 }
 
 // Mirrors backend/config/speech.go: any OpenAI-style audio endpoint is allowed,
@@ -547,5 +549,36 @@ describe("SettingsPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "试听 晓晴" }))
 
     expect(await screen.findByText("试听失败：语音服务没有响应")).toBeInTheDocument()
+  })
+
+  it("restoring asks twice, then says the restore is waiting for the next start", async () => {
+    // This is the one action in the app that throws data away, so a single stray
+    // click must not reach it.
+    mocks.requestBackupRestore.mockResolvedValue({ status: "scheduled", message: "已记下" })
+    mocks.getSystemStatus
+      .mockResolvedValueOnce(status)
+      .mockResolvedValue({ ...status, restore: { pending: true, last_recorded: false, last_ok: false } })
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "恢复" }))
+    expect(mocks.requestBackupRestore).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复这一份" }))
+
+    await waitFor(() => expect(mocks.requestBackupRestore).toHaveBeenCalledWith("daily-1"))
+    expect(await screen.findByText(/已安排恢复/)).toBeInTheDocument()
+  })
+
+  it("reports a restore that did not work instead of staying quiet", async () => {
+    // A failure at the next start is invisible from here unless the page says so.
+    mocks.getSystemStatus.mockResolvedValue({
+      ...status,
+      restore: { pending: false, last_recorded: true, last_ok: false, last_detail: "sqlite integrity check: broken" },
+    })
+    render(<SettingsPanel />)
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("上次恢复没有成功")
+    expect(alert).toHaveTextContent("数据保持原样")
   })
 })

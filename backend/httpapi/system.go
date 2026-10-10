@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"study-os/backend/app"
+	"study-os/backend/backup"
 	"study-os/backend/config"
 	"study-os/backend/version"
 )
@@ -21,6 +22,19 @@ type systemStatusResponse struct {
 	Review   reviewStatus   `json:"review"`
 	Backup   backupStatus   `json:"backup"`
 	App      appStatus      `json:"app"`
+	Restore  restoreStatus  `json:"restore"`
+}
+
+// restoreStatus tells the settings page two things it cannot see otherwise: that
+// a restore is waiting for the next start, and how the last one went. Without it
+// a failed restore is indistinguishable from one nobody asked for.
+type restoreStatus struct {
+	Pending      bool   `json:"pending"`
+	PendingPath  string `json:"pending_path,omitempty"`
+	LastOK       bool   `json:"last_ok"`
+	LastDetail   string `json:"last_detail,omitempty"`
+	LastResolved string `json:"last_resolved_at,omitempty"`
+	LastRecorded bool   `json:"last_recorded"`
 }
 
 type providerStatus struct {
@@ -87,7 +101,23 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 	if len(records) > 0 {
 		status.Backup.LastCreatedAt = records[0].CreatedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00")
 	}
+	status.Restore = restoreStatusFor(application.Config.DataDir)
 	writeJSON(response, http.StatusOK, status)
+}
+
+func restoreStatusFor(dataDir string) restoreStatus {
+	status := restoreStatus{}
+	if path, ok := backup.ReadRestoreRequest(dataDir); ok {
+		status.Pending = true
+		status.PendingPath = path
+	}
+	if outcome, ok := backup.ReadRestoreOutcome(dataDir); ok {
+		status.LastRecorded = true
+		status.LastOK = outcome.OK
+		status.LastDetail = outcome.Detail
+		status.LastResolved = outcome.ResolvedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00")
+	}
+	return status
 }
 
 func providerStatusFor(application *app.App) providerStatus {

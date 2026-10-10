@@ -35,6 +35,21 @@ export interface SystemStatus {
   review: ReviewStatus
   backup: BackupStatus
   app: AppStatus
+  restore: RestoreStatus
+}
+
+/**
+ * A restore cannot happen while the app is running, so the page has to show both
+ * halves of it: the request waiting for the next start, and how the last one went.
+ * Without the second, a failed restore looks exactly like one nobody asked for.
+ */
+export interface RestoreStatus {
+  pending: boolean
+  pending_path?: string
+  last_recorded: boolean
+  last_ok: boolean
+  last_detail?: string
+  last_resolved_at?: string
 }
 
 export interface BackupRecord {
@@ -81,6 +96,7 @@ export function normalizeSystemStatus(value: unknown): SystemStatus {
   const review = recordValue(input.review)
   const backup = recordValue(input.backup)
   const app = recordValue(input.app)
+  const restore = recordValue(input.restore)
   const normalizedProvider: ProviderStatus = {
     name: stringValue(provider.name, "mock"),
     mode: stringValue(provider.mode, "local"),
@@ -106,6 +122,14 @@ export function normalizeSystemStatus(value: unknown): SystemStatus {
     app: {
       version: stringValue(app.version, "开发版"),
       platform: stringValue(app.platform, "web"),
+    },
+    restore: {
+      pending: restore.pending === true,
+      ...(stringValue(restore.pending_path) ? { pending_path: stringValue(restore.pending_path) } : {}),
+      last_recorded: restore.last_recorded === true,
+      last_ok: restore.last_ok === true,
+      ...(stringValue(restore.last_detail) ? { last_detail: stringValue(restore.last_detail) } : {}),
+      ...(stringValue(restore.last_resolved_at) ? { last_resolved_at: stringValue(restore.last_resolved_at) } : {}),
     },
   }
 }
@@ -181,4 +205,15 @@ export interface BackupVerification {
  */
 export function verifyBackup(id: string): Promise<BackupVerification> {
   return apiRequest<BackupVerification>(`/backups/${encodeURIComponent(id)}/verify`)
+}
+
+/**
+ * Ask for a backup to be restored at the next start.
+ *
+ * Not a restore now: the running app holds the database open, so the request is
+ * recorded and carried out before the store is next opened. The server answers
+ * 202 to say exactly that.
+ */
+export function requestBackupRestore(id: string): Promise<{ status: string; message: string }> {
+  return apiRequest<{ status: string; message: string }>(`/backups/${encodeURIComponent(id)}/restore`, { method: "POST" })
 }
