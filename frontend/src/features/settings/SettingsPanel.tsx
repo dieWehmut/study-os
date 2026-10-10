@@ -1143,7 +1143,10 @@ export default function SettingsPanel() {
             {restoreStatus.pending ? (
               <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
                 <p role="status" className="text-sm text-primary">
-                  已安排恢复：下次启动学习系统时，会用选中的那份备份替换当前数据。
+                  {/* Which file, like the finished report: the row it came from may
+                      be scrolled out of sight, and "选中的那份" is the reader's
+                      memory, not the page's. */}
+                  已安排恢复：下次启动学习系统时，会用 {restoreStatus.pending_path?.split(/[\\/]/).pop() ?? "选中的那份备份"} 替换当前数据。
                 </p>
                 {/* A request that cannot be taken back is a trap: picking the wrong
                     file must be undoable before the next start acts on it. */}

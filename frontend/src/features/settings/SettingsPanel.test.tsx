@@ -557,8 +557,11 @@ describe("SettingsPanel", () => {
     // click must not reach it.
     mocks.requestBackupRestore.mockResolvedValue({ status: "scheduled", message: "已记下" })
     mocks.getSystemStatus
-      .mockResolvedValueOnce(status)
-      .mockResolvedValue({ ...status, restore: { pending: true, last_recorded: false, last_ok: false } })
+      .mockResolvedValueOnce({
+        ...status,
+        restore: { pending: true, pending_path: "D:/StudyOS/data/backups/daily/study-daily-20261010.db", last_recorded: false, last_ok: false },
+      })
+      .mockResolvedValue({ ...status, restore: { pending: true, pending_path: "D:/StudyOS/data/backups/daily/study-daily-20261010.db", last_recorded: false, last_ok: false } })
     render(<SettingsPanel />)
 
     fireEvent.click(await screen.findByRole("button", { name: "恢复" }))
@@ -627,11 +630,17 @@ describe("SettingsPanel", () => {
     // Picking the wrong file must be undoable before the next start acts on it.
     mocks.cancelBackupRestore.mockResolvedValue({ status: "cancelled" })
     mocks.getSystemStatus
-      .mockResolvedValueOnce({ ...status, restore: { pending: true, last_recorded: false, last_ok: false } })
+      .mockResolvedValueOnce({
+        ...status,
+        restore: { pending: true, pending_path: "D:/StudyOS/data/backups/daily/study-daily-20261010.db", last_recorded: false, last_ok: false },
+      })
       .mockResolvedValue(status)
     render(<SettingsPanel />)
 
-    expect(await screen.findByText(/已安排恢复/)).toBeInTheDocument()
+    // Named, like the finished report: "选中的那份" is the reader's memory, not
+    // the page's, and the row can be scrolled out of sight.
+    const banner = await screen.findByText(/已安排恢复/)
+    expect(banner).toHaveTextContent("study-daily-20261010.db")
     fireEvent.click(screen.getByRole("button", { name: "取消安排" }))
 
     await waitFor(() => expect(mocks.cancelBackupRestore).toHaveBeenCalled())
