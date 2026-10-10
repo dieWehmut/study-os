@@ -125,6 +125,25 @@ func (s *Store) ListLessonPracticeAttempts(ctx context.Context, lessonID, sectio
 	return items, nil
 }
 
+// CountLessonPracticeAttempts answers how many times this section was answered,
+// not how many fit in the page the practice panel shows -- that panel prints the
+// number as "已作答 N 次".
+func (s *Store) CountLessonPracticeAttempts(ctx context.Context, lessonID, sectionID string) (int, error) {
+	lessonID = strings.TrimSpace(lessonID)
+	sectionID = strings.TrimSpace(sectionID)
+	if lessonID == "" || sectionID == "" {
+		return 0, fmt.Errorf("%w: lesson and section ids are required", ErrInvalidLessonPracticeAttempt)
+	}
+	var total int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM lesson_attempts WHERE lesson_id = ? AND section_id = ?`,
+		lessonID, sectionID).Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("count lesson practice attempts: %w", err)
+	}
+	return total, nil
+}
+
 func scanLessonPracticeAttempt(row scanner) (models.LessonPracticeAttempt, error) {
 	var item models.LessonPracticeAttempt
 	var createdAt string

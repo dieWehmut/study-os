@@ -98,7 +98,13 @@ func handleLessonPracticeAttemptList(response http.ResponseWriter, request *http
 		writeLessonPracticeError(response, err)
 		return
 	}
-	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+	total, err := application.Store.CountLessonPracticeAttempts(request.Context(), lesson.ID, section.ID)
+	if err != nil {
+		writeLessonPracticeError(response, err)
+		return
+	}
+	// The total, not the page: the panel prints it as "已作答 N 次".
+	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": total})
 }
 
 func getLessonPracticeSection(request *http.Request, application *app.App, lessonID, sectionID string) (models.Lesson, models.LessonSection, error) {
