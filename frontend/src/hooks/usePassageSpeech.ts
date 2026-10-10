@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 import { synthesizeSentence } from "@/api/audio"
 import { splitSentences } from "@/lib/sentences"
+import { failureMessage } from "@/lib/errors"
 
 export type PassageSpeechStatus = "idle" | "preparing" | "playing" | "error"
 
@@ -125,7 +126,7 @@ export function usePassageSpeech(): PassageSpeech {
         teardown()
         setStatus("error")
         // 一句失败就停下并说出来。跳过去接着读，等于假装整段都念完了。
-        setError(cause instanceof Error ? cause.message : "朗读失败")
+        setError(failureMessage(cause, "朗读失败"))
       }
 
       const play = async (index: number) => {

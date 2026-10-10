@@ -12,6 +12,7 @@ import {
   type EnglishCorpusEntry,
 } from "@/features/english-corpora/english-corpora"
 import { cn } from "@/lib/utils"
+import { failureMessage } from "@/lib/errors"
 
 const visibleLimit = 120
 
@@ -30,7 +31,7 @@ export default function EnglishCorpora() {
       .then((loaded) => setEntries(Object.fromEntries(loaded)))
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : "无法读取内置英语语料")
+          setError(failureMessage(cause, "无法读取内置英语语料"))
         }
       })
     return () => controller.abort()

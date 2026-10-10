@@ -115,7 +115,7 @@ function KnowledgePage({
       setCount(result.count)
       setScheduledIds((current) => new Set([...current, ...(result.scheduled_ids ?? [])]))
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : "读取更多知识点失败，请重试。")
+      setError(failureMessage(reason, "读取更多知识点失败"))
     } finally {
       setLoadingMore(false)
     }
@@ -136,7 +136,7 @@ function KnowledgePage({
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return
-        setError(reason instanceof Error ? reason.message : "知识库暂时无法读取，请重试。")
+        setError(failureMessage(reason, "无法读取知识库"))
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
@@ -190,7 +190,7 @@ function KnowledgePage({
       })
       .catch((reason: unknown) => {
         if (!active || selectedSummary) return
-        setError(reason instanceof Error ? reason.message : "知识点详情暂时无法读取，请重试。")
+        setError(failureMessage(reason, "无法读取知识点详情"))
       })
     return () => {
       active = false

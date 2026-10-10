@@ -130,7 +130,9 @@ describe("Knowledge page", () => {
 
     render(<Knowledge />, ["/knowledge?item=k-complicated"])
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("detail unavailable")
+    // Nothing answered, so the page says what that usually means rather than
+    // passing on an English internal from a thrown Error.
+    expect(await screen.findByRole("alert")).toHaveTextContent("无法读取知识点详情，请确认本地后端正在运行。")
     fireEvent.click(screen.getByRole("button", { name: "重试" }))
     expect(await screen.findByRole("heading", { name: "complicated" })).toBeInTheDocument()
     expect(mocks.getKnowledge).toHaveBeenCalledTimes(2)
@@ -147,7 +149,7 @@ describe("Knowledge page", () => {
 
     render(<Knowledge />, ["/knowledge?item=k-complicated"])
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("list unavailable")
+    expect(await screen.findByRole("alert")).toHaveTextContent("无法读取知识库，请确认本地后端正在运行。")
     expect(await screen.findByRole("heading", { name: "complicated" })).toBeInTheDocument()
   })
 

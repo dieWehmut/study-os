@@ -325,7 +325,7 @@ export default function SettingsPanel() {
       setPreviewPhase("playing")
     } catch (cause) {
       stopPreview()
-      setPreviewError(cause instanceof Error ? cause.message : "试听失败")
+      setPreviewError(failureMessage(cause, "试听失败"))
     }
   }
 

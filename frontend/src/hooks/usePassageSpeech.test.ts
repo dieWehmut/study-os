@@ -161,7 +161,8 @@ describe("reading a passage aloud", () => {
     act(() => result.current.start(passage))
 
     await waitFor(() => expect(result.current.status).toBe("error"))
-    expect(result.current.error).toBe("语音服务没有响应")
+    // Named as 朗读 failing, with the server's own reason after it.
+    expect(result.current.error).toBe("朗读失败：语音服务没有响应")
     expect(AudioStub.instances).toHaveLength(0)
   })
 

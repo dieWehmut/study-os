@@ -546,6 +546,6 @@ describe("SettingsPanel", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "试听 晓晴" }))
 
-    expect(await screen.findByText("语音服务没有响应")).toBeInTheDocument()
+    expect(await screen.findByText("试听失败：语音服务没有响应")).toBeInTheDocument()
   })
 })
