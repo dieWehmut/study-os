@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, BookOpenCheck, CheckCircle2, CircleHelp, Clock3, FileText, Pencil, RotateCcw } from "lucide-react"
+import { ArrowLeft, BookOpenCheck, CheckCircle2, CircleHelp, Clock3, FileText, History, Pencil, RotateCcw } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
 
-import { getLesson, LESSON_SECTION_ORDER, updateLesson, type Lesson, type LessonSection } from "@/api/lessons"
+import {
+  getLesson,
+  LESSON_SECTION_ORDER,
+  listLessonVersions,
+  updateLesson,
+  type Lesson,
+  type LessonSection,
+  type LessonVersionSummary,
+} from "@/api/lessons"
 import { ApiError } from "@/api/client"
 import { Badge } from "@/components/ui/badge"
 import LessonPractice from "@/components/lessons/LessonPractice"
@@ -44,6 +52,12 @@ const statusLabels: Record<string, string> = {
 
 function statusLabel(status: string): string {
   return statusLabels[status] ?? status
+}
+
+function formatMoment(value: string): string {
+  if (!value) return "时间未知"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN")
 }
 
 function sectionType(section: LessonSection): string {
@@ -178,6 +192,86 @@ export default function LessonDetail() {
   const [draftSubject, setDraftSubject] = useState("")
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState("")
+  const [history, setHistory] = useState<LessonVersionSummary[] | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  // The version the lesson is actually on, which is not `lesson.version` while an
+  // older revision is on screen.
+  const [currentVersion, setCurrentVersion] = useState(0)
+  const [previewVersion, setPreviewVersion] = useState<number | null>(null)
+
+  async function refreshHistory() {
+    if (!lesson) return
+    try {
+      setHistory(await listLessonVersions(lesson.id))
+    } catch {
+      setNotice("读取版本历史失败，请确认本地后端正在运行。")
+    }
+  }
+
+  async function openHistory() {
+    if (!lesson) return
+    setHistoryOpen(true)
+    setNotice("")
+    setHistory(null)
+    await refreshHistory()
+  }
+
+  /**
+   * Show an older revision.
+   *
+   * Read-only on purpose: writing from here would mean writing against a version
+   * that is no longer current, and the server would (rightly) refuse it. 恢复这一版
+   * is the way back, and it is a deliberate click.
+   */
+  async function viewVersion(version: number) {
+    if (!lesson) return
+    setNotice("")
+    try {
+      const value = await getLesson(lesson.id, version)
+      setPreviewVersion(version)
+      setEditing(false)
+      setDrafts({})
+      setLesson(value)
+    } catch {
+      setNotice("读取这一版失败。")
+    }
+  }
+
+  async function leavePreview() {
+    if (!lesson) return
+    setNotice("")
+    try {
+      setLesson(await getLesson(lesson.id))
+      setPreviewVersion(null)
+    } catch {
+      setNotice("回到当前版本失败。")
+    }
+  }
+
+  /** Restore a revision by writing it again: versions are immutable, so the old
+   * one stays in the history and the restore is itself a new version. */
+  async function restoreVersion(version: number) {
+    if (!lesson || saving) return
+    setSaving(true)
+    setNotice("")
+    try {
+      const [revision, current] = await Promise.all([getLesson(lesson.id, version), getLesson(lesson.id)])
+      const updated = await updateLesson(lesson.id, {
+        version: current.version ?? 1,
+        document: { schema_version: revision.document?.schema_version ?? 1, sections: revision.sections },
+      })
+      setLesson(updated)
+      setCurrentVersion(updated.version ?? 0)
+      setPreviewVersion(null)
+      setHistory(await listLessonVersions(lesson.id))
+      setNotice(`已恢复第 ${version} 版 · 现在是版本 ${updated.version ?? ""}`.trim())
+    } catch (failure) {
+      const conflict = failure instanceof ApiError && failure.status === 409
+      setNotice(conflict ? "恢复失败：这节课刚被改过，刷新后再试。" : "恢复失败，请确认本地后端正在运行。")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   function startEditing() {
     if (!lesson) return
@@ -228,9 +322,12 @@ export default function LessonDetail() {
         document: { schema_version: lesson.document?.schema_version ?? 1, sections },
       })
       setLesson(updated)
+      setCurrentVersion(updated.version ?? 0)
       setEditing(false)
       setDrafts({})
       setNotice(updated.version ? `已保存 · 版本 ${updated.version}` : "已保存")
+      // Only when the history is already on screen: saving should not pop it open.
+      if (historyOpen) void refreshHistory()
     } catch (failure) {
       const conflict = failure instanceof ApiError && failure.status === 409
       setNotice(conflict
@@ -248,7 +345,10 @@ export default function LessonDetail() {
       setError("")
       try {
         const value = await getLesson(id)
-        if (active) setLesson(value)
+        if (active) {
+          setLesson(value)
+          setCurrentVersion(value.version ?? 0)
+        }
       } catch {
         if (active) setError("课程暂时无法读取，请确认本地后端正在运行。")
       } finally {
@@ -312,19 +412,33 @@ export default function LessonDetail() {
             </>
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {lesson.version ? (
+              <Button size="sm" variant="ghost" onClick={() => void openHistory()}>
+                <History data-icon="inline-start" />版本历史
+              </Button>
+            ) : null}
             {editing ? (
               <>
                 <Button size="sm" disabled={saving} onClick={() => void saveEdits()}>{saving ? "保存中…" : "保存"}</Button>
                 <Button size="sm" variant="outline" disabled={saving} onClick={cancelEditing}>取消</Button>
               </>
-            ) : (
+            ) : previewVersion === null ? (
               <Button size="sm" variant="outline" onClick={startEditing}>
                 <Pencil data-icon="inline-start" />编辑内容
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
         {notice ? <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</p> : null}
+        {previewVersion !== null ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            <span>正在查看第 {previewVersion} 版（只读）</span>
+            <Button size="xs" variant="outline" onClick={() => void leavePreview()}>回到当前版本</Button>
+            <Button size="xs" variant="outline" disabled={saving} onClick={() => void restoreVersion(previewVersion)}>
+              恢复这一版
+            </Button>
+          </div>
+        ) : null}
         {editing ? (
           <label className="grid gap-1 text-sm font-medium">
             课程标题
@@ -343,6 +457,43 @@ export default function LessonDetail() {
           {lesson.version ? <span>版本 {lesson.version}</span> : null}
         </div>
       </header>
+
+      {/* The immutable history, one line per version. 恢复 is a deliberate click:
+          it writes the old document as a new version rather than overwriting. */}
+      {historyOpen ? (
+        <Card>
+          <CardHeader className="gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-base">版本历史</CardTitle>
+              <Button size="xs" variant="ghost" onClick={() => setHistoryOpen(false)}>收起</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">文档版本不可变：恢复旧版会写成新的一版，旧版永远留着。</p>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {history === null ? (
+              <p className="text-sm text-muted-foreground">正在读取…</p>
+            ) : history.length === 0 ? (
+              <p className="text-sm text-muted-foreground">还没有版本记录。</p>
+            ) : history.map((entry) => (
+              <div key={entry.version} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted/45 px-3 py-2 text-sm">
+                <strong>第 {entry.version} 版</strong>
+                {entry.version === currentVersion ? <Badge variant="secondary">当前</Badge> : null}
+                <span className="text-xs text-muted-foreground">
+                  {formatMoment(entry.created_at)} · {entry.sections_filled} 节有内容
+                </span>
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  <Button size="xs" variant="outline" onClick={() => void viewVersion(entry.version)}>查看</Button>
+                  {entry.version !== currentVersion ? (
+                    <Button size="xs" variant="outline" disabled={saving} onClick={() => void restoreVersion(entry.version)}>
+                      恢复这一版
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {objectives.length ? (
         <Card className="border-primary/25 bg-primary/5">

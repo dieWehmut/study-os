@@ -193,8 +193,30 @@ export function listLessons(options: LessonListOptions = {}): Promise<LessonList
   }))
 }
 
-export function getLesson(id: string): Promise<Lesson> {
-  return apiRequest<unknown>(`/lessons/${encodeURIComponent(id)}`).then(normalizeLesson)
+export function getLesson(id: string, version?: number): Promise<Lesson> {
+  const suffix = version === undefined ? "" : `?version=${Math.trunc(version)}`
+  return apiRequest<unknown>(`/lessons/${encodeURIComponent(id)}${suffix}`).then(normalizeLesson)
+}
+
+export interface LessonVersionSummary {
+  version: number
+  created_at: string
+  /** How many of the ten sections carry anything, so a history is readable at a glance. */
+  sections_filled: number
+}
+
+/** The immutable document history, newest first. */
+export function listLessonVersions(id: string): Promise<LessonVersionSummary[]> {
+  return apiRequest<{ items?: unknown[] }>(`/lessons/${encodeURIComponent(id)}/versions`).then((result) =>
+    (result.items ?? []).map((value) => {
+      const raw = value && typeof value === "object" ? value as Record<string, unknown> : {}
+      return {
+        version: typeof raw.version === "number" ? raw.version : 0,
+        created_at: typeof raw.created_at === "string" ? raw.created_at : "",
+        sections_filled: typeof raw.sections_filled === "number" ? raw.sections_filled : 0,
+      }
+    }),
+  )
 }
 
 export interface LessonCreateInput {

@@ -9,13 +9,19 @@ import LessonDetail from "./LessonDetail"
 const mocks = vi.hoisted(() => ({
   getLesson: vi.fn(),
   updateLesson: vi.fn(),
+  listLessonVersions: vi.fn(),
   submitLessonPracticeAttempt: vi.fn(),
   listLessonPracticeAttempts: vi.fn(),
 }))
 
 vi.mock("@/api/lessons", async () => {
   const actual = await vi.importActual<typeof import("@/api/lessons")>("@/api/lessons")
-  return { ...actual, getLesson: mocks.getLesson, updateLesson: mocks.updateLesson }
+  return {
+    ...actual,
+    getLesson: mocks.getLesson,
+    updateLesson: mocks.updateLesson,
+    listLessonVersions: mocks.listLessonVersions,
+  }
 })
 
 vi.mock("@/api/lesson-practice", () => ({
@@ -65,6 +71,11 @@ describe("lesson detail page", () => {
       created_at: "2026-08-20T00:00:00Z",
     })
     mocks.listLessonPracticeAttempts.mockResolvedValue({ count: 0, items: [] })
+    mocks.listLessonVersions.mockResolvedValue([
+      { version: 3, created_at: "2026-08-21T10:00:00Z", sections_filled: 5 },
+      { version: 2, created_at: "2026-08-20T10:00:00Z", sections_filled: 2 },
+      { version: 1, created_at: "2026-08-19T10:00:00Z", sections_filled: 0 },
+    ])
   })
 
   it("orders fixed sections for scanning and exposes provenance", async () => {
@@ -302,5 +313,52 @@ describe("lesson detail page", () => {
     // Back to reading: the page shows what was saved rather than the old name.
     expect(await screen.findByRole("heading", { name: "牛顿第二定律" })).toBeInTheDocument()
     expect(screen.getByText("已发布")).toBeInTheDocument()
+  })
+
+  it("reads an older revision, and says it is read-only", async () => {
+    // Documents are immutable, so the history is the only way back to what a
+    // lesson said before it was edited.
+    mocks.getLesson.mockImplementation((_id: string, version?: number) => Promise.resolve(
+      version === undefined
+        ? { ...lesson, version: 3 }
+        : { ...lesson, version, sections: [{ id: "concept", kind: "concept", title: "核心概念", body: "旧版的一句话" }] },
+    ))
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "版本历史" }))
+    expect(await screen.findByText(/第 3 版/)).toBeInTheDocument()
+    expect(screen.getByText("当前")).toBeInTheDocument()
+    expect(screen.getByText(/第 1 版/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole("button", { name: "查看" })[2])
+
+    await waitFor(() => expect(mocks.getLesson).toHaveBeenCalledWith("lesson-1", 1))
+    expect(await screen.findByText("正在查看第 1 版（只读）")).toBeInTheDocument()
+    expect(screen.getByText("旧版的一句话")).toBeInTheDocument()
+    // Editing from here would write against a version that is no longer current.
+    expect(screen.queryByRole("button", { name: "编辑内容" })).not.toBeInTheDocument()
+  })
+
+  it("restores a revision by writing it again, not by overwriting it", async () => {
+    const oldDocument = { id: "concept", kind: "concept", title: "核心概念", body: "旧版的一句话" }
+    mocks.getLesson.mockImplementation((_id: string, version?: number) => Promise.resolve(
+      version === undefined
+        ? { ...lesson, version: 3 }
+        : { ...lesson, version, sections: [oldDocument] },
+    ))
+    mocks.updateLesson.mockResolvedValue({ ...lesson, version: 4, sections: [oldDocument] })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "版本历史" }))
+    await screen.findByText(/第 3 版/)
+    fireEvent.click(screen.getAllByRole("button", { name: "恢复这一版" })[1])
+
+    await waitFor(() => expect(mocks.updateLesson).toHaveBeenCalled())
+    const [, input] = mocks.updateLesson.mock.calls[0]
+    // Written against the version that is current (3), with the old document: the
+    // result is version 4 and version 1 stays in the history.
+    expect(input.version).toBe(3)
+    expect(input.document.sections[0].body).toBe("旧版的一句话")
+    expect(await screen.findByRole("status")).toHaveTextContent("已恢复第 1 版 · 现在是版本 4")
   })
 })

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { getLesson, listLessons, normalizeLesson, updateLesson } from "./lessons"
+import { getLesson, listLessons, listLessonVersions, normalizeLesson, updateLesson } from "./lessons"
 
 const mocks = vi.hoisted(() => ({ apiRequest: vi.fn() }))
 
@@ -87,5 +87,24 @@ describe("lessons api", () => {
 
     expect(lesson.source?.title).toBe("Mechanics notes")
     expect(lesson.sections.map((section) => section.kind)).toEqual(["summary", "diagnostic"])
+  })
+
+  it("reads one revision by version, and reads the history beside it", async () => {
+    // Documents are immutable, so `?version=` and the history endpoint are the
+    // only way back to what a lesson said before it was edited.
+    mocks.apiRequest.mockResolvedValueOnce({ id: "lesson-1", version: 2, sections: [] })
+    await getLesson("lesson-1", 2)
+    expect(mocks.apiRequest).toHaveBeenNthCalledWith(1, "/lessons/lesson-1?version=2")
+
+    mocks.apiRequest.mockResolvedValueOnce({
+      items: [{ version: 2, created_at: "2026-08-21T10:00:00Z", sections_filled: 5 }, { version: 1 }],
+      count: 2,
+    })
+    await expect(listLessonVersions("lesson-1")).resolves.toEqual([
+      { version: 2, created_at: "2026-08-21T10:00:00Z", sections_filled: 5 },
+      // A row that lost a field still comes back with the shape the page reads.
+      { version: 1, created_at: "", sections_filled: 0 },
+    ])
+    expect(mocks.apiRequest).toHaveBeenNthCalledWith(2, "/lessons/lesson-1/versions")
   })
 })
