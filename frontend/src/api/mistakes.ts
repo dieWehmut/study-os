@@ -1,4 +1,4 @@
-import { ApiError, apiRequest, resolveApiBase } from "./client"
+import { apiRequest, apiRequestText } from "./client"
 import { normalizeSubjectAttemptEvidence, type MistakeEvidence } from "@/lib/mistake-evidence"
 import type { MistakeCause, MistakeRecord } from "@/lib/mistakes"
 
@@ -128,12 +128,9 @@ export async function exportMistakes(options: { subject?: string; query?: string
   if (options.subject) params.set("subject", options.subject)
   if (options.query) params.set("q", options.query)
   const suffix = params.toString()
-  const response = await fetch(`${resolveApiBase()}/mistakes/export${suffix ? `?${suffix}` : ""}`)
-  if (!response.ok) {
-    const detail = (await response.text()).trim()
-    throw new ApiError(response.status, detail || `导出失败（${response.status}）`)
-  }
-  return response.text()
+  // Authenticated like every other call: the desktop shell passes a token, which
+  // a fetch built from resolveApiBase alone would leave behind.
+  return apiRequestText(`/mistakes/export${suffix ? `?${suffix}` : ""}`)
 }
 
 export async function recordMistake(filed: {

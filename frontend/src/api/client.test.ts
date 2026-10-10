@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { apiRequest, apiRequestBlob, filenameFromDisposition, resolveApiBase, resolveApiConfig } from "./client"
+import { apiRequest, apiRequestBlob, apiRequestText, filenameFromDisposition, resolveApiBase, resolveApiConfig } from "./client"
 
 describe("resolveApiBase", () => {
   const originalBridge = window.__STUDY_OS_API_BASE__
@@ -190,5 +190,26 @@ describe("apiRequestBlob", () => {
       status: 404,
       message: "备份文件已经不在了，列表会在下次刷新时更新",
     })
+  })
+
+  it("carries the desktop token on a file request too", async () => {
+    // The exports and the backup download used to be built from resolveApiBase
+    // alone, so the desktop shell -- which authenticates with a token -- would
+    // have answered them 401 while the browser build worked.
+    window.go = {
+      main: {
+        DesktopApp: {
+          APIBaseURL: vi.fn().mockResolvedValue("http://127.0.0.1:43123/"),
+          APIToken: vi.fn().mockResolvedValue("desk-token"),
+        },
+      },
+    } as unknown as Window["go"]
+    const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue(new Response("term,definition\n", { status: 200 }))
+
+    await expect(apiRequestText("/knowledge/export?format=csv")).resolves.toBe("term,definition\n")
+
+    const [, init] = fetchSpy.mock.calls[0]
+    const headers = new Headers(init?.headers)
+    expect(headers.get("Authorization")).toBe("Bearer desk-token")
   })
 })

@@ -143,11 +143,21 @@ export function filenameFromDisposition(disposition: string | null): string {
  * One request that is not JSON: a file the reader asked to keep.
  *
  * It goes through `resolveApiConfig` for the same reason `apiRequest` does -- the
- * desktop shell authenticates with a token, and a plain `<a href>` to the API
- * would arrive without it.
+ * desktop shell authenticates with a token, and a plain `<a href>` (or a bare
+ * `fetch` to `resolveApiBase`) would arrive without it.
  */
 export async function apiRequestBlob(path: string): Promise<{ blob: Blob; filename: string }> {
-  if (isStaticDemo()) throw new ApiError(404, "演示版没有本地文件")
+  const response = await fileRequest(path)
+  return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get("Content-Disposition")) }
+}
+
+/** The same authenticated request, for a file that is plain text (a CSV export). */
+export async function apiRequestText(path: string): Promise<string> {
+  return (await fileRequest(path)).text()
+}
+
+async function fileRequest(path: string): Promise<Response> {
+  if (isStaticDemo()) throw new ApiError(404, "GitHub Pages 展示模式没有本地文件")
   const { baseUrl, token } = await resolveApiConfig()
   const headers = new Headers()
   if (token) headers.set("Authorization", `Bearer ${token}`)
@@ -167,7 +177,7 @@ export async function apiRequestBlob(path: string): Promise<{ blob: Blob; filena
     }
     throw new ApiError(response.status, message)
   }
-  return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get("Content-Disposition")) }
+  return response
 }
 import { StaticDemoError, staticDemoRequest } from "./static-demo"
 import { isStaticDemo } from "@/lib/runtime"

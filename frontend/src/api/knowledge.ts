@@ -1,4 +1,4 @@
-import { ApiError, apiRequest, resolveApiBase } from "./client"
+import { apiRequest, apiRequestText } from "./client"
 import type { KnowledgeItem } from "./types"
 
 export interface ListKnowledgeOptions {
@@ -70,12 +70,9 @@ export async function exportKnowledge(
   if (options.subject) params.set("subject", options.subject)
   if (options.tag) params.set("tag", options.tag)
   if (options.scheduled) params.set("scheduled", options.scheduled)
-  const response = await fetch(`${resolveApiBase()}/knowledge/export?${params.toString()}`)
-  if (!response.ok) {
-    const detail = (await response.text()).trim()
-    throw new ApiError(response.status, detail || `导出失败（${response.status}）`)
-  }
-  return response.text()
+  // apiRequestText rather than a bare fetch: the desktop shell authenticates with
+  // a token, and a request built from resolveApiBase alone arrives without it.
+  return apiRequestText(`/knowledge/export?${params.toString()}`)
 }
 
 export type EnglishMasteryDimension = "recognition" | "comprehension" | "retrieval" | "use"
