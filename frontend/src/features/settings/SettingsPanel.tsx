@@ -979,16 +979,21 @@ export default function SettingsPanel() {
                     <span className="text-xs text-muted-foreground">{formatBytes(backup.size_bytes)}</span>
                     {/* The 路径 above is inside an app directory on the desktop:
                         a backup you cannot take anywhere is not a backup yet. */}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={downloadingBackup === backup.id}
-                      onClick={() => void saveBackup(backup.id)}
-                    >
-                      <Download data-icon="inline-start" />
-                      {downloadingBackup === backup.id ? "下载中…" : "下载"}
-                    </Button>
+                    {/* The Pages demo has no local database, so there is no file
+                        to hand over: the button is left out rather than left to
+                        fail with the same sentence every other demo action uses. */}
+                    {isStaticDemo() ? null : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={downloadingBackup === backup.id}
+                        onClick={() => void saveBackup(backup.id)}
+                      >
+                        <Download data-icon="inline-start" />
+                        {downloadingBackup === backup.id ? "下载中…" : "下载"}
+                      </Button>
+                    )}
                   </span>
                 </div>
                 <span className="text-xs text-muted-foreground">{formatDate(backup.created_at)}</span>
