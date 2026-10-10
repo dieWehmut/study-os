@@ -580,7 +580,15 @@ describe("Chat page", () => {
     expect(options[1]).toHaveTextContent("知识点：动能定理")
   })
 
-  it("looks in mistakes and courses too, not only the knowledge library", async () => {
+  // Three pages answer this search, so the wait runs through three promises and
+// their renders. Every load-sensitive assertion in this suite waits 5s for that
+// reason; this test was on the 1s default, which is the one wait here that a busy
+// machine can still outrun. That is a guess at why one full run went red -- the
+// failure's detail was lost before it could say -- so this removes an
+// inconsistency rather than claiming a fix.
+const SEARCH_WAIT = { timeout: 5000 }
+
+it("looks in mistakes and courses too, not only the knowledge library", async () => {
     // The select offers 知识点 / 错题 / 课程. A search that only ever answered
     // for the first of the three made the others look unfindable, which is the
     // one thing a search box must not do.
@@ -616,9 +624,9 @@ describe("Chat page", () => {
     fireEvent.change(box, { target: { value: "极值" } })
     fireEvent.click(screen.getByRole("button", { name: "搜索" }))
 
-    expect(await screen.findByRole("option", { name: "错题：求函数极值" })).toBeInTheDocument()
-    expect(await screen.findByRole("option", { name: "课程：极值一节课" })).toBeInTheDocument()
-    expect(await screen.findByText(/找到 2 条/)).toBeInTheDocument()
+    expect(await screen.findByRole("option", { name: "错题：求函数极值" }, SEARCH_WAIT)).toBeInTheDocument()
+    expect(await screen.findByRole("option", { name: "课程：极值一节课" }, SEARCH_WAIT)).toBeInTheDocument()
+    expect(await screen.findByText(/找到 2 条/, undefined, SEARCH_WAIT)).toBeInTheDocument()
     const options = within(screen.getByLabelText("关联对象")).getAllByRole("option")
     expect(options[1]).toHaveTextContent("错题：求函数极值")
     expect(options[2]).toHaveTextContent("课程：极值一节课")
