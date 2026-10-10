@@ -46,6 +46,38 @@ describe("RecognitionPrompt", () => {
     await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalledWith("p1", rating))
   })
 
+  it("takes 1, 2 and 3 from the keyboard while a card is being rated", async () => {
+    // Drilling is repetitive: reaching for the mouse on every card is the slow part.
+    render(<RecognitionPrompt current={current} onNext={vi.fn()} onError={vi.fn()} />)
+
+    fireEvent.keyDown(window, { key: "2" })
+
+    await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalledWith("p1", 2))
+  })
+
+  it("moves on with Enter once the answer is shown", async () => {
+    const onNext = vi.fn()
+    render(<RecognitionPrompt current={current} onNext={onNext} onError={vi.fn()} />)
+    fireEvent.click(screen.getByRole("button", { name: "认识" }))
+    await screen.findByText("放弃 / 抛弃")
+
+    fireEvent.keyDown(window, { key: "Enter" })
+
+    expect(onNext).toHaveBeenCalled()
+  })
+
+  it("does not treat a keypress in a field as a rating", async () => {
+    // A digit typed into something the reader is editing is text, not a verdict.
+    render(<RecognitionPrompt current={current} onNext={vi.fn()} onError={vi.fn()} />)
+    const field = document.createElement("input")
+    document.body.append(field)
+
+    fireEvent.keyDown(field, { key: "3" })
+
+    expect(mocks.submitSelfRating).not.toHaveBeenCalled()
+    field.remove()
+  })
+
   it("reveals the expected answers after rating and offers the next card", async () => {
     const onNext = vi.fn()
     render(<RecognitionPrompt current={current} onNext={onNext} onError={vi.fn()} />)

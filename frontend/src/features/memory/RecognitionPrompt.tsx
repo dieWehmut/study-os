@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import { submitSelfRating } from "@/api/reviews"
 import type { DueReview, ReviewEvaluation } from "@/api/types"
@@ -22,7 +22,8 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
   const [evaluation, setEvaluation] = useState<ReviewEvaluation | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  async function rate(value: 1 | 2 | 3) {
+  // Stable so the key listener is not torn down and rebuilt on every render.
+  const rate = useCallback(async (value: 1 | 2 | 3) => {
     if (submitting || evaluation) return
     setSubmitting(true)
     try {
@@ -34,7 +35,29 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
     } finally {
       setSubmitting(false)
     }
-  }
+  }, [current.prompt.id, evaluation, onError, onRated, submitting])
+
+  // Typing into a field is not a shortcut, and a card being rated twice is not a
+  // rating: the listener stands down for both.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return
+      if (evaluation) {
+        if (event.key !== "Enter") return
+        event.preventDefault()
+        onNext()
+        return
+      }
+      const rating = { "1": 1, "2": 2, "3": 3 }[event.key] as 1 | 2 | 3 | undefined
+      if (!rating || submitting) return
+      event.preventDefault()
+      void rate(rating)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [evaluation, onNext, rate, submitting])
 
   return (
     <>
@@ -68,11 +91,18 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
               </Button>
             ))}
           </div>
+          {/* Drilling is repetitive by design, so the keys are worth saying out loud. */}
+          <p className="text-xs text-muted-foreground">键盘：1 不认识 · 2 模糊 · 3 认识</p>
         </fieldset>
       )}
 
       <div className="flex justify-end">
-        {evaluation ? <Button onClick={onNext}>下一题</Button> : null}
+        {evaluation ? (
+          <>
+            <p className="mr-auto self-center text-xs text-muted-foreground">回车进入下一题</p>
+            <Button onClick={onNext}>下一题</Button>
+          </>
+        ) : null}
       </div>
     </>
   )
