@@ -362,6 +362,42 @@ describe("lesson detail page", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("已恢复第 1 版 · 现在是版本 4")
   })
 
+  it("says what a revision changed about the one before it", async () => {
+    // The history says how much each revision holds; deciding which one to go
+    // back to is a question about what changed.
+    mocks.getLesson.mockImplementation((_id: string, version?: number) => Promise.resolve(
+      version === undefined
+        ? { ...lesson, version: 3 }
+        : version === 3
+          ? { ...lesson, version: 3, sections: [
+              { id: "concept", kind: "concept", title: "核心概念", body: "F = ma\n方向与合力一致" },
+              { id: "summary", kind: "summary", title: "总结", body: "一句话" },
+            ] }
+          : { ...lesson, version: 2, sections: [
+              { id: "concept", kind: "concept", title: "核心概念", body: "F = ma" },
+            ] },
+    ))
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "版本历史" }))
+    await screen.findByText(/第 3 版/)
+    // The newest row first: versions 2 and 3 both offer a comparison.
+    fireEvent.click(screen.getAllByRole("button", { name: "对比上一版" })[0])
+
+    const changes = await screen.findByRole("list", { name: "第 3 版的变化" })
+    expect(within(changes).getByText("核心概念")).toBeInTheDocument()
+    expect(within(changes).getByText("2 行（+1）")).toBeInTheDocument()
+    expect(within(changes).getByText("总结")).toBeInTheDocument()
+    expect(within(changes).getByText("新增（1 行）")).toBeInTheDocument()
+    // Only the sections that moved are listed.
+    expect(within(changes).queryByText("诊断")).not.toBeInTheDocument()
+
+    // The oldest revision has nothing to compare with, and a second click closes.
+    expect(screen.getAllByRole("button", { name: "对比上一版" })).toHaveLength(1)
+    fireEvent.click(screen.getByRole("button", { name: "收起对比" }))
+    expect(screen.queryByRole("list", { name: "第 3 版的变化" })).not.toBeInTheDocument()
+  })
+
   it("warns before a reload throws unsaved edits away", async () => {
     mocks.getLesson.mockResolvedValue({ ...lesson, version: 3 })
     renderPage()

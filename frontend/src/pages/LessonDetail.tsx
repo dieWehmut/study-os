@@ -27,6 +27,7 @@ import {
   sectionItems,
   sectionText,
 } from "@/lib/lesson-content"
+import { changedSections, compareLessonSections, describeChange, type LessonSectionDiff } from "@/lib/lesson-diff"
 import { subjectName, SUBJECTS } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
 
@@ -198,6 +199,8 @@ export default function LessonDetail() {
   // older revision is on screen.
   const [currentVersion, setCurrentVersion] = useState(0)
   const [previewVersion, setPreviewVersion] = useState<number | null>(null)
+  // Per version: what it changed, while it is being looked at.
+  const [diffs, setDiffs] = useState<Record<number, LessonSectionDiff[] | "loading" | "error">>({})
 
   async function refreshHistory() {
     if (!lesson) return
@@ -335,6 +338,35 @@ export default function LessonDetail() {
         : "保存失败，请确认本地后端正在运行。")
     } finally {
       setSaving(false)
+    }
+  }
+
+  /**
+   * What this revision changed about the one before it.
+   *
+   * Both documents are read on demand: the history list carries only how much
+   * each revision holds, and a reader deciding which version to go back to is
+   * asking what changed, not how much. Nothing is fetched until it is asked for.
+   */
+  async function toggleDiff(version: number) {
+    if (!lesson) return
+    if (diffs[version]) {
+      setDiffs((current) => {
+        // The row's own entry is the only thing removed: a second click closes it.
+        const rest = { ...current }
+        delete rest[version]
+        return rest
+      })
+      return
+    }
+    setDiffs((current) => ({ ...current, [version]: "loading" }))
+    try {
+      const previous = version > 1 ? await getLesson(lesson.id, version - 1) : null
+      const revision = await getLesson(lesson.id, version)
+      const rows = compareLessonSections(previous?.sections ?? [], revision.sections)
+      setDiffs((current) => ({ ...current, [version]: rows }))
+    } catch {
+      setDiffs((current) => ({ ...current, [version]: "error" }))
     }
   }
 
@@ -511,20 +543,43 @@ export default function LessonDetail() {
             ) : history.length === 0 ? (
               <p className="text-sm text-muted-foreground">还没有版本记录。</p>
             ) : history.map((entry) => (
-              <div key={entry.version} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted/45 px-3 py-2 text-sm">
-                <strong>第 {entry.version} 版</strong>
-                {entry.version === currentVersion ? <Badge variant="secondary">当前</Badge> : null}
-                <span className="text-xs text-muted-foreground">
-                  {formatMoment(entry.created_at)} · {entry.sections_filled} 节有内容
-                </span>
-                <div className="ml-auto flex flex-wrap items-center gap-2">
-                  <Button size="xs" variant="outline" onClick={() => void viewVersion(entry.version)}>查看</Button>
-                  {entry.version !== currentVersion ? (
-                    <Button size="xs" variant="outline" disabled={saving} onClick={() => void restoreVersion(entry.version)}>
-                      恢复这一版
-                    </Button>
-                  ) : null}
+              <div key={entry.version} className="grid gap-2 rounded-lg bg-muted/45 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <strong>第 {entry.version} 版</strong>
+                  {entry.version === currentVersion ? <Badge variant="secondary">当前</Badge> : null}
+                  <span className="text-xs text-muted-foreground">
+                    {formatMoment(entry.created_at)} · {entry.sections_filled} 节有内容
+                  </span>
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <Button size="xs" variant="outline" onClick={() => void viewVersion(entry.version)}>查看</Button>
+                    {entry.version > 1 ? (
+                      <Button size="xs" variant="outline" onClick={() => void toggleDiff(entry.version)}>
+                        {diffs[entry.version] ? "收起对比" : "对比上一版"}
+                      </Button>
+                    ) : null}
+                    {entry.version !== currentVersion ? (
+                      <Button size="xs" variant="outline" disabled={saving} onClick={() => void restoreVersion(entry.version)}>
+                        恢复这一版
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
+                {diffs[entry.version] === "loading" ? (
+                  <p className="text-xs text-muted-foreground">正在对比…</p>
+                ) : diffs[entry.version] === "error" ? (
+                  <p role="alert" className="text-xs text-destructive">对比失败，请确认本地后端正在运行。</p>
+                ) : Array.isArray(diffs[entry.version]) ? (
+                  <ul aria-label={`第 ${entry.version} 版的变化`} className="grid gap-1 border-l-2 border-primary/25 pl-3 text-xs">
+                    {changedSections(diffs[entry.version] as LessonSectionDiff[]).length === 0 ? (
+                      <li className="text-muted-foreground">与上一版相同。</li>
+                    ) : changedSections(diffs[entry.version] as LessonSectionDiff[]).map((change) => (
+                      <li key={change.type} className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{change.title}</span>
+                        <span className="text-muted-foreground">{describeChange(change)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             ))}
           </CardContent>
