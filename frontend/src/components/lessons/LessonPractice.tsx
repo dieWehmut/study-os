@@ -340,7 +340,9 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
           ) : null}
           {lessonID && historyState === "ready" && historyCount > 0 ? (
             <p className="text-xs text-muted-foreground">
-              <span>{`已作答 ${historyCount} 次`}</span>
+              {/* The history is one list for the section, so with several questions
+                  it cannot claim to be this question's count. */}
+              <span>{questions.length > 1 ? `本节已作答 ${historyCount} 次` : `已作答 ${historyCount} 次`}</span>
               {latestAttempt && latestAttempt.elapsed_ms > 0
                 ? ` · 最近一次用时 ${Math.max(1, Math.round(latestAttempt.elapsed_ms / 1000))} 秒`
                 : null}

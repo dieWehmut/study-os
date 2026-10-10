@@ -2,8 +2,10 @@ package httpapi_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"study-os/backend/app"
@@ -109,6 +111,37 @@ func TestLessonRoutesCreateUpdateHistoryAndConflict(t *testing.T) {
 	})
 	if duplicate.Code != http.StatusConflict {
 		t.Fatalf("duplicate status = %d; body = %s", duplicate.Code, duplicate.Body.String())
+	}
+}
+
+// The 20-question cap is refused at the door, not stored and discovered later. The
+// store does the refusing; this pins that the route turns that into a 400.
+func TestLessonRoutesRefuseAPracticeSectionWithTooManyQuestions(t *testing.T) {
+	application, err := app.New(context.Background(), app.Options{DBPath: filepath.Join(t.TempDir(), "study.db")})
+	if err != nil {
+		t.Fatalf("construct application: %v", err)
+	}
+	t.Cleanup(func() { _ = application.Close() })
+	router := httpapi.NewRouter(application)
+
+	questions := make([]any, 0, models.MaxLessonPracticeQuestions+1)
+	for index := 0; index <= models.MaxLessonPracticeQuestions; index++ {
+		questions = append(questions, map[string]any{
+			"id": fmt.Sprintf("q%d", index+1), "question": fmt.Sprintf("第 %d 题", index+1),
+			"options": []string{"A", "B"}, "correct_answer": "A",
+		})
+	}
+	response := requestJSON(t, router, http.MethodPost, "/api/lessons", map[string]any{
+		"id": "lesson-too-many", "title": "题太多",
+		"document": map[string]any{"sections": []any{map[string]any{
+			"type": "practice", "content": map[string]any{"questions": questions},
+		}}},
+	})
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), "at most 20") {
+		t.Fatalf("body = %s, want the limit named", response.Body.String())
 	}
 }
 
