@@ -55,8 +55,13 @@ func handleLessonPracticeAttemptCreate(response http.ResponseWriter, request *ht
 		writeLessonPracticeError(response, err)
 		return
 	}
-	evaluation, referenceAnswer, feedback, err := evaluateLessonPractice(section, answer)
+	questionID := strings.TrimSpace(input.QuestionID)
+	evaluation, referenceAnswer, feedback, err := evaluateLessonPractice(section, questionID, answer)
 	if err != nil {
+		if errors.Is(err, errPracticeQuestionMissing) || errors.Is(err, errPracticeQuestionAmbiguous) {
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": practiceQuestionMessage(err)})
+			return
+		}
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "evaluate lesson practice failed"})
 		return
 	}
@@ -64,7 +69,7 @@ func handleLessonPracticeAttemptCreate(response http.ResponseWriter, request *ht
 		ID:              newRequestID("lesson-attempt"),
 		LessonID:        lesson.ID,
 		SectionID:       section.ID,
-		QuestionID:      strings.TrimSpace(input.QuestionID),
+		QuestionID:      questionID,
 		Answer:          answer,
 		Evaluation:      evaluation,
 		ReferenceAnswer: referenceAnswer,
@@ -91,17 +96,19 @@ func handleLessonPracticeAttemptList(response http.ResponseWriter, request *http
 		writeLessonPracticeError(response, err)
 		return
 	}
-	items, err := application.Store.ListLessonPracticeAttempts(request.Context(), lesson.ID, section.ID,
-		models.LessonPracticeAttemptListOptions{
-			Limit:      parseLimit(request.URL.Query().Get("limit"), 50, 100),
-			Offset:     parseOffset(request.URL.Query().Get("offset")),
-			QuestionID: strings.TrimSpace(request.URL.Query().Get("question_id")),
-		})
+	listOptions := models.LessonPracticeAttemptListOptions{
+		Limit:      parseLimit(request.URL.Query().Get("limit"), 50, 100),
+		Offset:     parseOffset(request.URL.Query().Get("offset")),
+		QuestionID: strings.TrimSpace(request.URL.Query().Get("question_id")),
+	}
+	items, err := application.Store.ListLessonPracticeAttempts(request.Context(), lesson.ID, section.ID, listOptions)
 	if err != nil {
 		writeLessonPracticeError(response, err)
 		return
 	}
-	total, err := application.Store.CountLessonPracticeAttempts(request.Context(), lesson.ID, section.ID)
+	// The same filter as the list: a total that ignores question_id would say "2"
+	// above a list of one.
+	total, err := application.Store.CountLessonPracticeAttempts(request.Context(), lesson.ID, section.ID, listOptions)
 	if err != nil {
 		writeLessonPracticeError(response, err)
 		return
@@ -123,7 +130,73 @@ func getLessonPracticeSection(request *http.Request, application *app.App, lesso
 	return models.Lesson{}, models.LessonSection{}, fmt.Errorf("lesson practice section %q: %w", sectionID, db.ErrNotFound)
 }
 
-func evaluateLessonPractice(section models.LessonSection, answer string) (string, string, string, error) {
+// practiceQuestion is one question inside a practice section. A section that
+// predates `questions` yields exactly one of these with an empty ID, which is how
+// the single-question documents keep working untouched.
+type practiceQuestion struct {
+	ID      string
+	Content map[string]any
+}
+
+// practiceQuestionsFromContent reads the questions of a practice section.
+//
+// `questions` wins when present. The flat fields (`question`, `options`,
+// `correct_answer`…) are then read from the question itself and, for an older
+// document, from the section: one code path, and the single-question shape is the
+// degenerate case rather than a second implementation.
+func practiceQuestionsFromContent(content map[string]any) []practiceQuestion {
+	if items, ok := content["questions"].([]any); ok && len(items) > 0 {
+		questions := make([]practiceQuestion, 0, len(items))
+		for _, item := range items {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := entry["id"].(string)
+			questions = append(questions, practiceQuestion{ID: strings.TrimSpace(id), Content: entry})
+		}
+		return questions
+	}
+	return []practiceQuestion{{Content: content}}
+}
+
+// practiceQuestionFor picks the question to grade. An empty id means "the only
+// one": a section with several questions must say which, rather than have the
+// server guess and file the answer under the wrong question.
+func practiceQuestionFor(content map[string]any, questionID string) (practiceQuestion, error) {
+	questions := practiceQuestionsFromContent(content)
+	if len(questions) == 0 {
+		return practiceQuestion{}, errPracticeQuestionMissing
+	}
+	if questionID == "" {
+		if len(questions) > 1 {
+			return practiceQuestion{}, errPracticeQuestionAmbiguous
+		}
+		return questions[0], nil
+	}
+	for _, question := range questions {
+		if question.ID == questionID {
+			return question, nil
+		}
+	}
+	return practiceQuestion{}, errPracticeQuestionMissing
+}
+
+var (
+	errPracticeQuestionMissing   = errors.New("lesson practice question not found")
+	errPracticeQuestionAmbiguous = errors.New("lesson practice section has several questions")
+)
+
+// practiceQuestionMessage is what the writer of a question id sees. The reader of
+// the page never sees these: the panel always sends the id it rendered.
+func practiceQuestionMessage(err error) string {
+	if errors.Is(err, errPracticeQuestionAmbiguous) {
+		return "这一节有多道题，提交时请带 question_id 指明是第几题"
+	}
+	return "这道题不在这节课里"
+}
+
+func evaluateLessonPractice(section models.LessonSection, questionID, answer string) (string, string, string, error) {
 	var rawContent any
 	if len(section.Content) > 0 {
 		if err := json.Unmarshal(section.Content, &rawContent); err != nil {
@@ -132,8 +205,18 @@ func evaluateLessonPractice(section models.LessonSection, answer string) (string
 	}
 	content, ok := rawContent.(map[string]any)
 	if !ok {
+		// No content at all: nothing to grade, and nothing to look a question up
+		// in -- the reader still gets the "compare it yourself" feedback.
 		return models.LessonPracticeEvaluationUngraded, "", "暂无标准答案，请对照反馈复盘。", nil
 	}
+	question, err := practiceQuestionFor(content, strings.TrimSpace(questionID))
+	if err != nil {
+		return "", "", "", err
+	}
+	return evaluatePracticeContent(question.Content, answer)
+}
+
+func evaluatePracticeContent(content map[string]any, answer string) (string, string, string, error) {
 	options := practiceOptionValues(content["options"])
 	var expectedValue any
 	for _, key := range []string{"correct_answer", "correctAnswer", "answer"} {

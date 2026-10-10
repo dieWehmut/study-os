@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"study-os/backend/app"
@@ -161,6 +162,77 @@ func TestLessonPracticeRoutesRejectInvalidInputAndMissingRecords(t *testing.T) {
 				t.Fatalf("status = %d, want %d; body = %s", response.Code, testCase.status, response.Body.String())
 			}
 		})
+	}
+}
+
+// A section with several questions grades the one the answer names, keeps each
+// answer under its own question, and refuses to guess when it is not told which.
+func TestLessonPracticeRoutesGradeEachQuestionOfASection(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+	createLessonWithPractice(t, application, "lesson-two-questions", map[string]any{
+		"questions": []map[string]any{
+			{"id": "q1", "question": "速度的单位", "options": []string{"m/s", "N"}, "correct_answer": "m/s", "explanation": "速度是位移随时间的变化。"},
+			{"id": "q2", "question": "力的单位", "options": []string{"m/s", "N"}, "correct_answer": "N", "explanation": "力的单位是牛顿。"},
+		},
+	})
+	route := "/api/lessons/lesson-two-questions/practice/practice/attempts"
+
+	ambiguous := requestJSON(t, router, http.MethodPost, route, map[string]any{"answer": "m/s"})
+	if ambiguous.Code != http.StatusBadRequest || !strings.Contains(ambiguous.Body.String(), "question_id") {
+		t.Fatalf("without a question id = %d, body = %s", ambiguous.Code, ambiguous.Body.String())
+	}
+
+	first := requestJSON(t, router, http.MethodPost, route, map[string]any{"answer": "m/s", "question_id": "q1"})
+	if first.Code != http.StatusCreated {
+		t.Fatalf("q1 status = %d, body = %s", first.Code, first.Body.String())
+	}
+	var firstAttempt models.LessonPracticeAttempt
+	decodeJSON(t, first, &firstAttempt)
+	if firstAttempt.QuestionID != "q1" || firstAttempt.Evaluation != models.LessonPracticeEvaluationCorrect {
+		t.Fatalf("q1 attempt = %#v, want its own id and a correct verdict", firstAttempt)
+	}
+	if !strings.Contains(firstAttempt.Feedback, "速度是位移随时间的变化") {
+		t.Fatalf("q1 feedback = %q, want the explanation of q1 and not of q2", firstAttempt.Feedback)
+	}
+
+	// The same answer is wrong for the other question, which is the whole point of
+	// grading by question rather than by section.
+	second := requestJSON(t, router, http.MethodPost, route, map[string]any{"answer": "m/s", "question_id": "q2"})
+	var secondAttempt models.LessonPracticeAttempt
+	decodeJSON(t, second, &secondAttempt)
+	if secondAttempt.Evaluation != models.LessonPracticeEvaluationIncorrect || secondAttempt.QuestionID != "q2" {
+		t.Fatalf("q2 attempt = %#v, want q2's own verdict", secondAttempt)
+	}
+	if !strings.Contains(secondAttempt.Feedback, "力的单位是牛顿") {
+		t.Fatalf("q2 feedback = %q", secondAttempt.Feedback)
+	}
+
+	unknown := requestJSON(t, router, http.MethodPost, route, map[string]any{"answer": "N", "question_id": "q9"})
+	if unknown.Code != http.StatusBadRequest || !strings.Contains(unknown.Body.String(), "不在这节课里") {
+		t.Fatalf("unknown question = %d, body = %s", unknown.Code, unknown.Body.String())
+	}
+
+	narrowed := requestJSON(t, router, http.MethodGet, route+"?question_id=q1", nil)
+	var narrowedBody struct {
+		Items []models.LessonPracticeAttempt `json:"items"`
+		Count int                            `json:"count"`
+	}
+	decodeJSON(t, narrowed, &narrowedBody)
+	if narrowedBody.Count != 1 || len(narrowedBody.Items) != 1 || narrowedBody.Items[0].QuestionID != "q1" {
+		t.Fatalf("q1 list = %#v, want only q1's answer", narrowedBody)
+	}
+	if narrowedBody.Items[0].ID == secondAttempt.ID {
+		t.Fatal("the q1 list returned the q2 answer")
+	}
+
+	every := requestJSON(t, router, http.MethodGet, route, nil)
+	var everyBody struct {
+		Count int `json:"count"`
+	}
+	decodeJSON(t, every, &everyBody)
+	if everyBody.Count != 2 {
+		t.Fatalf("unfiltered count = %d, want both answers", everyBody.Count)
 	}
 }
 

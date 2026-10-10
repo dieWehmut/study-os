@@ -132,16 +132,25 @@ func (s *Store) ListLessonPracticeAttempts(ctx context.Context, lessonID, sectio
 // CountLessonPracticeAttempts answers how many times this section was answered,
 // not how many fit in the page the practice panel shows -- that panel prints the
 // number as "已作答 N 次".
-func (s *Store) CountLessonPracticeAttempts(ctx context.Context, lessonID, sectionID string) (int, error) {
+//
+// It takes the same options as the list, and for the same reason: a count that
+// ignores the question filter says "2" above a list of one.
+func (s *Store) CountLessonPracticeAttempts(ctx context.Context, lessonID, sectionID string, options ...models.LessonPracticeAttemptListOptions) (int, error) {
 	lessonID = strings.TrimSpace(lessonID)
 	sectionID = strings.TrimSpace(sectionID)
 	if lessonID == "" || sectionID == "" {
 		return 0, fmt.Errorf("%w: lesson and section ids are required", ErrInvalidLessonPracticeAttempt)
 	}
+	listOptions := models.LessonPracticeAttemptListOptions{}
+	if len(options) > 0 {
+		listOptions = options[0]
+	}
+	questionID := strings.TrimSpace(listOptions.QuestionID)
 	var total int
 	err := s.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM lesson_attempts WHERE lesson_id = ? AND section_id = ?`,
-		lessonID, sectionID).Scan(&total)
+		SELECT COUNT(*) FROM lesson_attempts
+		WHERE lesson_id = ? AND section_id = ? AND (? = '' OR question_id = ?)`,
+		lessonID, sectionID, questionID, questionID).Scan(&total)
 	if err != nil {
 		return 0, fmt.Errorf("count lesson practice attempts: %w", err)
 	}
