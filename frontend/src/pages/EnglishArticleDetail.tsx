@@ -15,6 +15,7 @@ import { EnglishArticleBody } from "@/features/english-articles/EnglishArticleBo
 import { exportArticlePdf } from "@/features/english-articles/export-pdf"
 import { articleSectionID, sectionHash } from "@/features/english-articles/article-sections"
 import { useArticleSectionRoute } from "@/features/english-articles/useArticleSectionRoute"
+import { saveTextFile } from "@/lib/download"
 import { cn } from "@/lib/utils"
 
 function metadata(article: EnglishArticle) {
@@ -109,6 +110,22 @@ export default function EnglishArticleDetail() {
     }
   }
 
+  /**
+   * Take the article out as Markdown.
+   *
+   * The app already stores the article as Markdown, so this is the file itself
+   * rather than a rendering of the page -- and unlike the PDF it needs nothing
+   * from the browser's print pipeline.
+   */
+  function exportMarkdown() {
+    if (!article) return
+    saveTextFile(
+      article.markdown?.trim() ? article.markdown : `# ${article.title}\n`,
+      `${article.title || "article"}${article.id ? `-${article.id}` : ""}.md`,
+      "text/markdown;charset=utf-8",
+    )
+  }
+
   if (loading) {
     return <p className="py-12 text-center text-sm text-muted-foreground">正在打开文章…</p>
   }
@@ -141,6 +158,9 @@ export default function EnglishArticleDetail() {
           <Button size="sm" variant="outline" disabled={regenerating || deleting || exporting} onClick={() => void exportPDF()}>
             {exporting ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
             {exporting ? "导出中…" : "导出 PDF"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => exportMarkdown()}>
+            <Download data-icon="inline-start" />导出 Markdown
           </Button>
           <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={regenerating || deleting || exporting} onClick={() => void remove()}>
             {deleting ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Trash2 data-icon="inline-start" />}

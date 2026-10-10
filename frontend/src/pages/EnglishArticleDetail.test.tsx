@@ -11,11 +11,15 @@ const mocks = vi.hoisted(() => ({
   deleteEnglishArticle: vi.fn(),
   exportArticlePdf: vi.fn(),
   playPronunciation: vi.fn(),
+  saveTextFile: vi.fn(),
 }))
 
 vi.mock("@/api/english-articles", () => mocks)
 vi.mock("@/features/english-articles/export-pdf", () => ({ exportArticlePdf: mocks.exportArticlePdf }))
 vi.mock("@/api/audio", () => ({ playPronunciation: mocks.playPronunciation }))
+// The file itself is the browser's job; what this page decides is the text and the
+// name, which is what the test asserts.
+vi.mock("@/lib/download", () => ({ saveTextFile: mocks.saveTextFile }))
 
 const article = {
   id: "article-1",
@@ -84,6 +88,30 @@ describe("EnglishArticleDetail", () => {
     expect(screen.getByRole("link", { name: /Opening/ })).toHaveAttribute("href", "#section-1-opening")
     expect(document.getElementById("section-1-opening")).toBeInTheDocument()
     expect(document.getElementById("section-2-the-turn")).toBeInTheDocument()
+  })
+
+  it("exports the article as Markdown, using the stored text rather than the page", async () => {
+    mocks.getEnglishArticle.mockResolvedValue({ ...article, markdown: "# 市场变化\n\nThe market shifted quickly.\n" })
+    renderDetail()
+    await screen.findByRole("heading", { name: "市场变化" })
+
+    fireEvent.click(screen.getByRole("button", { name: "导出 Markdown" }))
+
+    expect(mocks.saveTextFile).toHaveBeenCalledWith(
+      "# 市场变化\n\nThe market shifted quickly.\n",
+      "市场变化-article-1.md",
+      expect.stringContaining("markdown"),
+    )
+  })
+
+  it("still writes a usable file when the article has no stored Markdown", async () => {
+    mocks.getEnglishArticle.mockResolvedValue({ ...article, markdown: "" })
+    renderDetail()
+    await screen.findByRole("heading", { name: "市场变化" })
+
+    fireEvent.click(screen.getByRole("button", { name: "导出 Markdown" }))
+
+    expect(mocks.saveTextFile).toHaveBeenCalledWith("# 市场变化\n", "市场变化-article-1.md", expect.any(String))
   })
 
   it("uses history navigation for a directory click and scrolls to the section", async () => {
