@@ -1,6 +1,6 @@
 import type { LessonSection } from "@/api/lessons"
 
-import { sectionEditorText, sectionHasContent, sectionType } from "./lesson-content"
+import { sectionContent, sectionEditorText, sectionHasContent, sectionType } from "./lesson-content"
 
 /**
  * What one revision changed about another.
@@ -19,10 +19,19 @@ export interface LessonSectionDiff {
 }
 
 function readableLines(section: LessonSection): string[] {
-  return sectionEditorText(section)
+  const lines = sectionEditorText(section)
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "")
+  if (lines.length > 0) return lines
+  // A practice section has no prose to compare: its content is the shape. Without
+  // this, adding a question to it read as "same" -- two empty line lists look
+  // identical, and the reader looking for what changed would be told nothing did.
+  const content = sectionContent(section)
+  if (content && typeof content === "object" && Object.keys(content).length > 0) {
+    return [JSON.stringify(content)]
+  }
+  return []
 }
 
 function sameLines(before: string[], after: string[]): boolean {

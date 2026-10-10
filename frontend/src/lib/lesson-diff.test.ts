@@ -63,6 +63,23 @@ describe("comparing two revisions of a lesson", () => {
     expect(describeChange(diff[0])).toBe("2 行（内容有改动）")
   })
 
+  it("sees a question added to a practice section", () => {
+    // A practice section has no prose, so both sides used to produce zero lines and
+    // the reader was told nothing had changed.
+    const diff = compareLessonSections(
+      [section("practice", "即时练习", { questions: [{ id: "q1", question: "速度单位？", options: ["m/s", "N"] }] })],
+      [section("practice", "即时练习", {
+        questions: [
+          { id: "q1", question: "速度单位？", options: ["m/s", "N"] },
+          { id: "q2", question: "力的单位？", options: ["N", "J"] },
+        ],
+      })],
+    )
+
+    expect(diff[0].change).toBe("changed")
+    expect(describeChange(diff[0])).toContain("内容有改动")
+  })
+
   it("reports a section that only one revision has", () => {
     const diff = compareLessonSections(
       [section("legacy", "旧版小节", { text: "只剩它" }), section("concept", "核心概念", { items: ["甲"] })],
