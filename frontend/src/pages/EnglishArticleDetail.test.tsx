@@ -90,6 +90,34 @@ describe("EnglishArticleDetail", () => {
     expect(document.getElementById("section-2-the-turn")).toBeInTheDocument()
   })
 
+  it("copies the address of one section", async () => {
+    // The anchors have been there for a while; this is what makes one usable away
+    // from the page.
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    renderDetail()
+    await screen.findByRole("heading", { name: "市场变化" })
+
+    fireEvent.click(screen.getByRole("button", { name: "复制「The Turn」的链接" }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0]).toContain("#section-2-the-turn")
+    expect(writeText.mock.calls[0][0]).toContain("/reading/articles/article-1")
+  })
+
+  it("says so when the browser refuses the clipboard instead of staying quiet", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    })
+    renderDetail()
+    await screen.findByRole("heading", { name: "市场变化" })
+
+    fireEvent.click(screen.getByRole("button", { name: "复制「The Turn」的链接" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("复制链接失败")
+  })
+
   it("exports the article as Markdown, using the stored text rather than the page", async () => {
     mocks.getEnglishArticle.mockResolvedValue({ ...article, markdown: "# 市场变化\n\nThe market shifted quickly.\n" })
     renderDetail()

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, ChevronDown, Download, LoaderCircle, RefreshCw, Trash2 } from "lucide-react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { ArrowLeft, ChevronDown, Download, Link2, LoaderCircle, RefreshCw, Trash2 } from "lucide-react"
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom"
 
 import { playPronunciation } from "@/api/audio"
 import {
@@ -16,6 +16,7 @@ import { exportArticlePdf } from "@/features/english-articles/export-pdf"
 import { articleSectionID, sectionHash } from "@/features/english-articles/article-sections"
 import { useArticleSectionRoute } from "@/features/english-articles/useArticleSectionRoute"
 import { saveTextFile } from "@/lib/download"
+import { routerMode } from "@/lib/runtime"
 import { cn } from "@/lib/utils"
 
 function metadata(article: EnglishArticle) {
@@ -37,6 +38,7 @@ function messageForLoad(error: unknown): string {
 export default function EnglishArticleDetail() {
   const { id = "" } = useParams()
   const navigate = useNavigate()
+  const routeLocation = useLocation()
   const articleRootRef = useRef<HTMLElement>(null)
   const [article, setArticle] = useState<EnglishArticle | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,6 +47,8 @@ export default function EnglishArticleDetail() {
   const [deleting, setDeleting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [directoryOpen, setDirectoryOpen] = useState(false)
+  // Which section's link was just copied, so the button can say so and then stop.
+  const [linkCopied, setLinkCopied] = useState("")
 
   const sectionIDs = useMemo(
     () => (article?.content?.sections ?? []).map((section, index) => articleSectionID(section.title, index)),
@@ -126,6 +130,31 @@ export default function EnglishArticleDetail() {
     )
   }
 
+  /**
+   * Copy the address of one section.
+   *
+   * The page has carried section anchors for a while; this is what makes them
+   * usable away from the page -- a link to hand to someone, or to keep.
+   *
+   * Built from the router's location, not from the window: the address bar and the
+   * route are two different things here (the desktop shell has no address bar, and
+   * the Pages build keeps the route inside the hash). Reading window.location put
+   * the section onto the site root.
+   */
+  async function copySectionLink(sectionID: string) {
+    const path = `${routeLocation.pathname}${routeLocation.search}`
+    const url = routerMode() === "hash"
+      ? `${window.location.origin}${window.location.pathname}#${path}${sectionHash(sectionID)}`
+      : `${window.location.origin}${path}${sectionHash(sectionID)}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setLinkCopied(sectionID)
+      window.setTimeout(() => setLinkCopied((current) => (current === sectionID ? "" : current)), 1500)
+    } catch {
+      setError("复制链接失败，请从地址栏复制。")
+    }
+  }
+
   if (loading) {
     return <p className="py-12 text-center text-sm text-muted-foreground">正在打开文章…</p>
   }
@@ -187,22 +216,35 @@ export default function EnglishArticleDetail() {
           {article.content.sections.map((section, index) => {
             const sectionID = sectionIDs[index]
             return (
-              <a
-                key={sectionID}
-                href={sectionHash(sectionID)}
-                aria-current={activeID === sectionID ? "true" : undefined}
-                onClick={(event) => {
-                  event.preventDefault()
-                  goToSection(sectionID)
-                  setDirectoryOpen(false)
-                }}
-                className={cn(
-                  "break-words border-l-2 px-3 py-1.5 text-left text-sm leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  activeID === sectionID ? "border-primary font-medium text-primary" : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
-                )}
-              >
-                {index + 1}. {section.title}
-              </a>
+              <div key={sectionID} className="flex items-center gap-1">
+                <a
+                  href={sectionHash(sectionID)}
+                  aria-current={activeID === sectionID ? "true" : undefined}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    goToSection(sectionID)
+                    setDirectoryOpen(false)
+                  }}
+                  className={cn(
+                    "min-w-0 flex-1 break-words border-l-2 px-3 py-1.5 text-left text-sm leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    activeID === sectionID ? "border-primary font-medium text-primary" : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
+                  )}
+                >
+                  {index + 1}. {section.title}
+                </a>
+                {/* A section is where a reader stops reading; the address is how they
+                    come back to it, and this is the only way to take it away. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`复制「${section.title}」的链接`}
+                  title={linkCopied === sectionID ? "已复制" : "复制这一节的链接"}
+                  onClick={() => void copySectionLink(sectionID)}
+                >
+                  <Link2 aria-hidden="true" className="size-3.5" />
+                </Button>
+              </div>
             )
           })}
           </div>
