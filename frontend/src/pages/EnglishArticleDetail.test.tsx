@@ -93,10 +93,15 @@ describe("EnglishArticleDetail", () => {
     fireEvent.click(screen.getByRole("link", { name: /The Turn/ }))
 
     // These land after the router has taken the click, and the scroll rides on it.
-    // The wait is 5s rather than the 1s default, and each assertion carries its own
-    // label: this is the one test in the suite that goes red only while the machine
-    // is loaded (6/6 passes alone), and a 5.07s failure fits either wait, so the
-    // next occurrence has to say which one it was.
+    // The wait is 5s and each assertion carries a label: this is the one test in the
+    // suite that goes red only while the machine is loaded, and the label is what
+    // finally said which one. It reported:
+    //   the click did not reach the router: received ...#section-1-opening
+    // so the click did arrive, and the hook's "no section in the address, so show
+    // the first one" jump then ran late and undid it. That jump no longer fires
+    // once a reader has chosen (see chosenByReader), which the hook cannot pin in
+    // jsdom -- the window needs an unflushed passive effect -- so this test is the
+    // place the mechanism stays written down.
     await waitFor(
       () => expect(screen.getByTestId("location"), "the click did not reach the router")
         .toHaveTextContent("/reading/articles/article-1#section-2-the-turn"),

@@ -31,6 +31,13 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
   )
   const activeIDRef = useRef(activeID)
   const scrollingTo = useRef("")
+  // Set the moment a reader picks a section.
+  //
+  // The 首段 jump below is scheduled from a render whose address had no section,
+  // and its effect can land after the click that chose one -- observed as a click
+  // on 第二节 arriving at #section-1-opening. A choice a reader made is never
+  // undone by an automatic one.
+  const chosenByReader = useRef(false)
 
   useEffect(() => {
     activeIDRef.current = activeID
@@ -42,7 +49,7 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
   }, [activeID, sectionIDs])
 
   useEffect(() => {
-    if (sectionIDs.length === 0 || location.hash) return
+    if (sectionIDs.length === 0 || location.hash || chosenByReader.current) return
     const id = sectionIDs[0]
     document.getElementById(id)?.scrollIntoView({ behavior: "auto", block: "start" })
     navigate({ pathname: location.pathname, search: location.search, hash: sectionHash(id) }, {
@@ -110,6 +117,7 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
 
   const goToSection = useCallback((id: string) => {
     if (!validIDs.current.has(id)) return
+    chosenByReader.current = true
     scrollingTo.current = sectionIDFromHash(location.hash) === id ? "" : id
     setActiveID(id)
     navigate({ pathname: location.pathname, search: location.search, hash: sectionHash(id) }, {
