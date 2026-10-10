@@ -72,6 +72,12 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   await expect(page.locator("main")).toBeVisible()
   await expect(page.getByRole("button", { name: "\u5bfc\u51fa CSV" })).toHaveCount(0)
 
+  // The 错题本 export is the same kind of button and had been left unguarded: the
+  // demo lists mistakes, so this one would have been visible and always failing.
+  await page.goto("#/practice")
+  await expect(page.getByRole("listitem").first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "\u5bfc\u51fa CSV" })).toHaveCount(0)
+
   // The course export is pure client-side, so it works here too.
   await page.goto("#/lessons/lesson-newton")
   await expect(page.locator("main")).toContainText("\u725b\u987f\u7b2c\u4e8c\u5b9a\u5f8b\uff1a\u4ece\u53d7\u529b\u56fe\u5f00\u59cb")

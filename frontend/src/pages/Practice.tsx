@@ -53,6 +53,7 @@ import {
 } from "@/lib/mistakes"
 import { summarizeMistakeDiagnostics } from "@/lib/mistake-diagnostics"
 import { saveTextFile } from "@/lib/download"
+import { isStaticDemo } from "@/lib/runtime"
 import { failureMessage } from "@/lib/errors"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
@@ -690,18 +691,22 @@ export default function Practice() {
             ) : null}
             {/* The list is one page of the newest mistakes; the file is all of
                 them, for the reading a page cannot do (print it, hand it to
-                someone, sort it in a spreadsheet by 错因). */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="ml-auto shrink-0"
-              disabled={exporting}
-              onClick={() => void downloadMistakes()}
-            >
-              <Download data-icon="inline-start" />
-              {exporting ? "导出中…" : "导出 CSV"}
-            </Button>
+                someone, sort it in a spreadsheet by 错因). Left out of the Pages
+                build, which has no local database to export from -- a button
+                that can only fail is worse than no button. */}
+            {isStaticDemo() ? null : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto shrink-0"
+                disabled={exporting}
+                onClick={() => void downloadMistakes()}
+              >
+                <Download data-icon="inline-start" />
+                {exporting ? "导出中…" : "导出 CSV"}
+              </Button>
+            )}
             {exportError ? (
               <p role="alert" className="w-full text-sm text-destructive">
                 {exportError}
