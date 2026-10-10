@@ -28,6 +28,10 @@ frontend/.e2e-data/
 frontend/test-results/
 frontend/playwright-report/
 .playwright-mcp/
+# flake-hunt writes one vitest JSON report per run (hundreds of KB); they are
+# evidence for whoever is hunting, not part of the repository.
+flake/
+.flake-out/
 *.tsbuildinfo
 /build/
 prompt
