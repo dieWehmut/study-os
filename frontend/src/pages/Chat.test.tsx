@@ -680,6 +680,47 @@ describe("Chat page", () => {
       vi.useRealTimers()
     }
   })
+
+  it("keeps the conversations the reader paged through when an answer lands", async () => {
+    // The refresh that follows a reply replaces the newest page. Doing that to a
+    // list the reader had paged through threw the older rows away -- an automatic
+    // action undoing something they had asked for.
+    vi.useFakeTimers()
+    try {
+      const conversation = (id: string, title: string) => ({
+        session_id: id, subject: "math", message_count: 2, last_at: "2026-08-04T00:00:00Z", title, preview: `${title}的内容`,
+      })
+      mocks.listChatConversations.mockImplementation((_subject: string, _limit: number, _query: string, offset = 0) =>
+        Promise.resolve(
+          offset === 0
+            ? { items: [conversation("s-new", "最新一段"), conversation("s-2", "第二段")], count: 3 }
+            : { items: [conversation("s-old", "很早以前的一段")], count: 3 },
+        ),
+      )
+      render(<Chat />)
+      await act(async () => undefined)
+
+      fireEvent.click(screen.getByRole("button", { name: "加载更多（还有 1 段）" }))
+      await act(async () => undefined)
+      expect(screen.getByText("很早以前的一段")).toBeInTheDocument()
+
+      mocks.sendChatMessage.mockResolvedValue({ session_id: "s-new", message_id: "ai-1", status: "pending" })
+      mocks.listChatMessages.mockResolvedValue({
+        items: [{ id: "a1", role: "assistant", content: "答案", status: "done", created_at: "2026-08-04T00:00:01Z" }],
+        count: 1,
+      })
+      fireEvent.change(screen.getByLabelText("发给 AI 的消息"), { target: { value: "问题" } })
+      fireEvent.click(screen.getByRole("button", { name: "发送" }))
+      await act(async () => undefined)
+      await act(async () => vi.advanceTimersByTime(1600))
+
+      expect(screen.getByText("最新一段")).toBeInTheDocument()
+      expect(screen.getByText("很早以前的一段")).toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe("picking up a question left by 阅读", () => {

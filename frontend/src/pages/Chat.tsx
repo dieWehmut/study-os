@@ -144,10 +144,22 @@ export default function Chat() {
     }
   }, [])
 
-  const refreshConversations = useCallback(() => {
+  /**
+   * Re-read the conversation list.
+   *
+   * `keep-loaded` is for the refresh after an answer lands: replacing the list
+   * there collapsed it back to the newest 50, throwing away the pages the reader
+   * had asked for. A filter change still replaces -- the rows under it belong to
+   * the subject or search that just went away.
+   */
+  const refreshConversations = useCallback((mode: "replace" | "keep-loaded" = "replace") => {
     return listChatConversations(subject === "all" ? "" : subject, 50, conversationQuery)
       .then((result) => {
-        setConversations(result.items)
+        setConversations((current) => {
+          if (mode === "replace") return result.items
+          const fresh = new Set(result.items.map((item) => item.session_id))
+          return [...result.items, ...current.filter((item) => !fresh.has(item.session_id))]
+        })
         setConversationTotal(result.count)
       })
       .catch(() => {
@@ -572,7 +584,7 @@ export default function Chat() {
             window.clearInterval(timer)
             if (pollRef.current === timer) pollRef.current = null
             setSending(false)
-            void refreshConversations()
+            void refreshConversations("keep-loaded")
           }
         } catch {
           window.clearInterval(timer)
