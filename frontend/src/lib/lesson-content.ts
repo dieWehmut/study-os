@@ -104,6 +104,22 @@ export interface LessonPracticeDraft {
   optionsText: string
   correctAnswer: string
   explanation: string
+  /**
+   * The questions after the first, which stay in the flat fields above.
+   *
+   * Additive on purpose: every reader of a draft (the textareas, the "has anything
+   * changed" check, the tests) keeps working unchanged, and a single-question
+   * lesson never grows a second shape.
+   */
+  more?: LessonPracticeDraftFields[]
+}
+
+/** One question's fields, without the list that carries the rest. */
+export interface LessonPracticeDraftFields {
+  question: string
+  optionsText: string
+  correctAnswer: string
+  explanation: string
 }
 
 export function practiceOptions(draft: LessonPracticeDraft): string[] {
@@ -125,10 +141,6 @@ export function practiceQuestionsOf(section: LessonSection): Record<string, unkn
 }
 
 /** A question's own fields, or the section's when it uses the flat shape. */
-function practiceQuestionRecord(section: LessonSection): Record<string, unknown> {
-  return practiceQuestionsOf(section)[0] ?? practiceRecord(section)
-}
-
 function practiceAnswerText(record: Record<string, unknown>): string {
   for (const key of ["correct_answer", "correctAnswer", "answer"]) {
     const value = record[key]
@@ -140,11 +152,15 @@ function practiceAnswerText(record: Record<string, unknown>): string {
 }
 
 export function practiceDraftFromSection(section: LessonSection): LessonPracticeDraft {
-  // A section that holds several questions shows its first one here. The editor
-  // can only change that one, and practiceContentFromDraft keeps the rest: reading
-  // and writing only the flat fields would have deleted every other question the
-  // moment someone pressed 保存.
-  const record = practiceQuestionRecord(section)
+  const records = practiceQuestionsOf(section)
+  const [first, ...rest] = records.length > 0 ? records : [practiceRecord(section)]
+  const draft: LessonPracticeDraft = practiceFieldsFromRecord(first ?? {}, records.length === 0 ? section : undefined)
+  if (rest.length > 0) draft.more = rest.map((record) => practiceFieldsFromRecord(record))
+  return draft
+}
+
+/** One question's editable fields, read from its stored content. */
+function practiceFieldsFromRecord(record: Record<string, unknown>, section?: LessonSection): LessonPracticeDraftFields {
   const question = typeof record.question === "string"
     ? record.question
     : typeof record.prompt === "string"
@@ -153,7 +169,7 @@ export function practiceDraftFromSection(section: LessonSection): LessonPractice
   const rawOptions = record.options
   const options = Array.isArray(rawOptions)
     ? rawOptions.map((option) => (typeof option === "string" ? option : "")).filter(Boolean)
-    : sectionItems(section)
+    : section ? sectionItems(section) : []
   return {
     question,
     optionsText: options.join("\n"),
@@ -162,29 +178,44 @@ export function practiceDraftFromSection(section: LessonSection): LessonPractice
   }
 }
 
-export function practiceContentFromDraft(draft: LessonPracticeDraft, section?: LessonSection): unknown {
-  const options = practiceOptions(draft)
-  const question = draft.question.trim()
-  const explanation = draft.explanation.trim()
-  const content: Record<string, unknown> = { question, options }
-  // Only an answer that is one of the options: anything else cannot be graded.
-  if (draft.correctAnswer && options.includes(draft.correctAnswer)) content.correct_answer = draft.correctAnswer
-  if (explanation) content.explanation = explanation
+/** A blank question, for 「再加一题」. */
+export function blankPracticeDraft(): LessonPracticeDraftFields {
+  return { question: "", optionsText: "", correctAnswer: "", explanation: "" }
+}
 
-  // A multi-question section keeps the questions the editor did not show. Writing
-  // the flat shape here is what made 保存 quietly delete them.
-  if (section) {
-    const questions = practiceQuestionsOf(section)
-    if (questions.length > 0) {
-      const [first, ...rest] = questions
-      const id = typeof first.id === "string" ? first.id : ""
-      return { questions: [{ ...content, ...(id ? { id } : {}) }, ...rest] }
-    }
-  }
+/** One question's fields as the stored shape. */
+function practiceContentFromFields(fields: LessonPracticeDraftFields): Record<string, unknown> {
+  const options = fields.optionsText.split("\n").map((line) => line.trim()).filter((line) => line !== "")
+  const content: Record<string, unknown> = { question: fields.question.trim(), options }
+  // Only an answer that is one of the options: anything else cannot be graded.
+  if (fields.correctAnswer && options.includes(fields.correctAnswer)) content.correct_answer = fields.correctAnswer
+  const explanation = fields.explanation.trim()
+  if (explanation) content.explanation = explanation
   return content
+}
+
+export function practiceContentFromDraft(draft: LessonPracticeDraft, section?: LessonSection): unknown {
+  const first = practiceContentFromFields(draft)
+  const more = draft.more ?? []
+
+  // A section that asks several questions keeps them all. Writing the flat shape
+  // here is what made 保存 quietly delete the ones the editor could not show.
+  if (more.length > 0 || practiceQuestionsOf(section ?? { id: "", type: "", title: "" }).length > 0) {
+    const stored = practiceQuestionsOf(section ?? { id: "", type: "", title: "" })
+    const firstID = typeof stored[0]?.id === "string" ? stored[0].id : ""
+    const questions: Record<string, unknown>[] = [{ ...first, ...(firstID ? { id: firstID } : {}), ...(firstID ? {} : { id: "q1" }) }]
+    more.forEach((fields, index) => {
+      const storedID = typeof stored[index + 1]?.id === "string" ? stored[index + 1].id : ""
+      questions.push({ ...practiceContentFromFields(fields), id: storedID || `q${index + 2}` })
+    })
+    return { questions }
+  }
+  return first
 }
 
 /** Is this a question someone could actually answer? */
 export function practiceDraftComplete(draft: LessonPracticeDraft): boolean {
-  return draft.question.trim() !== "" && practiceOptions(draft).length > 0
+  const complete = (fields: LessonPracticeDraftFields) =>
+    fields.question.trim() !== "" && fields.optionsText.split("\n").some((line) => line.trim() !== "")
+  return complete(draft) && (draft.more ?? []).every(complete)
 }

@@ -124,10 +124,25 @@ describe("lesson content", () => {
       optionsText: "m/s\nN",
       correctAnswer: "m/s",
       explanation: "速度。",
+      // The questions after the first are carried in the draft so the editor can
+      // show and keep them.
+      more: [
+        { question: "力的单位？", optionsText: "m/s\nN", correctAnswer: "N", explanation: "" },
+        { question: "功的单位？", optionsText: "J\nN", correctAnswer: "J", explanation: "" },
+      ],
     })
 
     const edited = practiceContentFromDraft(
-      { question: "速度的单位？", optionsText: "m/s\nN", correctAnswer: "N", explanation: "速度是位移随时间的变化。" },
+      {
+        question: "速度的单位？",
+        optionsText: "m/s\nN",
+        correctAnswer: "N",
+        explanation: "速度是位移随时间的变化。",
+        more: [
+          { question: "力的单位？", optionsText: "m/s\nN", correctAnswer: "N", explanation: "" },
+          { question: "功的单位？", optionsText: "J\nN", correctAnswer: "J", explanation: "" },
+        ],
+      },
       practice,
     )
     expect(edited).toEqual({

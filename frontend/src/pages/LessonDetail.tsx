@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import {
+  blankPracticeDraft,
   isEditableSection,
   practiceContentFromDraft,
   practiceDraftFromSection,
@@ -33,6 +34,7 @@ import {
   sectionItems,
   sectionText,
   type LessonPracticeDraft,
+  type LessonPracticeDraftFields,
 } from "@/lib/lesson-content"
 import { changedSections, compareLessonSections, describeChange, type LessonSectionDiff } from "@/lib/lesson-diff"
 import { subjectName, SUBJECTS } from "@/lib/subjects"
@@ -276,8 +278,95 @@ function PracticeSectionEditor({
           className={field}
         />
       </label>
+
+      {(draft.more ?? []).map((question, index) => (
+        <div key={`practice-question-${index}`} className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">{`第 ${index + 2} 题`}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={`删除第 ${index + 2} 题`}
+              onClick={() => onChange({ ...draft, more: (draft.more ?? []).filter((_, position) => position !== index) })}
+            >
+              删除这题
+            </Button>
+          </div>
+          <label className="grid gap-1 text-sm font-medium">
+            题干
+            <textarea
+              aria-label={`第 ${index + 2} 题题干`}
+              value={question.question}
+              onChange={(event) => onChange(updateExtraQuestion(draft, index, { ...question, question: event.target.value }))}
+              className={field}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            选项（一行一个）
+            <textarea
+              aria-label={`第 ${index + 2} 题选项`}
+              value={question.optionsText}
+              onChange={(event) => onChange(updateExtraQuestion(draft, index, retypedOptions(question, event.target.value)))}
+              className={field}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            标准答案
+            <Input
+              aria-label={`第 ${index + 2} 题标准答案`}
+              value={question.correctAnswer}
+              onChange={(event) => onChange(updateExtraQuestion(draft, index, { ...question, correctAnswer: event.target.value }))}
+              placeholder="留空即未评分"
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            解析（可选）
+            <textarea
+              aria-label={`第 ${index + 2} 题解析`}
+              value={question.explanation}
+              onChange={(event) => onChange(updateExtraQuestion(draft, index, { ...question, explanation: event.target.value }))}
+              className={field}
+            />
+          </label>
+        </div>
+      ))}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onChange({ ...draft, more: [...(draft.more ?? []), blankPracticeDraft()] })}
+        >
+          再加一题
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {/* No cap is printed here: the server owns it (models.MaxLessonPracticeQuestions),
+              and a number copied into this file would drift from it. */}
+          {`本节共 ${1 + (draft.more ?? []).length} 道题`}
+        </p>
+      </div>
     </article>
   )
+}
+
+/** Replace one of the questions after the first. */
+function updateExtraQuestion(
+  draft: LessonPracticeDraft,
+  index: number,
+  next: LessonPracticeDraftFields,
+): LessonPracticeDraft {
+  const more = [...(draft.more ?? [])]
+  more[index] = next
+  return { ...draft, more }
+}
+
+/** Retyping the options can leave the key naming nothing: drop it rather than
+ *  keeping an answer that cannot be matched. */
+function retypedOptions(question: LessonPracticeDraftFields, optionsText: string): LessonPracticeDraftFields {
+  const stillThere = optionsText.split("\n").map((line) => line.trim()).includes(question.correctAnswer)
+  return { ...question, optionsText, correctAnswer: stillThere ? question.correctAnswer : "" }
 }
 
 /** Everything the editor starts from, so opening it twice seeds the same way. */

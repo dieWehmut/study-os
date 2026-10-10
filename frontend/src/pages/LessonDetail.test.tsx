@@ -436,6 +436,72 @@ describe("lesson detail page", () => {
     })
   })
 
+  it("adds a second question to a practice section and saves both", async () => {
+    // 「再加一题」 is what a teacher needs for a lesson with more than one question;
+    // without it the only way to get a second question was to write the document
+    // by hand.
+    mocks.getLesson.mockResolvedValue({
+      ...lesson,
+      version: 3,
+      sections: [...lesson.sections, { id: "practice", type: "practice", title: "即时练习", content: {} }],
+    })
+    mocks.updateLesson.mockResolvedValue({ ...lesson, version: 4 })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    fireEvent.change(screen.getByLabelText("练习题干"), { target: { value: "速度的单位？" } })
+    fireEvent.change(screen.getByLabelText("练习选项"), { target: { value: "m/s\nN" } })
+
+    fireEvent.click(screen.getByRole("button", { name: "再加一题" }))
+    expect(screen.getByText("本节共 2 道题")).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText("第 2 题题干"), { target: { value: "力的单位？" } })
+    fireEvent.change(screen.getByLabelText("第 2 题选项"), { target: { value: "m/s\nN" } })
+    fireEvent.change(screen.getByLabelText("第 2 题标准答案"), { target: { value: "N" } })
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+
+    await waitFor(() => expect(mocks.updateLesson).toHaveBeenCalled())
+    const [, input] = mocks.updateLesson.mock.calls[0]
+    const practice = input.document.sections.find((section: { type: string }) => section.type === "practice")
+    expect(practice.content).toEqual({
+      questions: [
+        { id: "q1", question: "速度的单位？", options: ["m/s", "N"] },
+        { id: "q2", question: "力的单位？", options: ["m/s", "N"], correct_answer: "N" },
+      ],
+    })
+  })
+
+  it("can take an added question back out", async () => {
+    mocks.getLesson.mockResolvedValue({
+      ...lesson,
+      version: 3,
+      sections: [
+        ...lesson.sections,
+        {
+          id: "practice",
+          type: "practice",
+          title: "即时练习",
+          content: { questions: [{ id: "q1", question: "速度的单位？", options: ["m/s", "N"] }, { id: "q2", question: "力的单位？", options: ["N", "J"] }] },
+        },
+      ],
+    })
+    mocks.updateLesson.mockResolvedValue({ ...lesson, version: 4 })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    expect(await screen.findByLabelText("第 2 题题干")).toHaveValue("力的单位？")
+    fireEvent.click(screen.getByRole("button", { name: "删除第 2 题" }))
+    expect(screen.queryByLabelText("第 2 题题干")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+    await waitFor(() => expect(mocks.updateLesson).toHaveBeenCalled())
+    const [, input] = mocks.updateLesson.mock.calls[0]
+    const practice = input.document.sections.find((section: { type: string }) => section.type === "practice")
+    expect(practice.content).toEqual({
+      questions: [{ id: "q1", question: "速度的单位？", options: ["m/s", "N"] }],
+    })
+  })
+
   it("leaves a quiz-typed section alone rather than rewriting content it cannot read", async () => {
     // The fixture's 先试一题 is a legacy shape; the practice editor must not touch it.
     mocks.getLesson.mockResolvedValue({ ...lesson, version: 3 })
