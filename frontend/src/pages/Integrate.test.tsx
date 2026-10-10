@@ -236,4 +236,31 @@ describe("Integrate page", () => {
     expect(alert).toHaveTextContent("已收进知识库 2 张")
     expect(alert).toHaveTextContent("1 张没排上复习")
   })
+
+  it("says the history is longer when it cannot show all of it", async () => {
+    // The list answers a page with no total, so without asking for one row too
+    // many the card would call 20 records "the history".
+    const notes = Array.from({ length: 21 }, (_, index) => ({
+      id: `note-${index}`,
+      title: `第 ${index} 份整合`,
+      subject: "physics",
+      mindmap: { title: "图", nodes: [] },
+      cards: [],
+      created_at: "2026-08-04T00:00:00Z",
+    }))
+    mocks.listIntegrateNotes.mockResolvedValue({ items: notes, count: notes.length })
+    renderPage()
+
+    expect(await screen.findByText(/显示最近 20 份/)).toBeInTheDocument()
+    expect(await screen.findByText("第 0 份整合")).toBeInTheDocument()
+    expect(screen.queryByText("第 20 份整合")).not.toBeInTheDocument()
+    expect(mocks.listIntegrateNotes).toHaveBeenCalledWith("", 21)
+  })
+
+  it("says nothing about truncation when the history is complete", async () => {
+    renderPage()
+
+    await screen.findByText(/点击查看之前生成过的导图与卡片/)
+    expect(screen.queryByText(/显示最近 20 份/)).not.toBeInTheDocument()
+  })
 })

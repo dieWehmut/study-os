@@ -21,6 +21,9 @@ import { CapabilityCatalog } from "@/features/whiteboard/CapabilityCatalog"
 import { failureMessage } from "@/lib/errors"
 import { cardNote } from "@/lib/review-note"
 
+/** How many 整合 records the history card shows before it admits there are more. */
+const historyLimit = 20
+
 function cardTypeLabel(cardType: string): string {
   switch (cardType) {
     case "conclusion":
@@ -55,11 +58,17 @@ export default function Integrate() {
   const [queueError, setQueueError] = useState("")
   const [error, setError] = useState("")
   const [copied, setCopied] = useState(false)
+  // One row past the page: the only way to tell a full list from a truncated one
+  // when the answer carries no total.
+  const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const navigate = useNavigate()
 
   const refreshHistory = useCallback(() => {
-    return listIntegrateNotes(subject === "all" ? "" : subject, 20)
-      .then((result) => setHistory(result.items))
+    return listIntegrateNotes(subject === "all" ? "" : subject, historyLimit + 1)
+      .then((result) => {
+        setHistory(result.items.slice(0, historyLimit))
+        setHasMoreHistory(result.items.length > historyLimit)
+      })
       .catch(() => {
         // 历史加载失败不阻塞生成。
       })
@@ -376,7 +385,12 @@ export default function Integrate() {
       <Card>
         <CardHeader className="gap-1.5">
           <CardTitle>历史整合</CardTitle>
-          <p className="text-sm text-muted-foreground">点击查看之前生成过的导图与卡片</p>
+          <p className="text-sm text-muted-foreground">
+            点击查看之前生成过的导图与卡片
+            {/* The list answers a page, not a total: without the extra row this
+                would read as "these are all of them" once there are more. */}
+            {hasMoreHistory ? `（显示最近 ${historyLimit} 份，更早的还在库里）` : ""}
+          </p>
         </CardHeader>
         <CardContent className="grid gap-2">
           {history.length === 0 ? (
