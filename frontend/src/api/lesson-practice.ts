@@ -90,8 +90,11 @@ export async function submitLessonPracticeAttempt(
 export async function listLessonPracticeAttempts(
   lessonID: string,
   sectionID: string,
+  questionID?: string,
 ): Promise<LessonPracticeAttemptListResponse> {
-  const result = await apiRequest<{ items?: unknown[]; count?: unknown }>(practicePath(lessonID, sectionID))
+  const trimmed = questionID?.trim() ?? ""
+  const suffix = trimmed ? `?question_id=${encodeURIComponent(trimmed)}` : ""
+  const result = await apiRequest<{ items?: unknown[]; count?: unknown }>(`${practicePath(lessonID, sectionID)}${suffix}`)
   const items = Array.isArray(result.items) ? result.items.map(normalizeLessonPracticeAttempt) : []
   return { items, count: typeof result.count === "number" ? result.count : items.length }
 }

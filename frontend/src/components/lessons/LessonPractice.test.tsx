@@ -177,6 +177,30 @@ it("names the question it submits, and leaves the field out when there is only o
   ))
 })
 
+it("counts each question's own attempts, not the section's total", async () => {
+    // The section total would say "3" beside a question nobody has answered.
+    mocks.listLessonPracticeAttempts.mockImplementation((_lesson: string, _section: string, questionID?: string) =>
+      Promise.resolve(
+        questionID === "q2"
+          ? { items: [{ id: "la-1", lesson_id: "lesson-1", section_id: "practice-1", question_id: "q2", answer: "N", evaluation: "correct", reference_answer: "N", feedback: "对", elapsed_ms: 0, created_at: "2026-08-22T00:00:00Z" }], count: 2 }
+          : { items: [], count: 0 },
+      ),
+    )
+    renderPractice(
+      {
+        questions: [
+          { id: "q1", question: "速度的单位？", options: ["m/s", "N"], correct_answer: "m/s" },
+          { id: "q2", question: "力的单位？", options: ["N", "J"], correct_answer: "N" },
+        ],
+      },
+      {},
+      "lesson-1",
+    )
+
+    expect(await screen.findByText("这题已作答 2 次")).toBeInTheDocument()
+    expect(screen.queryByText("已作答 2 次")).not.toBeInTheDocument()
+  })
+
 it("saves evidence after showing the optimistic result", async () => {
     mocks.submitLessonPracticeAttempt.mockResolvedValue({
       id: "lesson-attempt-1",

@@ -64,6 +64,22 @@ describe("lesson practice API", () => {
     expect(mocks.apiRequest).toHaveBeenCalledWith("/lessons/lesson-1/practice/practice-1/attempts")
   })
 
+  it("asks for one question's attempts when a question id is given", async () => {
+    mocks.apiRequest.mockResolvedValue({ items: [], count: 0 })
+
+    await listLessonPracticeAttempts("lesson-1", "practice-1", "q2")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/lessons/lesson-1/practice/practice-1/attempts?question_id=q2")
+  })
+
+  it("leaves the query off when there is only one question", async () => {
+    mocks.apiRequest.mockResolvedValue({ items: [], count: 0 })
+
+    await listLessonPracticeAttempts("lesson-1", "practice-1", "  ")
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/lessons/lesson-1/practice/practice-1/attempts")
+  })
+
   it("normalizes nullable reference fields without changing the three evaluations", () => {
     expect(normalizeLessonPracticeAttempt({
       id: "la-3",

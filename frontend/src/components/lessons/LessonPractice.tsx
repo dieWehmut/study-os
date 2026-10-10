@@ -415,7 +415,25 @@ function PracticeQuestionForm({
   // reader will make again. Filing it puts the question back in front of them.
   const [intakeState, setIntakeState] = useState<"idle" | "saving" | "saved">("idle")
   const [intakeError, setIntakeError] = useState("")
+  // This question's own history, when the section asks several: the section's
+  // number is a total, and "answered 3 times" would otherwise read as this one.
+  const [ownCount, setOwnCount] = useState<number | null>(null)
   const startedAt = useRef(clockNow())
+
+  useEffect(() => {
+    if (!lessonID || total < 2 || !question.id) return
+    let active = true
+    void listLessonPracticeAttempts(lessonID, sectionID, question.id)
+      .then((history) => {
+        if (active) setOwnCount(Math.max(history.count, history.items.length))
+      })
+      .catch(() => {
+        // The count is a convenience; the question is still answerable without it.
+      })
+    return () => {
+      active = false
+    }
+  }, [lessonID, question.id, sectionID, total])
 
   const suffix = total > 1 ? `-q${index + 1}` : ""
   const questionID = `${articleID}-question${suffix}`
@@ -485,6 +503,9 @@ function PracticeQuestionForm({
         {total > 1 ? <span className="mr-1 text-xs text-muted-foreground">{`第 ${index + 1} 题`}</span> : null}
         {question.question}
       </p>
+      {ownCount !== null && ownCount > 0 ? (
+        <p className="text-xs text-muted-foreground">{`这题已作答 ${ownCount} 次`}</p>
+      ) : null}
       <fieldset className="grid gap-2" aria-describedby={questionID}>
             <legend className="sr-only">选择答案</legend>
             {question.options.map((option, optionIndex) => (
