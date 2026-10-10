@@ -162,3 +162,21 @@ export function createBackup(category: BackupCategory = "daily"): Promise<unknow
 export function downloadBackup(id: string): Promise<{ blob: Blob; filename: string }> {
   return apiRequestBlob(`/backups/${encodeURIComponent(id)}/download`)
 }
+
+export interface BackupVerification {
+  ok: boolean
+  size_bytes: number
+  category: string
+  created_at: string
+}
+
+/**
+ * Whether a backup file could actually be restored.
+ *
+ * Read-only: the server opens the file and runs SQLite's integrity check. It is
+ * the question a reader has when choosing among dated files, and finding out
+ * during a restore is the worst moment to learn.
+ */
+export function verifyBackup(id: string): Promise<BackupVerification> {
+  return apiRequest<BackupVerification>(`/backups/${encodeURIComponent(id)}/verify`)
+}

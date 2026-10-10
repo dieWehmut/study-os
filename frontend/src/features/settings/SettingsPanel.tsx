@@ -9,7 +9,7 @@ import {
   type VoiceRole,
   type VoiceRolePatch,
 } from "@/api/speech"
-import { downloadBackup, revealDataDirectory } from "@/api/system"
+import { downloadBackup, revealDataDirectory, verifyBackup } from "@/api/system"
 import { saveBlobFile } from "@/lib/download"
 import { failureMessage } from "@/lib/errors"
 import { applyUpdate, getUpdateStatus, type UpdateStatus } from "@/api/update"
@@ -118,6 +118,10 @@ export default function SettingsPanel() {
   const [revealNotice, setRevealNotice] = useState("")
   const [downloadingBackup, setDownloadingBackup] = useState("")
   const [backupDownloadError, setBackupDownloadError] = useState("")
+  // Per record: what the server said when asked whether this file could be
+  // restored. Choosing between dated files is guesswork without it.
+  const [verifiedBackups, setVerifiedBackups] = useState<Record<string, string>>({})
+  const [verifyingBackup, setVerifyingBackup] = useState("")
   // 试听：同一时刻只允许一个角色在响，所以状态是「哪个角色」而不是「是否在响」。
   const [previewRoleId, setPreviewRoleId] = useState<string | null>(null)
   const [previewPhase, setPreviewPhase] = useState<"loading" | "playing">("loading")
@@ -228,6 +232,26 @@ export default function SettingsPanel() {
       setBackupDownloadError(failureMessage(reason, "下载备份失败"))
     } finally {
       setDownloadingBackup("")
+    }
+  }
+
+  /**
+   * Ask whether one backup could actually be restored.
+   *
+   * Read-only on the server: the file is opened and SQLite's integrity check is
+   * run. The answer is kept per record so the list can be compared at a glance.
+   */
+  async function checkBackup(id: string) {
+    if (verifyingBackup) return
+    setVerifyingBackup(id)
+    setVerifiedBackups((current) => ({ ...current, [id]: "" }))
+    try {
+      const result = await verifyBackup(id)
+      setVerifiedBackups((current) => ({ ...current, [id]: `可以恢复 · ${formatBytes(result.size_bytes)}` }))
+    } catch (reason) {
+      setVerifiedBackups((current) => ({ ...current, [id]: failureMessage(reason, "这份备份无法恢复") }))
+    } finally {
+      setVerifyingBackup("")
     }
   }
 
@@ -987,6 +1011,17 @@ export default function SettingsPanel() {
                         type="button"
                         variant="ghost"
                         size="sm"
+                        disabled={verifyingBackup === backup.id}
+                        onClick={() => void checkBackup(backup.id)}
+                      >
+                        {verifyingBackup === backup.id ? "校验中…" : "校验"}
+                      </Button>
+                    )}
+                    {isStaticDemo() ? null : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
                         disabled={downloadingBackup === backup.id}
                         onClick={() => void saveBackup(backup.id)}
                       >
@@ -998,6 +1033,11 @@ export default function SettingsPanel() {
                 </div>
                 <span className="text-xs text-muted-foreground">{formatDate(backup.created_at)}</span>
                 <code className="truncate text-xs" title={backup.path}>{backup.path}</code>
+                {verifiedBackups[backup.id] ? (
+                  <span role="status" className="text-xs text-muted-foreground">
+                    {verifiedBackups[backup.id]}
+                  </span>
+                ) : null}
               </div>
             ))}
             <p className="text-xs text-muted-foreground">位置：{status.backup.directory}</p>
