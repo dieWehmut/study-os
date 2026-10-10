@@ -513,7 +513,7 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 	var total int
 	var err error
 	if groupID := strings.TrimSpace(request.URL.Query().Get("group")); groupID != "" {
-		groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Limit: limit, Offset: offset}
+		groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"), Tag: request.URL.Query().Get("tag"), Limit: limit, Offset: offset}
 		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, groupOptions)
 		if err == nil {
 			total, err = application.Store.CountItemsByGroup(request.Context(), groupID, groupOptions)

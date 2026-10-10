@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -134,5 +135,15 @@ func TestKnowledgeExportNarrowsWithTheListFilters(t *testing.T) {
 	inGroup := exportRequest(t, router, "?group=group-mechanics")
 	if !strings.Contains(inGroup.Body.String(), "velocity") || strings.Contains(inGroup.Body.String(), "abandon") {
 		t.Fatalf("group filter leaked: %s", inGroup.Body.String())
+	}
+	// And the search box keeps working inside the group: it used to be ignored
+	// there, in the list as well as in the file.
+	inGroupSearched := exportRequest(t, router, "?group=group-mechanics&q="+url.QueryEscape("velocity"))
+	if !strings.Contains(inGroupSearched.Body.String(), "velocity") {
+		t.Fatalf("search inside a group dropped the row: %s", inGroupSearched.Body.String())
+	}
+	inGroupMissed := exportRequest(t, router, "?group=group-mechanics&q="+url.QueryEscape("abandon"))
+	if strings.Contains(inGroupMissed.Body.String(), "velocity") {
+		t.Fatalf("search inside a group was ignored: %s", inGroupMissed.Body.String())
 	}
 }

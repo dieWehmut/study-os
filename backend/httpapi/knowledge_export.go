@@ -95,7 +95,7 @@ func handleKnowledgeExport(response http.ResponseWriter, request *http.Request, 
 	groupID := strings.TrimSpace(request.URL.Query().Get("group"))
 	readPage := func(offset int) ([]models.KnowledgeItem, error) {
 		if groupID != "" {
-			groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Limit: exportPageSize, Offset: offset}
+			groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Query: options.Query, Subject: options.Subject, Tag: options.Tag, Limit: exportPageSize, Offset: offset}
 			return application.Store.ListItemsByGroup(request.Context(), groupID, groupOptions)
 		}
 		options.Offset = offset

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"study-os/backend/models"
@@ -118,32 +119,46 @@ func (s *TxStore) LinkKnowledgeItemsToGroup(ctx context.Context, itemIDs []strin
 // CountItemsByGroup answers how many the group holds, not how many fit on a
 // page -- the same distinction the whole-library count makes.
 func (s *Store) CountItemsByGroup(ctx context.Context, groupID string, options models.KnowledgeListOptions) (int, error) {
-	where := `WHERE ig.group_id = ?`
-	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {
-		where += ` AND ` + predicate
-	}
+	where, arguments := groupFilter(groupID, options)
 	var total int
 	err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM knowledge_items
 		JOIN knowledge_item_groups AS ig ON ig.knowledge_item_id = knowledge_items.id
-		`+where, groupID).Scan(&total)
+		`+where, arguments...).Scan(&total)
 	if err != nil {
 		return 0, err
 	}
 	return total, nil
 }
 
-func (s *Store) ListItemsByGroup(ctx context.Context, groupID string, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
+// The group's own condition, plus every filter the reader also set.
+//
+// The list used to answer a group with only the scheduled filter applied, so the
+// search box, the subject chip and the tag filter all sat there doing nothing
+// while a group was selected. The clauses are the same ones the whole-library
+// query uses, and their column names are unqualified because the join brings in
+// no column of the same name.
+func groupFilter(groupID string, options models.KnowledgeListOptions) (string, []any) {
 	where := `WHERE ig.group_id = ?`
-	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {
-		where += ` AND ` + predicate
+	arguments := []any{groupID}
+	if clause, filterArguments := knowledgeFilter(models.KnowledgeListOptions{
+		Query: options.Query, Subject: options.Subject, Tag: options.Tag, Scheduled: options.Scheduled,
+	}); clause != "" {
+		where += ` AND ` + strings.TrimPrefix(clause, ` WHERE `)
+		arguments = append(arguments, filterArguments...)
 	}
+	return where, arguments
+}
+
+func (s *Store) ListItemsByGroup(ctx context.Context, groupID string, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
+	where, arguments := groupFilter(groupID, options)
+	arguments = append(arguments, options.Limit, options.Offset)
 	rows, err := s.db.QueryContext(ctx, `
 		`+knowledgeSelect+`
 		JOIN knowledge_item_groups AS ig ON ig.knowledge_item_id = knowledge_items.id
 		`+where+`
 		ORDER BY knowledge_items.term ASC
-		LIMIT ? OFFSET ?`, groupID, options.Limit, options.Offset)
+		LIMIT ? OFFSET ?`, arguments...)
 	if err != nil {
 		return nil, err
 	}
