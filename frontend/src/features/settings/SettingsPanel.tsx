@@ -312,6 +312,17 @@ export default function SettingsPanel() {
     }
   }
 
+  /**
+   * Put the last report away.
+   *
+   * The same request as cancelling, because the server clears the request and the
+   * stale report together: a restore that has already happened is not a state the
+   * reader needs to keep being told about on every visit.
+   */
+  async function dismissRestoreReport() {
+    await cancelRestore()
+  }
+
   async function saveVendorSettings(vendorID: string) {
     const values: VendorConfigInput = { provider: vendorID }
     const model = modelDraft.trim()
@@ -1142,16 +1153,21 @@ export default function SettingsPanel() {
               </div>
             ) : null}
             {restoreStatus.last_recorded ? (
-              <p
-                role={restoreStatus.last_ok ? "status" : "alert"}
-                className={restoreStatus.last_ok ? "text-sm text-muted-foreground" : "text-sm text-destructive"}
-              >
-                {restoreStatus.last_ok
-                  // Which file, and when: "上次恢复已完成" with neither is a claim
-                  // the reader cannot check against the list in front of them.
-                  ? `上次恢复已完成（${restoreStatus.last_path?.split(/[\\/]/).pop() ?? "备份文件"} · ${formatDate(restoreStatus.last_resolved_at)}）。`
-                  : `上次恢复没有成功，数据保持原样：${failureMessage(new Error(restoreStatus.last_detail ?? ""), "原因不明")}`}
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p
+                  role={restoreStatus.last_ok ? "status" : "alert"}
+                  className={restoreStatus.last_ok ? "text-sm text-muted-foreground" : "text-sm text-destructive"}
+                >
+                  {restoreStatus.last_ok
+                    // Which file, and when: "上次恢复已完成" with neither is a claim
+                    // the reader cannot check against the list in front of them.
+                    ? `上次恢复已完成（${restoreStatus.last_path?.split(/[\\/]/).pop() ?? "备份文件"} · ${formatDate(restoreStatus.last_resolved_at)}）。`
+                    : `上次恢复没有成功，数据保持原样：${failureMessage(new Error(restoreStatus.last_detail ?? ""), "原因不明")}`}
+                </p>
+                <Button type="button" variant="ghost" size="sm" disabled={restoring} onClick={() => void dismissRestoreReport()}>
+                  知道了
+                </Button>
+              </div>
             ) : null}
             {backupDownloadError ? (
               <p role="alert" className="text-sm text-destructive">{backupDownloadError}</p>

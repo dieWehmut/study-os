@@ -605,6 +605,24 @@ describe("SettingsPanel", () => {
     expect(report?.textContent).toMatch(/2026\/10\/1\d/)
   })
 
+  it("lets the reader put a finished report away", async () => {
+    // The report is about something that already happened; being told on every
+    // visit is not a reminder, it is noise.
+    mocks.cancelBackupRestore.mockResolvedValue({ status: "cancelled" })
+    mocks.getSystemStatus
+      .mockResolvedValueOnce({
+        ...status,
+        restore: { pending: false, last_recorded: true, last_ok: true, last_path: "D:/data/backup.db", last_resolved_at: "2026-10-10T18:40:00Z" },
+      })
+      .mockResolvedValue(status)
+    render(<SettingsPanel />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "知道了" }))
+
+    await waitFor(() => expect(mocks.cancelBackupRestore).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByText(/上次恢复已完成/)).not.toBeInTheDocument())
+  })
+
   it("lets the reader take a scheduled restore back", async () => {
     // Picking the wrong file must be undoable before the next start acts on it.
     mocks.cancelBackupRestore.mockResolvedValue({ status: "cancelled" })
