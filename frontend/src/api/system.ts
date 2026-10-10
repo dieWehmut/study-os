@@ -1,4 +1,4 @@
-import { apiRequest } from "./client"
+import { apiRequest, apiRequestBlob } from "./client"
 
 export interface ProviderStatus {
   name: string
@@ -150,4 +150,15 @@ export function createBackup(category: BackupCategory = "daily"): Promise<unknow
     method: "POST",
     body: JSON.stringify({ category }),
   })
+}
+
+/**
+ * One backup file, as bytes.
+ *
+ * By record id: the server looks the path up itself, so nothing in this call can
+ * name a file to read. The name comes back in Content-Disposition, which is the
+ * only place that knows what the file is called on disk.
+ */
+export function downloadBackup(id: string): Promise<{ blob: Blob; filename: string }> {
+  return apiRequestBlob(`/backups/${encodeURIComponent(id)}/download`)
 }

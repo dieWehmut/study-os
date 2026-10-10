@@ -126,5 +126,37 @@ export async function apiRequest<T>(
   const text = await response.text()
   return (text ? JSON.parse(text) : undefined) as T
 }
+
+/** The filename a server suggested, when it suggested one. */
+export function filenameFromDisposition(disposition: string | null): string {
+  if (!disposition) return ""
+  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition)
+  if (!match) return ""
+  try {
+    return decodeURIComponent(match[1].trim().replace(/"$/, ""))
+  } catch {
+    return match[1].trim().replace(/"$/, "")
+  }
+}
+
+/**
+ * One request that is not JSON: a file the reader asked to keep.
+ *
+ * It goes through `resolveApiConfig` for the same reason `apiRequest` does -- the
+ * desktop shell authenticates with a token, and a plain `<a href>` to the API
+ * would arrive without it.
+ */
+export async function apiRequestBlob(path: string): Promise<{ blob: Blob; filename: string }> {
+  if (isStaticDemo()) throw new ApiError(404, "演示版没有本地文件")
+  const { baseUrl, token } = await resolveApiConfig()
+  const headers = new Headers()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  const response = await fetch(`${baseUrl}${path.startsWith("/") ? path : `/${path}`}`, { headers })
+  if (!response.ok) {
+    const detail = (await response.text()).trim()
+    throw new ApiError(response.status, detail || `下载失败（${response.status}）`)
+  }
+  return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get("Content-Disposition")) }
+}
 import { StaticDemoError, staticDemoRequest } from "./static-demo"
 import { isStaticDemo } from "@/lib/runtime"

@@ -318,6 +318,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/backups", func(response http.ResponseWriter, request *http.Request) {
 			handleBackupList(response, request, application)
 		})
+		api.Get("/backups/{backupID}/download", func(response http.ResponseWriter, request *http.Request) {
+			handleBackupDownload(response, request, application)
+		})
 		api.Post("/update/apply", func(response http.ResponseWriter, request *http.Request) {
 			handleUpdateApply(response, request, application)
 		})

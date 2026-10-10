@@ -748,6 +748,27 @@ func (s *Store) ListBackupRecords(ctx context.Context, limit int) ([]models.Back
 	return records, nil
 }
 
+// GetBackupRecord reads one record by id.
+//
+// By id rather than by path, deliberately: the path is a server-owned value
+// written by RecordBackup, and a download that took a path from the caller would
+// be a file-read primitive pointed at the whole disk.
+func (s *Store) GetBackupRecord(ctx context.Context, id string) (models.BackupRecord, error) {
+	var record models.BackupRecord
+	var createdAt string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, category, path, sha256, size_bytes, created_at
+		FROM backup_records WHERE id = ?`, id).
+		Scan(&record.ID, &record.Category, &record.Path, &record.SHA256, &record.SizeBytes, &createdAt)
+	if err != nil {
+		return models.BackupRecord{}, mapNotFound(err, "backup record")
+	}
+	if record.CreatedAt, err = parseTime(createdAt); err != nil {
+		return models.BackupRecord{}, fmt.Errorf("parse backup record time: %w", err)
+	}
+	return record, nil
+}
+
 // ReconcileBackupRecords removes metadata for backup files that retention or
 // an external cleanup has already removed, and returns the number of live
 // records. Paths are server-owned values written by RecordBackup.

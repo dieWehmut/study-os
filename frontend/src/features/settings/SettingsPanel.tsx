@@ -9,7 +9,9 @@ import {
   type VoiceRole,
   type VoiceRolePatch,
 } from "@/api/speech"
-import { revealDataDirectory } from "@/api/system"
+import { downloadBackup, revealDataDirectory } from "@/api/system"
+import { saveBlobFile } from "@/lib/download"
+import { failureMessage } from "@/lib/errors"
 import { applyUpdate, getUpdateStatus, type UpdateStatus } from "@/api/update"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -114,6 +116,8 @@ export default function SettingsPanel() {
   // rather than change, so its result is kept here beside the button.
   const [revealing, setRevealing] = useState(false)
   const [revealNotice, setRevealNotice] = useState("")
+  const [downloadingBackup, setDownloadingBackup] = useState("")
+  const [backupDownloadError, setBackupDownloadError] = useState("")
   // 试听：同一时刻只允许一个角色在响，所以状态是「哪个角色」而不是「是否在响」。
   const [previewRoleId, setPreviewRoleId] = useState<string | null>(null)
   const [previewPhase, setPreviewPhase] = useState<"loading" | "playing">("loading")
@@ -203,6 +207,27 @@ export default function SettingsPanel() {
       setRevealNotice("打不开文件管理器，可以复制上面的路径手动打开")
     } finally {
       setRevealing(false)
+    }
+  }
+
+  /**
+   * Take one backup off the machine.
+   *
+   * The path above this button is inside an app directory on the desktop -- the
+   * one place a reader cannot conveniently reach. Without this, "备份" only means
+   * the file exists somewhere they would have to go looking for.
+   */
+  async function saveBackup(id: string) {
+    if (downloadingBackup) return
+    setDownloadingBackup(id)
+    setBackupDownloadError("")
+    try {
+      const { blob, filename } = await downloadBackup(id)
+      saveBlobFile(blob, filename || `study-os-backup-${id}.db`)
+    } catch (reason) {
+      setBackupDownloadError(failureMessage(reason, "下载备份失败"))
+    } finally {
+      setDownloadingBackup("")
     }
   }
 
@@ -948,12 +973,32 @@ export default function SettingsPanel() {
               <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">尚无备份记录</p>
             ) : backups.map((backup) => (
               <div key={backup.id} className="grid gap-1 rounded-lg bg-muted/45 px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3"><strong>{backup.category === "daily" ? "日常备份" : "更新前备份"}</strong><span className="text-xs text-muted-foreground">{formatBytes(backup.size_bytes)}</span></div>
+                <div className="flex items-center justify-between gap-3">
+                  <strong>{backup.category === "daily" ? "日常备份" : "更新前备份"}</strong>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{formatBytes(backup.size_bytes)}</span>
+                    {/* The 路径 above is inside an app directory on the desktop:
+                        a backup you cannot take anywhere is not a backup yet. */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={downloadingBackup === backup.id}
+                      onClick={() => void saveBackup(backup.id)}
+                    >
+                      <Download data-icon="inline-start" />
+                      {downloadingBackup === backup.id ? "下载中…" : "下载"}
+                    </Button>
+                  </span>
+                </div>
                 <span className="text-xs text-muted-foreground">{formatDate(backup.created_at)}</span>
                 <code className="truncate text-xs" title={backup.path}>{backup.path}</code>
               </div>
             ))}
             <p className="text-xs text-muted-foreground">位置：{status.backup.directory}</p>
+            {backupDownloadError ? (
+              <p role="alert" className="text-sm text-destructive">{backupDownloadError}</p>
+            ) : null}
             {notice?.kind === "backup" ? (
               <p role="status" aria-live="polite" className="text-sm text-primary">{notice.text}</p>
             ) : null}
