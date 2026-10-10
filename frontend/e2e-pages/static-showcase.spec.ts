@@ -63,6 +63,22 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   await expect(reopenedMistake).toContainText("\u7b54\u6848\uff1a6 N")
 
   await expect(page.locator('[data-static-demo="true"]')).toBeVisible()
+
+  // What this build can and cannot offer, on the routes that carry an export.
+  // The library's CSV needs the local database, so the demo leaves the button
+  // out -- it has knowledge items to list, so its absence is a decision and not
+  // an empty page.
+  await page.goto("#/knowledge")
+  await expect(page.locator("main")).toBeVisible()
+  await expect(page.getByRole("button", { name: "\u5bfc\u51fa CSV" })).toHaveCount(0)
+
+  // The course export is pure client-side, so it works here too.
+  await page.goto("#/lessons/lesson-newton")
+  await expect(page.locator("main")).toContainText("\u725b\u987f\u7b2c\u4e8c\u5b9a\u5f8b\uff1a\u4ece\u53d7\u529b\u56fe\u5f00\u59cb")
+  const markdown = page.waitForEvent("download")
+  await page.getByRole("button", { name: "\u5bfc\u51fa Markdown" }).click()
+  expect((await markdown).suggestedFilename()).toMatch(/\.md$/)
+
   expect(apiRequests).toEqual([])
   expect(runtimeErrors).toEqual([])
 })
