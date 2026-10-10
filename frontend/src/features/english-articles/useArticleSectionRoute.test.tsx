@@ -34,11 +34,8 @@ function wrapper(entries: string[]) {
   }
 }
 
-function installSections() {
-  const positions = new Map([
-    ["section-1-opening", 40],
-    ["section-2-shift", 480],
-  ])
+function installSections(tops: Record<string, number> = { "section-1-opening": 40, "section-2-shift": 480 }) {
+  const positions = new Map(Object.entries(tops))
   for (const [id, top] of positions) {
     const section = document.createElement("section")
     section.id = id
@@ -138,6 +135,57 @@ describe("useArticleSectionRoute", () => {
       expect(result.current.route.activeID).toBe("section-2-shift")
       expect(result.current.location.hash).toBe("#section-2-shift")
     })
+  })
+
+  it("ignores the sections a smooth scroll passes through on the way to the chosen one", async () => {
+    // Measured in Chromium: clicking 第四节 scrolled there, then the observer
+    // reported 第一节 (which the scroll was passing) and the address -- and the
+    // page -- went with it. The choice holds the route until the scroll arrives.
+    vi.stubGlobal("IntersectionObserver", IntersectionObserverStub)
+    IntersectionObserverStub.instances = []
+    installSections()
+    const sectionIDs = ["section-1-opening", "section-2-shift"]
+
+    const { result } = renderHook(
+      () => ({
+        route: useArticleSectionRoute(sectionIDs),
+        location: useLocationValue(),
+      }),
+      { wrapper: wrapper(["/reading/articles/a-1#section-1-opening"]) },
+    )
+    await waitFor(() => expect(IntersectionObserverStub.instances).toHaveLength(1))
+
+    act(() => result.current.route.goToSection("section-2-shift"))
+    expect(result.current.location.hash).toBe("#section-2-shift")
+
+    const first = document.getElementById("section-1-opening") as HTMLElement
+    act(() => IntersectionObserverStub.instances[0].trigger([
+      { target: first, isIntersecting: true, intersectionRatio: 1 },
+    ]))
+    expect(result.current.location.hash).toBe("#section-2-shift")
+    expect(result.current.route.activeID).toBe("section-2-shift")
+
+    // Arriving is not the end of the hold either: the observer sees the target while
+    // the page is still moving. It ends when the scroll stops.
+    const second = document.getElementById("section-2-shift") as HTMLElement
+    act(() => IntersectionObserverStub.instances[0].trigger([
+      { target: second, isIntersecting: true, intersectionRatio: 1 },
+    ]))
+    expect(result.current.location.hash).toBe("#section-2-shift")
+
+    // The page settles, and the geometry says the reader is now looking at
+    // section 2 (its top is at the line). Following the reader resumes.
+    second.getBoundingClientRect = () => ({ top: 96, bottom: 336, left: 0, right: 800, width: 800, height: 240, x: 0, y: 96, toJSON: () => ({}) }) as DOMRect
+    act(() => window.dispatchEvent(new Event("scroll")))
+    await waitFor(() => expect(IntersectionObserverStub.instances).toHaveLength(1))
+    await new Promise((resolve) => setTimeout(resolve, 260))
+    expect(result.current.location.hash).toBe("#section-2-shift")
+
+    // Now a section it passes over is the reader's own scrolling, so it counts.
+    act(() => IntersectionObserverStub.instances[0].trigger([
+      { target: first, isIntersecting: true, intersectionRatio: 1 },
+    ]))
+    await waitFor(() => expect(result.current.location.hash).toBe("#section-1-opening"))
   })
 
   it("restores a valid initial hash without moving for an invalid one", () => {

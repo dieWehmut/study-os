@@ -3,7 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom"
 
 import { sectionHash, sectionIDFromHash } from "./article-sections"
 
-const headerOffset = 72
+// Matches `scroll-mt-24` on a section: it is where a section's top lands after
+// being scrolled to, so it is exactly the line that says "the reader is here".
+// At 72 a section that had just been scrolled to sat *below* the line and counted
+// as not yet reached -- the outline then named the section above it.
+const headerOffset = 96
 
 function sectionAtScroll(ids: readonly string[]): string {
   let active = ids[0] ?? ""
@@ -38,6 +42,15 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
   // on 第二节 arriving at #section-1-opening. A choice a reader made is never
   // undone by an automatic one.
   const chosenByReader = useRef(false)
+  // How long a chosen section keeps the route to itself. Measured in Chromium:
+  // without it, clicking 第四节 scrolled there and then the observer reported the
+  // sections the smooth scroll passed through, dragging the address -- and the
+  // page -- back to 第一节. Long enough for the scroll, short enough that a scroll
+  // which never arrives cannot freeze the outline.
+  const scrollDeadline = useRef(0)
+  // The pending "the scroll has stopped" timer, shared with goToSection so a new
+  // click cancels the previous one's settle.
+  const settleTimer = useRef(0)
 
   useEffect(() => {
     activeIDRef.current = activeID
@@ -62,16 +75,24 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
     const id = sectionIDFromHash(location.hash)
     if (!validIDs.current.has(id)) return
     setActiveID(id)
-    if (scrollingTo.current === id) {
-      scrollingTo.current = ""
-      return
-    }
+    // The handler already scrolled, and the flag stays up until the scroll gets
+    // there: clearing it here -- which is what this did -- handed the route back
+    // to the observer while the page was still travelling.
+    if (scrollingTo.current === id) return
     document.getElementById(id)?.scrollIntoView({ behavior: "auto", block: "start" })
   }, [location.hash, sectionIDs])
 
   useEffect(() => {
     const syncRoute = (id: string) => {
-      if (scrollingTo.current) return
+      if (scrollingTo.current) {
+        // On the way to the section the reader picked. Passing over other sections
+        // is not the reader changing their mind, and *seeing* the target is not
+        // arrival either: measured in Chromium, releasing the hold on the first
+        // sighting let the observer name the section the scroll was passing and
+        // pull the page back. The settle listener below is what ends it.
+        if (Date.now() >= scrollDeadline.current) scrollingTo.current = ""
+        return
+      }
       if (!id || id === activeIDRef.current) return
       activeIDRef.current = id
       setActiveID(id)
@@ -81,12 +102,39 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
       })
     }
 
+    // The hold ends when the page stops moving, not when a section is seen: the
+    // smooth scroll reports intersections all the way, and the reader's own
+    // scrolling afterwards is what should move the outline on.
+    const releaseWhenSettled = () => {
+      if (!scrollingTo.current) return
+      window.clearTimeout(settleTimer.current)
+      settleTimer.current = window.setTimeout(() => {
+        if (!scrollingTo.current) return
+        scrollingTo.current = ""
+        // Now that the page has stopped, the one rule decides where it landed.
+        const landed = sectionAtScroll(sectionIDs)
+        if (landed) syncRoute(landed)
+      }, 180)
+    }
+    window.addEventListener("scroll", releaseWhenSettled, { passive: true })
+    const stopListening = () => {
+      window.clearTimeout(settleTimer.current)
+      window.removeEventListener("scroll", releaseWhenSettled)
+    }
+
     if (typeof IntersectionObserver !== "undefined") {
       const observer = new IntersectionObserver((entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top)
-        const id = (visible[0]?.target as HTMLElement | undefined)?.id
+        const visible = entries.filter((entry) => entry.isIntersecting)
+        if (visible.length === 0) return
+        // The current section is the last one whose top has reached the line, not
+        // the first one still touching the band: the section above is usually
+        // still intersecting, and naming it moved the outline back one section.
+        const top = (entry: IntersectionObserverEntry) => entry.boundingClientRect?.top ?? Number.NEGATIVE_INFINITY
+        const passed = visible.filter((entry) => top(entry) <= headerOffset)
+        const chosen = passed.length > 0
+          ? passed.reduce((last, entry) => (top(entry) > top(last) ? entry : last))
+          : visible.reduce((first, entry) => (top(entry) < top(first) ? entry : first))
+        const id = (chosen.target as HTMLElement | undefined)?.id
         if (id && validIDs.current.has(id)) syncRoute(id)
       }, {
         rootMargin: `-${headerOffset}px 0px -55% 0px`,
@@ -96,7 +144,10 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
         const element = document.getElementById(id)
         if (element) observer.observe(element)
       }
-      return () => observer.disconnect()
+      return () => {
+        stopListening()
+        observer.disconnect()
+      }
     }
 
     let frame = 0
@@ -110,6 +161,7 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
     }
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => {
+      stopListening()
       window.removeEventListener("scroll", onScroll)
       if (frame) cancelAnimationFrame(frame)
     }
@@ -119,6 +171,9 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
     if (!validIDs.current.has(id)) return
     chosenByReader.current = true
     scrollingTo.current = sectionIDFromHash(location.hash) === id ? "" : id
+    scrollDeadline.current = Date.now() + 1500
+    // A settle left over from the last scroll must not release this one's hold.
+    window.clearTimeout(settleTimer.current)
     setActiveID(id)
     navigate({ pathname: location.pathname, search: location.search, hash: sectionHash(id) }, {
       preventScrollReset: true,
