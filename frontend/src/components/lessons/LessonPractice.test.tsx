@@ -111,7 +111,67 @@ describe("LessonPractice", () => {
     expect(screen.queryByRole("button", { name: "提交答案" })).not.toBeInTheDocument()
   })
 
-  it("saves evidence after showing the optimistic result", async () => {
+  // A section that asks several questions used to render as if it asked none: the
+// panel only read the flat `question` field. It now answers the first one and says
+// how many are left, which is less than a full multi-question panel but is not a
+// silent lie about the document.
+it("answers the first question of a section that holds several, and says so", () => {
+  renderPractice({
+    questions: [
+      { id: "q1", question: "速度的单位是什么？", options: ["m/s", "N"], correct_answer: "m/s" },
+      { id: "q2", question: "力的单位是什么？", options: ["m/s", "N"], correct_answer: "N" },
+      { id: "q3", question: "功的单位是什么？", options: ["J", "N"], correct_answer: "J" },
+    ],
+  })
+
+  expect(screen.getByText("速度的单位是什么？")).toBeInTheDocument()
+  expect(screen.queryByText("力的单位是什么？")).not.toBeInTheDocument()
+  expect(screen.getByRole("status")).toHaveTextContent("本节共 3 道题")
+  expect(screen.getByRole("status")).toHaveTextContent("其余 2 道")
+  expect(screen.getByRole("article")).toHaveAttribute("data-practice-question-count", "3")
+})
+
+it("names the question it submits, and leaves the field out when there is only one", async () => {
+  mocks.submitLessonPracticeAttempt.mockResolvedValue({
+    id: "lesson-attempt-q1",
+    lesson_id: "lesson-1",
+    section_id: "practice-1",
+    answer: "m/s",
+    evaluation: "correct",
+    reference_answer: "m/s",
+    feedback: "服务端确认正确。",
+    elapsed_ms: 8,
+    created_at: "2026-08-21T00:00:00Z",
+  })
+  const { unmount } = renderPractice(
+    { questions: [{ id: "q1", question: "速度的单位是什么？", options: ["m/s", "N"], correct_answer: "m/s" }] },
+    {},
+    "lesson-1",
+  )
+
+  fireEvent.click(screen.getByRole("radio", { name: "m/s" }))
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+  await waitFor(() => expect(mocks.submitLessonPracticeAttempt).toHaveBeenCalledWith(
+    "lesson-1",
+    "practice-1",
+    expect.objectContaining({ answer: "m/s", questionId: "q1" }),
+  ))
+  unmount()
+
+  // The single-question shape sends no questionId at all, so its request body is
+  // what it always was.
+  mocks.submitLessonPracticeAttempt.mockClear()
+  renderPractice({ question: "2 + 2 = ?", options: ["3", "4"], answer: "4" }, {}, "lesson-1")
+  fireEvent.click(screen.getByRole("radio", { name: "4" }))
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+  await waitFor(() => expect(mocks.submitLessonPracticeAttempt).toHaveBeenCalledWith(
+    "lesson-1",
+    "practice-1",
+    expect.objectContaining({ answer: "4", questionId: "" }),
+  ))
+})
+
+it("saves evidence after showing the optimistic result", async () => {
     mocks.submitLessonPracticeAttempt.mockResolvedValue({
       id: "lesson-attempt-1",
       lesson_id: "lesson-1",

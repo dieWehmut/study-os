@@ -17,6 +17,8 @@ import { practiceNote } from "@/lib/review-note"
 import { cn } from "@/lib/utils"
 
 interface PracticeContent {
+  /** Which question of the section this is, when the document names them. */
+  id?: string
   question: string
   options: string[]
   answer?: unknown
@@ -122,11 +124,27 @@ function textField(record: Record<string, unknown>, keys: string[]): string {
   return ""
 }
 
-function parseContent(section: LessonSection): PracticeContent | null {
+// practiceQuestions answers "what does this section ask?".
+//
+// A section may carry several questions in `questions`, and those are the source
+// when present: reading only the flat `question` field left such a section
+// rendering as if it had no question at all. The flat shape stays the
+// single-question case, so an older document takes the path it always did.
+function practiceQuestions(section: LessonSection): PracticeContent[] {
   const content = sectionContent(section)
-  if (!content || typeof content !== "object" || Array.isArray(content)) return null
-
+  if (!content || typeof content !== "object" || Array.isArray(content)) return []
   const record = content as Record<string, unknown>
+  if (Array.isArray(record.questions) && record.questions.length > 0) {
+    return record.questions
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+      .map(parseContentRecord)
+      .filter((parsed): parsed is PracticeContent => parsed !== null)
+  }
+  const single = parseContentRecord(record)
+  return single ? [single] : []
+}
+
+function parseContentRecord(record: Record<string, unknown>): PracticeContent | null {
   const question = textField(record, ["question", "prompt", "stem"])
   const options = optionValues(record.options)
   if (!question || options.length === 0) return null
@@ -138,6 +156,7 @@ function parseContent(section: LessonSection): PracticeContent | null {
     ? feedbackValue as Record<string, unknown>
     : undefined
   return {
+    id: textField(record, ["id"]),
     question,
     options,
     answer,
@@ -246,7 +265,12 @@ function LegacyPractice({ section }: LessonPracticeProps) {
 
 export default function LessonPractice({ section, lessonID }: LessonPracticeProps) {
   const type = sectionType(section)
-  const content = parseContent(section)
+  const questions = practiceQuestions(section)
+  // One question is answered here for now. Rendering all of them is a per-question
+  // version of this component's whole state machine, and doing that badly would be
+  // worse than naming the limit: a section that asks four questions and shows one
+  // with no hint would read as a section that asks one.
+  const content = questions[0] ?? null
   const [selected, setSelected] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [result, setResult] = useState<PracticeResult | null>(null)
@@ -316,6 +340,7 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
     try {
       const attempt = await submitLessonPracticeAttempt(lessonID, section.id, {
         answer: content.options[selected],
+        questionId: content.id,
         elapsedMs: Math.max(0, Math.round(clockNow() - startedAt.current)),
       })
       setResult(resultFromAttempt(attempt))
@@ -360,6 +385,7 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
       data-section-kind={type}
       data-practice-mode={content ? "interactive" : "legacy"}
       data-practice-history={historyState}
+      data-practice-question-count={questions.length}
       className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -367,6 +393,12 @@ export default function LessonPractice({ section, lessonID }: LessonPracticeProp
         <h2 className="font-heading text-lg font-semibold">{section.title || sectionLabels[type] || type}</h2>
         {section.required ? <Badge variant="outline">必看</Badge> : null}
       </div>
+
+      {questions.length > 1 ? (
+        <p role="status" className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          本节共 {questions.length} 道题，这里作答第 1 道；其余 {questions.length - 1} 道尚未在此显示。
+        </p>
+      ) : null}
 
       {content ? (
         <form

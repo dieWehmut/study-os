@@ -22,6 +22,8 @@ export interface LessonPracticeAttemptListResponse {
 
 export interface SubmitLessonPracticeAttemptInput {
   answer: string
+  /** Which question of the section, when the document names them. */
+  questionId?: string
   elapsedMs?: number
 }
 
@@ -71,9 +73,16 @@ export async function submitLessonPracticeAttempt(
   sectionID: string,
   input: SubmitLessonPracticeAttemptInput,
 ): Promise<LessonPracticeAttempt> {
+  const questionId = input.questionId?.trim() ?? ""
   const result = await apiRequest<unknown>(practicePath(lessonID, sectionID), {
     method: "POST",
-    body: JSON.stringify({ answer: input.answer, elapsed_ms: input.elapsedMs ?? 0 }),
+    // Left out entirely for the single-question shape, so those requests stay
+    // byte-for-byte what they were before questions had ids.
+    body: JSON.stringify({
+      answer: input.answer,
+      elapsed_ms: input.elapsedMs ?? 0,
+      ...(questionId ? { question_id: questionId } : {}),
+    }),
   })
   return normalizeLessonPracticeAttempt(result)
 }
