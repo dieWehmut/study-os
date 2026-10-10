@@ -11,6 +11,14 @@ describe("failureMessage", () => {
     )
   })
 
+  it("still passes on a reader-facing message that is not an HTTP reply", () => {
+    // Callers reject with plain Errors too, and a Chinese sentence is written for
+    // the reader whichever layer produced it.
+    expect(failureMessage(new Error("文件超过 25 MiB"), "文件未能上传")).toBe(
+      "文件未能上传：文件超过 25 MiB",
+    )
+  })
+
   it("does not tell the reader to check a backend that just answered", () => {
     // The server answered 400 with its own words; asking whether it is running
     // would be false, and it is the one party that knows what happened.

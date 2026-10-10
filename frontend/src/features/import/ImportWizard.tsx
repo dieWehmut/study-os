@@ -5,6 +5,7 @@ import { commitImport, previewImport, uploadImport } from "@/api/imports"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { failureMessage } from "@/lib/errors"
 
 type UploadResult = Awaited<ReturnType<typeof uploadImport>>
 type PreviewResult = Awaited<ReturnType<typeof previewImport>>
@@ -31,10 +32,6 @@ const dispositionLabels: Record<string, string> = {
   review: "需要确认",
   new_sense: "新义项",
   invalid: "无效行",
-}
-
-function errorMessage(reason: unknown, fallback: string) {
-  return reason instanceof Error && reason.message ? reason.message : fallback
 }
 
 function createInitialMapping(columns: string[]): ImportMapping {
@@ -73,7 +70,7 @@ export function ImportWizard() {
       setUploadResult(result)
       setMapping(createInitialMapping(result.inspection.columns))
     } catch (reason) {
-      setError(errorMessage(reason, "文件未能上传，请重试。"))
+      setError(failureMessage(reason, "文件未能上传"))
     } finally {
       setPending(null)
     }
@@ -93,7 +90,11 @@ export function ImportWizard() {
       setPreview(result)
       setResolutions({})
     } catch (reason) {
-      setError(errorMessage(reason, "预览生成失败，请检查字段映射。"))
+      // A server reply comes through with its own reason (it knows whether the
+      // mapping was wrong); only a request that never arrived falls back to
+      // advice -- "请检查字段映射" used to be said to everyone, including someone
+      // whose backend was not running.
+      setError(failureMessage(reason, "预览生成失败"))
     } finally {
       setPending(null)
     }
@@ -106,7 +107,7 @@ export function ImportWizard() {
     try {
       setCommit(await commitImport(uploadResult.job_id, { resolutions }))
     } catch (reason) {
-      setError(errorMessage(reason, "导入未能提交，请重试。"))
+      setError(failureMessage(reason, "导入未能提交"))
     } finally {
       setPending(null)
     }

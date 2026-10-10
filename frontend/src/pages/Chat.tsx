@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ArrowUp, MessageSquarePlus, Paperclip, Sparkles } from "lucide-react"
 
 import { ApiError } from "@/api/client"
+import { failureMessage } from "@/lib/errors"
 import {
   getQARecord,
   listChatConversations,
@@ -587,20 +588,22 @@ export default function Chat() {
             setSending(false)
             void refreshConversations("keep-loaded")
           }
-        } catch {
+        } catch (reason) {
           window.clearInterval(timer)
           if (pollRef.current === timer) pollRef.current = null
           if (sendRequestRef.current === sendRequestID) {
             setSending(false)
-            setError("读取回答失败，请重试。")
+            setError(failureMessage(reason, "读取回答失败"))
           }
         }
       }, 1500)
       pollRef.current = timer
-    } catch {
+    } catch (reason) {
       if (sendRequestRef.current === sendRequestID) {
         setSending(false)
-        setError("发送失败，请重试。")
+        // The server knows whether it was the AI configuration, the request, or
+        // nothing at all ("发送失败，请重试" hid a missing API key).
+        setError(failureMessage(reason, "发送失败"))
       }
     }
   }

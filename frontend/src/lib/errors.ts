@@ -17,7 +17,13 @@ const readerFacing = /[\u3400-\u9fff]/
  * named instead when it is an internal like `list lessons failed`.
  */
 export function failureMessage(reason: unknown, action: string): string {
-  if (!(reason instanceof ApiError)) return `${action}，请确认本地后端正在运行。`
+  if (!(reason instanceof ApiError)) {
+    // Not an HTTP reply: usually fetch itself throwing because nothing is
+    // listening. A message written for the reader is still worth passing on --
+    // callers reject with plain Errors too -- while "Failed to fetch" is not.
+    const text = reason instanceof Error ? reason.message.trim() : ""
+    return readerFacing.test(text) ? `${action}：${text}` : `${action}，请确认本地后端正在运行。`
+  }
   const server = reason.message.trim()
   const usable = reason.status < 500 || readerFacing.test(server)
   const detail = usable && server ? server : `服务出错（${reason.status}）`
