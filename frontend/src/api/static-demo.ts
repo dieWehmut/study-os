@@ -1412,5 +1412,8 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor({ job_id: id, state: "committed", summary: { inserted: 1, exact_duplicates: 0, merged: 0, pending_reviews: 1, rejected: 0, prompts_created: 1 } }) as T
   }
 
-  throw new StaticDemoError(`Static demo does not implement ${method} ${url.pathname}`)
+  // The demo answers a handful of routes and refuses the rest. The sentence is what
+// a visitor sees in a Chinese page, so it is written for them, with the technical
+// detail kept in brackets for whoever is comparing it against the real backend.
+  throw new StaticDemoError(`GitHub Pages 展示模式没有实现这个操作（${method} ${url.pathname}）`)
 }

@@ -128,8 +128,10 @@ describe("static Pages API fixtures", () => {
   })
 
   it("rejects unsupported server-only calls instead of issuing a request", async () => {
+    // The refusal reaches the page, so it is a Chinese sentence; the route it names
+    // is the bracketed detail.
     await expect(staticDemoRequest("/audio?term=hello", { method: "POST" })).rejects.toThrow(
-      /static demo/i,
+      /展示模式没有实现这个操作（POST \/audio）/,
     )
   })
 
@@ -557,14 +559,17 @@ describe("static Pages API fixtures", () => {
   })
 
   it("keeps lesson writes backend-only in the static Pages adapter", async () => {
+    // The refusal is a sentence a visitor reads on a Chinese page, so it is written
+    // for them; the bracketed detail is what a developer compares against the real
+    // backend.
     await expect(staticDemoRequest("/lessons", {
       method: "POST",
       body: JSON.stringify({ title: "不可写入" }),
-    })).rejects.toThrow(/static demo does not implement/i)
+    })).rejects.toThrow(/展示模式没有实现这个操作/)
     await expect(staticDemoRequest("/lessons/lesson-newton", {
       method: "PATCH",
       body: JSON.stringify({ version: 1, title: "不可写入" }),
-    })).rejects.toThrow(/static demo does not implement/i)
+    })).rejects.toThrow("GitHub Pages 展示模式没有实现这个操作（PATCH /lessons/lesson-newton）")
   })
 
   it("rejects unknown lesson statuses like the backend route", async () => {
