@@ -2,6 +2,24 @@
 
 ## 未发布
 
+### 一节多题（后端第一刀）：schema 19，作答按题分开
+
+按 ROADMAP 里定下的形状开始实现，这一刀只做**后端与迁移**：
+
+- schema 18 → 19：`lesson_attempts` 加 `question_id TEXT NOT NULL DEFAULT ''`，并把
+  `(lesson_id, section_id, …)` 索引扩成 `(lesson_id, section_id, question_id, created_at DESC, id DESC)`。
+  **空串 = 旧数据**，也就是「一节一题」的情形，所以老库不需要数据迁移。
+- `LessonPracticeAttempt.QuestionID`（`omitempty`）与 `LessonPracticeAttemptListOptions.QuestionID`：
+  列表可以按题收窄，**留空即不收窄**（旧读者看到的仍是这一节的全部作答）。
+- 接口：`POST …/practice/{sectionID}/attempts` 接受可选 `question_id`；
+  `GET` 支持 `?question_id=`。
+- 用例：新增 1 条（同一节里 q1/q2 各自留痕、不带 id 的那条也各自独立，且**不带 question_id 时列表
+  不窄化**）；既有「最新在前 / 窗口 / 校验」用例原样通过（等价性）。
+- 途中修掉两处**由我这次改版本号暴露出来的旧测试脆弱点**：三处 `db.SchemaVersion != 18` 的硬断言
+  改成 `< 18` 的下限断言；`subject_evidence_store_test.go` 的「降级到 v17」fixture 原来只删
+  18 号标记（head 变 19 后就不再触发重迁移），改成删 `>= 18`。
+- 还没做：`content.questions` 的校验、前端作答面与编辑面、列表页题数、Markdown 导出多题。
+
 ### 一节多题：把形状定下来（写进 ROADMAP「第 3 阶段」）
 
 - 「一门课只有一题」我拖了很久，理由是「要先定文档形状」。这轮去读代码把**到底是什么挡着**写清楚了，

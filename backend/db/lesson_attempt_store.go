@@ -38,6 +38,7 @@ func (s *TxStore) createLessonPracticeAttempt(ctx context.Context, attempt model
 	attempt.ID = strings.TrimSpace(attempt.ID)
 	attempt.LessonID = strings.TrimSpace(attempt.LessonID)
 	attempt.SectionID = strings.TrimSpace(attempt.SectionID)
+	attempt.QuestionID = strings.TrimSpace(attempt.QuestionID)
 	attempt.Evaluation = strings.TrimSpace(attempt.Evaluation)
 	if err := attempt.Validate(); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidLessonPracticeAttempt, err)
@@ -62,10 +63,10 @@ func (s *TxStore) createLessonPracticeAttempt(ctx context.Context, attempt model
 	}
 	if _, err := s.tx.ExecContext(ctx, `
 		INSERT INTO lesson_attempts(
-			id, lesson_id, section_id, answer, evaluation,
+			id, lesson_id, section_id, question_id, answer, evaluation,
 			reference_answer, feedback, elapsed_ms, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		attempt.ID, attempt.LessonID, attempt.SectionID, attempt.Answer, attempt.Evaluation,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		attempt.ID, attempt.LessonID, attempt.SectionID, attempt.QuestionID, attempt.Answer, attempt.Evaluation,
 		attempt.ReferenceAnswer, attempt.Feedback, attempt.ElapsedMS, formatTime(createdAt)); err != nil {
 		return fmt.Errorf("create lesson practice attempt %q: %w", attempt.ID, err)
 	}
@@ -100,13 +101,16 @@ func (s *Store) ListLessonPracticeAttempts(ctx context.Context, lessonID, sectio
 	if offset < 0 {
 		offset = 0
 	}
+	// An empty QuestionID asks for every question in the section, which is what the
+	// single-question reader wants and what it did before this column existed.
+	questionID := strings.TrimSpace(listOptions.QuestionID)
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, lesson_id, section_id, answer, evaluation,
+		SELECT id, lesson_id, section_id, question_id, answer, evaluation,
 			reference_answer, feedback, elapsed_ms, created_at
 		FROM lesson_attempts
-		WHERE lesson_id = ? AND section_id = ?
+		WHERE lesson_id = ? AND section_id = ? AND (? = '' OR question_id = ?)
 		ORDER BY created_at DESC, id DESC
-		LIMIT ? OFFSET ?`, lessonID, sectionID, limit, offset)
+		LIMIT ? OFFSET ?`, lessonID, sectionID, questionID, questionID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list lesson practice attempts: %w", err)
 	}
@@ -147,7 +151,7 @@ func (s *Store) CountLessonPracticeAttempts(ctx context.Context, lessonID, secti
 func scanLessonPracticeAttempt(row scanner) (models.LessonPracticeAttempt, error) {
 	var item models.LessonPracticeAttempt
 	var createdAt string
-	if err := row.Scan(&item.ID, &item.LessonID, &item.SectionID, &item.Answer,
+	if err := row.Scan(&item.ID, &item.LessonID, &item.SectionID, &item.QuestionID, &item.Answer,
 		&item.Evaluation, &item.ReferenceAnswer, &item.Feedback, &item.ElapsedMS, &createdAt); err != nil {
 		return models.LessonPracticeAttempt{}, fmt.Errorf("scan lesson practice attempt: %w", err)
 	}

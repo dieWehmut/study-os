@@ -66,6 +66,63 @@ func TestLessonPracticeAttemptPersistsAndListsNewestFirst(t *testing.T) {
 	}
 }
 
+// Two questions in one section must each keep their own answer, while the
+// single-question reader (no question id at all) keeps seeing every attempt it
+// saw before this column existed.
+func TestLessonPracticeAttemptsSeparateQuestionsWithinOneSection(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.CreateLesson(ctx, models.Lesson{
+		ID: "lesson-questions", Title: "一节多题", Document: models.NewLessonDocument(),
+	}); err != nil {
+		t.Fatalf("create lesson: %v", err)
+	}
+
+	base := time.Date(2026, 8, 21, 3, 4, 5, 0, time.UTC)
+	for index, attempt := range []models.LessonPracticeAttempt{
+		{ID: "attempt-q1", QuestionID: "q1", Answer: "8 N", Evaluation: models.LessonPracticeEvaluationCorrect, CreatedAt: base},
+		{ID: "attempt-q2", QuestionID: "q2", Answer: "6 N", Evaluation: models.LessonPracticeEvaluationIncorrect, CreatedAt: base.Add(time.Second)},
+		// The old single-question shape: no id at all.
+		{ID: "attempt-plain", Answer: "不关联题目", Evaluation: models.LessonPracticeEvaluationUngraded, CreatedAt: base.Add(2 * time.Second)},
+	} {
+		attempt.LessonID = "lesson-questions"
+		attempt.SectionID = "practice"
+		if err := store.CreateLessonPracticeAttempt(ctx, attempt); err != nil {
+			t.Fatalf("create attempt %d: %v", index, err)
+		}
+	}
+
+	every, err := store.ListLessonPracticeAttempts(ctx, "lesson-questions", "practice")
+	if err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+	if len(every) != 3 {
+		t.Fatalf("all attempts = %d, want 3 (no question filter means no narrowing)", len(every))
+	}
+
+	first, err := store.ListLessonPracticeAttempts(ctx, "lesson-questions", "practice",
+		models.LessonPracticeAttemptListOptions{QuestionID: "q1"})
+	if err != nil {
+		t.Fatalf("list q1: %v", err)
+	}
+	if len(first) != 1 || first[0].ID != "attempt-q1" || first[0].QuestionID != "q1" {
+		t.Fatalf("q1 attempts = %#v, want only its own", first)
+	}
+
+	second, err := store.ListLessonPracticeAttempts(ctx, "lesson-questions", "practice",
+		models.LessonPracticeAttemptListOptions{QuestionID: "q2"})
+	if err != nil {
+		t.Fatalf("list q2: %v", err)
+	}
+	if len(second) != 1 || second[0].ID != "attempt-q2" {
+		t.Fatalf("q2 attempts = %#v, want only its own", second)
+	}
+}
+
 func TestLessonPracticeAttemptRejectsInvalidInputAndMissingLesson(t *testing.T) {
 	ctx := context.Background()
 	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))

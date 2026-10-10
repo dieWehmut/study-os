@@ -332,6 +332,7 @@ CREATE TABLE lesson_attempts (
     id TEXT PRIMARY KEY,
     lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
     section_id TEXT NOT NULL,
+    question_id TEXT NOT NULL DEFAULT '',
     answer TEXT NOT NULL,
     evaluation TEXT NOT NULL CHECK (evaluation IN ('correct', 'incorrect', 'ungraded')),
     reference_answer TEXT NOT NULL DEFAULT '',
@@ -340,4 +341,4 @@ CREATE TABLE lesson_attempts (
     created_at TEXT NOT NULL
 );
 CREATE INDEX lesson_attempts_lesson_section_idx
-    ON lesson_attempts(lesson_id, section_id, created_at DESC, id DESC);
+    ON lesson_attempts(lesson_id, section_id, question_id, created_at DESC, id DESC);

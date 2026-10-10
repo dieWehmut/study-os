@@ -26,8 +26,8 @@ func openErrorCauseStore(t *testing.T) (*db.Store, context.Context) {
 
 func TestErrorCauseSchemaSeedsTheCompatibleConfirmedTaxonomy(t *testing.T) {
 	store, ctx := openErrorCauseStore(t)
-	if db.SchemaVersion != 18 {
-		t.Fatalf("schema version = %d, want 18", db.SchemaVersion)
+	if db.SchemaVersion < 18 {
+		t.Fatalf("schema version = %d, want at least 18", db.SchemaVersion)
 	}
 
 	causes, err := store.ListErrorCauses(ctx, models.ErrorCauseListOptions{

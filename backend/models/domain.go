@@ -406,9 +406,13 @@ type LessonLink struct {
 // submitting a course question records evidence, but must not schedule an
 // FSRS card.
 type LessonPracticeAttempt struct {
-	ID              string    `json:"id"`
-	LessonID        string    `json:"lesson_id"`
-	SectionID       string    `json:"section_id"`
+	ID        string `json:"id"`
+	LessonID  string `json:"lesson_id"`
+	SectionID string `json:"section_id"`
+	// QuestionID names which question inside the section was answered. Empty is
+	// the single-question case, and every row written before sections could hold
+	// several questions.
+	QuestionID      string    `json:"question_id,omitempty"`
 	Answer          string    `json:"answer"`
 	Evaluation      string    `json:"evaluation"`
 	ReferenceAnswer string    `json:"reference_answer,omitempty"`
@@ -420,6 +424,9 @@ type LessonPracticeAttempt struct {
 type LessonPracticeAttemptListOptions struct {
 	Limit  int
 	Offset int
+	// QuestionID narrows the list to one question. Empty means "all of them",
+	// which is what the single-question reader wants.
+	QuestionID string
 }
 
 const (
@@ -448,6 +455,11 @@ func (attempt LessonPracticeAttempt) Validate() error {
 	}
 	if strings.TrimSpace(attempt.SectionID) == "" {
 		return errors.New("lesson practice attempt section id is required")
+	}
+	// Empty is the single-question case, so it is valid; anything else has to fit
+	// the column rather than be silently truncated by the driver.
+	if len(strings.TrimSpace(attempt.QuestionID)) > 64 {
+		return errors.New("lesson practice attempt question id is too long")
 	}
 	if strings.TrimSpace(attempt.Answer) == "" {
 		return errors.New("lesson practice attempt answer is required")

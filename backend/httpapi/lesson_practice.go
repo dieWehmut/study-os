@@ -25,8 +25,9 @@ func handleLessonPracticeAttemptCreate(response http.ResponseWriter, request *ht
 		return
 	}
 	var input struct {
-		Answer    string `json:"answer"`
-		ElapsedMS *int   `json:"elapsed_ms"`
+		Answer     string `json:"answer"`
+		QuestionID string `json:"question_id"`
+		ElapsedMS  *int   `json:"elapsed_ms"`
 	}
 	request.Body = http.MaxBytesReader(response, request.Body, maxLessonPracticeBodyBytes)
 	if err := decodeRequest(request, &input); err != nil {
@@ -63,6 +64,7 @@ func handleLessonPracticeAttemptCreate(response http.ResponseWriter, request *ht
 		ID:              newRequestID("lesson-attempt"),
 		LessonID:        lesson.ID,
 		SectionID:       section.ID,
+		QuestionID:      strings.TrimSpace(input.QuestionID),
 		Answer:          answer,
 		Evaluation:      evaluation,
 		ReferenceAnswer: referenceAnswer,
@@ -91,8 +93,9 @@ func handleLessonPracticeAttemptList(response http.ResponseWriter, request *http
 	}
 	items, err := application.Store.ListLessonPracticeAttempts(request.Context(), lesson.ID, section.ID,
 		models.LessonPracticeAttemptListOptions{
-			Limit:  parseLimit(request.URL.Query().Get("limit"), 50, 100),
-			Offset: parseOffset(request.URL.Query().Get("offset")),
+			Limit:      parseLimit(request.URL.Query().Get("limit"), 50, 100),
+			Offset:     parseOffset(request.URL.Query().Get("offset")),
+			QuestionID: strings.TrimSpace(request.URL.Query().Get("question_id")),
 		})
 	if err != nil {
 		writeLessonPracticeError(response, err)

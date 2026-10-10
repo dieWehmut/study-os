@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 18
+const currentSchemaVersion = 19
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -496,6 +496,26 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				return fmt.Errorf("apply schema version %d: %w", version, err)
 			}
 		}
+	case 19:
+		// One practice section may carry several questions, so an answer is keyed
+		// by (lesson, section, question). The empty string is the single-question
+		// case and every row written before this version, so nothing migrates.
+		if !hasTable(ctx, tx, "lesson_attempts") {
+			return nil
+		}
+		if !hasColumn(ctx, tx, "lesson_attempts", "question_id") {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE lesson_attempts ADD COLUMN question_id TEXT NOT NULL DEFAULT ''`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `DROP INDEX IF EXISTS lesson_attempts_lesson_section_idx`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			CREATE INDEX IF NOT EXISTS lesson_attempts_lesson_section_idx
+				ON lesson_attempts(lesson_id, section_id, question_id, created_at DESC, id DESC)`); err != nil {
+			return fmt.Errorf("apply schema version %d: %w", version, err)
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -617,6 +637,17 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 		}
 		if hasAttempts && !hasColumn(ctx, tx, "question_attempts", "evidence_json") {
 			return errors.New("schema version 18 is recorded but question_attempts.evidence_json is missing")
+		}
+	case 19:
+		if err := verifySchema(ctx, tx, 18); err != nil {
+			return err
+		}
+		hasAttempts := hasTable(ctx, tx, "lesson_attempts")
+		if !hasAttempts {
+			return errors.New("schema version 19 is recorded but lesson_attempts is missing")
+		}
+		if !hasColumn(ctx, tx, "lesson_attempts", "question_id") {
+			return errors.New("schema version 19 is recorded but lesson_attempts.question_id is missing")
 		}
 	}
 	return nil

@@ -86,9 +86,12 @@ func TestStoreUpgradesSchemaVersionSeventeenWithSubjectEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open legacy sqlite: %v", err)
 	}
-	if _, err := legacy.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = 18`); err != nil {
+	// Un-record everything above 17, not just 18: the store was just created at the
+// current head, and a recorded head is only verified, never re-migrated. Pinning
+// a single version number here is what made this fixture break on the next bump.
+	if _, err := legacy.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version >= 18`); err != nil {
 		_ = legacy.Close()
-		t.Fatalf("remove version 18 marker: %v", err)
+		t.Fatalf("remove version 18+ markers: %v", err)
 	}
 	if _, err := legacy.ExecContext(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES (17, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`); err != nil {
 		_ = legacy.Close()
