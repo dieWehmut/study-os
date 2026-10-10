@@ -138,6 +138,53 @@ func handleLessonGet(response http.ResponseWriter, request *http.Request, applic
 	writeJSON(response, http.StatusOK, lesson)
 }
 
+func handleLessonVersionList(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	id := chi.URLParam(request, "lessonID")
+	// Read the lesson first: a history of nothing looks the same as a lesson that
+	// was deleted, and only one of those is a 404.
+	if _, err := application.Store.GetLesson(request.Context(), id); err != nil {
+		writeLessonError(response, err)
+		return
+	}
+	revisions, err := application.Store.ListLessonVersions(request.Context(), id)
+	if err != nil {
+		writeLessonError(response, err)
+		return
+	}
+	// Each row says what is in that revision, so the history is readable without
+	// pulling every document down: the point of looking is to find the one to
+	// go back to.
+	items := make([]map[string]any, 0, len(revisions))
+	for _, revision := range revisions {
+		filled := 0
+		for _, section := range revision.Document.Sections {
+			if lessonSectionFilled(section) {
+				filled++
+			}
+		}
+		items = append(items, map[string]any{
+			"version":         revision.Version,
+			"created_at":      revision.CreatedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"),
+			"sections_filled": filled,
+		})
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+}
+
+// lessonSectionFilled reports whether a section carries anything a reader can
+// see, whatever shape its content takes.
+func lessonSectionFilled(section models.LessonSection) bool {
+	raw := strings.TrimSpace(string(section.Content))
+	if raw == "" || raw == "{}" || raw == "null" || raw == `""` || raw == "[]" {
+		return false
+	}
+	return true
+}
+
 func handleLessonUpdate(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})

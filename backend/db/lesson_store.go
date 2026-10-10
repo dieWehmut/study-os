@@ -169,6 +169,53 @@ func (s *Store) GetLesson(ctx context.Context, id string) (models.Lesson, error)
 	return lesson, nil
 }
 
+/**
+ * The history of one lesson, newest first.
+ *
+ * Documents are immutable, so this is the only way back to what a lesson said
+ * before it was edited -- the API promised 回滚 when the table was added and
+ * nothing could read it.
+ *
+ * The documents themselves are decoded: a caller showing the history wants to
+ * say what is in each revision, and reading every document one request at a time
+ * would be the caller's problem otherwise.
+ */
+func (s *Store) ListLessonVersions(ctx context.Context, lessonID string) ([]models.LessonVersion, error) {
+	lessonID = strings.TrimSpace(lessonID)
+	if lessonID == "" {
+		return nil, errors.New("lesson id is required")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT lesson_id, version, schema_version, document_json, created_at
+		FROM lesson_versions WHERE lesson_id = ? ORDER BY version DESC`, lessonID)
+	if err != nil {
+		return nil, fmt.Errorf("list lesson versions: %w", err)
+	}
+	defer rows.Close()
+	revisions := make([]models.LessonVersion, 0)
+	for rows.Next() {
+		var revision models.LessonVersion
+		var documentJSON, createdAt string
+		if err := rows.Scan(&revision.LessonID, &revision.Version, &revision.SchemaVersion,
+			&documentJSON, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan lesson version: %w", err)
+		}
+		if err := json.Unmarshal([]byte(documentJSON), &revision.Document); err != nil {
+			return nil, fmt.Errorf("decode lesson document version %d: %w", revision.Version, err)
+		}
+		normalized, err := models.NormalizeLessonDocument(revision.Document)
+		if err != nil {
+			return nil, fmt.Errorf("validate lesson document version %d: %w", revision.Version, err)
+		}
+		revision.Document = normalized
+		if revision.CreatedAt, err = parseTime(createdAt); err != nil {
+			return nil, fmt.Errorf("parse lesson version time: %w", err)
+		}
+		revisions = append(revisions, revision)
+	}
+	return revisions, rows.Err()
+}
+
 func (s *Store) GetLessonVersion(ctx context.Context, lessonID string, version int) (models.LessonVersion, error) {
 	if version <= 0 {
 		return models.LessonVersion{}, errors.New("lesson version must be positive")
