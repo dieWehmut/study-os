@@ -11,6 +11,7 @@ import (
 	"study-os/backend/backup"
 	"study-os/backend/config"
 	"study-os/backend/httpapi"
+	"study-os/backend/models"
 )
 
 func backupVerify(t *testing.T, router http.Handler, id string) *httptest.ResponseRecorder {
@@ -29,6 +30,14 @@ func TestBackupVerifyAnswersWhetherAFileIsUsable(t *testing.T) {
 	application := testApplication(t, config.Config{DataDir: dataDir})
 	router := httpapi.NewRouter(application)
 
+	// Something to be counted: an empty database verifies fine but says nothing
+	// about whether the reading side works.
+	if err := application.Store.CreateKnowledgeItem(t.Context(), models.KnowledgeItem{
+		ID: "k-1", ItemType: "word_sense", Term: "abandon", ConciseDefinition: "放弃",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("create item: %v", err)
+	}
 	created := requestJSON(t, router, http.MethodPost, "/api/backups", map[string]any{"category": "daily"})
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create backup = %d, body = %s", created.Code, created.Body.String())
@@ -47,6 +56,11 @@ func TestBackupVerifyAnswersWhetherAFileIsUsable(t *testing.T) {
 	}
 	if !strings.Contains(good.Body.String(), `"ok":true`) {
 		t.Fatalf("verify body = %s", good.Body.String())
+	}
+	// "ok" alone cannot tell yesterday's copy from one three months old, so the
+	// answer names what is inside it.
+	if !strings.Contains(good.Body.String(), `"label":"知识点"`) || !strings.Contains(good.Body.String(), `"count":1`) {
+		t.Fatalf("verify body has no contents: %s", good.Body.String())
 	}
 
 	// A truncated copy: the file still exists and is named like a backup, which

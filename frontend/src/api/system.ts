@@ -168,6 +168,8 @@ export interface BackupVerification {
   size_bytes: number
   category: string
   created_at: string
+  /** What the file holds, in the reader's vocabulary. Empty for an empty backup. */
+  contents?: { table: string; label: string; count: number }[]
 }
 
 /**

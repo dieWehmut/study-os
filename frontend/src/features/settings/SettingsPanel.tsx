@@ -247,7 +247,13 @@ export default function SettingsPanel() {
     setVerifiedBackups((current) => ({ ...current, [id]: "" }))
     try {
       const result = await verifyBackup(id)
-      setVerifiedBackups((current) => ({ ...current, [id]: `可以恢复 · ${formatBytes(result.size_bytes)}` }))
+      // "可以恢复" alone cannot tell yesterday's copy from one three months old,
+      // so the answer names what is inside it.
+      const inside = (result.contents ?? []).map((entry) => `${entry.count} 个${entry.label}`).join(" · ")
+      setVerifiedBackups((current) => ({
+        ...current,
+        [id]: [`可以恢复 · ${formatBytes(result.size_bytes)}`, inside].filter(Boolean).join(" · "),
+      }))
     } catch (reason) {
       setVerifiedBackups((current) => ({ ...current, [id]: failureMessage(reason, "这份备份无法恢复") }))
     } finally {
