@@ -41,6 +41,17 @@ func NewRouter(application *app.App) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(loopbackHostOnly)
 	router.Use(trustedOriginOnly)
+	// Two guards, not three. The desktop shell also generates a token and the
+	// client sends it on every request, but nothing here reads it: the tests above
+	// are what actually keep an unrelated local page out -- a non-loopback Host is
+	// answered 421, an untrusted Origin 403.
+	//
+	// Enforcing the token is the obvious next step and it is not free: the reader's
+	// audio and avatars are fetched straight from a URL (`<audio src>`, `<img>`),
+	// where no header can be attached, so an enforced token today would silence
+	// playback and pictures in the desktop build. Whoever takes it on has to either
+	// pass a short-lived query token for those routes and exempt them here, or move
+	// those bytes through the JSON client. Until then the header stays readiness.
 	router.Route("/api", func(api chi.Router) {
 		api.Get("/health", func(response http.ResponseWriter, request *http.Request) {
 			if application == nil || application.Store == nil {
