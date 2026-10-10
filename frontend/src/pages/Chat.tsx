@@ -4,6 +4,7 @@ import { Link } from "react-router-dom"
 
 import { ApiError } from "@/api/client"
 import { failureMessage } from "@/lib/errors"
+import { answerNote } from "@/lib/review-note"
 import {
   dumpThought,
   getQARecord,
@@ -84,17 +85,6 @@ function latestCompletedTurn(items: ChatMessage[]): CompletedTurn | null {
     return null
   }
   return null
-}
-
-/**
- * The question and its answer as one note to remember.
- *
- * The question goes first and the answer under it: the library names an item by
- * the opening of its text, so the card is asked by the question rather than by
- * the first line of prose, which is where an answer usually opens with "因为".
- */
-function answerNote(turn: CompletedTurn): string {
-  return `${turn.question.trim()}\n\n${turn.answer.trim()}`
 }
 
 export default function Chat() {
@@ -349,7 +339,7 @@ export default function Chat() {
     setIntakePending(true)
     setIntakeError("")
     try {
-      const item = await dumpThought(answerNote(turn))
+      const item = await dumpThought(answerNote(turn.question, turn.answer))
       // Filing without queueing is a library you never look at again; this button
       // is about the answer coming back tomorrow.
       await scheduleKnowledge(item.id)

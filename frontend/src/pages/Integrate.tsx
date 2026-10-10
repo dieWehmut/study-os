@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
-import { Copy, GraduationCap, ListTree, Network, RefreshCw, Wand2 } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { CalendarPlus, Copy, GraduationCap, ListTree, Network, RefreshCw, Wand2 } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
 
+import { dumpThought } from "@/api/chat"
 import { createIntegrate, getIntegrateNote, listIntegrateNotes, type IntegratedNote, type MindMap as MindMapData } from "@/api/integrate"
-import { listKnowledge } from "@/api/knowledge"
+import { listKnowledge, scheduleKnowledge } from "@/api/knowledge"
 import { createLesson } from "@/api/lessons"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +19,7 @@ import { subjectName } from "@/lib/subjects"
 import { useSubjectStore } from "@/store/useSubjectStore"
 import { CapabilityCatalog } from "@/features/whiteboard/CapabilityCatalog"
 import { failureMessage } from "@/lib/errors"
+import { cardNote } from "@/lib/review-note"
 
 function cardTypeLabel(cardType: string): string {
   switch (cardType) {
@@ -45,6 +47,12 @@ export default function Integrate() {
   const [history, setHistory] = useState<IntegratedNote[]>([])
   const [generating, setGenerating] = useState(false)
   const [savingLesson, setSavingLesson] = useState(false)
+  // 排进复习: 整合 produces cards by definition, but there was no way to have them
+  // asked. Kept per card id so a second press only files what did not land.
+  const [queueingCards, setQueueingCards] = useState(false)
+  const [queuedCardIDs, setQueuedCardIDs] = useState<string[]>([])
+  const [queueNote, setQueueNote] = useState("")
+  const [queueError, setQueueError] = useState("")
   const [error, setError] = useState("")
   const [copied, setCopied] = useState(false)
   const navigate = useNavigate()
@@ -169,6 +177,54 @@ export default function Integrate() {
     }
   }
 
+  /**
+ * Turn the generated cards into review cards.
+ *
+ * Two writes per card, and both halves are reported: 收进知识库 without 排进复习
+ * leaves an item the due queue can never see, because that queue joins review
+ * states. Which half failed is the difference between "try again" and "try the
+ * other button".
+ */
+  async function queueCards() {
+    if (!note || queueingCards || note.cards.length === 0) return
+    const pending = note.cards.filter((card) => !queuedCardIDs.includes(card.id))
+    if (pending.length === 0) return
+    setQueueingCards(true)
+    setQueueNote("")
+    setQueueError("")
+    const filed: string[] = []
+    let prompts = 0
+    let unscheduled = 0
+    let failed = 0
+    for (const card of pending) {
+      try {
+        const item = await dumpThought(cardNote(card.title, card.body))
+        filed.push(card.id)
+        try {
+          prompts += (await scheduleKnowledge(item.id)).prompt_count
+        } catch {
+          unscheduled += 1
+        }
+      } catch {
+        failed += 1
+      }
+    }
+    setQueuedCardIDs((current) => [...current, ...filed])
+    setQueueingCards(false)
+    if (filed.length > 0 && unscheduled === 0 && failed === 0) {
+      setQueueNote(`已排进复习：${filed.length} 张卡 · ${prompts} 个问题等着`)
+      return
+    }
+    if (filed.length > 0) {
+      const parts = [`已收进知识库 ${filed.length} 张`]
+      if (unscheduled > 0) parts.push(`${unscheduled} 张没排上复习（可在知识库里再排一次）`)
+      if (failed > 0) parts.push(`${failed} 张失败`)
+      setQueueError(parts.join("，"))
+      return
+    }
+    setQueueError("没能把这些卡片收进知识库，等会儿再试。")
+  }
+
   async function copyMermaid() {
     const map = structure ?? note?.mindmap
     if (!map) return
@@ -265,6 +321,34 @@ export default function Integrate() {
               <p className="text-sm text-muted-foreground">
                 {note.subject ? subjectName(note.subject) : "综合"} · 导图节点 {note.mindmap.nodes.length} 个 · 卡片 {note.cards.length} 张
               </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={queueingCards || note.cards.length === 0 || queuedCardIDs.length >= note.cards.length}
+                  onClick={() => void queueCards()}
+                >
+                  <CalendarPlus data-icon="inline-start" />
+                  {queuedCardIDs.length >= note.cards.length && note.cards.length > 0
+                    ? "已全部排进复习"
+                    : queueingCards
+                      ? "正在排进复习…"
+                      : `把这 ${note.cards.length - queuedCardIDs.length} 张卡排进复习`}
+                </Button>
+                {queueNote ? (
+                  <p role="status" className="text-xs text-muted-foreground">
+                    {queueNote}
+                    <Link to="/memory" className="ml-2 underline underline-offset-2">
+                      去记忆
+                    </Link>
+                  </p>
+                ) : null}
+                {queueError ? (
+                  <p role="alert" className="text-xs text-destructive">
+                    {queueError}
+                  </p>
+                ) : null}
+              </div>
             </CardHeader>
             <CardContent className="grid gap-4">
               <MindMap data={note.mindmap} />

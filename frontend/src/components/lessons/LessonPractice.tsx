@@ -13,7 +13,7 @@ import type { LessonSection } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { failureMessage } from "@/lib/errors"
-import { practiceNote } from "@/lib/practice-note"
+import { practiceNote } from "@/lib/review-note"
 import { cn } from "@/lib/utils"
 
 interface PracticeContent {

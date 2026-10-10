@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   getIntegrateNote: vi.fn(),
   listKnowledge: vi.fn(),
   createLesson: vi.fn(),
+  dumpThought: vi.fn(),
+  scheduleKnowledge: vi.fn(),
 }))
 
 vi.mock("@/api/integrate", () => ({
@@ -18,7 +20,11 @@ vi.mock("@/api/integrate", () => ({
   listIntegrateNotes: mocks.listIntegrateNotes,
   getIntegrateNote: mocks.getIntegrateNote,
 }))
-vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge }))
+vi.mock("@/api/knowledge", () => ({
+  listKnowledge: mocks.listKnowledge,
+  scheduleKnowledge: mocks.scheduleKnowledge,
+}))
+vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
 vi.mock("@/api/lessons", () => ({ createLesson: mocks.createLesson }))
 
 // 存成课程 navigates to the lesson it just made, so the page needs a router.
@@ -43,6 +49,8 @@ describe("Integrate page", () => {
     useSubjectStore.setState({ subject: "all" })
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
     mocks.listIntegrateNotes.mockResolvedValue({ items: [], count: 0 })
+    mocks.dumpThought.mockImplementation((note: string) => Promise.resolve({ id: `dump-${note.slice(0, 4)}`, term: note.split("\n")[0] }))
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "dump-1", prompt_count: 3 })
     mocks.createIntegrate.mockResolvedValue({
       id: "note-1",
       subject: "physics",
@@ -177,5 +185,55 @@ describe("Integrate page", () => {
       },
     })))
     expect(mocks.createLesson.mock.calls[0][0]).not.toHaveProperty("source_id")
+  })
+
+  it("files every generated card into 复习, title first", async () => {
+    // 整合 produces cards by definition and there was no way to be asked them.
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText("整合资料来源"), { target: { value: "速度描述快慢。" } })
+    fireEvent.click(screen.getByRole("button", { name: "生成导图与卡片" }))
+    await screen.findByRole("tree", { name: "导图：运动学整合" })
+
+    fireEvent.click(screen.getByRole("button", { name: "把这 2 张卡排进复习" }))
+
+    await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledTimes(2))
+    expect(mocks.dumpThought.mock.calls[0][0]).toBe("速度\n\n速度描述运动的快慢。")
+    expect(mocks.dumpThought.mock.calls[1][0]).toBe("二级结论\n\n匀变速运动中加速度恒定。")
+    // Filing without queueing leaves an item the due queue can never see.
+    expect(mocks.scheduleKnowledge).toHaveBeenCalledTimes(2)
+    expect(await screen.findByRole("status")).toHaveTextContent("已排进复习：2 张卡 · 6 个问题等着")
+    expect(screen.getByRole("button", { name: "已全部排进复习" })).toBeDisabled()
+  })
+
+  it("does not file the same card twice when the button is pressed again", async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText("整合资料来源"), { target: { value: "速度描述快慢。" } })
+    fireEvent.click(screen.getByRole("button", { name: "生成导图与卡片" }))
+    await screen.findByRole("tree", { name: "导图：运动学整合" })
+
+    fireEvent.click(screen.getByRole("button", { name: "把这 2 张卡排进复习" }))
+    await waitFor(() => expect(mocks.dumpThought).toHaveBeenCalledTimes(2))
+    // The control is spent once everything is filed, and pressing it is a no-op.
+    expect(screen.getByRole("button", { name: "已全部排进复习" })).toBeDisabled()
+    fireEvent.click(screen.getByRole("button", { name: "已全部排进复习" }))
+
+    expect(mocks.dumpThought).toHaveBeenCalledTimes(2)
+  })
+
+  it("names which half failed when a card is filed but not queued", async () => {
+    mocks.scheduleKnowledge.mockRejectedValueOnce(new Error("offline"))
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText("整合资料来源"), { target: { value: "速度描述快慢。" } })
+    fireEvent.click(screen.getByRole("button", { name: "生成导图与卡片" }))
+    await screen.findByRole("tree", { name: "导图：运动学整合" })
+
+    fireEvent.click(screen.getByRole("button", { name: "把这 2 张卡排进复习" }))
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("已收进知识库 2 张")
+    expect(alert).toHaveTextContent("1 张没排上复习")
   })
 })
