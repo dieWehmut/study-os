@@ -77,7 +77,9 @@ describe("comparing two revisions of a lesson", () => {
     )
 
     expect(diff[0].change).toBe("changed")
-    expect(describeChange(diff[0])).toContain("内容有改动")
+    // A practice section has no prose: a line count would say "1 行" and mean
+    // nothing, so it is described as what changed -- the questions.
+    expect(describeChange(diff[0])).toBe("题目有改动")
   })
 
   it("reports a section that only one revision has", () => {

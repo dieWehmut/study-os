@@ -68,6 +68,18 @@ export function changedSections(diff: LessonSectionDiff[]): LessonSectionDiff[] 
 
 export function describeChange(section: LessonSectionDiff): string {
   const delta = section.afterLines - section.beforeLines
+  // A practice section has no prose, so its "lines" are the one serialized shape it
+  // is compared as: counting them would print "1 行" and mean nothing.
+  if (section.type === "practice" || section.type === "quiz") {
+    switch (section.change) {
+      case "added":
+        return "新增了题目"
+      case "removed":
+        return "题目被清空"
+      default:
+        return "题目有改动"
+    }
+  }
   switch (section.change) {
     case "added":
       return `新增（${section.afterLines} 行）`
