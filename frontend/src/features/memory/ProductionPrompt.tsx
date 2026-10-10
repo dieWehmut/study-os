@@ -11,9 +11,11 @@ interface ProductionPromptProps {
   current: DueReview
   onNext: () => void
   onError: (message: string) => void
+  /** Told whenever this card's verdict changes, overrides included. */
+  onRated?: (outcome: ReviewEvaluation["outcome"]) => void
 }
 
-export function ProductionPrompt({ current, onNext, onError }: ProductionPromptProps) {
+export function ProductionPrompt({ current, onNext, onError, onRated }: ProductionPromptProps) {
   const [answer, setAnswer] = useState("")
   const [evaluation, setEvaluation] = useState<ReviewEvaluation | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -26,7 +28,9 @@ export function ProductionPrompt({ current, onNext, onError }: ProductionPromptP
     if (!value || submitting) return
     setSubmitting(true)
     try {
-      setEvaluation(await answerReview(current.prompt.id, value, undefined))
+      const graded = await answerReview(current.prompt.id, value, undefined)
+      setEvaluation(graded)
+      onRated?.(graded.outcome)
     } catch {
       onError("答案未能保存，请重试；当前输入不会丢失。")
     } finally {
@@ -38,7 +42,11 @@ export function ProductionPrompt({ current, onNext, onError }: ProductionPromptP
     if (!evaluation || submitting) return
     setSubmitting(true)
     try {
-      setEvaluation(await overrideAttempt(evaluation.attempt_id, rating))
+      // A 改判 replaces the verdict, so the round's tally is told again and
+      // corrects itself rather than counting the card twice.
+      const overridden = await overrideAttempt(evaluation.attempt_id, rating)
+      setEvaluation(overridden)
+      onRated?.(overridden.outcome)
     } catch {
       onError("改判没有保存，请稍后重试。")
     } finally {

@@ -14,9 +14,11 @@ interface RecognitionPromptProps {
   current: DueReview
   onNext: () => void
   onError: (message: string) => void
+  /** Told once per card, so the session can say how the round went. */
+  onRated?: (outcome: ReviewEvaluation["outcome"]) => void
 }
 
-export function RecognitionPrompt({ current, onNext, onError }: RecognitionPromptProps) {
+export function RecognitionPrompt({ current, onNext, onError, onRated }: RecognitionPromptProps) {
   const [evaluation, setEvaluation] = useState<ReviewEvaluation | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -24,7 +26,9 @@ export function RecognitionPrompt({ current, onNext, onError }: RecognitionPromp
     if (submitting || evaluation) return
     setSubmitting(true)
     try {
-      setEvaluation(await submitSelfRating(current.prompt.id, value))
+      const rated = await submitSelfRating(current.prompt.id, value)
+      setEvaluation(rated)
+      onRated?.(rated.outcome)
     } catch {
       onError("评分未能保存，请重试。")
     } finally {

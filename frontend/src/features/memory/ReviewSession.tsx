@@ -5,7 +5,7 @@ import { Link } from "react-router-dom"
 import { playPronunciation } from "@/api/audio"
 import { listKnowledge } from "@/api/knowledge"
 import { getDueReviews } from "@/api/reviews"
-import type { DueReview } from "@/api/types"
+import type { DueReview, ReviewEvaluation } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -57,6 +57,9 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
   const [libraryCount, setLibraryCount] = useState<number | null>(null)
   const [index, setIndex] = useState(0)
   const [error, setError] = useState("")
+  // How this round went, keyed by card: a 改判 replaces the card's verdict instead
+  // of counting it twice, so the session can say what it just did.
+  const [outcomes, setOutcomes] = useState<Record<string, ReviewEvaluation["outcome"]>>({})
   const [audioSource, setAudioSource] = useState<"file" | "browser" | "unavailable" | null>(null)
 
   // Loading is derived rather than stored so the effect never has to call
@@ -78,6 +81,7 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
         setQueue(due.items)
         setLibraryCount(library.count)
         setIndex(0)
+        setOutcomes({})
       })
       .catch((reason) => {
         if (active) {
@@ -142,12 +146,30 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
   }
 
   if (!current) {
+    const verdicts = Object.values(outcomes)
+    const counts = {
+      correct: verdicts.filter((outcome) => outcome === "correct").length,
+      partial: verdicts.filter((outcome) => outcome === "partial").length,
+      incorrect: verdicts.filter((outcome) => outcome === "incorrect").length,
+    }
     return (
       <Card className="mx-auto w-full max-w-2xl">
         <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
           <CheckCircle2 aria-hidden="true" className="size-12 text-primary" />
           <div>
             <h2 className="font-heading text-lg font-semibold">今天的到期内容已经完成</h2>
+            {/* What this round actually was: finishing 20 cards and finishing none
+                looked identical, and the second is not an achievement. */}
+            {verdicts.length > 0 ? (
+              <p className="mt-2 text-sm text-foreground" data-round-tally="true">
+                这一轮做了 {verdicts.length} 张：
+                {[
+                  counts.correct > 0 ? `正确 ${counts.correct}` : "",
+                  counts.partial > 0 ? `部分正确 ${counts.partial}` : "",
+                  counts.incorrect > 0 ? `需要重学 ${counts.incorrect}` : "",
+                ].filter(Boolean).join("、")}
+              </p>
+            ) : null}
             <p className="mt-1 text-sm text-muted-foreground">
               新导入或新学的知识会自动进入这里；还没排复习的知识点不会自己进来。
             </p>
@@ -223,6 +245,7 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
               current={current}
               onNext={nextPrompt}
               onError={setError}
+              onRated={(outcome) => setOutcomes((tally) => ({ ...tally, [current.prompt.id]: outcome }))}
             />
           ) : (
             <ProductionPrompt
@@ -230,6 +253,7 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
               current={current}
               onNext={nextPrompt}
               onError={setError}
+              onRated={(outcome) => setOutcomes((tally) => ({ ...tally, [current.prompt.id]: outcome }))}
             />
           )}
           {error ? (

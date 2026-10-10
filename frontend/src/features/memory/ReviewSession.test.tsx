@@ -227,4 +227,69 @@ describe("ReviewSession", () => {
 
     await waitFor(() => expect(mocks.getDueReviews).toHaveBeenCalledWith(35, undefined, undefined))
   })
+
+  it("says how the round went instead of only that it is over", async () => {
+    // Finishing twenty cards and finishing none looked the same on this screen.
+    mocks.submitSelfRating.mockResolvedValueOnce({
+      attempt_id: "a1",
+      outcome: "correct",
+      rating: 3,
+      expected_answers: ["abandon"],
+    })
+    renderSession()
+
+    fireEvent.click(await screen.findByRole("button", { name: "认识" }))
+    await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole("button", { name: "下一题" }))
+
+    const tally = await screen.findByText(/这一轮做了/)
+    expect(tally).toHaveTextContent("这一轮做了 1 张：正确 1")
+  })
+
+  it("counts a 改判 once, with the corrected verdict", async () => {
+    // The card was answered wrong and then the reader judged it correctly; the
+    // round's tally has to follow the correction, not the first verdict.
+    mocks.getDueReviews.mockResolvedValueOnce({
+      items: [
+        {
+          due_at: "2026-08-01T10:00:00Z",
+          knowledge: { id: "k1", item_type: "word_sense" },
+          prompt: {
+            id: "p2",
+            knowledge_item_id: "k1",
+            prompt_type: "zh_to_en",
+            question: "放弃；抛弃",
+          },
+        },
+      ],
+    })
+    mocks.answerReview.mockResolvedValueOnce({
+      attempt_id: "a9",
+      outcome: "incorrect",
+      rating: 1,
+      feedback: "再想想。",
+      due_at: "2026-08-02T10:00:00Z",
+      expected_answers: ["abandon"],
+    })
+    mocks.overrideAttempt.mockResolvedValueOnce({
+      attempt_id: "a9",
+      outcome: "correct",
+      rating: 3,
+      feedback: "已改判。",
+      due_at: "2026-08-05T10:00:00Z",
+      expected_answers: ["abandon"],
+    })
+    renderSession()
+
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "abandon" } })
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }))
+    expect(await screen.findByText("再想想。")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "改判为掌握" }))
+    await waitFor(() => expect(mocks.overrideAttempt).toHaveBeenCalled())
+    fireEvent.click(await screen.findByRole("button", { name: "下一题" }))
+
+    const tally = await screen.findByText(/这一轮做了/)
+    expect(tally).toHaveTextContent("这一轮做了 1 张：正确 1")
+    expect(tally).not.toHaveTextContent("需要重学")
+  })
 })
