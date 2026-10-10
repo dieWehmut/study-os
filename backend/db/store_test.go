@@ -449,12 +449,16 @@ func TestReconcileBackupRecordsCountsAllLiveFilesAndRemovesStaleMetadata(t *test
 		t.Fatalf("record stale backup: %v", err)
 	}
 
-	count, err := store.ReconcileBackupRecords(ctx)
+	usage, err := store.ReconcileBackupRecords(ctx)
 	if err != nil {
 		t.Fatalf("reconcile backups: %v", err)
 	}
-	if count != 105 {
-		t.Fatalf("live backup count = %d, want 105", count)
+	if usage.Count != 105 {
+		t.Fatalf("live backup count = %d, want 105", usage.Count)
+	}
+	// The size is read from the files, so it is the room they actually take.
+	if usage.Bytes <= 0 {
+		t.Fatalf("live backup bytes = %d, want the files' own sizes", usage.Bytes)
 	}
 	var staleCount int
 	if err := store.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM backup_records WHERE id = 'stale'`).Scan(&staleCount); err != nil {

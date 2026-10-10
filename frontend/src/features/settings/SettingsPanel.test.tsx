@@ -56,7 +56,7 @@ const status = {
   provider: { name: "deepseek", mode: "remote", configured: true, key_configured: true, model: "deepseek-v4-flash" },
   data: { directory: "D:/StudyOS/data", database_path: "D:/StudyOS/data/study.db" },
   review: { daily_limit: 20 },
-  backup: { directory: "D:/StudyOS/data/backups", count: 1, last_created_at: "2026-08-02T00:00:00Z" },
+  backup: { directory: "D:/StudyOS/data/backups", count: 1, total_bytes: 356352, last_created_at: "2026-08-02T00:00:00Z" },
   app: { version: "0.1.0", platform: "windows" },
   restore: { pending: false, last_recorded: false, last_ok: false },
 }
@@ -584,6 +584,15 @@ describe("SettingsPanel", () => {
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent("上次恢复没有成功")
     expect(alert).toHaveTextContent("数据保持原样")
+  })
+
+  it("says how much room the backups take, not only how many there are", async () => {
+    // One backup per day adds up quietly; the number of files says little about
+    // the room they take.
+    render(<SettingsPanel />)
+
+    const summary = await screen.findByText(/合计 348\.0 KB/)
+    expect(summary).toHaveTextContent("份记录")
   })
 
   it("names the backup a finished restore used", async () => {

@@ -1063,7 +1063,13 @@ export default function SettingsPanel() {
               )}
             </div>
             <CardTitle>备份记录</CardTitle>
-            <CardDescription>{status.backup.count} 份记录 · 最近：{formatDate(status.backup.last_created_at)}</CardDescription>
+            <CardDescription>
+              {status.backup.count} 份记录
+              {/* Backups accumulate silently, one per day: the number of files
+                  says little about the room they take. */}
+              {status.backup.total_bytes > 0 ? ` · 合计 ${formatBytes(status.backup.total_bytes)}` : ""}
+              {" "}· 最近：{formatDate(status.backup.last_created_at)}
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
             {backups.length === 0 ? (

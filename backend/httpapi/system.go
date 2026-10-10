@@ -59,6 +59,7 @@ type reviewStatus struct {
 type backupStatus struct {
 	Directory     string `json:"directory"`
 	Count         int    `json:"count"`
+	TotalBytes    int64  `json:"total_bytes"`
 	LastCreatedAt string `json:"last_created_at,omitempty"`
 }
 
@@ -73,7 +74,7 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 		return
 	}
 	limit := readDailyLimit(request, application)
-	backupCount, err := application.Store.ReconcileBackupRecords(request.Context())
+	usage, err := application.Store.ReconcileBackupRecords(request.Context())
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "read backup status failed"})
 		return
@@ -91,8 +92,9 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 		},
 		Review: reviewStatus{DailyLimit: limit},
 		Backup: backupStatus{
-			Directory: filepath.Join(application.Config.DataDir, "backups"),
-			Count:     backupCount,
+			Directory:  filepath.Join(application.Config.DataDir, "backups"),
+			Count:      usage.Count,
+			TotalBytes: usage.Bytes,
 		},
 		App: appStatus{
 			Version:  version.Version,

@@ -769,30 +769,41 @@ func (s *Store) GetBackupRecord(ctx context.Context, id string) (models.BackupRe
 	return record, nil
 }
 
+// BackupUsage is what the live backups cost: how many, and their size on disk.
+type BackupUsage struct {
+	Count int
+	Bytes int64
+}
+
 // ReconcileBackupRecords removes metadata for backup files that retention or
-// an external cleanup has already removed, and returns the number of live
-// records. Paths are server-owned values written by RecordBackup.
-func (s *Store) ReconcileBackupRecords(ctx context.Context) (int, error) {
+// an external cleanup has already removed, and reports what is left.
+//
+// The size comes from the files themselves rather than the recorded one: the
+// question it answers is "how much room do these take", and the record is a note
+// about a file, not the file. Paths are server-owned values written by
+// RecordBackup.
+func (s *Store) ReconcileBackupRecords(ctx context.Context) (BackupUsage, error) {
 	records, err := s.listAllBackupRecords(ctx)
 	if err != nil {
-		return 0, err
+		return BackupUsage{}, err
 	}
-	live := 0
+	usage := BackupUsage{}
 	for _, record := range records {
 		info, statErr := os.Lstat(record.Path)
 		if statErr == nil {
 			if info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-				live++
+				usage.Count++
+				usage.Bytes += info.Size()
 				continue
 			}
 		} else if !errors.Is(statErr, os.ErrNotExist) {
-			return 0, fmt.Errorf("inspect backup record %q: %w", record.ID, statErr)
+			return BackupUsage{}, fmt.Errorf("inspect backup record %q: %w", record.ID, statErr)
 		}
 		if _, deleteErr := s.db.ExecContext(ctx, `DELETE FROM backup_records WHERE id = ?`, record.ID); deleteErr != nil {
-			return 0, fmt.Errorf("delete stale backup record %q: %w", record.ID, deleteErr)
+			return BackupUsage{}, fmt.Errorf("delete stale backup record %q: %w", record.ID, deleteErr)
 		}
 	}
-	return live, nil
+	return usage, nil
 }
 
 func (s *Store) listAllBackupRecords(ctx context.Context) ([]models.BackupRecord, error) {

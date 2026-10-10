@@ -21,6 +21,8 @@ export interface ReviewStatus {
 export interface BackupStatus {
   directory: string
   count: number
+  /** Room the live backups take, read from the files themselves. */
+  total_bytes: number
   last_created_at?: string
 }
 
@@ -118,6 +120,7 @@ export function normalizeSystemStatus(value: unknown): SystemStatus {
     backup: {
       directory: stringValue(backup.directory, "未提供"),
       count: numberValue(backup.count),
+      total_bytes: numberValue(backup.total_bytes),
       ...(stringValue(backup.last_created_at) ? { last_created_at: stringValue(backup.last_created_at) } : {}),
     },
     app: {
