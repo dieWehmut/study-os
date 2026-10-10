@@ -886,7 +886,7 @@ export default function SettingsPanel() {
           <CardHeader>
             <div className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary"><Save aria-hidden="true" /></div>
             <CardTitle>记忆节奏</CardTitle>
-            <CardDescription>限制每天安排的记忆量，避免单次任务过载。</CardDescription>
+            <CardDescription>每次复习最多推这么多张，避免单次任务过载；做完可以再来一轮。</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void saveDailyLimit(dailyLimit) }}>

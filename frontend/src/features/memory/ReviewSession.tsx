@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { failureMessage } from "@/lib/errors"
+import { useSettingsStore } from "@/store/useSettingsStore"
 import { Progress } from "@/components/ui/progress"
 import { itemTypeLabel } from "@/lib/labels"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
@@ -48,6 +49,10 @@ interface ReviewSessionProps {
 
 export function ReviewSession({ recovery = false, onProgress }: ReviewSessionProps) {
   const subject = useSubjectStore((state) => state.subject)
+  // 「每日记忆上限」 was stored, validated, and shown on the settings page while
+  // nothing read it: the session always asked for 20. It is the size of today's
+  // queue, which is what the setting says it limits.
+  const dailyLimit = useSettingsStore((state) => state.settings.dailyLimit)
   const [queue, setQueue] = useState<DueReview[]>([])
   const [libraryCount, setLibraryCount] = useState<number | null>(null)
   const [index, setIndex] = useState(0)
@@ -57,7 +62,7 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
   // Loading is derived rather than stored so the effect never has to call
   // setState synchronously in its body just to show the spinner again when the
   // subject changes.
-  const requestKey = `${subject}|${recovery ? "recovery" : "due"}`
+  const requestKey = `${subject}|${recovery ? "recovery" : "due"}|${dailyLimit}`
   const [loadedKey, setLoadedKey] = useState<string | null>(null)
   const loading = loadedKey !== requestKey
 
@@ -65,7 +70,7 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
     let active = true
     const subjectFilter = subject === "all" ? undefined : subject
     Promise.all([
-      getDueReviews(20, subjectFilter, recovery ? "recovery" : undefined),
+      getDueReviews(dailyLimit, subjectFilter, recovery ? "recovery" : undefined),
       listKnowledge({ subject: subjectFilter, limit: 1 }),
     ])
       .then(([due, library]) => {
@@ -81,12 +86,12 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
         }
       })
       .finally(() => {
-        if (active) setLoadedKey(`${subject}|${recovery ? "recovery" : "due"}`)
+        if (active) setLoadedKey(`${subject}|${recovery ? "recovery" : "due"}|${dailyLimit}`)
       })
     return () => {
       active = false
     }
-  }, [subject, recovery])
+  }, [subject, recovery, dailyLimit])
 
   const current = queue[index]
 

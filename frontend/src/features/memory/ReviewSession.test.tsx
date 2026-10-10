@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ReviewSession } from "./ReviewSession"
+import { useSettingsStore } from "@/store/useSettingsStore"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const mocks = vi.hoisted(() => ({
@@ -31,6 +32,7 @@ describe("ReviewSession", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useSubjectStore.setState({ subject: "all" })
+    useSettingsStore.setState({ settings: { dailyLimit: 20 } })
     knowledgeMocks.listKnowledge.mockResolvedValue({ items: [{ id: "k1" }], count: 1 })
     mocks.getDueReviews.mockResolvedValue({
       items: [
@@ -215,5 +217,14 @@ describe("ReviewSession", () => {
     renderSession({ recovery: true })
 
     await waitFor(() => expect(mocks.getDueReviews).toHaveBeenCalledWith(20, undefined, "recovery"))
+  })
+
+  it("asks for as many cards as 每日记忆上限 says", async () => {
+    // The setting was stored, validated, and shown on the settings page while
+    // nothing read it: the session always asked for 20.
+    useSettingsStore.setState({ settings: { dailyLimit: 35 } })
+    renderSession()
+
+    await waitFor(() => expect(mocks.getDueReviews).toHaveBeenCalledWith(35, undefined, undefined))
   })
 })
