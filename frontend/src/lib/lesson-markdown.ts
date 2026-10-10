@@ -47,13 +47,32 @@ function practiceLines(section: Lesson["sections"][number]): string[] {
   const content = section.content
   if (!content || typeof content !== "object" || Array.isArray(content)) return []
   const record = content as Record<string, unknown>
+  // `questions` is the source when a section asks several. Reading only the flat
+  // fields exported such a section as nothing at all -- the same gap the practice
+  // panel had, and just as quiet.
+  const questions = Array.isArray(record.questions)
+    ? record.questions.filter(
+      (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item),
+    )
+    : []
+  if (questions.length > 0) {
+    return questions.flatMap((question, index) => {
+      const lines = practiceLinesFor(question, questions.length > 1 ? index + 1 : 0)
+      return index === 0 ? lines : ["", ...lines]
+    })
+  }
+  return practiceLinesFor(record, 0)
+}
+
+/** One question's lines. The number is only printed when a section asks several. */
+function practiceLinesFor(record: Record<string, unknown>, number: number): string[] {
   const question = typeof record.question === "string" ? record.question.trim() : ""
   if (!question) return []
   const options = Array.isArray(record.options) ? record.options.filter((option): option is string => typeof option === "string") : []
   const answer = typeof record.correct_answer === "string" ? record.correct_answer.trim() : ""
   const explanation = typeof record.explanation === "string" ? record.explanation.trim() : ""
   return [
-    `**${question}**`,
+    `**${number > 0 ? `${number}. ` : ""}${question}**`,
     ...options.map((option) => `- ${option}`),
     answer ? `\n答案：${answer}` : "",
     explanation ? `解析：${explanation}` : "",

@@ -76,6 +76,32 @@ describe("lessonToMarkdown", () => {
     expect(markdown).toContain("解析：a 是加速度。")
   })
 
+  it("prints every question of a section that asks several, numbered", () => {
+    // Before this, such a section exported as nothing at all: the printer only read
+    // the flat question field.
+    const markdown = lessonToMarkdown(
+      lessonWith({
+        sections: [{
+          id: "practice",
+          type: "practice",
+          title: "马上练一题",
+          content: {
+            questions: [
+              { id: "q1", question: "速度的单位？", options: ["m/s", "N"], correct_answer: "m/s", explanation: "速度。" },
+              { id: "q2", question: "力的单位？", options: ["N", "J"], correct_answer: "N" },
+            ],
+          },
+        }],
+      }),
+    )
+
+    expect(markdown).toContain("**1. 速度的单位？**")
+    expect(markdown).toContain("**2. 力的单位？**")
+    expect(markdown).toContain("答案：m/s")
+    expect(markdown).toContain("答案：N")
+    expect(markdown).toContain("解析：速度。")
+  })
+
   it("leaves out the sections nobody filled in", () => {
     // Ten headings with nine of them empty is a worse file than four filled ones.
     const markdown = lessonToMarkdown(

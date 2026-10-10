@@ -50,6 +50,10 @@ export function sectionItems(section: LessonSection): string[] {
 
 /** Does this section carry anything a learner can read? */
 export function sectionHasContent(section: LessonSection): boolean {
+  // A practice section that asks its questions in `questions` carries plenty, and
+  // the flat fields it does not use would have said it was empty: the export
+  // skipped the whole section.
+  if (practiceQuestionsOf(section).length > 0) return true
   return sectionText(section).trim() !== "" || sectionItems(section).length > 0
 }
 
