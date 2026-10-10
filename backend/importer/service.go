@@ -112,7 +112,7 @@ func (s *Service) Upload(ctx context.Context, source io.Reader, originalName, se
 		return UploadResult{}, errors.New("import service unavailable")
 	}
 	if source == nil {
-		return UploadResult{}, errors.New("upload body is empty")
+		return UploadResult{}, inputError("upload body is empty")
 	}
 	ext := strings.ToLower(filepath.Ext(originalName))
 	if ext != ".csv" && ext != ".jsonl" && ext != ".ndjson" && ext != ".sqlite" && ext != ".sqlite3" && ext != ".db" {
@@ -120,9 +120,9 @@ func (s *Service) Upload(ctx context.Context, source io.Reader, originalName, se
 		// the picker's `accept` list is not enforced once a file is chosen another
 		// way (a drag, a second window, a renamed file).
 		if ext == "" {
-			return UploadResult{}, errors.New("这个文件没有扩展名：请上传 CSV、JSONL 或 SQLite 文件。")
+			return UploadResult{}, inputError("这个文件没有扩展名：请上传 CSV、JSONL 或 SQLite 文件。")
 		}
-		return UploadResult{}, fmt.Errorf("不支持的文件类型「%s」：请上传 CSV、JSONL 或 SQLite 文件。", ext)
+		return UploadResult{}, inputErrorf("不支持的文件类型「%s」：请上传 CSV、JSONL 或 SQLite 文件。", ext)
 	}
 	jobID := newImportID("import")
 	root := s.DataDir
@@ -153,7 +153,7 @@ func (s *Service) Upload(ctx context.Context, source io.Reader, originalName, se
 		return UploadResult{}, fmt.Errorf("close staged import: %w", closeErr)
 	}
 	if written > MaxImportBytes {
-		return UploadResult{}, errors.New("import exceeds 25 MiB")
+		return UploadResult{}, inputError("import exceeds 25 MiB")
 	}
 	stagedPath := filepath.Join(stagingDir, jobID+ext)
 	if err := os.Rename(temporaryPath, stagedPath); err != nil {
@@ -197,7 +197,7 @@ func (s *Service) Preview(ctx context.Context, id string, mapping Mapping) (Prev
 		return PreviewResult{}, err
 	}
 	if job.State == jobStateCommitted {
-		return PreviewResult{}, errors.New("import job is already committed")
+		return PreviewResult{}, conflictError("import job is already committed")
 	}
 	inspection, err := InspectFile(ctx, job.StagedPath, job.SelectedTable)
 	if err != nil {
@@ -289,14 +289,14 @@ func (s *Service) Commit(ctx context.Context, id string, resolutions map[string]
 			return nil
 		}
 		if job.State != jobStatePreviewed {
-			return errors.New("import job must be previewed before commit")
+			return conflictError("import job must be previewed before commit")
 		}
 		rows, err := tx.ListImportRows(ctx, id)
 		if err != nil {
 			return err
 		}
 		if len(rows) == 0 {
-			return errors.New("import preview has no rows")
+			return inputError("import preview has no rows")
 		}
 		existing, err := tx.ListKnowledgeItemsForDedup(ctx)
 		if err != nil {
@@ -482,7 +482,7 @@ func readRows(ctx context.Context, path string, format Format, table string) ([]
 	case FormatSQLite:
 		return readSQLiteRows(ctx, path, table)
 	default:
-		return nil, fmt.Errorf("unsupported import format %q", format)
+		return nil, inputErrorf("unsupported import format %q", format)
 	}
 }
 
@@ -607,11 +607,11 @@ func csvReader(file io.Reader) *csv.Reader {
 
 func validateMapping(mapping Mapping, columns []string) error {
 	if strings.TrimSpace(mapping.Term) == "" || strings.TrimSpace(mapping.Definition) == "" {
-		return errors.New("term and definition mappings are required")
+		return inputError("term and definition mappings are required")
 	}
 	for field, column := range map[string]string{"term": mapping.Term, "definition": mapping.Definition, "item_type": mapping.ItemType, "part_of_speech": mapping.PartOfSpeech, "pronunciation": mapping.Pronunciation, "example": mapping.Example, "wiki": mapping.Wiki, "level": mapping.Level, "subject": mapping.Subject, "tags": mapping.Tags} {
 		if strings.TrimSpace(column) != "" && !contains(columns, column) {
-			return fmt.Errorf("mapping %s references unknown column %q", field, column)
+			return inputErrorf("mapping %s references unknown column %q", field, column)
 		}
 	}
 	return nil
@@ -624,11 +624,11 @@ func mapCandidate(value map[string]any, mapping Mapping, raw json.RawMessage) (C
 	}
 	itemType = normalizeToken(itemType)
 	if !supportedItemType(itemType) {
-		return Candidate{}, fmt.Errorf("unsupported item_type %q", itemType)
+		return Candidate{}, inputErrorf("unsupported item_type %q", itemType)
 	}
 	candidate := Candidate{ItemType: itemType, Term: valueString(value[mapping.Term]), Definition: valueString(value[mapping.Definition]), PartOfSpeech: valueString(value[mapping.PartOfSpeech]), Pronunciation: valueString(value[mapping.Pronunciation]), Example: valueString(value[mapping.Example]), Wiki: valueString(value[mapping.Wiki]), Level: valueString(value[mapping.Level]), Subject: valueString(value[mapping.Subject]), Tags: valueTags(value[mapping.Tags]), RawJSON: string(raw)}
 	if strings.TrimSpace(candidate.Term) == "" || strings.TrimSpace(candidate.Definition) == "" {
-		return Candidate{}, errors.New("term and definition are required")
+		return Candidate{}, inputError("term and definition are required")
 	}
 	return candidate, nil
 }

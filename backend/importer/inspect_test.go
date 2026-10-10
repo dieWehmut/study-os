@@ -3,6 +3,7 @@ package importer
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,6 +101,12 @@ func TestUploadNamesTheFormatsItAccepts(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error %q does not mention %q", err.Error(), want)
 		}
+	}
+	// And it says so as a request error, which is what the HTTP layer turns into
+	// a 400: that used to depend on the words in the message.
+	var request *RequestError
+	if !errors.As(err, &request) {
+		t.Fatalf("error %q is not a RequestError", err.Error())
 	}
 
 	// A name with no extension at all says that instead of quoting an empty one.

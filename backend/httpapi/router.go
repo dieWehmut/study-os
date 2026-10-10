@@ -637,59 +637,27 @@ func handleKnowledgeRelated(response http.ResponseWriter, request *http.Request,
 // is a sidebar, not a list page.
 const maxRelatedItems = 50
 
+// Which errors the reader can act on, and which are ours.
+//
+// Decided by type, not by the words in the message: the marker list this used to
+// be made the wording load-bearing, and rewording a message silently turned its
+// 400 into a generic 500. Anything the importer does not mark as a request error
+// is our own failure.
 func writeImportError(response http.ResponseWriter, err error) {
 	if errors.Is(err, db.ErrNotFound) {
 		writeJSON(response, http.StatusNotFound, map[string]string{"error": err.Error()})
 		return
 	}
-	message := strings.ToLower(err.Error())
-	status := http.StatusInternalServerError
-	if strings.Contains(message, "already committed") || strings.Contains(message, "must be previewed") {
-		status = http.StatusConflict
-	} else if isImportClientError(message) {
-		status = http.StatusBadRequest
-	}
-	if status == http.StatusInternalServerError {
-		writeJSON(response, status, map[string]string{"error": "import operation failed"})
+	var request *importer.RequestError
+	if errors.As(err, &request) {
+		status := http.StatusBadRequest
+		if request.Conflict {
+			status = http.StatusConflict
+		}
+		writeJSON(response, status, map[string]string{"error": request.Message})
 		return
 	}
-	writeJSON(response, status, map[string]string{"error": err.Error()})
-}
-
-// Which errors the reader can act on, and which are ours.
-//
-// This matches on the message text, which makes the wording load-bearing: a
-// message reworded and not listed here silently becomes a generic 500 instead of
-// a 400 that explains itself. The list is pinned by TestImportRejectionsExplain
-// Themselves, so that mistake fails in CI rather than in front of a reader.
-func isImportClientError(message string) bool {
-	for _, marker := range []string{
-		"unsupported import extension",
-		"upload body is empty",
-		"import exceeds",
-		"import must be a regular file",
-		"read csv ",
-		"duplicate csv header",
-		"csv ",
-		"decode jsonl row",
-		"jsonl ",
-		"sqlite import",
-		"sqlite table",
-		"mapping",
-		"source column",
-		"term and definition are required",
-		"item_type",
-		"import preview has no rows",
-		// The reader-facing messages these replaced.
-		"不支持的文件类型",
-		"没有扩展名",
-		"没有可导入的表",
-	} {
-		if strings.Contains(message, marker) {
-			return true
-		}
-	}
-	return false
+	writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "import operation failed"})
 }
 
 type reviewPromptResponse struct {

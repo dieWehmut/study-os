@@ -44,7 +44,7 @@ func InspectFile(ctx context.Context, path string, table string) (Inspection, er
 		return Inspection{}, fmt.Errorf("stat import: %w", err)
 	}
 	if !info.Mode().IsRegular() || info.Size() > MaxImportBytes {
-		return Inspection{}, errors.New("import must be a regular file no larger than 25 MiB")
+		return Inspection{}, inputError("import must be a regular file no larger than 25 MiB")
 	}
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".csv":
@@ -54,7 +54,7 @@ func InspectFile(ctx context.Context, path string, table string) (Inspection, er
 	case ".sqlite", ".db", ".sqlite3":
 		return inspectSQLite(ctx, path, table)
 	default:
-		return Inspection{}, fmt.Errorf("unsupported import extension %q", filepath.Ext(path))
+		return Inspection{}, inputErrorf("unsupported import extension %q", filepath.Ext(path))
 	}
 }
 
@@ -75,10 +75,10 @@ func inspectCSV(ctx context.Context, path string) (Inspection, error) {
 	seenHeaders := make(map[string]struct{}, len(headers))
 	for _, header := range headers {
 		if strings.TrimSpace(header) == "" {
-			return Inspection{}, errors.New("csv headers must not be empty")
+			return Inspection{}, inputError("csv headers must not be empty")
 		}
 		if _, exists := seenHeaders[header]; exists {
-			return Inspection{}, fmt.Errorf("duplicate csv header %q", header)
+			return Inspection{}, inputErrorf("duplicate csv header %q", header)
 		}
 		seenHeaders[header] = struct{}{}
 	}
@@ -92,7 +92,7 @@ func inspectCSV(ctx context.Context, path string) (Inspection, error) {
 			break
 		}
 		if readErr != nil {
-			return Inspection{}, fmt.Errorf("read csv row: %w", readErr)
+			return Inspection{}, inputErrorf("read csv row: %v", readErr)
 		}
 		inspection.RowCount++
 		if len(inspection.SampleRows) < 5 {
@@ -121,10 +121,10 @@ func inspectJSONL(ctx context.Context, path string) (Inspection, error) {
 		}
 		var row map[string]any
 		if err := json.Unmarshal([]byte(line), &row); err != nil {
-			return Inspection{}, fmt.Errorf("decode jsonl row %d: %w", inspection.RowCount+1, err)
+			return Inspection{}, inputErrorf("decode jsonl row %d: %v", inspection.RowCount+1, err)
 		}
 		if row == nil {
-			return Inspection{}, fmt.Errorf("decode jsonl row %d: expected object", inspection.RowCount+1)
+			return Inspection{}, inputErrorf("decode jsonl row %d: expected object", inspection.RowCount+1)
 		}
 		inspection.RowCount++
 		if len(inspection.SampleRows) < 5 {
@@ -171,13 +171,13 @@ func inspectSQLite(ctx context.Context, path, table string) (Inspection, error) 
 		// Two different situations look identical here, and both are worth naming:
 		// an empty database, and one whose main file is still empty because the
 		// program that owns it keeps its rows in a write-ahead log next to it.
-		return Inspection{}, errors.New("这个 SQLite 文件里没有可导入的表：它可能是空的，也可能正被别的程序打开（数据还在旁边的 -wal 文件里），先关闭那个程序或改用它的备份文件。")
+		return Inspection{}, inputError("这个 SQLite 文件里没有可导入的表：它可能是空的，也可能正被别的程序打开（数据还在旁边的 -wal 文件里），先关闭那个程序或改用它的备份文件。")
 	}
 	if table == "" {
 		table = tables[0]
 	}
 	if !contains(tables, table) {
-		return Inspection{}, fmt.Errorf("sqlite table %q is not an allowed user table", table)
+		return Inspection{}, inputErrorf("sqlite table %q is not an allowed user table", table)
 	}
 	quotedTable := `"` + strings.ReplaceAll(table, `"`, `""`) + `"`
 	var rowCount int

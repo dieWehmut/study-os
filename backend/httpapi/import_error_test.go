@@ -84,4 +84,29 @@ func TestImportRejectionsExplainThemselves(t *testing.T) {
 	if !strings.Contains(empty.Body.String(), "没有可导入的表") {
 		t.Fatalf("empty sqlite upload body = %s", empty.Body.String())
 	}
+
+	// The job's state is a different kind of refusal: 409, and the message says
+	// which step is missing.
+	uploaded := uploadFile(t, router, "words.csv", []byte("term,definition\nrace,condition\n"))
+	if uploaded.Code != http.StatusCreated {
+		t.Fatalf("csv upload = %d, body = %s", uploaded.Code, uploaded.Body.String())
+	}
+	var job struct {
+		JobID string `json:"job_id"`
+	}
+	decodeJSON(t, uploaded, &job)
+	commit := requestJSON(t, router, http.MethodPost, "/api/imports/"+job.JobID+"/commit", map[string]any{})
+	if commit.Code != http.StatusConflict {
+		t.Fatalf("commit before preview = %d, body = %s", commit.Code, commit.Body.String())
+	}
+	if !strings.Contains(commit.Body.String(), "previewed") {
+		t.Fatalf("commit before preview body = %s", commit.Body.String())
+	}
+
+	// A job that does not exist is a 404, not a 400 and not a 500.
+	missing := requestJSON(t, router, http.MethodPost, "/api/imports/nope/preview",
+		map[string]any{"mapping": map[string]string{"term": "term", "definition": "definition"}})
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unknown job preview = %d, body = %s", missing.Code, missing.Body.String())
+	}
 }
