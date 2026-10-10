@@ -61,6 +61,32 @@ func TestChatConversationsAndAttachments(t *testing.T) {
 			t.Fatalf("create message: %v", err)
 		}
 	}
+	// 综合 is every subject, not a bucket of its own. Conversations asked while
+	// 综合 was selected are stored with subject "all", so reading "all" as a
+	// literal subject hid everything asked under a subject -- the sidebar said
+	// 还没有对话 to a reader who had a shelf of them.
+	if err := store.CreateChatMessage(ctx, models.ChatMessage{
+		ID: "all-1", SessionID: "sess-all", Subject: "all", Role: "user", Content: "随便问问", Status: "done", CreatedAt: now.Add(3 * time.Second),
+	}); err != nil {
+		t.Fatalf("create message: %v", err)
+	}
+	for _, subject := range []string{"", "all"} {
+		listed, listErr := store.ListChatConversations(ctx, models.ChatConversationListOptions{Subject: subject, Limit: 10})
+		if listErr != nil {
+			t.Fatalf("list conversations (%q): %v", subject, listErr)
+		}
+		if len(listed) != 3 {
+			t.Fatalf("subject %q listed %d conversations, want every subject (3)", subject, len(listed))
+		}
+		counted, countErr := store.CountChatConversations(ctx, models.ChatConversationListOptions{Subject: subject})
+		if countErr != nil {
+			t.Fatalf("count conversations (%q): %v", subject, countErr)
+		}
+		if counted != 3 {
+			t.Fatalf("subject %q counted %d, want 3", subject, counted)
+		}
+	}
+
 	conversations, err := store.ListChatConversations(ctx, models.ChatConversationListOptions{Subject: "math", Limit: 10})
 	if err != nil {
 		t.Fatalf("list conversations: %v", err)

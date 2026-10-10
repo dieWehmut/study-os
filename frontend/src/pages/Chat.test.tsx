@@ -721,4 +721,14 @@ describe("picking up a question left by 阅读", () => {
 
     expect(screen.getByLabelText("发给 AI 的消息")).toHaveValue("")
   })
+
+  it("names the subject it is empty for, instead of the whole history", async () => {
+    // The card is scoped to the subject in hand, so "还没有对话" would read as
+    // "you have never asked anything" -- which it cannot know from here.
+    mocks.listChatConversations.mockResolvedValue({ items: [], count: 0 })
+    useSubjectStore.setState({ subject: "physics" })
+    render(<Chat />)
+
+    expect(await screen.findByText(/物理 下还没有对话/)).toBeInTheDocument()
+  })
 })

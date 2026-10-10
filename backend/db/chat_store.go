@@ -129,18 +129,31 @@ func (s *Store) GetChatAttachment(ctx context.Context, id string) (models.ChatAt
 
 // conversationScope is the WHERE every read of the conversation list shares, so
 // a page and its total cannot be about different sets.
+//
+// 综合 means "every subject", the way it does in every other list in the app --
+// and the way ListChatMessages already reads an empty subject two functions up.
+// It used to be a literal bucket here: conversations asked while 综合 was
+// selected are stored with subject "all", so filtering on it hid every
+// conversation asked under a subject and left the sidebar claiming 还没有对话.
 func conversationScope(options models.ChatConversationListOptions) (string, []any) {
+	where := make([]string, 0, 2)
+	arguments := make([]any, 0, 2)
+	if subject := strings.ToLower(strings.TrimSpace(options.Subject)); subject != "" && subject != "all" {
+		where = append(where, `c.subject = ?`)
+		arguments = append(arguments, subject)
+	}
 	// A conversation matches on any of its messages, not only on the two the row
 	// happens to show: the thing you remember saying is often neither the first
 	// question nor the last answer.
-	match := ""
-	arguments := []any{strings.TrimSpace(options.Subject)}
 	if needle := strings.TrimSpace(options.Query); needle != "" {
-		match = ` AND EXISTS (SELECT 1 FROM chat_messages m
-			WHERE m.session_id = c.session_id AND m.content LIKE ? ESCAPE '\')`
+		where = append(where, `EXISTS (SELECT 1 FROM chat_messages m
+			WHERE m.session_id = c.session_id AND m.content LIKE ? ESCAPE '\')`)
 		arguments = append(arguments, "%"+escapeLike(needle)+"%")
 	}
-	return ` WHERE c.subject = ?` + match, arguments
+	if len(where) == 0 {
+		return "", nil
+	}
+	return ` WHERE ` + strings.Join(where, " AND "), arguments
 }
 
 // CountChatConversations answers how many conversations match, not how many fit

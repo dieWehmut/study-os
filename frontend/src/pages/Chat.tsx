@@ -672,7 +672,12 @@ export default function Chat() {
           <CardContent className="grid gap-2">
             {conversations.length === 0 ? (
               <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                {conversationQuery ? `没有对话提到「${conversationQuery}」。` : "还没有对话，点击「新对话」开始。"}
+                {conversationQuery
+                  ? `没有对话提到「${conversationQuery}」。`
+                  // Named, because the card is scoped to the subject in hand:
+                  // "还没有对话" reads as the whole history being empty, which is
+                  // the one thing the list cannot know from here.
+                  : `${subject === "all" ? "综合" : subjectName(subject)} 下还没有对话，点击「新对话」开始。`}
               </p>
             ) : (
               conversations.map((conversation) => (
