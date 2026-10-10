@@ -168,7 +168,12 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
   }, [location.pathname, location.search, navigate, sectionIDs])
 
   const goToSection = useCallback((id: string) => {
-    if (!validIDs.current.has(id)) return
+    // Checked against the sections of this render, not against the set an effect
+    // copied: a click can arrive before that effect has run, and a click dropped
+    // here is a click the reader cannot tell was dropped. Observed under load as
+    // a directory click that left the address at 第一节 -- about one full-suite
+    // run in ten.
+    if (!sectionIDs.includes(id)) return
     chosenByReader.current = true
     scrollingTo.current = sectionIDFromHash(location.hash) === id ? "" : id
     scrollDeadline.current = Date.now() + 1500
@@ -179,7 +184,7 @@ export function useArticleSectionRoute(sectionIDs: readonly string[]): ArticleSe
       preventScrollReset: true,
     })
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [location.hash, location.pathname, location.search, navigate])
+  }, [location.hash, location.pathname, location.search, navigate, sectionIDs])
 
   return { activeID, goToSection }
 }
