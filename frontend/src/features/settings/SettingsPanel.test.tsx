@@ -595,6 +595,8 @@ describe("SettingsPanel", () => {
     expect(summary).toHaveTextContent("份记录")
     // The rule comes from the service, so it cannot drift out of the page.
     expect(summary).toHaveTextContent("每日保留最近 14 份")
+    // The other half of the same question: what makes a backup appear.
+    expect(screen.getByText(/每次启动时自动备份/)).toHaveTextContent("同一天只备一份")
   })
 
   it("names the backup a finished restore used", async () => {

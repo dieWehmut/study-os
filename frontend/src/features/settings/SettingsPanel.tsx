@@ -1073,6 +1073,10 @@ export default function SettingsPanel() {
               {status.backup.retention?.daily ? ` · 每日保留最近 ${status.backup.retention.daily} 份` : ""}
               {" "}· 最近：{formatDate(status.backup.last_created_at)}
             </CardDescription>
+            {/* The other half of the same question -- what makes a backup appear,
+                not what removes one. Mirrors CreateDailyIfNeeded: at startup, at
+                most one per UTC day. */}
+            <p className="text-xs text-muted-foreground">每次启动时自动备份，同一天只备一份（按 UTC 日期）。</p>
           </CardHeader>
           <CardContent className="grid gap-2">
             {backups.length === 0 ? (
