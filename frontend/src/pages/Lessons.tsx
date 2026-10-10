@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react"
-import { ArrowRight, BookOpenCheck, Clock3, FileText, RotateCcw } from "lucide-react"
-import { Link } from "react-router-dom"
+import { ArrowRight, BookOpenCheck, Clock3, FileText, Plus, RotateCcw } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
 
-import { listLessons, type Lesson } from "@/api/lessons"
+import { createLesson, listLessons, type Lesson } from "@/api/lessons"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
-import { subjectName } from "@/lib/subjects"
+import { subjectName, SUBJECTS } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
@@ -43,6 +44,34 @@ export default function Lessons() {
   // find here -- it is not in the list at all.
   const [query, setQuery] = useState("")
   const [draft, setDraft] = useState("")
+  // A course written by hand rather than handed over by 整合. The ten-section
+  // template is created empty and filled in on its own page.
+  const [drafting, setDrafting] = useState(false)
+  const [newTitle, setNewTitle] = useState("")
+  const [newSubject, setNewSubject] = useState(subject === "all" ? "" : subject)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState("")
+  const navigate = useNavigate()
+
+  async function createBlankLesson() {
+    const title = newTitle.trim()
+    if (!title || creating) {
+      if (!title) setCreateError("给这门课起个标题。")
+      return
+    }
+    setCreating(true)
+    setCreateError("")
+    try {
+      const lesson = await createLesson({ title, ...(newSubject ? { subject: newSubject } : {}) })
+      // Straight into filling it: a blank ten-section skeleton on a reading page
+      // is a page with nothing to do on it.
+      navigate(`/lessons/${encodeURIComponent(lesson.id)}?edit=1`)
+    } catch {
+      setCreateError("新建课程失败，请确认本地后端正在运行。")
+    } finally {
+      setCreating(false)
+    }
+  }
 
   /** The filters in hand, as the request they become -- one page at `offset`. */
   const listOptions = useCallback((offset: number): Parameters<typeof listLessons>[0] => ({
@@ -157,7 +186,54 @@ export default function Lessons() {
               </button>
             </span>
           ) : null}
+          <Button
+            type="button"
+            size="sm"
+            className="ml-auto"
+            aria-expanded={drafting}
+            onClick={() => {
+              setDrafting((open) => !open)
+              setCreateError("")
+            }}
+          >
+            <Plus data-icon="inline-start" />新建课程
+          </Button>
         </div>
+        {drafting ? (
+          <div className="grid gap-2 rounded-xl border border-border bg-muted/30 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                aria-label="新课程标题"
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return
+                  event.preventDefault()
+                  void createBlankLesson()
+                }}
+                placeholder="这门课叫什么？"
+                className="h-9 max-w-xs"
+              />
+              <Select
+                ariaLabel="新课程学科"
+                value={newSubject}
+                onValueChange={setNewSubject}
+                options={[
+                  { value: "", label: "综合" },
+                  ...SUBJECTS.map((subject) => ({ value: subject.id, label: subject.name })),
+                ]}
+              />
+              <Button type="button" size="sm" disabled={creating} onClick={() => void createBlankLesson()}>
+                {creating ? "正在新建…" : "创建"}
+              </Button>
+              <Button type="button" size="sm" variant="outline" disabled={creating} onClick={() => setDrafting(false)}>
+                取消
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">会生成固定十节的空骨架，创建后直接进入编辑。</p>
+            {createError ? <p role="alert" className="text-sm text-destructive">{createError}</p> : null}
+          </div>
+        ) : null}
       </header>
 
       {error ? (

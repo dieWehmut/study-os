@@ -477,4 +477,20 @@ describe("lesson detail page", () => {
     window.dispatchEvent(afterwards)
     expect(afterwards.defaultPrevented).toBe(false)
   })
+
+  it("opens ready to write in when a new course arrives with ?edit=1", async () => {
+    mocks.getLesson.mockResolvedValue({ ...lesson, version: 1 })
+    render(
+      <MemoryRouter initialEntries={["/lessons/lesson-1?edit=1"]}>
+        <Routes>
+          <Route path="/lessons/:id" element={<LessonDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    // Straight into the editor, with the sections already seeded from the lesson.
+    expect(await screen.findByLabelText("课程标题")).toHaveValue("Newton's second law")
+    expect(screen.getByLabelText("核心概念内容")).toHaveValue("F = ma")
+    expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument()
+  })
 })

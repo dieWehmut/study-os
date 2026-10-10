@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { ArrowLeft, BookOpenCheck, CheckCircle2, CircleHelp, Clock3, FileText, History, Pencil, RotateCcw } from "lucide-react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useParams, useSearchParams } from "react-router-dom"
 
 import {
   getLesson,
@@ -275,8 +275,29 @@ function PracticeSectionEditor({
   )
 }
 
+/** Everything the editor starts from, so opening it twice seeds the same way. */
+function editorSeed(lesson: Lesson) {
+  return {
+    drafts: Object.fromEntries(lesson.sections.map((section) => [section.id, sectionEditorText(section)])),
+    // Only the template's own practice section: a quiz-typed section may hold
+    // content this editor does not understand, and rewriting it would lose it.
+    practiceDrafts: Object.fromEntries(
+      lesson.sections
+        .filter((section) => sectionType(section) === "practice")
+        .map((section) => [section.id, practiceDraftFromSection(section)]),
+    ),
+    title: lesson.title,
+    status: lesson.status,
+    subject: lesson.subject === "all" ? "" : lesson.subject,
+  }
+}
+
 export default function LessonDetail() {
   const { id = "" } = useParams()
+  // 新建课程 arrives with ?edit=1: a blank ten-section skeleton on a reading page
+  // is a page with nothing to do on it.
+  const [searchParams] = useSearchParams()
+  const wantsEditing = searchParams.get("edit") === "1"
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -374,22 +395,15 @@ export default function LessonDetail() {
 
   function startEditing() {
     if (!lesson) return
-    setDrafts(Object.fromEntries(
-      lesson.sections.map((section) => [section.id, sectionEditorText(section)]),
-    ))
-    setPracticeDrafts(Object.fromEntries(
-      lesson.sections
-        // Only the template's own practice section: a quiz-typed section may hold
-        // content this editor does not understand, and rewriting it would lose it.
-        .filter((section) => sectionType(section) === "practice")
-        .map((section) => [section.id, practiceDraftFromSection(section)]),
-    ))
+    const seed = editorSeed(lesson)
+    setDrafts(seed.drafts)
+    setPracticeDrafts(seed.practiceDrafts)
+    setDraftTitle(seed.title)
+    setDraftStatus(seed.status)
+    setDraftSubject(seed.subject)
     // The title and the filing of the lesson are as editable as its sections: a
     // course made from a note arrives called 整合笔记, and 草稿 until someone
     // says otherwise.
-    setDraftTitle(lesson.title)
-    setDraftStatus(lesson.status)
-    setDraftSubject(lesson.subject === "all" ? "" : lesson.subject)
     setNotice("")
     setEditing(true)
   }
@@ -532,6 +546,18 @@ export default function LessonDetail() {
         if (active) {
           setLesson(value)
           setCurrentVersion(value.version ?? 0)
+          // 新建课程 lands here with ?edit=1: the page opens ready to write in.
+          // Seeded here rather than in an effect of its own -- the lint rule is
+          // right that syncing state from an effect cascades renders.
+          if (wantsEditing) {
+            const seed = editorSeed(value)
+            setDrafts(seed.drafts)
+            setPracticeDrafts(seed.practiceDrafts)
+            setDraftTitle(seed.title)
+            setDraftStatus(seed.status)
+            setDraftSubject(seed.subject)
+            setEditing(true)
+          }
         }
       } catch {
         if (active) setError("课程暂时无法读取，请确认本地后端正在运行。")
@@ -543,7 +569,7 @@ export default function LessonDetail() {
     return () => {
       active = false
     }
-  }, [id, requestVersion])
+  }, [id, requestVersion, wantsEditing])
 
   const sections = useMemo(() => (lesson ? sortSections(lesson.sections) : []), [lesson])
   const objectives = useMemo(() => (lesson ? objectivesForLesson(lesson) : []), [lesson])

@@ -1,15 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
-import { MemoryRouter } from "react-router-dom"
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { Lesson } from "@/api/lessons"
 import Lessons from "./Lessons"
 
-const mocks = vi.hoisted(() => ({ listLessons: vi.fn() }))
+const mocks = vi.hoisted(() => ({ listLessons: vi.fn(), createLesson: vi.fn() }))
 
 vi.mock("@/api/lessons", async () => {
   const actual = await vi.importActual<typeof import("@/api/lessons")>("@/api/lessons")
-  return { ...actual, listLessons: mocks.listLessons }
+  return { ...actual, listLessons: mocks.listLessons, createLesson: mocks.createLesson }
 })
 
 vi.mock("@/features/subjects/SubjectChips", () => ({
@@ -30,10 +30,18 @@ const lesson: Lesson = {
   updated_at: "2026-08-19T00:00:00Z",
 }
 
+function LocationProbe() {
+  const location = useLocation()
+  return <p data-testid="location">{`${location.pathname}${location.search}`}</p>
+}
+
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <Lessons />
+    <MemoryRouter initialEntries={["/lessons"]}>
+      <Routes>
+        <Route path="/lessons" element={<Lessons />} />
+        <Route path="*" element={<LocationProbe />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -131,5 +139,32 @@ describe("lessons page", () => {
     await screen.findByRole("link", { name: /Newton's second law/ })
 
     expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
+  })
+
+  it("creates a blank course and opens it ready to write in", async () => {
+    // Until now a course could only arrive from 整合; the editor can fill all ten
+    // sections, so a hand-written one is worth starting.
+    mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
+    mocks.createLesson.mockResolvedValue({ ...lesson, id: "lesson-new", title: "受力分析" })
+    renderPage()
+
+    fireEvent.click(screen.getByRole("button", { name: "新建课程" }))
+    fireEvent.change(screen.getByLabelText("新课程标题"), { target: { value: "受力分析" } })
+    fireEvent.click(screen.getByRole("button", { name: "创建" }))
+
+    await waitFor(() => expect(mocks.createLesson).toHaveBeenCalledWith({ title: "受力分析" }))
+    // Straight into editing: a blank skeleton on a reading page has nothing to do.
+    expect(await screen.findByTestId("location")).toHaveTextContent("/lessons/lesson-new?edit=1")
+  })
+
+  it("asks for a title before creating anything", async () => {
+    mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
+    renderPage()
+
+    fireEvent.click(screen.getByRole("button", { name: "新建课程" }))
+    fireEvent.click(screen.getByRole("button", { name: "创建" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("给这门课起个标题")
+    expect(mocks.createLesson).not.toHaveBeenCalled()
   })
 })
