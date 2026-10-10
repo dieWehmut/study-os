@@ -2,6 +2,15 @@
 
 ## 未发布
 
+### 收尾全量里那条 Chat 偶发红又出现了一次（详情又被我丢掉）
+
+- 收尾全量里 `Chat.test.tsx > looks in mistakes and courses too, not only the knowledge library` 红了一次
+  （与第 74-76 轮同一条）。随后 `scripts/flake-hunt.mjs 3` 连跑三轮全量**未复现**。
+- **详情又丢了，而且这次原因更荒唐**：输出确实落盘到了 `sweep.log`，可我在同一条命令的最后把它
+  `Remove-Item` 掉了，而筛选只留下 `FAIL` 那一行。**这是第三次因为「先筛再删」丢掉断言详情**。
+- 立一条硬性规矩：**收尾全量一律走 `scripts/flake-hunt.mjs`**（JSON 报告落盘到已忽略目录），
+  或在删除日志前把失败块**先完整打印出来**。脚本与 `.gitignore` 都已就位，缺的只是执行。
+
 ### Pages 演示里也验了「复制链接」——顺便验掉那条 hash 分支
 
 - 上一轮我在浏览器里验了开发版（browser 模式）。**hash 模式**只在单测里走过，而它恰恰是最容易写错的一条：
