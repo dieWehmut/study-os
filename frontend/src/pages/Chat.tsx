@@ -443,7 +443,13 @@ export default function Chat() {
           options.push({ value: qaContextValue("lesson", item.id), label: `课程：${item.title}` })
         }
       }
-      setQAContextOptions(options)
+      // Merged, not replaced: a search can answer before this page does, and the
+// reader's find must not be thrown away by the list catching up. The options were
+// cleared when the session changed, so this is normally a plain assignment.
+      setQAContextOptions((current) => {
+        const known = new Set(options.map((option) => option.value))
+        return [...options, ...current.filter((option) => !known.has(option.value))]
+      })
       setQAScheduled(knowledge.status === "fulfilled" ? knowledge.value.scheduled_ids ?? [] : [])
       setQAContextLoadedKey(currentKey)
     })

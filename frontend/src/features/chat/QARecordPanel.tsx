@@ -198,7 +198,10 @@ export default function QARecordPanel({
                       event.preventDefault()
                       if (contextQuery.trim()) void onSearchContexts(contextQuery)
                     }}
-                    disabled={disabled || contextLoading}
+                    // Deliberately not disabled while 关联对象 loads: searching is
+                    // its own request, and a disabled control swallows the typing
+                    // and the click without saying so.
+                    disabled={disabled}
                     className="h-9"
                   />
                   <Button
@@ -206,7 +209,7 @@ export default function QARecordPanel({
                     variant="outline"
                     size="sm"
                     aria-label="搜索"
-                    disabled={disabled || contextLoading || searchingContexts || !contextQuery.trim()}
+                    disabled={disabled || searchingContexts || !contextQuery.trim()}
                     onClick={() => void onSearchContexts(contextQuery)}
                     className="shrink-0"
                   >
