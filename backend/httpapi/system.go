@@ -32,6 +32,7 @@ type restoreStatus struct {
 	Pending      bool   `json:"pending"`
 	PendingPath  string `json:"pending_path,omitempty"`
 	LastOK       bool   `json:"last_ok"`
+	LastPath     string `json:"last_path,omitempty"`
 	LastDetail   string `json:"last_detail,omitempty"`
 	LastResolved string `json:"last_resolved_at,omitempty"`
 	LastRecorded bool   `json:"last_recorded"`
@@ -114,6 +115,9 @@ func restoreStatusFor(dataDir string) restoreStatus {
 	if outcome, ok := backup.ReadRestoreOutcome(dataDir); ok {
 		status.LastRecorded = true
 		status.LastOK = outcome.OK
+		// Which file it was: "上次恢复已完成" without a name is a report the reader
+		// cannot check against the list in front of them.
+		status.LastPath = outcome.Path
 		status.LastDetail = outcome.Detail
 		status.LastResolved = outcome.ResolvedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00")
 	}

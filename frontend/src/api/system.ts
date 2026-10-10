@@ -48,6 +48,7 @@ export interface RestoreStatus {
   pending_path?: string
   last_recorded: boolean
   last_ok: boolean
+  last_path?: string
   last_detail?: string
   last_resolved_at?: string
 }
@@ -128,6 +129,7 @@ export function normalizeSystemStatus(value: unknown): SystemStatus {
       ...(stringValue(restore.pending_path) ? { pending_path: stringValue(restore.pending_path) } : {}),
       last_recorded: restore.last_recorded === true,
       last_ok: restore.last_ok === true,
+      ...(stringValue(restore.last_path) ? { last_path: stringValue(restore.last_path) } : {}),
       ...(stringValue(restore.last_detail) ? { last_detail: stringValue(restore.last_detail) } : {}),
       ...(stringValue(restore.last_resolved_at) ? { last_resolved_at: stringValue(restore.last_resolved_at) } : {}),
     },

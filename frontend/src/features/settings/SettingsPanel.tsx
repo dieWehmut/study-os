@@ -1147,7 +1147,9 @@ export default function SettingsPanel() {
                 className={restoreStatus.last_ok ? "text-sm text-muted-foreground" : "text-sm text-destructive"}
               >
                 {restoreStatus.last_ok
-                  ? "上次恢复已完成。"
+                  // Which file, and when: "上次恢复已完成" with neither is a claim
+                  // the reader cannot check against the list in front of them.
+                  ? `上次恢复已完成（${restoreStatus.last_path?.split(/[\\/]/).pop() ?? "备份文件"} · ${formatDate(restoreStatus.last_resolved_at)}）。`
                   : `上次恢复没有成功，数据保持原样：${failureMessage(new Error(restoreStatus.last_detail ?? ""), "原因不明")}`}
               </p>
             ) : null}

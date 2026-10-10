@@ -583,6 +583,28 @@ describe("SettingsPanel", () => {
     expect(alert).toHaveTextContent("数据保持原样")
   })
 
+  it("names the backup a finished restore used", async () => {
+    // "上次恢复已完成" without a name is a claim the reader cannot check against
+    // the list in front of them.
+    mocks.getSystemStatus.mockResolvedValue({
+      ...status,
+      restore: {
+        pending: false,
+        last_recorded: true,
+        last_ok: true,
+        last_path: "D:/StudyOS/data/backups/daily/study-daily-20261010.db",
+        last_resolved_at: "2026-10-10T18:40:00Z",
+      },
+    })
+    render(<SettingsPanel />)
+
+    const report = await screen.findByText(/上次恢复已完成/)
+    expect(report).toHaveTextContent("study-daily-20261010.db")
+    // The time is rendered in the reader's zone, so the day may differ from the
+    // UTC one in the fixture; what matters is that a date is there at all.
+    expect(report?.textContent).toMatch(/2026\/10\/1\d/)
+  })
+
   it("lets the reader take a scheduled restore back", async () => {
     // Picking the wrong file must be undoable before the next start acts on it.
     mocks.cancelBackupRestore.mockResolvedValue({ status: "cancelled" })
