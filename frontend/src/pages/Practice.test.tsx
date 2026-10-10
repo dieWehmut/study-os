@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   scheduleMistake: vi.fn(),
   correctMistake: vi.fn(),
   listErrorCauses: vi.fn(),
+  exportMistakes: vi.fn(),
 }))
 
 vi.mock("@/api/mistakes", () => ({
@@ -947,5 +948,43 @@ describe("taking apart the 长难句 英语 keeps being told to look at structur
 
     expect(await screen.findByRole("button", { name: "对得分点" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "拆长难句" })).not.toBeInTheDocument()
+  })
+
+  it("hands the whole 错题本 over as a file, not just the page on screen", async () => {
+    // The list shows the newest fifty; a file that stopped there would look
+    // complete and be a fragment.
+    useSubjectStore.setState({ subject: "all" })
+    mocks.exportMistakes.mockResolvedValue("题干,学科,错因\n斜面上的木块受力,physics,思路不对\n")
+    const downloads: string[] = []
+    const originalClick = HTMLAnchorElement.prototype.click
+    const originalCreate = URL.createObjectURL
+    const originalRevoke = URL.revokeObjectURL
+    HTMLAnchorElement.prototype.click = function click(this: HTMLAnchorElement) {
+      downloads.push(this.download)
+    }
+    URL.createObjectURL = vi.fn(() => "blob:mistakes") as unknown as typeof URL.createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    try {
+      render(<Practice />)
+      fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
+
+      await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith({ subject: undefined }))
+      expect(downloads[0]).toMatch(/错题.*\.csv$/)
+      await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mistakes"))
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick
+      URL.createObjectURL = originalCreate
+      URL.revokeObjectURL = originalRevoke
+    }
+  })
+
+  it("says so when the 错题本 cannot be exported", async () => {
+    mocks.exportMistakes.mockRejectedValue(new Error("导出错题失败"))
+    render(<Practice />)
+
+    fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("导出错题失败")
+    expect(screen.getByRole("button", { name: "导出 CSV" })).toBeEnabled()
   })
 })

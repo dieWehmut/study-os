@@ -1,4 +1,4 @@
-import { apiRequest } from "./client"
+import { ApiError, apiRequest, resolveApiBase } from "./client"
 import { normalizeSubjectAttemptEvidence, type MistakeEvidence } from "@/lib/mistake-evidence"
 import type { MistakeCause, MistakeRecord } from "@/lib/mistakes"
 
@@ -114,6 +114,25 @@ export async function listMistakePage(
   const page = await apiRequest<MistakeListResponse>(`/mistakes${suffix ? `?${suffix}` : ""}`)
   const items = (page.items ?? []).map(toRecord)
   return { items, count: typeof page.count === "number" ? page.count : items.length }
+}
+
+/**
+ * The 错题本 as a CSV file, in the words the page uses.
+ *
+ * Plain text rather than the parsed rows: the file is meant to be opened in a
+ * spreadsheet or handed to someone, and the columns are headings a person reads
+ * (题干 / 错因 / 订正答案), not field names.
+ */
+export async function exportMistakes(options: { subject?: string } = {}): Promise<string> {
+  const params = new URLSearchParams()
+  if (options.subject) params.set("subject", options.subject)
+  const suffix = params.toString()
+  const response = await fetch(`${resolveApiBase()}/mistakes/export${suffix ? `?${suffix}` : ""}`)
+  if (!response.ok) {
+    const detail = (await response.text()).trim()
+    throw new ApiError(response.status, detail || `导出失败（${response.status}）`)
+  }
+  return response.text()
 }
 
 export async function recordMistake(filed: {

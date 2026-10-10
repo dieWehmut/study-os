@@ -3,6 +3,7 @@ import {
   CalendarPlus,
   CheckCheck,
   ClipboardCheck,
+  Download,
   Link2,
   ListOrdered,
   PenLine,
@@ -16,6 +17,7 @@ import {
 import {
   correctMistake,
   deleteMistake,
+  exportMistakes,
   listMistakePage,
   recordMistake,
   scheduleMistake,
@@ -50,6 +52,7 @@ import {
   type MistakeRecord,
 } from "@/lib/mistakes"
 import { summarizeMistakeDiagnostics } from "@/lib/mistake-diagnostics"
+import { saveTextFile } from "@/lib/download"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 function describe(error: unknown, fallback: string): string {
@@ -211,6 +214,8 @@ export default function Practice() {
   const [correctionAnswer, setCorrectionAnswer] = useState("")
   const [correctionStartedAt, setCorrectionStartedAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState("")
   // Which cause row has its drawing board open, "" for none. A cause rather
   // than a flag: the row is the reason the board is on screen, and a second
   // executable piece of advice would need to say which one it belongs to.
@@ -365,6 +370,26 @@ export default function Practice() {
       setError("读取更多错题失败，请重试。")
     } finally {
       setLoadingMoreRecords(false)
+    }
+  }
+
+  /**
+   * The whole 错题本, not the page on screen.
+   *
+   * The list shows the newest fifty and offers a next page; a file that stopped
+   * at the same point would look complete and quietly be a fragment.
+   */
+  async function downloadMistakes() {
+    if (exporting) return
+    setExporting(true)
+    setExportError("")
+    try {
+      const text = await exportMistakes({ subject: subject === "all" ? undefined : subject })
+      saveTextFile(text, `study-os-错题-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8")
+    } catch (failure) {
+      setExportError(describe(failure, "导出错题失败"))
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -661,6 +686,25 @@ export default function Practice() {
                   清除
                 </button>
               </span>
+            ) : null}
+            {/* The list is one page of the newest mistakes; the file is all of
+                them, for the reading a page cannot do (print it, hand it to
+                someone, sort it in a spreadsheet by 错因). */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="ml-auto shrink-0"
+              disabled={exporting}
+              onClick={() => void downloadMistakes()}
+            >
+              <Download data-icon="inline-start" />
+              {exporting ? "导出中…" : "导出 CSV"}
+            </Button>
+            {exportError ? (
+              <p role="alert" className="w-full text-sm text-destructive">
+                {exportError}
+              </p>
             ) : null}
           </div>
         </CardHeader>

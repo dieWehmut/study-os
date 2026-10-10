@@ -293,6 +293,10 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/mistakes", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeList(response, request, application)
 		})
+		// Before /mistakes/{attemptID} would see it: "export" is not an attempt id.
+		api.Get("/mistakes/export", func(response http.ResponseWriter, request *http.Request) {
+			handleMistakeExport(response, request, application)
+		})
 		api.Delete("/mistakes/{attemptID}", func(response http.ResponseWriter, request *http.Request) {
 			handleMistakeDelete(response, request, application)
 		})
