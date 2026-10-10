@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { ArrowRight, BookOpenCheck, Clock3, FileText, RotateCcw } from "lucide-react"
 import { Link } from "react-router-dom"
 
@@ -38,10 +38,43 @@ export default function Lessons() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   // The list is one page of the newest courses, so an older one is not hard to
   // find here -- it is not in the list at all.
   const [query, setQuery] = useState("")
   const [draft, setDraft] = useState("")
+
+  /** The filters in hand, as the request they become -- one page at `offset`. */
+  const listOptions = useCallback((offset: number): Parameters<typeof listLessons>[0] => ({
+    subject: subject === "all" ? undefined : subject,
+    query: query || undefined,
+    limit: 100,
+    offset,
+  }), [subject, query])
+
+  /**
+   * The next page, appended.
+   *
+   * One request of 100, and the page says how many there are: without this the
+   * course library is browsable only as far as its first page.
+   */
+  async function loadMore() {
+    if (loadingMore) return
+    setLoadingMore(true)
+    setError("")
+    try {
+      const result = await listLessons(listOptions(items.length))
+      setItems((current) => {
+        const seen = new Set(current.map((item) => item.id))
+        return [...current, ...result.items.filter((item) => !seen.has(item.id))]
+      })
+      setCount(result.count)
+    } catch {
+      setError("读取更多课程失败，请重试。")
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -49,12 +82,7 @@ export default function Lessons() {
       setLoading(true)
       setError("")
       try {
-        const result = await listLessons({
-          subject: subject === "all" ? undefined : subject,
-          query: query || undefined,
-          limit: 100,
-          offset: 0,
-        })
+        const result = await listLessons(listOptions(0))
         if (!active) return
         setItems(result.items)
         setCount(result.count)
@@ -68,7 +96,7 @@ export default function Lessons() {
     return () => {
       active = false
     }
-  }, [subject, requestVersion, query])
+  }, [listOptions, requestVersion])
 
   function retry() {
     setRequestVersion((value) => value + 1)
@@ -190,6 +218,20 @@ export default function Lessons() {
             </Card>
           ))}
         </div>
+      ) : null}
+
+      {/* Said as well as offered: the count is what tells you whether there is
+          anything left to look at, and "加载更多" alone does not. */}
+      {items.length > 0 && count > items.length ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          disabled={loadingMore}
+          onClick={() => void loadMore()}
+        >
+          {loadingMore ? "正在读取…" : `加载更多（还有 ${count - items.length} 门）`}
+        </Button>
       ) : null}
     </section>
   )

@@ -107,4 +107,29 @@ describe("lessons page", () => {
     expect(await screen.findByText(/没有标题含「不存在」的课程/)).toBeInTheDocument()
     expect(screen.queryByText("还没有课程")).not.toBeInTheDocument()
   })
+
+  it("loads the next page instead of stopping at the first hundred", async () => {
+    // The page says how many there are, so one request of 100 is not the library.
+    const page = (offset: number) =>
+      offset === 0
+        ? { count: 3, items: [lesson, { ...lesson, id: "lesson-2", title: "第二门" }] }
+        : { count: 3, items: [{ ...lesson, id: "lesson-3", title: "第三门" }] }
+    mocks.listLessons.mockImplementation((options?: { offset?: number }) => Promise.resolve(page(options?.offset ?? 0)))
+    renderPage()
+    await screen.findByRole("link", { name: /Newton's second law/ })
+
+    fireEvent.click(screen.getByRole("button", { name: "加载更多（还有 1 门）" }))
+
+    await waitFor(() => expect(mocks.listLessons).toHaveBeenCalledWith(expect.objectContaining({ offset: 2 })))
+    expect(await screen.findByRole("link", { name: /第三门/ })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
+  })
+
+  it("offers nothing to load when the first page is the whole library", async () => {
+    mocks.listLessons.mockResolvedValue({ items: [lesson], count: 1 })
+    renderPage()
+    await screen.findByRole("link", { name: /Newton's second law/ })
+
+    expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
+  })
 })
