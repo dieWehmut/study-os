@@ -492,6 +492,9 @@ describe("lesson detail page", () => {
     expect(await screen.findByLabelText("课程标题")).toHaveValue("Newton's second law")
     expect(screen.getByLabelText("核心概念内容")).toHaveValue("F = ma")
     expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument()
+    // The drafts are not saved yet, so a file exported now would be the previous
+    // version -- one that disagrees with the screen in front of the reader.
+    expect(screen.queryByRole("button", { name: "导出 Markdown" })).not.toBeInTheDocument()
   })
 
   it("hands the course over as a Markdown file", async () => {

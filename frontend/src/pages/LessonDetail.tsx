@@ -634,12 +634,14 @@ export default function LessonDetail() {
             </>
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {/* A lesson is a document and this is the only way one leaves the app:
-                the reading page reads Markdown, so what is exported can be read
-                back in -- and printed or filed anywhere else. */}
-            <Button size="sm" variant="ghost" onClick={() => downloadMarkdown()}>
-              <Download data-icon="inline-start" />导出 Markdown
-            </Button>
+            {/* Not while editing: the drafts are not saved yet, so the file would
+                be the previous version -- a reader who exported mid-edit would
+                have a document that disagrees with the screen in front of them. */}
+            {editing ? null : (
+              <Button size="sm" variant="ghost" onClick={() => downloadMarkdown()}>
+                <Download data-icon="inline-start" />导出 Markdown
+              </Button>
+            )}
             {lesson.version ? (
               <Button size="sm" variant="ghost" onClick={() => void openHistory()}>
                 <History data-icon="inline-start" />版本历史
