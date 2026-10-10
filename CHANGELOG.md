@@ -2,6 +2,23 @@
 
 ## 未发布
 
+### 抓到偶发红了：机制已定位（关联对象搜索被静默丢弃）
+
+- 这轮按上一轮定的方法做：**循环跑全量**、每次把 vitest 的 **JSON 报告落盘**（新增
+  `scripts/flake-hunt.mjs`），因此失败详情这次留下来了。第一次循环就抓到：
+  `Chat.test.tsx > finds a knowledge point the first page of 关联对象 never had` 失败，
+  断言显示 `listKnowledge` 只被调用 1 次，且参数是初始那页（`limit:100, offset:0`）——
+  **搜索那次调用根本没发生**。
+- 机制（读代码确认）：`QARecordPanel` 把「搜索关联对象」输入框与「搜索」按钮都设成
+  `disabled={… || contextLoading}`。整套测试负载下，初始那一页还没回来，输入框处于禁用状态 →
+  `fireEvent.change` 写不进值 → 按钮仍是禁用 → 点击被**静默丢弃**。这也解释了它为什么只在
+  全量测试时出现：单跑时初始请求立刻返回，禁用窗口短到看不见。
+- 这轮改的是**测试**：等控件可用再输入/点击（读者本来也是先看到列表再搜索），并在注释里写明
+  这条来龙去脉。**应用侧的毛病仍然存在**：读者在初始列表加载期间打字搜索，点击会被无声吞掉——
+  已记入下一轮候选（要修得连带处理「初始结果晚到会不会覆盖搜索结果」这个竞态）。
+- 工具：`scripts/flake-hunt.mjs`（循环全量 + JSON 报告，stdio 用 inherit，避免管道受限），
+  第一次运行即抓到本次失败；报告里的断言文本是完整保留的。
+
 ### 偶发红：这轮又抓到一次，并记下正确抓法
 
 - 全量测试里 `EnglishArticleDetail.test.tsx > uses history navigation for a directory click and scrolls to the section`

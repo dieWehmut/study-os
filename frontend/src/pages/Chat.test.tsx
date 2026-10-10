@@ -557,8 +557,16 @@ describe("Chat page", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
     const box = await screen.findByLabelText("搜索关联对象")
+    // The panel disables the search until the first page of 关联对象 has arrived,
+    // so typing before it does is typing into a disabled input: the click is
+    // dropped and the search never happens. That is what this test used to fail
+    // on under load, once every ten full runs -- waiting for the control to be
+    // usable is what a reader does anyway.
+    await waitFor(() => expect(box).toBeEnabled())
     fireEvent.change(box, { target: { value: "动能" } })
-    fireEvent.click(screen.getByRole("button", { name: "搜索" }))
+    const search = screen.getByRole("button", { name: "搜索" })
+    await waitFor(() => expect(search).toBeEnabled())
+    fireEvent.click(search)
 
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ query: "动能" })))
     expect(await screen.findByRole("option", { name: "知识点：动能定理" })).toBeInTheDocument()
