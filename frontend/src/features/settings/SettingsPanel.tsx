@@ -1068,6 +1068,9 @@ export default function SettingsPanel() {
               {/* Backups accumulate silently, one per day: the number of files
                   says little about the room they take. */}
               {status.backup.total_bytes > 0 ? ` · 合计 ${formatBytes(status.backup.total_bytes)}` : ""}
+              {/* A list that silently drops its oldest copy is a surprise: the rule
+                  is read from the service, not copied here where it can drift. */}
+              {status.backup.retention?.daily ? ` · 每日保留最近 ${status.backup.retention.daily} 份` : ""}
               {" "}· 最近：{formatDate(status.backup.last_created_at)}
             </CardDescription>
           </CardHeader>

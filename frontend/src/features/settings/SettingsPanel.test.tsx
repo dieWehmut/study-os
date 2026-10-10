@@ -56,7 +56,7 @@ const status = {
   provider: { name: "deepseek", mode: "remote", configured: true, key_configured: true, model: "deepseek-v4-flash" },
   data: { directory: "D:/StudyOS/data", database_path: "D:/StudyOS/data/study.db" },
   review: { daily_limit: 20 },
-  backup: { directory: "D:/StudyOS/data/backups", count: 1, total_bytes: 356352, last_created_at: "2026-08-02T00:00:00Z" },
+  backup: { directory: "D:/StudyOS/data/backups", count: 1, total_bytes: 356352, retention: { daily: 14, "pre-update": 5 }, last_created_at: "2026-08-02T00:00:00Z" },
   app: { version: "0.1.0", platform: "windows" },
   restore: { pending: false, last_recorded: false, last_ok: false },
 }
@@ -593,6 +593,8 @@ describe("SettingsPanel", () => {
 
     const summary = await screen.findByText(/合计 348\.0 KB/)
     expect(summary).toHaveTextContent("份记录")
+    // The rule comes from the service, so it cannot drift out of the page.
+    expect(summary).toHaveTextContent("每日保留最近 14 份")
   })
 
   it("names the backup a finished restore used", async () => {

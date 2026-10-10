@@ -23,6 +23,8 @@ export interface BackupStatus {
   count: number
   /** Room the live backups take, read from the files themselves. */
   total_bytes: number
+  /** How many of each category are kept, as the backup service has it. */
+  retention: Record<string, number>
   last_created_at?: string
 }
 
@@ -121,6 +123,9 @@ export function normalizeSystemStatus(value: unknown): SystemStatus {
       directory: stringValue(backup.directory, "未提供"),
       count: numberValue(backup.count),
       total_bytes: numberValue(backup.total_bytes),
+      retention: Object.fromEntries(
+        Object.entries(recordValue(backup.retention)).map(([key, value]) => [key, numberValue(value)]),
+      ),
       ...(stringValue(backup.last_created_at) ? { last_created_at: stringValue(backup.last_created_at) } : {}),
     },
     app: {

@@ -420,6 +420,19 @@ func VerifySQLite(path string) error {
 	return nil
 }
 
+// Retention answers how many copies of a category are kept.
+//
+// The page shows this to the reader: a backup list that silently deletes the
+// fifteenth copy is a surprise, and the number must come from here rather than
+// from a constant copied into the frontend that the option below can change.
+func (s *Service) Retention(category Category) (int, bool) {
+	if s == nil {
+		return 0, false
+	}
+	limit, ok := s.retention[category]
+	return limit, ok
+}
+
 // Prune keeps the newest configured number of published copies for category.
 func (s *Service) Prune(category Category) error {
 	limit, ok := s.retention[category]

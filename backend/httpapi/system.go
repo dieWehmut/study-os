@@ -57,10 +57,26 @@ type reviewStatus struct {
 }
 
 type backupStatus struct {
-	Directory     string `json:"directory"`
-	Count         int    `json:"count"`
-	TotalBytes    int64  `json:"total_bytes"`
-	LastCreatedAt string `json:"last_created_at,omitempty"`
+	Directory     string         `json:"directory"`
+	Count         int            `json:"count"`
+	TotalBytes    int64          `json:"total_bytes"`
+	Retention     map[string]int `json:"retention"`
+	LastCreatedAt string         `json:"last_created_at,omitempty"`
+}
+
+// backupRetentionFor reports how many of each category are kept. A list that
+// silently drops its oldest copy is a surprise, so the page can say the rule.
+func backupRetentionFor(application *app.App) map[string]int {
+	retention := map[string]int{}
+	if application == nil || application.Backups == nil {
+		return retention
+	}
+	for _, category := range []backup.Category{backup.Daily, backup.PreUpdate} {
+		if limit, ok := application.Backups.Retention(category); ok {
+			retention[string(category)] = limit
+		}
+	}
+	return retention
 }
 
 type appStatus struct {
@@ -84,6 +100,7 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "read latest backup failed"})
 		return
 	}
+	backupRetention := backupRetentionFor(application)
 	status := systemStatusResponse{
 		Provider: providerStatusFor(application),
 		Data: dataStatus{
@@ -95,6 +112,7 @@ func handleSystemStatus(response http.ResponseWriter, request *http.Request, app
 			Directory:  filepath.Join(application.Config.DataDir, "backups"),
 			Count:      usage.Count,
 			TotalBytes: usage.Bytes,
+			Retention:  backupRetention,
 		},
 		App: appStatus{
 			Version:  version.Version,
