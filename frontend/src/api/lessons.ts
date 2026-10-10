@@ -196,3 +196,23 @@ export function listLessons(options: LessonListOptions = {}): Promise<LessonList
 export function getLesson(id: string): Promise<Lesson> {
   return apiRequest<unknown>(`/lessons/${encodeURIComponent(id)}`).then(normalizeLesson)
 }
+
+export interface LessonCreateInput {
+  subject?: string
+  title: string
+  /**
+   * The note this course came out of, when there is one.
+   *
+   * Sent as a reference rather than as a document: the note already holds the
+   * cards and the map, and the server is the one place that turns them into
+   * sections. `document` is for a structure that was never saved as a note.
+   */
+  source_type?: string
+  source_id?: string
+  document?: { schema_version?: number; sections: Array<{ type: string; content: unknown }> }
+}
+
+export function createLesson(input: LessonCreateInput): Promise<Lesson> {
+  return apiRequest<unknown>("/lessons", { method: "POST", body: JSON.stringify(input) })
+    .then(normalizeLesson)
+}

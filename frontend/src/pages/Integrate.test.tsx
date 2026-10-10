@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Integrate from "./Integrate"
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   listIntegrateNotes: vi.fn(),
   getIntegrateNote: vi.fn(),
   listKnowledge: vi.fn(),
+  createLesson: vi.fn(),
 }))
 
 vi.mock("@/api/integrate", () => ({
@@ -17,6 +19,23 @@ vi.mock("@/api/integrate", () => ({
   getIntegrateNote: mocks.getIntegrateNote,
 }))
 vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge }))
+vi.mock("@/api/lessons", () => ({ createLesson: mocks.createLesson }))
+
+// 存成课程 navigates to the lesson it just made, so the page needs a router.
+function LocationProbe() {
+  return <p data-testid="location">{useLocation().pathname}</p>
+}
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={["/integrate"]}>
+      <Routes>
+        <Route path="/integrate" element={<Integrate />} />
+        <Route path="*" element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
 
 describe("Integrate page", () => {
   beforeEach(() => {
@@ -44,7 +63,7 @@ describe("Integrate page", () => {
   })
 
   it("generates a mindmap and cards from text", async () => {
-    render(<Integrate />)
+    renderPage()
 
     fireEvent.change(screen.getByLabelText("整合资料来源"), { target: { value: "速度描述快慢。加速度描述变化快慢。" } })
     fireEvent.click(screen.getByRole("button", { name: "生成导图与卡片" }))
@@ -57,7 +76,7 @@ describe("Integrate page", () => {
   })
 
   it("builds a map from the document's own structure, without asking a model", async () => {
-    render(<Integrate />)
+    renderPage()
 
     fireEvent.change(screen.getByLabelText("整合资料来源"), {
       target: { value: "# 运动学\n## 速度\n描述快慢。\n## 加速度" },
@@ -72,7 +91,7 @@ describe("Integrate page", () => {
   it("says which map came from the document rather than from a model", async () => {
     // The two paths produce the same kind of picture. Without a label, a map
     // a model invented is indistinguishable from one the document dictated.
-    render(<Integrate />)
+    renderPage()
 
     fireEvent.change(screen.getByLabelText("整合资料来源"), {
       target: { value: "# 运动学\n## 速度" },
@@ -83,7 +102,7 @@ describe("Integrate page", () => {
   })
 
   it("shows one map at a time, whichever was asked for last", async () => {
-    render(<Integrate />)
+    renderPage()
 
     fireEvent.change(screen.getByLabelText("整合资料来源"), {
       target: { value: "# 运动学\n## 速度" },
@@ -100,16 +119,63 @@ describe("Integrate page", () => {
   })
 
   it("has nothing to build a structure from until something is pasted", () => {
-    render(<Integrate />)
+    renderPage()
 
     expect(screen.getByRole("button", { name: /按结构生成/ })).toBeDisabled()
   })
 
   it("keeps the whiteboard research catalogue beside the integration workbench", () => {
-    render(<Integrate />)
+    renderPage()
 
     expect(screen.getByRole("heading", { name: "白板能力目录" })).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "进阶能力" }))
     expect(screen.getByText("知识图谱与路径回放")).toBeInTheDocument()
+  })
+
+  it("hands a saved note to 课程 as a reference, not as a document", async () => {
+    // The 课程 page tells an empty library to 去整合资料; this is the end of that
+    // sentence. The note already holds the cards and the map, and the server is
+    // the one place that decides how those become sections.
+    mocks.createLesson.mockResolvedValue({ id: "lesson-9", title: "运动学整合" })
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText("整合资料来源"), { target: { value: "速度描述快慢。" } })
+    fireEvent.click(screen.getByRole("button", { name: "生成导图与卡片" }))
+    await screen.findByRole("tree", { name: "导图：运动学整合" })
+
+    fireEvent.click(screen.getByRole("button", { name: "存成课程" }))
+
+    await waitFor(() =>
+      expect(mocks.createLesson).toHaveBeenCalledWith({
+        // The note's own subject, not the page's 综合: a 物理 note belongs to 物理.
+        subject: "physics",
+        title: "运动学整合",
+        source_type: "integrated_note",
+        source_id: "note-1",
+      }),
+    )
+    expect(await screen.findByTestId("location")).toHaveTextContent("/lessons/lesson-9")
+  })
+
+  it("sends the pasted structure itself when it was never saved as a note", async () => {
+    mocks.createLesson.mockResolvedValue({ id: "lesson-10", title: "运动学" })
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText("整合资料来源"), {
+      target: { value: "# 运动学\n## 速度\n描述快慢。" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /按结构生成/ }))
+    await screen.findByRole("tree", { name: "导图：运动学" })
+
+    fireEvent.click(screen.getByRole("button", { name: "存成课程" }))
+
+    await waitFor(() => expect(mocks.createLesson).toHaveBeenCalledWith(expect.objectContaining({
+      title: "运动学",
+      document: {
+        schema_version: 1,
+        sections: [{ type: "visualization", content: { markdown: "# 运动学\n## 速度\n描述快慢。" } }],
+      },
+    })))
+    expect(mocks.createLesson.mock.calls[0][0]).not.toHaveProperty("source_id")
   })
 })

@@ -27,6 +27,10 @@ export const SUBJECT_META: Record<string, SubjectMeta> = {
 }
 
 export function subjectName(id: string): string {
+  // 综合 is a choice -- every subject at once -- rather than one of the six, but
+  // it arrives at these pages as a stored value: a lesson made from a 综合 note
+  // has no subject of its own, and "all" is not a name to show a reader.
+  if (id === "all") return "综合"
   return SUBJECTS.find((subject) => subject.id === id)?.name ?? id
 }
 

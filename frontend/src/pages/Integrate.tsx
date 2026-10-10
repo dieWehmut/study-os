@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
-import { Copy, ListTree, Network, RefreshCw, Wand2 } from "lucide-react"
+import { Copy, GraduationCap, ListTree, Network, RefreshCw, Wand2 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 import { createIntegrate, getIntegrateNote, listIntegrateNotes, type IntegratedNote, type MindMap as MindMapData } from "@/api/integrate"
 import { listKnowledge } from "@/api/knowledge"
+import { createLesson } from "@/api/lessons"
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -41,8 +43,10 @@ export default function Integrate() {
   const [structure, setStructure] = useState<MindMapData | null>(null)
   const [history, setHistory] = useState<IntegratedNote[]>([])
   const [generating, setGenerating] = useState(false)
+  const [savingLesson, setSavingLesson] = useState(false)
   const [error, setError] = useState("")
   const [copied, setCopied] = useState(false)
+  const navigate = useNavigate()
 
   const refreshHistory = useCallback(() => {
     return listIntegrateNotes(subject === "all" ? "" : subject, 20)
@@ -128,6 +132,42 @@ export default function Integrate() {
     }
   }
 
+  /**
+   * Hand the result over to 课程.
+   *
+   * The 课程 page tells an empty library to 去整合资料, and this is the end of
+   * that sentence -- without it a lesson could only be created by talking to the
+   * API directly. A saved note is passed as a reference (the server knows how its
+   * cards and map become sections); a structure that was never saved travels as
+   * the document itself, with the pasted markdown as its 可视化.
+   */
+  async function saveAsLesson() {
+    if (savingLesson) return
+    if (!note && !structure) {
+      setError("先生成一次导图或卡片，再存成课程。")
+      return
+    }
+    setSavingLesson(true)
+    setError("")
+    try {
+      // The note's own subject first, then the page's: a 物理 note handed over
+      // while 综合 is selected still belongs to 物理, and "all" is not a subject
+      // a lesson can be filed under.
+      const lessonSubject = [note?.subject, subject].find((value) => value && value !== "all")
+      const lesson = await createLesson({
+        subject: lessonSubject,
+        title: note?.title || structure?.title || "未命名课程",
+        ...(note ? { source_type: "integrated_note", source_id: note.id } : {}),
+        ...(note ? {} : { document: { schema_version: 1, sections: [{ type: "visualization", content: { markdown: text.trim() } }] } }),
+      })
+      navigate(`/lessons/${encodeURIComponent(lesson.id)}`)
+    } catch {
+      setError("存成课程失败，请确认本地后端正在运行。")
+    } finally {
+      setSavingLesson(false)
+    }
+  }
+
   async function copyMermaid() {
     const map = structure ?? note?.mindmap
     if (!map) return
@@ -179,6 +219,11 @@ export default function Integrate() {
             <Button variant="outline" disabled={!text.trim()} onClick={buildFromStructure}>
               <ListTree data-icon="inline-start" />按结构生成（不调用 AI）
             </Button>
+            {note || structure ? (
+              <Button variant="outline" disabled={savingLesson} onClick={() => void saveAsLesson()}>
+                <GraduationCap data-icon="inline-start" />{savingLesson ? "保存中…" : "存成课程"}
+              </Button>
+            ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
             资料本身带 <code>#</code> 标题时优先用「按结构生成」：层级来自原文，每次结果一致，适合正式阅读前先看一遍。

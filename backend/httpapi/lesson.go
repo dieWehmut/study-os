@@ -66,9 +66,20 @@ func handleLessonCreate(response http.ResponseWriter, request *http.Request, app
 	if id == "" {
 		id = newRequestID("lesson")
 	}
+	sourceType := strings.TrimSpace(input.SourceType)
+	sourceID := strings.TrimSpace(input.SourceID)
 	document := models.NewLessonDocument()
 	if input.Document != nil {
 		document = *input.Document
+	} else if sourceType == "integrated_note" && sourceID != "" {
+		// A lesson made from an integrated note arrives as a reference, not as a
+		// document: the note already holds the cards and the map, and this is the
+		// one place that decides how they become sections. A note that has since
+		// been deleted leaves the empty template -- the lesson is still a usable
+		// draft, and the client sent no document to fall back on.
+		if note, err := application.Store.GetIntegratedNote(request.Context(), sourceID); err == nil {
+			document = lessonDocumentFromNote(note)
+		}
 	}
 	status := strings.TrimSpace(input.Status)
 	if status == "" {
@@ -76,7 +87,7 @@ func handleLessonCreate(response http.ResponseWriter, request *http.Request, app
 	}
 	lesson := models.Lesson{
 		ID: id, Subject: strings.TrimSpace(input.Subject), Title: strings.TrimSpace(input.Title),
-		SourceType: strings.TrimSpace(input.SourceType), SourceID: strings.TrimSpace(input.SourceID),
+		SourceType: sourceType, SourceID: sourceID,
 		Status: status, Document: document,
 	}
 	if err := application.Store.CreateLesson(request.Context(), lesson); err != nil {
