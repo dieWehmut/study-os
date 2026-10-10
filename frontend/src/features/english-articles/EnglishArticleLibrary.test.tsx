@@ -74,4 +74,27 @@ describe("EnglishArticleLibrary", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/无法加载英语时文/)
   })
+
+  it("asks for one row too many, and says so when the library is longer", async () => {
+    // The list answers a page rather than a total, so the extra row is the only
+    // way to tell "these are all of them" from "these are the newest hundred".
+    const items = Array.from({ length: 101 }, (_, index) => ({ id: `a-${index}`, title: `第 ${index} 篇` }))
+    mocks.listEnglishArticles.mockResolvedValue({ items, count: items.length })
+
+    renderLibrary()
+
+    expect(await screen.findByText(/显示最近 100 篇/)).toBeInTheDocument()
+    expect(screen.getByText(/更早的时文还在库里/)).toBeInTheDocument()
+    // The hundred-and-first row was only there to be counted.
+    expect(screen.queryByRole("link", { name: /第 100 篇/ })).not.toBeInTheDocument()
+    expect(mocks.listEnglishArticles).toHaveBeenCalledWith({ limit: 101 })
+  })
+
+  it("claims the whole library only when it really has it", async () => {
+    mocks.listEnglishArticles.mockResolvedValue({ items: [{ id: "a-1", title: "唯一一篇" }], count: 1 })
+
+    renderLibrary()
+
+    expect(await screen.findByText(/共 1 篇/)).toBeInTheDocument()
+  })
 })

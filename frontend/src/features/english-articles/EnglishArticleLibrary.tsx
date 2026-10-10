@@ -11,6 +11,9 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { failureMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 
+/** How many articles the library shows before it has to admit there are more. */
+const englishArticlePageSize = 100
+
 function displayDate(value?: string): string {
   if (!value) return "日期未填写"
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
@@ -29,16 +32,25 @@ function byline(article: EnglishArticle): string {
 
 export default function EnglishArticleLibrary() {
   const [articles, setArticles] = useState<EnglishArticle[]>([])
+  // The list answers a page, not a total, so the only way to know there is more
+  // is to ask for one row too many. A silently short library reads as "these are
+  // all of them", which is the one thing it must not say.
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [deletingID, setDeletingID] = useState("")
+
+  function applyPage(items: EnglishArticle[]) {
+    setArticles(items.slice(0, englishArticlePageSize))
+    setHasMore(items.length > englishArticlePageSize)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      const response = await listEnglishArticles({ limit: 100 })
-      setArticles(response.items)
+      const response = await listEnglishArticles({ limit: englishArticlePageSize + 1 })
+      applyPage(response.items)
     } catch (reason) {
       setError(failureMessage(reason, "无法加载英语时文"))
     } finally {
@@ -48,9 +60,9 @@ export default function EnglishArticleLibrary() {
 
   useEffect(() => {
     let active = true
-    listEnglishArticles({ limit: 100 })
+    listEnglishArticles({ limit: englishArticlePageSize + 1 })
       .then((response) => {
-        if (active) setArticles(response.items)
+        if (active) applyPage(response.items)
       })
       .catch((reason) => {
         if (active) setError(failureMessage(reason, "无法加载英语时文"))
@@ -88,8 +100,12 @@ export default function EnglishArticleLibrary() {
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {articles.length > 0 ? `共 ${articles.length} 篇 · 最近更新在前` : "从一篇原始英文开始建立精读材料"}
+        <p className="text-sm text-muted-foreground" data-article-summary="true">
+          {articles.length > 0
+            ? hasMore
+              ? `显示最近 ${articles.length} 篇 · 更早的时文还在库里，暂时只能从这里删掉它们`
+              : `共 ${articles.length} 篇 · 最近更新在前`
+            : "从一篇原始英文开始建立精读材料"}
         </p>
         {articles.length > 0 ? (
           <Link className={buttonVariants()} to="/reading/articles/new">
