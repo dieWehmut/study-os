@@ -92,8 +92,13 @@ describe("EnglishArticleDetail", () => {
 
     fireEvent.click(screen.getByRole("link", { name: /The Turn/ }))
 
-    expect(screen.getByTestId("location")).toHaveTextContent("/reading/articles/article-1#section-2-the-turn")
-    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled()
+    // Both of these land after the router has taken the click: asserted through
+    // waitFor rather than straight after it, which is what made this the one test
+    // in the suite that failed under load and passed on its own.
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent("/reading/articles/article-1#section-2-the-turn"),
+    )
+    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled())
   })
 
   it("exports the article root while ignoring the toolbar", async () => {
