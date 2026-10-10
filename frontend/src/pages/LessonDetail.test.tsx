@@ -361,4 +361,27 @@ describe("lesson detail page", () => {
     expect(input.document.sections[0].body).toBe("旧版的一句话")
     expect(await screen.findByRole("status")).toHaveTextContent("已恢复第 1 版 · 现在是版本 4")
   })
+
+  it("warns before a reload throws unsaved edits away", async () => {
+    mocks.getLesson.mockResolvedValue({ ...lesson, version: 3 })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    // Nothing typed yet: leaving is free, so nothing should stop the reader.
+    const clean = new Event("beforeunload", { cancelable: true })
+    window.dispatchEvent(clean)
+    expect(clean.defaultPrevented).toBe(false)
+
+    fireEvent.change(screen.getByLabelText("核心概念内容"), { target: { value: "改了一半" } })
+    expect(screen.getByText("有未保存的改动")).toBeInTheDocument()
+    const dirty = new Event("beforeunload", { cancelable: true })
+    window.dispatchEvent(dirty)
+    expect(dirty.defaultPrevented).toBe(true)
+
+    // 取消 is how a reader abandons edits on purpose; after that the warning goes.
+    fireEvent.click(screen.getByRole("button", { name: "放弃改动" }))
+    const afterwards = new Event("beforeunload", { cancelable: true })
+    window.dispatchEvent(afterwards)
+    expect(afterwards.defaultPrevented).toBe(false)
+  })
 })

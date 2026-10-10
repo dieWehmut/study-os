@@ -338,6 +338,39 @@ export default function LessonDetail() {
     }
   }
 
+  /**
+   * Is anything on the page different from what was loaded?
+   *
+   * Written inline so the hook's dependencies are the state it actually reads;
+   * a named helper would have to be listed as a dependency instead.
+   */
+  const dirty = useMemo(() => {
+    if (!lesson) return false
+    return lesson.sections.some((section) =>
+      drafts[section.id] !== undefined && drafts[section.id] !== sectionEditorText(section))
+      || draftTitle.trim() !== lesson.title
+      || draftStatus !== lesson.status
+      || draftSubject !== (lesson.subject === "all" ? "" : lesson.subject)
+  }, [lesson, drafts, draftTitle, draftStatus, draftSubject])
+
+  /**
+   * Warn before a reload or a closed tab throws the edits away.
+   *
+   * Only the browser's own exit, not in-app navigation: this shell has no route
+   * blocker, and a homemade dialog covering every link would be worse than the
+   * problem. The 取消 button is where a reader abandons edits deliberately.
+   */
+  useEffect(() => {
+    if (!editing || !dirty) return
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      // Chrome needs returnValue set; the string itself is not shown.
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [editing, dirty])
+
   useEffect(() => {
     let active = true
     async function loadLesson() {
@@ -419,8 +452,11 @@ export default function LessonDetail() {
             ) : null}
             {editing ? (
               <>
+                {dirty ? <span className="text-xs text-muted-foreground">有未保存的改动</span> : null}
                 <Button size="sm" disabled={saving} onClick={() => void saveEdits()}>{saving ? "保存中…" : "保存"}</Button>
-                <Button size="sm" variant="outline" disabled={saving} onClick={cancelEditing}>取消</Button>
+                <Button size="sm" variant="outline" disabled={saving} onClick={cancelEditing}>
+                  {dirty ? "放弃改动" : "取消"}
+                </Button>
               </>
             ) : previewVersion === null ? (
               <Button size="sm" variant="outline" onClick={startEditing}>
