@@ -111,6 +111,17 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
     setAudioSource(await playPronunciation(current.prompt.question))
   }
 
+  // A second pass over the cards that did not land. The refused ones are asked
+  // again as a fresh round: the tally starts over, so what it reports afterwards
+  // is the retry, not the original round.
+  function redoMissed(items: DueReview[]) {
+    if (items.length === 0) return
+    setError("")
+    setOutcomes({})
+    setQueue(items)
+    setIndex(0)
+  }
+
   if (loading) {
     return <p className="py-16 text-center text-sm text-muted-foreground">正在整理今天的复习队列…</p>
   }
@@ -152,6 +163,13 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
       partial: verdicts.filter((outcome) => outcome === "partial").length,
       incorrect: verdicts.filter((outcome) => outcome === "incorrect").length,
     }
+    // The cards this round did not land. Re-asking them right here is the whole
+    // point of noticing: the schedule pushes them out by days, and by then the
+    // wrong answer is all that is remembered.
+    const toRedo = queue.filter((item) => {
+      const outcome = outcomes[item.prompt.id]
+      return outcome === "incorrect" || outcome === "partial"
+    })
     return (
       <Card className="mx-auto w-full max-w-2xl">
         <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
@@ -174,6 +192,11 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
               新导入或新学的知识会自动进入这里；还没排复习的知识点不会自己进来。
             </p>
           </div>
+          {toRedo.length > 0 ? (
+            <Button onClick={() => redoMissed(toRedo)}>
+              再练这 {toRedo.length} 张
+            </Button>
+          ) : null}
           {/* Finishing today's cards is the moment the gap is visible: an item
               carrying no cards can never surface here, so point at the ones
               that are not in the plan at all instead of stopping at "done". */}

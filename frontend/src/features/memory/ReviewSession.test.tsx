@@ -292,4 +292,45 @@ describe("ReviewSession", () => {
     expect(tally).toHaveTextContent("这一轮做了 1 张：正确 1")
     expect(tally).not.toHaveTextContent("需要重学")
   })
+
+  it("offers the missed cards again, as a fresh round", async () => {
+    // The schedule pushes a missed card out by days, and by then the wrong answer
+    // is what is remembered -- so the moment to redo it is right here.
+    mocks.submitSelfRating.mockResolvedValueOnce({
+      attempt_id: "a9",
+      outcome: "incorrect",
+      rating: 1,
+      expected_answers: ["放弃；抛弃"],
+    })
+    renderSession()
+
+    fireEvent.click(await screen.findByRole("button", { name: "不认识" }))
+    await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalled())
+    fireEvent.click(await screen.findByRole("button", { name: "下一题" }))
+
+    const redo = await screen.findByRole("button", { name: "再练这 1 张" })
+    fireEvent.click(redo)
+
+    // The card is back, and the round's tally started over rather than doubling.
+    expect(await screen.findByRole("button", { name: "认识" })).toBeInTheDocument()
+    expect(screen.queryByText(/这一轮做了/)).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /再练这/ })).not.toBeInTheDocument()
+  })
+
+  it("does not offer a redo when every card landed", async () => {
+    mocks.submitSelfRating.mockResolvedValueOnce({
+      attempt_id: "a1",
+      outcome: "correct",
+      rating: 3,
+      expected_answers: ["abandon"],
+    })
+    renderSession()
+
+    fireEvent.click(await screen.findByRole("button", { name: "认识" }))
+    await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole("button", { name: "下一题" }))
+
+    expect(await screen.findByText(/这一轮做了/)).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /再练这/ })).not.toBeInTheDocument()
+  })
 })
