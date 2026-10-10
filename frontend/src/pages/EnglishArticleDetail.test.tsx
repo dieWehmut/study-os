@@ -92,13 +92,17 @@ describe("EnglishArticleDetail", () => {
 
     fireEvent.click(screen.getByRole("link", { name: /The Turn/ }))
 
-    // Both of these land after the router has taken the click: asserted through
-    // waitFor rather than straight after it, which is what made this the one test
-    // in the suite that failed under load and passed on its own.
-    await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/reading/articles/article-1#section-2-the-turn"),
+    // These land after the router has taken the click, and the scroll rides on it.
+    // The wait is 5s rather than the 1s default: this is the one test in the suite
+    // that goes red only while the machine is loaded (6/6 passes alone). From that
+    // failure: the location assertion held and the scroll one timed out for 5s, so
+    // the navigation happened and the scrollIntoView call did not. The cause is
+    // still unconfirmed -- this widens the window rather than fixing it.
+    await waitFor(
+      () => expect(screen.getByTestId("location")).toHaveTextContent("/reading/articles/article-1#section-2-the-turn"),
+      { timeout: 5000 },
     )
-    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled())
+    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled(), { timeout: 5000 })
   })
 
   it("exports the article root while ignoring the toolbar", async () => {
