@@ -153,8 +153,19 @@ export async function apiRequestBlob(path: string): Promise<{ blob: Blob; filena
   if (token) headers.set("Authorization", `Bearer ${token}`)
   const response = await fetch(`${baseUrl}${path.startsWith("/") ? path : `/${path}`}`, { headers })
   if (!response.ok) {
-    const detail = (await response.text()).trim()
-    throw new ApiError(response.status, detail || `下载失败（${response.status}）`)
+    // The same envelope `apiRequest` unwraps: without this the reader is shown
+    // `{"error":"备份文件已经不在了…"}` instead of the sentence inside it.
+    const text = (await response.text()).trim()
+    let message = text || `下载失败（${response.status}）`
+    try {
+      const payload: unknown = JSON.parse(text)
+      if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string" && payload.error.trim()) {
+        message = payload.error
+      }
+    } catch {
+      // Not JSON: whatever the server said is the message.
+    }
+    throw new ApiError(response.status, message)
   }
   return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get("Content-Disposition")) }
 }

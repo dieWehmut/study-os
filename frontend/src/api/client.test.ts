@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { apiRequest, resolveApiBase, resolveApiConfig } from "./client"
+import { apiRequest, apiRequestBlob, filenameFromDisposition, resolveApiBase, resolveApiConfig } from "./client"
 
 describe("resolveApiBase", () => {
   const originalBridge = window.__STUDY_OS_API_BASE__
@@ -128,6 +128,67 @@ describe("resolveApiBase", () => {
     await expect(apiRequest("/chat/records/missing-session")).rejects.toMatchObject({
       name: "ApiError",
       status: 404,
+    })
+  })
+})
+
+describe("filenameFromDisposition", () => {
+  it("reads the plain quoted name the server sends", () => {
+    // The backup download names the reader's file from here: a parser that
+    // missed it would hand them "study-os-backup.db" for every backup.
+    expect(filenameFromDisposition('attachment; filename="study-daily-20261010-000001.db"')).toBe(
+      "study-daily-20261010-000001.db",
+    )
+  })
+
+  it("reads the encoded form too", () => {
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''%E9%94%99%E9%A2%98.csv")).toBe("错题.csv")
+  })
+
+  it("answers with nothing rather than throwing on what it cannot read", () => {
+    // A missing header, a bare attachment, and a broken escape all leave the
+    // caller to pick its own name instead of failing the download.
+    expect(filenameFromDisposition(null)).toBe("")
+    expect(filenameFromDisposition("attachment")).toBe("")
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''%ZZ")).toBe("%ZZ")
+  })
+})
+
+describe("apiRequestBlob", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it("brings back the bytes and the server's filename", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response("SQLite format 3\u0000", {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.sqlite3",
+          "Content-Disposition": 'attachment; filename="study-daily.db"',
+        },
+      }),
+    )
+
+    const { blob, filename } = await apiRequestBlob("/backups/b-1/download")
+
+    expect(filename).toBe("study-daily.db")
+    expect(blob.size).toBeGreaterThan(0)
+  })
+
+  it("turns a refusal into the same error contract the JSON calls use", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "备份文件已经不在了，列表会在下次刷新时更新" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      }),
+    )
+
+    await expect(apiRequestBlob("/backups/b-1/download")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 404,
+      message: "备份文件已经不在了，列表会在下次刷新时更新",
     })
   })
 })
