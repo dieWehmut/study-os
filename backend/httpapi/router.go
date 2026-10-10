@@ -384,12 +384,19 @@ func handleImportUpload(response http.ResponseWriter, request *http.Request, app
 	}
 	request.Body = http.MaxBytesReader(response, request.Body, importer.MaxImportBytes+(1<<20))
 	if err := request.ParseMultipartForm(importer.MaxImportBytes + (1 << 20)); err != nil {
-		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "invalid multipart upload"})
+		// Same as the chat attachment: an oversized body is cut before any size
+		// check can run, so it has to be named here.
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": "导入文件超过 25 MiB 上限"})
+			return
+		}
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "无效的文件上传"})
 		return
 	}
 	file, header, err := request.FormFile("file")
 	if err != nil {
-		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "multipart file field is required"})
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "上传表单里缺少文件字段"})
 		return
 	}
 	defer file.Close()

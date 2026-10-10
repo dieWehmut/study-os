@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ArrowUp, MessageSquarePlus, Paperclip, Sparkles } from "lucide-react"
 
+import { ApiError } from "@/api/client"
 import {
   getQARecord,
   listChatConversations,
@@ -613,8 +614,12 @@ export default function Chat() {
     try {
       const result = await uploadChatAttachment(file)
       setAttachments((current) => [...current, result])
-    } catch {
-      setError("附件上传失败，请确认文件不超过 5MB。")
+    } catch (reason) {
+      // The server knows why it refused (too large, storage failed) and says so
+      // in the reader's language for 4xx. Guessing "请确认文件不超过 5MB" told
+      // someone whose disk was full to check the size of their file.
+      const detail = reason instanceof ApiError && reason.status >= 400 && reason.status < 500 ? reason.message : ""
+      setError(detail ? `附件上传失败：${detail}` : "附件上传失败，请确认本地后端正在运行。")
     } finally {
       setUploading(false)
     }
@@ -865,6 +870,12 @@ export default function Chat() {
                 </Button>
               </div>
             </div>
+            {/* The rule before the attempt: the upload button had no accept list
+                and the failure copy guessed, so the limit was only ever learned
+                by being refused. */}
+            <p className="text-xs text-muted-foreground">
+              附件单个不超过 5MB：文本附件会把内容读进提问，其它格式只保存原文件。
+            </p>
           </div>
         </div>
       </div>

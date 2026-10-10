@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { QARecord } from "@/api/chat"
+import { ApiError } from "@/api/client"
 import Chat from "./Chat"
 import { putAskDraft } from "@/lib/ask-draft"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -209,6 +210,23 @@ describe("Chat page", () => {
 
     await waitFor(() => expect(mocks.uploadChatAttachment).toHaveBeenCalled())
     expect(await screen.findByText("notes.txt")).toBeInTheDocument()
+  })
+
+  it("says why the server refused an attachment instead of guessing the size", async () => {
+    // The old copy told everyone to check the size of their file; the server knows
+    // whether that was the reason.
+    mocks.uploadChatAttachment.mockRejectedValue(new ApiError(400, "附件不能超过 5MB"))
+    render(<Chat />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(["hello"], "big.zip")] } })
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("附件上传失败：附件不能超过 5MB")
+  })
+
+  it("states the attachment rule before the reader has to be refused by it", () => {
+    render(<Chat />)
+
+    expect(screen.getByText(/附件单个不超过 5MB/)).toBeInTheDocument()
   })
 
   it("keeps upload and send controls inside the composer bottom-right action area", () => {

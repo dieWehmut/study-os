@@ -66,6 +66,11 @@ func inspectCSV(ctx context.Context, path string) (Inspection, error) {
 	defer file.Close()
 	reader := csv.NewReader(file)
 	headers, err := reader.Read()
+	if errors.Is(err, io.EOF) {
+		// An empty file is a reader's mistake, not ours: say which file and what
+		// is missing, rather than answering with the generic failure.
+		return Inspection{}, inputError("CSV 文件是空的：第一行需要是表头（term,definition）。")
+	}
 	if err != nil {
 		return Inspection{}, fmt.Errorf("read csv header: %w", err)
 	}

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -187,6 +188,14 @@ func handleChatAttachmentUpload(response http.ResponseWriter, request *http.Requ
 	}
 	request.Body = http.MaxBytesReader(response, request.Body, maxChatAttachmentBytes+(1<<20))
 	if err := request.ParseMultipartForm(maxChatAttachmentBytes + (1 << 20)); err != nil {
+		// The body reader cuts an oversized upload before the size check below can
+		// see it, so the reader was told "无效的文件上传" for a file that is simply
+		// too big. Say the rule that was broken.
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": "附件不能超过 5MB"})
+			return
+		}
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "无效的文件上传"})
 		return
 	}
