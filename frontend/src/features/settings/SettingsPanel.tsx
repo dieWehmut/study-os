@@ -991,9 +991,14 @@ export default function SettingsPanel() {
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <div className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary"><HardDrive aria-hidden="true" /></div>
-              <Button variant="outline" size="sm" disabled={isBackingUp} onClick={() => void createDailyBackup()}>
-                <Download data-icon="inline-start" />{isBackingUp ? "备份中…" : "立即备份"}
-              </Button>
+              {/* Writing a backup is a server-side file operation, and the Pages
+                  build has no server: offering it there would only produce an
+                  error, so the card stands on its own. */}
+              {isStaticDemo() ? null : (
+                <Button variant="outline" size="sm" disabled={isBackingUp} onClick={() => void createDailyBackup()}>
+                  <Download data-icon="inline-start" />{isBackingUp ? "备份中…" : "立即备份"}
+                </Button>
+              )}
             </div>
             <CardTitle>备份记录</CardTitle>
             <CardDescription>{status.backup.count} 份记录 · 最近：{formatDate(status.backup.last_created_at)}</CardDescription>

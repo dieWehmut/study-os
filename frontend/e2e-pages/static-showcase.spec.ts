@@ -78,6 +78,16 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   await expect(page.getByRole("listitem").first()).toBeVisible()
   await expect(page.getByRole("button", { name: "\u5bfc\u51fa CSV" })).toHaveCount(0)
 
+  // Every backup action needs the local database, so none of them is offered here
+  // -- including 立即备份, which the header renders whenever the page does. The row
+  // buttons below it are vacuous in this build (the demo keeps no backup records),
+  // so they are asserted only to catch a future fixture that adds one.
+  await page.goto("#/settings")
+  await expect(page.locator("main")).toContainText("\u5907\u4efd\u8bb0\u5f55")
+  await expect(page.getByRole("button", { name: "\u7acb\u5373\u5907\u4efd" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "\u6821\u9a8c" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "\u4e0b\u8f7d", exact: true })).toHaveCount(0)
+
   // The course export is pure client-side, so it works here too.
   await page.goto("#/lessons/lesson-newton")
   await expect(page.locator("main")).toContainText("\u725b\u987f\u7b2c\u4e8c\u5b9a\u5f8b\uff1a\u4ece\u53d7\u529b\u56fe\u5f00\u59cb")
