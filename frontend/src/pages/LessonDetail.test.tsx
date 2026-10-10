@@ -493,4 +493,33 @@ describe("lesson detail page", () => {
     expect(screen.getByLabelText("核心概念内容")).toHaveValue("F = ma")
     expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument()
   })
+
+  it("hands the course over as a Markdown file", async () => {
+    // A lesson is a document; 阅读 reads Markdown, so this can be read back in.
+    const downloads: string[] = []
+    const originalClick = HTMLAnchorElement.prototype.click
+    const originalCreate = URL.createObjectURL
+    const originalRevoke = URL.revokeObjectURL
+    let exported = ""
+    HTMLAnchorElement.prototype.click = function click(this: HTMLAnchorElement) {
+      downloads.push(this.download)
+    }
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      exported = blob.type
+      return "blob:lesson"
+    }) as unknown as typeof URL.createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    try {
+      renderPage()
+      fireEvent.click(await screen.findByRole("button", { name: "导出 Markdown" }))
+
+      expect(downloads[0]).toMatch(/\.md$/)
+      expect(exported).toContain("text/markdown")
+      await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:lesson"))
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick
+      URL.createObjectURL = originalCreate
+      URL.revokeObjectURL = originalRevoke
+    }
+  })
 })

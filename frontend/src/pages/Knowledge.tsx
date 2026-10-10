@@ -15,18 +15,9 @@ import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
 import { insightTagsFor } from "@/lib/insights"
 import { isStaticDemo } from "@/lib/runtime"
+import { saveTextFile } from "@/lib/download"
 import { useSubjectStore } from "@/store/useSubjectStore"
 import { failureMessage } from "@/lib/errors"
-
-/** Hand the reader a file rather than a tab full of text. */
-function saveTextFile(text: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }))
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
-}
 
 /** Only the two values the server accepts; anything else means "either". */
 function scheduledFromSearch(value: string | null): "" | "yes" | "no" {
@@ -275,7 +266,7 @@ function KnowledgePage({
         tag: tag || undefined,
         scheduled: scheduled || undefined,
       })
-      saveTextFile(text, `study-os-知识库-${new Date().toISOString().slice(0, 10)}.csv`)
+      saveTextFile(text, `study-os-知识库-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8")
     } catch (reason) {
       setExportError(failureMessage(reason, "导出失败"))
     } finally {

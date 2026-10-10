@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, BookOpenCheck, CheckCircle2, CircleHelp, Clock3, FileText, History, Pencil, RotateCcw } from "lucide-react"
+import { ArrowLeft, BookOpenCheck, CheckCircle2, CircleHelp, Clock3, Download, FileText, History, Pencil, RotateCcw } from "lucide-react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 
 import {
@@ -12,6 +12,8 @@ import {
   type LessonVersionSummary,
 } from "@/api/lessons"
 import { ApiError } from "@/api/client"
+import { saveTextFile } from "@/lib/download"
+import { lessonToMarkdown } from "@/lib/lesson-markdown"
 import { failureMessage } from "@/lib/errors"
 import { Badge } from "@/components/ui/badge"
 import LessonPractice from "@/components/lessons/LessonPractice"
@@ -411,6 +413,13 @@ export default function LessonDetail() {
     setEditing(true)
   }
 
+  /** The lesson as a Markdown document, named the way the file should arrive. */
+  function downloadMarkdown() {
+    if (!lesson) return
+    const name = (lesson.title.trim() || "未命名课程").replace(/[\\/:*?"<>|]/g, "-")
+    saveTextFile(lessonToMarkdown(lesson), `${name}.md`, "text/markdown;charset=utf-8")
+  }
+
   function cancelEditing() {
     setEditing(false)
     setDrafts({})
@@ -625,6 +634,12 @@ export default function LessonDetail() {
             </>
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* A lesson is a document and this is the only way one leaves the app:
+                the reading page reads Markdown, so what is exported can be read
+                back in -- and printed or filed anywhere else. */}
+            <Button size="sm" variant="ghost" onClick={() => downloadMarkdown()}>
+              <Download data-icon="inline-start" />导出 Markdown
+            </Button>
             {lesson.version ? (
               <Button size="sm" variant="ghost" onClick={() => void openHistory()}>
                 <History data-icon="inline-start" />版本历史
