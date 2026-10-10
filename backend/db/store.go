@@ -179,6 +179,49 @@ func updateKnowledgeItem(ctx context.Context, database queryer, item models.Know
 	return requireChanged(result, "knowledge item")
 }
 
+/**
+ * The WHERE every read of the library shares.
+ *
+ * Factored so a page and its total can never be about different sets: the count
+ * below builds the same predicate as the list, from the same options. The
+ * response used to report `len(items)` as `count`, which every caller reads as
+ * "how many there are" -- so a library of 140 called itself 100.
+ */
+func knowledgeFilter(options models.KnowledgeListOptions) (string, []any) {
+	where := make([]string, 0, 4)
+	arguments := make([]any, 0, 6)
+	if strings.TrimSpace(options.Query) != "" {
+		where = append(where, `(term LIKE ? ESCAPE '\' OR concise_definition LIKE ? ESCAPE '\')`)
+		pattern := "%" + escapeLike(strings.TrimSpace(options.Query)) + "%"
+		arguments = append(arguments, pattern, pattern)
+	}
+	if subject := strings.ToLower(strings.TrimSpace(options.Subject)); subject != "" {
+		where = append(where, `subject = ?`)
+		arguments = append(arguments, subject)
+	}
+	if tag := strings.TrimSpace(options.Tag); tag != "" {
+		where = append(where, `tags_json LIKE ? ESCAPE '\'`)
+		arguments = append(arguments, `%"`+escapeLike(tag)+`"%`)
+	}
+	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {
+		where = append(where, predicate)
+	}
+	if len(where) == 0 {
+		return "", nil
+	}
+	return ` WHERE ` + strings.Join(where, " AND "), arguments
+}
+
+// CountKnowledgeItems answers how many match, not how many fit on a page.
+func (s *Store) CountKnowledgeItems(ctx context.Context, options models.KnowledgeListOptions) (int, error) {
+	clause, arguments := knowledgeFilter(options)
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM knowledge_items`+clause, arguments...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count knowledge items: %w", err)
+	}
+	return total, nil
+}
+
 func (s *Store) ListKnowledgeItems(ctx context.Context, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
 	limit := options.Limit
 	if limit <= 0 || limit > 500 {
@@ -188,31 +231,8 @@ func (s *Store) ListKnowledgeItems(ctx context.Context, options models.Knowledge
 	if offset < 0 {
 		offset = 0
 	}
-	query := knowledgeSelect
-	arguments := make([]any, 0, 6)
-	subject := strings.ToLower(strings.TrimSpace(options.Subject))
-	tag := strings.TrimSpace(options.Tag)
-	where := make([]string, 0, 3)
-	if strings.TrimSpace(options.Query) != "" {
-		where = append(where, `(term LIKE ? ESCAPE '\' OR concise_definition LIKE ? ESCAPE '\')`)
-		pattern := "%" + escapeLike(strings.TrimSpace(options.Query)) + "%"
-		arguments = append(arguments, pattern, pattern)
-	}
-	if subject != "" {
-		where = append(where, `subject = ?`)
-		arguments = append(arguments, subject)
-	}
-	if tag != "" {
-		where = append(where, `tags_json LIKE ? ESCAPE '\'`)
-		arguments = append(arguments, `%"`+escapeLike(tag)+`"%`)
-	}
-	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {
-		where = append(where, predicate)
-	}
-	if len(where) > 0 {
-		query += ` WHERE ` + strings.Join(where, " AND ")
-	}
-	query += ` ORDER BY updated_at DESC, id ASC LIMIT ? OFFSET ?`
+	clause, arguments := knowledgeFilter(options)
+	query := knowledgeSelect + clause + ` ORDER BY updated_at DESC, id ASC LIMIT ? OFFSET ?`
 	arguments = append(arguments, limit, offset)
 	rows, err := s.db.QueryContext(ctx, query, arguments...)
 	if err != nil {

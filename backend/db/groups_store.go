@@ -115,6 +115,24 @@ func (s *TxStore) LinkKnowledgeItemsToGroup(ctx context.Context, itemIDs []strin
 // ListItemsByGroup returns a group's items, optionally narrowed by the same
 // review-queue filter the plain list understands. A group and a filter that
 // could not compose would let the page show rows it said it had hidden.
+// CountItemsByGroup answers how many the group holds, not how many fit on a
+// page -- the same distinction the whole-library count makes.
+func (s *Store) CountItemsByGroup(ctx context.Context, groupID string, options models.KnowledgeListOptions) (int, error) {
+	where := `WHERE ig.group_id = ?`
+	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {
+		where += ` AND ` + predicate
+	}
+	var total int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM knowledge_items
+		JOIN knowledge_item_groups AS ig ON ig.knowledge_item_id = knowledge_items.id
+		`+where, groupID).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 func (s *Store) ListItemsByGroup(ctx context.Context, groupID string, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
 	where := `WHERE ig.group_id = ?`
 	if predicate := scheduledPredicate(options.Scheduled, "knowledge_items"); predicate != "" {

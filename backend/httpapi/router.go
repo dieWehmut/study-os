@@ -477,15 +477,25 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		return
 	}
 	var items []models.KnowledgeItem
+	var total int
 	var err error
 	if groupID := strings.TrimSpace(request.URL.Query().Get("group")); groupID != "" {
-		items, err = application.Store.ListItemsByGroup(request.Context(), groupID,
-			models.KnowledgeListOptions{Scheduled: scheduledFilter, Limit: limit, Offset: offset})
+		groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Limit: limit, Offset: offset}
+		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, groupOptions)
+		if err == nil {
+			total, err = application.Store.CountItemsByGroup(request.Context(), groupID, groupOptions)
+		}
 	} else {
-		items, err = application.Store.ListKnowledgeItems(request.Context(), models.KnowledgeListOptions{
+		options := models.KnowledgeListOptions{
 			Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"),
 			Tag: request.URL.Query().Get("tag"), Scheduled: scheduledFilter, Limit: limit, Offset: offset,
-		})
+		}
+		items, err = application.Store.ListKnowledgeItems(request.Context(), options)
+		if err == nil {
+			// The total, not the page: the page says how many there are, and it is
+			// what tells a caller whether there is a next page to ask for.
+			total, err = application.Store.CountKnowledgeItems(request.Context(), options)
+		}
 	}
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -513,7 +523,7 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		}
 	}
 	writeJSON(response, http.StatusOK, map[string]any{
-		"items": items, "count": len(items), "scheduled_ids": scheduledIDs,
+		"items": items, "count": total, "scheduled_ids": scheduledIDs,
 	})
 }
 
