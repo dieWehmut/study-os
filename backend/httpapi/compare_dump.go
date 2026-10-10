@@ -33,7 +33,7 @@ func handleCompare(response http.ResponseWriter, request *http.Request, applicat
 	}
 	provider, err := providerFor(application)
 	if err != nil {
-		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "AI 服务商未配置"})
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": aiFailureMessage("AI 服务商未配置", err)})
 		return
 	}
 	generated, err := provider.Generate(request.Context(), agent.Request{
@@ -45,7 +45,7 @@ func handleCompare(response http.ResponseWriter, request *http.Request, applicat
 		},
 	})
 	if err != nil || generated.Compare == nil {
-		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "对比生成失败"})
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": aiFailureMessage("对比生成失败", err)})
 		return
 	}
 	writeJSON(response, http.StatusOK, generated.Compare)

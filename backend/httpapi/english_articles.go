@@ -62,7 +62,7 @@ func handleEnglishArticleGenerate(response http.ResponseWriter, request *http.Re
 	}
 	provider, err := providerFor(application)
 	if err != nil {
-		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "AI provider is not configured"})
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": aiFailureMessage("AI 服务商未配置", err)})
 		return
 	}
 	preview, err := english.NewArticleService(provider).GeneratePreview(request.Context(), input)
@@ -171,7 +171,7 @@ func handleEnglishArticleRegenerate(response http.ResponseWriter, request *http.
 	}
 	provider, err := providerFor(application)
 	if err != nil {
-		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "AI provider is not configured"})
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": aiFailureMessage("AI 服务商未配置", err)})
 		return
 	}
 	preview, err := english.NewArticleService(provider).GeneratePreview(request.Context(), agent.EnglishArticleInput{
@@ -277,6 +277,10 @@ func writeEnglishArticleError(response http.ResponseWriter, err error, badReques
 	}
 	if badRequest {
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if agent.ErrorClassOf(err) == agent.ErrorConfigMissing {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": aiFailureMessage("生成失败", err)})
 		return
 	}
 	if agent.ErrorClassOf(err) == agent.ErrorPermanent {

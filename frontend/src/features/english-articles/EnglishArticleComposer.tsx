@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { failureMessage } from "@/lib/errors"
 
 interface EnglishArticleComposerProps {
   onSaved?: (article: EnglishArticle) => void
@@ -86,8 +87,10 @@ export default function EnglishArticleComposer({ onSaved, renderPreview }: Engli
     try {
       const generated = await generateEnglishArticle(input)
       if (version === inputVersion.current) setPreview(generated)
-    } catch {
-      setError("生成失败。已保留全部原文和来源信息，请检查 AI 设置后重试。")
+    } catch (reason) {
+      // The draft stays in the form, so the note that nothing was lost is visible;
+      // what went wrong comes from the server.
+      setError(failureMessage(reason, "生成失败"))
     } finally {
       setGenerating(false)
     }
@@ -193,3 +196,4 @@ export default function EnglishArticleComposer({ onSaved, renderPreview }: Engli
     </div>
   )
 }
+

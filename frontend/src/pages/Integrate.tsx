@@ -91,8 +91,8 @@ export default function Integrate() {
       setNote(result)
       setStructure(null)
       await refreshHistory()
-    } catch {
-      setError("整合生成失败，请确认 AI 服务已配置或稍后重试。")
+    } catch (reason) {
+      setError(failureMessage(reason, "整合生成失败"))
     } finally {
       setGenerating(false)
     }

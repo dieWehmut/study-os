@@ -60,7 +60,7 @@ func handleIntegrateCreate(response http.ResponseWriter, request *http.Request, 
 	}
 	provider, err := providerFor(application)
 	if err != nil {
-		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "AI 服务商未配置"})
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": aiFailureMessage("AI 服务商未配置", err)})
 		return
 	}
 	generated, err := provider.Generate(request.Context(), agent.Request{
@@ -73,7 +73,7 @@ func handleIntegrateCreate(response http.ResponseWriter, request *http.Request, 
 		},
 	})
 	if err != nil || generated.Integrate == nil {
-		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "整合生成失败"})
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": aiFailureMessage("整合生成失败", err)})
 		return
 	}
 	mindmapJSON, _ := json.Marshal(generated.Integrate.Map)
