@@ -16,7 +16,7 @@ import { useMemo } from "react"
 
 import { readCard } from "@/lib/card-blocks"
 import { layoutCard } from "@/lib/card-layout"
-import { classify } from "@/lib/card-structure"
+import { classify, drawingHeightBudget } from "@/lib/card-structure"
 import { plainInline } from "@/lib/markdown-inline"
 import { parseOutline } from "@/lib/outline"
 
@@ -77,24 +77,30 @@ export function VisualCard({ markdown, title }: VisualCardProps) {
   }
 
   const { frame, structure, name } = drawing
+  // A screen of card, near enough: the note is about how much scrolling is
+  // coming, not about pixels.
+  const screens = Math.max(2, Math.round(frame.h / 900))
 
   return (
-    // Scrolling rather than scaling. `width="100%"` looks accommodating and is
-    // not: the card is ≥640px by construction and 知识库's wiki panel is 309px
-    // at a 1029px window, so fitting meant drawing at 34% -- 14px body text
-    // rendered at 4.8px. A map can be scaled because you read its shape; a card
-    // is read as words, so an unreadable card is a blank one. Panning is a cost
-    // the reader can see and undo. Illegibility is not.
-    <div className="overflow-x-auto">
-      <svg
-        role="img"
-        aria-label={`${name}·${structure}结构信息图`}
-        data-structure={structure}
-        data-width={frame.w}
-        data-height={frame.h}
-        viewBox={`0 0 ${frame.w} ${frame.h}`}
-        width={frame.w}
-        height={frame.h}
+    <div className="grid gap-2">
+      {/* The picture is not cut and not shrunk -- a card several screens tall is
+          still the truthful drawing of a document that long. What was missing is
+          saying so before the reader starts scrolling for it. */}
+      {frame.h > drawingHeightBudget ? (
+        <p data-card-note="long" className="text-xs text-muted-foreground">
+          这张图比一屏长（约 {screens} 屏）：内容是完整的，按原文顺序从上往下排。
+        </p>
+      ) : null}
+      <div className="overflow-x-auto">
+        <svg
+          role="img"
+          aria-label={`${name}·${structure}结构信息图`}
+          data-structure={structure}
+          data-width={frame.w}
+          data-height={frame.h}
+          viewBox={`0 0 ${frame.w} ${frame.h}`}
+          width={frame.w}
+          height={frame.h}
         className="rounded-lg border bg-card"
       >
         {frame.links.map((link) => (
@@ -145,6 +151,10 @@ export function VisualCard({ markdown, title }: VisualCardProps) {
           </text>
         ))}
       </svg>
+      </div>
+      {/* Kept from the version that had one wrapper: the card is drawn at its
+          own size and the reader pans it, rather than it being scaled down to
+          something unreadable. */}
     </div>
   )
 }

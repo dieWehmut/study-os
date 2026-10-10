@@ -137,6 +137,17 @@ function hasBuriedText(blocks: Block[]): boolean {
  */
 const treeNodeBudget = 21
 
+/**
+ * About how tall a card can be and still be taken in as one drawing.
+ *
+ * This is the number the tree budget above was derived from. Nothing bounds the
+ * *other* structures by it -- measured, eight documents in sample/distill draw
+ * 3373px and up, and the tallest 7107px -- so the 信息图 uses it to say when a
+ * card is longer than one picture rather than letting the reader discover that
+ * by scrolling seven screens.
+ */
+export const drawingHeightBudget = 1600
+
 /** Boxes a tree would draw: three levels, and everything under them folds in. */
 function treeNodes(block: Block, level: number): number {
   if (level >= 2) return 1

@@ -85,4 +85,26 @@ describe("VisualCard", () => {
 
     expect(screen.queryByText(/百科/)).not.toBeInTheDocument()
   })
+
+  it("says a card that runs past one screen is long, without cutting it", () => {
+    // 一张七千像素的卡片是那种文档的诚实画法；缺的是在读者开始滚动之前说一声。
+    // Measured: 30 sections this size draw 1190px, 60 draw 2340px -- the budget is
+    // about a screen, and this document is past it.
+    const body = "这一节有一句很长的正文，长到要在格子里折好几行才放得下，于是整张图的每一行都更高一些。"
+    const long = Array.from({ length: 60 }, (_, index) => `## 第 ${index + 1} 节\n${body}`).join("\n")
+    const { container } = render(<VisualCard markdown={long} title="长文" />)
+
+    const note = container.querySelector("[data-card-note='long']")
+    expect(note).not.toBeNull()
+    expect(note?.textContent).toContain("约")
+    // 内容没有因此被裁：画布还是它自己算出来的高度。
+    const svg = container.querySelector("svg")!
+    expect(Number(svg.dataset.height)).toBeGreaterThan(1600)
+  })
+
+  it("keeps quiet about length when the card fits one screen", () => {
+    const { container } = render(<VisualCard markdown={["## 甲", "正文。", "## 乙", "正文。"].join("\n")} title="短文" />)
+
+    expect(container.querySelector("[data-card-note='long']")).toBeNull()
+  })
 })
