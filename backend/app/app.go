@@ -42,6 +42,14 @@ func New(ctx context.Context, options Options) (*App, error) {
 	}
 	cfg = applyPathOverrides(cfg, options)
 
+	// The one moment a restore can happen: nobody holds the database yet.
+	//
+	// Everything about this is best-effort on purpose. A restore that cannot be
+	// carried out leaves the app exactly as it is and says so afterwards; it must
+	// never be the reason a start fails, or a bad backup note would be a
+	// permanently broken application with no way back in.
+	applyPendingRestore(ctx, cfg)
+
 	databaseOptions := make([]db.OpenOption, 0, 1)
 	if cfg.SeedFixtures {
 		databaseOptions = append(databaseOptions, db.WithFixtureSeed())
@@ -277,6 +285,33 @@ func applyPathOverrides(cfg config.Config, options Options) config.Config {
 		cfg.DBPath = filepath.Join(options.DataDir, "study.db")
 	}
 	return cfg
+}
+
+// applyPendingRestore carries out a restore that was requested while the app was
+// running, from the last start's note. It reports nothing and returns nothing: the
+// caller is on its way to opening the database, and the only acceptable outcomes
+// here are "restored" and "started anyway".
+//
+// The outcome is written next to the note so the settings page can say that a
+// restore failed, instead of the reader believing it happened.
+func applyPendingRestore(ctx context.Context, cfg config.Config) {
+	path, ok := backup.ReadRestoreRequest(cfg.DataDir)
+	if !ok {
+		return
+	}
+	// Cleared first: a crash in the middle must not make the next start try the
+	// same file again, because the file may be the reason this one failed.
+	_ = backup.ClearRestoreRequest(cfg.DataDir)
+	service := backup.NewService(filepath.Join(cfg.DataDir, "backups"))
+	if err := service.Restore(ctx, path, cfg.DBPath); err != nil {
+		_ = backup.WriteRestoreOutcome(cfg.DataDir, backup.RestoreOutcome{
+			OK:     false,
+			Path:   path,
+			Detail: err.Error(),
+		})
+		return
+	}
+	_ = backup.WriteRestoreOutcome(cfg.DataDir, backup.RestoreOutcome{OK: true, Path: path})
 }
 
 func (a *App) Close() error {
