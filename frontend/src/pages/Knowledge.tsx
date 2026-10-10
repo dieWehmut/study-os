@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react"
-import { GitCompareArrows, LibraryBig, RotateCcw, Search } from "lucide-react"
+import { Download, GitCompareArrows, LibraryBig, RotateCcw, Search } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 
 import { compareKnowledge } from "@/api/chat"
-import { getKnowledge, listGroups, listKnowledge, type KnowledgeGroup } from "@/api/knowledge"
+import { exportKnowledge, getKnowledge, listGroups, listKnowledge, type KnowledgeGroup } from "@/api/knowledge"
 import type { CompareOutput, KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,8 +14,19 @@ import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
 import { insightTagsFor } from "@/lib/insights"
+import { isStaticDemo } from "@/lib/runtime"
 import { useSubjectStore } from "@/store/useSubjectStore"
 import { failureMessage } from "@/lib/errors"
+
+/** Hand the reader a file rather than a tab full of text. */
+function saveTextFile(text: string, filename: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }))
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 /** Only the two values the server accepts; anything else means "either". */
 function scheduledFromSearch(value: string | null): "" | "yes" | "no" {
@@ -78,6 +89,8 @@ function KnowledgePage({
   const [compareB, setCompareB] = useState("")
   const [compareResult, setCompareResult] = useState<CompareOutput | null>(null)
   const [comparing, setComparing] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState("")
   const subject = useSubjectStore((state) => state.subject)
   const setSubject = useSubjectStore((state) => state.setSubject)
   const selectedId = requestedId ?? fallbackSelectedId
@@ -243,6 +256,33 @@ function KnowledgePage({
     }
   }
 
+  /**
+   * Everything on screen, as a file 导入 can read back.
+   *
+   * The filters travel with it, so the export means "what I am looking at" rather
+   * than "everything", which is the difference between a useful file and one the
+   * reader has to trim in a spreadsheet.
+   */
+  async function downloadExport() {
+    if (exporting) return
+    setExporting(true)
+    setExportError("")
+    try {
+      const text = await exportKnowledge({
+        format: "csv",
+        query: query.trim() || undefined,
+        subject: subject === "all" ? undefined : subject,
+        tag: tag || undefined,
+        scheduled: scheduled || undefined,
+      })
+      saveTextFile(text, `study-os-知识库-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (reason) {
+      setExportError(failureMessage(reason, "导出失败"))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <section className="grid gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -335,6 +375,26 @@ function KnowledgePage({
               className="h-10 pl-9"
             />
           </label>
+          {/* The library could only be read on screen: 导入 could read a file but
+              nothing could write one. Same filters as the list, so what leaves
+              matches what is in front of the reader. */}
+          {isStaticDemo() ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              className="self-start"
+              disabled={exporting}
+              onClick={() => void downloadExport()}
+            >
+              <Download data-icon="inline-start" />
+              {exporting ? "导出中…" : "导出 CSV"}
+            </Button>
+          )}
+          {exportError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {exportError}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent>
           <div className="mb-4 grid gap-3 rounded-xl border border-border bg-muted/25 p-3">

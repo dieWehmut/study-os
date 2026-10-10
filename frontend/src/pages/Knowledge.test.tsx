@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import Knowledge from "./Knowledge"
+import { ApiError } from "@/api/client"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   scheduleKnowledge: vi.fn(),
   compareKnowledge: vi.fn(),
   updateKnowledgeTag: vi.fn(),
+  exportKnowledge: vi.fn(),
 }))
 
 vi.mock("@/api/knowledge", () => mocks)
@@ -823,5 +825,50 @@ describe("tagging a knowledge point with an insight type", () => {
 
     await waitFor(() => expect(mocks.updateKnowledgeTag).toHaveBeenCalledWith("k1", "考点", false))
     expect(await screen.findByRole("button", { name: "✓ 考点" })).toBeInTheDocument()
+  })
+
+  it("hands the reader the library as a file of what is on screen", async () => {
+    // 导入 could read a file and nothing could write one; the pair is only a loop
+    // if the export carries the filters the reader set.
+    mocks.exportKnowledge.mockResolvedValue("term,definition\nabandon,放弃；抛弃\n")
+    const downloads: string[] = []
+    const originalClick = HTMLAnchorElement.prototype.click
+    const originalCreate = URL.createObjectURL
+    const originalRevoke = URL.revokeObjectURL
+    HTMLAnchorElement.prototype.click = function click(this: HTMLAnchorElement) {
+      downloads.push(this.download)
+    }
+    URL.createObjectURL = vi.fn(() => "blob:study-os") as unknown as typeof URL.createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    try {
+      render(<Knowledge />)
+      const exportButton = await screen.findByRole("button", { name: "导出 CSV" })
+      fireEvent.change(screen.getByLabelText("搜索知识库"), { target: { value: "ab" } })
+      fireEvent.click(exportButton)
+
+      await waitFor(() => expect(mocks.exportKnowledge).toHaveBeenCalledWith({
+        format: "csv",
+        query: "ab",
+        subject: undefined,
+        tag: undefined,
+        scheduled: undefined,
+      }))
+      expect(downloads[0]).toMatch(/\.csv$/)
+      // The object URL is revoked again: a page-long blob leaks the export.
+      await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:study-os"))
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick
+      URL.createObjectURL = originalCreate
+      URL.revokeObjectURL = originalRevoke
+    }
+  })
+
+  it("says so when the export fails instead of downloading nothing", async () => {
+    mocks.exportKnowledge.mockRejectedValue(new ApiError(400, "format 只支持 csv 或 jsonl"))
+    render(<Knowledge />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "导出 CSV" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("导出失败：format 只支持 csv 或 jsonl")
   })
 })

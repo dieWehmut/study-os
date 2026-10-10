@@ -179,6 +179,11 @@ func NewRouter(application *app.App) http.Handler {
 		api.Get("/knowledge", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeList(response, request, application)
 		})
+		// Registered before the {knowledgeID} route for the same reason /imports/{id}
+		// is: "export" is not an item id.
+		api.Get("/knowledge/export", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeExport(response, request, application)
+		})
 		api.Post("/knowledge/lookup", func(response http.ResponseWriter, request *http.Request) {
 			handleVocabularyLookup(response, request, application)
 		})

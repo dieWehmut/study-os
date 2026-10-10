@@ -1,4 +1,4 @@
-import { apiRequest } from "./client"
+import { ApiError, apiRequest, resolveApiBase } from "./client"
 import type { KnowledgeItem } from "./types"
 
 export interface ListKnowledgeOptions {
@@ -53,6 +53,29 @@ export function listKnowledge(options: ListKnowledgeOptions = {}): Promise<Knowl
 
 export function getKnowledge(id: string): Promise<KnowledgeItem> {
   return apiRequest<KnowledgeItem>(`/knowledge/${encodeURIComponent(id)}`)
+}
+
+/**
+ * The library as a file, in the column names 导入 reads.
+ *
+ * Plain text rather than JSON: the point of this button is a spreadsheet, and a
+ * parsed object would have to be re-serialized exactly the way the importer
+ * expects. The same filters as the list, so what leaves matches what is on screen.
+ */
+export async function exportKnowledge(
+  options: { format?: "csv" | "jsonl"; query?: string; subject?: string; tag?: string; scheduled?: "yes" | "no" } = {},
+): Promise<string> {
+  const params = new URLSearchParams({ format: options.format ?? "csv" })
+  if (options.query) params.set("q", options.query)
+  if (options.subject) params.set("subject", options.subject)
+  if (options.tag) params.set("tag", options.tag)
+  if (options.scheduled) params.set("scheduled", options.scheduled)
+  const response = await fetch(`${resolveApiBase()}/knowledge/export?${params.toString()}`)
+  if (!response.ok) {
+    const detail = (await response.text()).trim()
+    throw new ApiError(response.status, detail || `导出失败（${response.status}）`)
+  }
+  return response.text()
 }
 
 export type EnglishMasteryDimension = "recognition" | "comprehension" | "retrieval" | "use"
