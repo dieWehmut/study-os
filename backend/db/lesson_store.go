@@ -196,18 +196,13 @@ func (s *Store) GetLessonVersion(ctx context.Context, lessonID string, version i
 	return revision, nil
 }
 
-func (s *Store) ListLessons(ctx context.Context, options models.LessonListOptions) ([]models.LessonSummary, error) {
-	limit := options.Limit
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-	offset := options.Offset
-	if offset < 0 {
-		offset = 0
-	}
-	query := `SELECT id, subject, title, source_type, source_id, status,
-		current_version, created_at, updated_at FROM lessons`
-	where := make([]string, 0, 2)
+/**
+ * The WHERE every list of lessons shares, so a page and its total cannot be
+ * about different sets. `count` used to be `len(items)`, and the page prints it
+ * as "N 门课程" -- with 140 courses behind a limit of 100 it read 100.
+ */
+func lessonFilter(options models.LessonListOptions) (string, []any) {
+	where := make([]string, 0, 3)
 	arguments := make([]any, 0, 4)
 	if subject := strings.TrimSpace(options.Subject); subject != "" {
 		where = append(where, "subject = ?")
@@ -217,13 +212,38 @@ func (s *Store) ListLessons(ctx context.Context, options models.LessonListOption
 		where = append(where, "status = ?")
 		arguments = append(arguments, status)
 	}
-	if query := strings.TrimSpace(options.Query); query != "" {
+	if needle := strings.TrimSpace(options.Query); needle != "" {
 		where = append(where, `title LIKE ? ESCAPE '\'`)
-		arguments = append(arguments, "%"+escapeLike(query)+"%")
+		arguments = append(arguments, "%"+escapeLike(needle)+"%")
 	}
-	if len(where) > 0 {
-		query += " WHERE " + strings.Join(where, " AND ")
+	if len(where) == 0 {
+		return "", nil
 	}
+	return " WHERE " + strings.Join(where, " AND "), arguments
+}
+
+// CountLessons answers how many match, not how many fit on a page.
+func (s *Store) CountLessons(ctx context.Context, options models.LessonListOptions) (int, error) {
+	clause, arguments := lessonFilter(options)
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM lessons`+clause, arguments...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count lessons: %w", err)
+	}
+	return total, nil
+}
+
+func (s *Store) ListLessons(ctx context.Context, options models.LessonListOptions) ([]models.LessonSummary, error) {
+	limit := options.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	offset := options.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	clause, arguments := lessonFilter(options)
+	query := `SELECT id, subject, title, source_type, source_id, status,
+		current_version, created_at, updated_at FROM lessons` + clause
 	query += " ORDER BY updated_at DESC, id ASC LIMIT ? OFFSET ?"
 	arguments = append(arguments, limit, offset)
 	rows, err := s.db.QueryContext(ctx, query, arguments...)

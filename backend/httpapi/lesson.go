@@ -22,18 +22,25 @@ func handleLessonList(response http.ResponseWriter, request *http.Request, appli
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "invalid lesson status"})
 		return
 	}
-	items, err := application.Store.ListLessons(request.Context(), models.LessonListOptions{
+	options := models.LessonListOptions{
 		Subject: strings.TrimSpace(request.URL.Query().Get("subject")),
 		Status:  status,
 		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
 		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 100),
 		Offset:  parseOffset(request.URL.Query().Get("offset")),
-	})
+	}
+	items, err := application.Store.ListLessons(request.Context(), options)
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "list lessons failed"})
 		return
 	}
-	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+	// The total, not the page: the page prints it as "N 门课程".
+	total, err := application.Store.CountLessons(request.Context(), options)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "count lessons failed"})
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": total})
 }
 
 func handleLessonCreate(response http.ResponseWriter, request *http.Request, application *app.App) {

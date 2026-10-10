@@ -2,6 +2,12 @@
 
 ## 未发布
 
+### 课程：列表的 `count` 是总数，不是这一页
+
+- 与知识库同一处语义错误：`GET /api/lessons` 返回 `len(items)`，而页面把它印成「N 门课程」，
+  于是 140 门课的库会自称 100 门。筛选题干/学科的 WHERE 抽成 `lessonFilter`，新增
+  `CountLessons`，列表与计数共用同一份条件。
+
 ### 知识库：列表的 `count` 是总数，不是这一页
 
 - `GET /api/knowledge` 一直把 `len(items)` 当 `count` 返回，而所有调用方都按「一共有多少」理解它：
