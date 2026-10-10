@@ -2,18 +2,20 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { ApiError } from "@/api/client"
 import { normalizeLesson, type Lesson } from "@/api/lessons"
 import LessonDetail from "./LessonDetail"
 
 const mocks = vi.hoisted(() => ({
   getLesson: vi.fn(),
+  updateLesson: vi.fn(),
   submitLessonPracticeAttempt: vi.fn(),
   listLessonPracticeAttempts: vi.fn(),
 }))
 
 vi.mock("@/api/lessons", async () => {
   const actual = await vi.importActual<typeof import("@/api/lessons")>("@/api/lessons")
-  return { ...actual, getLesson: mocks.getLesson }
+  return { ...actual, getLesson: mocks.getLesson, updateLesson: mocks.updateLesson }
 })
 
 vi.mock("@/api/lesson-practice", () => ({
@@ -223,5 +225,46 @@ describe("lesson detail page", () => {
     expect(practiceSection).not.toBeNull()
     await waitFor(() => expect(within(practiceSection as HTMLElement).getByText("已作答 1 次")).toBeInTheDocument())
     expect(mocks.listLessonPracticeAttempts).toHaveBeenCalledWith("lesson-1", "practice-1")
+  })
+
+  it("edits a section and saves the document at the version it read", async () => {
+    // The ten-section template was reachable only through the API: a lesson could
+    // be created and then never filled in.
+    mocks.getLesson.mockResolvedValue({ ...lesson, version: 3 })
+    mocks.updateLesson.mockResolvedValue({ ...lesson, version: 4 })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    const concept = screen.getByLabelText("核心概念内容")
+    expect(concept).toHaveValue("F = ma")
+
+    fireEvent.change(concept, { target: { value: "F = ma，方向与合力一致。" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+
+    await waitFor(() => expect(mocks.updateLesson).toHaveBeenCalled())
+    const [id, input] = mocks.updateLesson.mock.calls[0]
+    expect(id).toBe("lesson-1")
+    expect(input.version).toBe(3)
+    const saved = input.document.sections.find((section: { id: string }) => section.id === "concept")
+    expect(saved.content).toEqual({ text: "F = ma，方向与合力一致。" })
+    // Every section travels with the write, not just the edited one: the document
+    // is replaced whole and the version is what makes that safe.
+    expect(input.document.sections).toHaveLength(lesson.sections.length)
+    expect(await screen.findByRole("status")).toHaveTextContent("已保存 · 版本 4")
+  })
+
+  it("keeps the edits on screen when the version moved on", async () => {
+    mocks.getLesson.mockResolvedValue({ ...lesson, version: 3 })
+    mocks.updateLesson.mockRejectedValue(new ApiError(409, "lesson version conflict"))
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "编辑内容" }))
+    fireEvent.change(screen.getByLabelText("核心概念内容"), { target: { value: "改到一半的内容" } })
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+
+    expect(await screen.findByRole("status")).toHaveTextContent("版本冲突")
+    // Still editing, text intact: reloading over the reader's own words is the one
+    // thing here that cannot be undone.
+    expect(screen.getByLabelText("核心概念内容")).toHaveValue("改到一半的内容")
   })
 })

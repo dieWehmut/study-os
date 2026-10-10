@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, BookOpenCheck, CheckCircle2, CircleHelp, Clock3, FileText, RotateCcw } from "lucide-react"
+import { ArrowLeft, BookOpenCheck, CheckCircle2, CircleHelp, Clock3, FileText, Pencil, RotateCcw } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
 
-import { getLesson, LESSON_SECTION_ORDER, type Lesson, type LessonSection } from "@/api/lessons"
+import { getLesson, LESSON_SECTION_ORDER, updateLesson, type Lesson, type LessonSection } from "@/api/lessons"
+import { ApiError } from "@/api/client"
 import { Badge } from "@/components/ui/badge"
 import LessonPractice from "@/components/lessons/LessonPractice"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  isEditableSection,
+  sectionContentFromText,
+  sectionContentKind,
+  sectionEditorText,
+  sectionHasContent,
+  sectionItems,
+  sectionText,
+} from "@/lib/lesson-content"
 import { subjectName } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
 
@@ -38,56 +48,16 @@ function sectionType(section: LessonSection): string {
   return section.type || section.kind || "concept"
 }
 
-function sectionContent(section: LessonSection): unknown {
-  if (section.content !== undefined) return section.content
-  if (section.body !== undefined) return section.body
-  if (section.markdown !== undefined) return section.markdown
-  if (section.summary !== undefined) return section.summary
-  return ""
-}
-
-function contentText(value: unknown): string {
-  if (typeof value === "string") return value
-  if (Array.isArray(value)) return value.filter((item) => typeof item === "string").join("\n")
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>
-    for (const key of ["text", "body", "markdown", "prompt", "question"]) {
-      if (typeof record[key] === "string") return record[key] as string
-    }
-    return ""
-  }
-  return ""
-}
-
-function contentItems(section: LessonSection): string[] {
-  if (section.items?.length) return section.items
-  const value = section.content
-  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string")
-  if (value && typeof value === "object") {
-    const items = (value as Record<string, unknown>).items
-    if (Array.isArray(items)) return items.filter((item): item is string => typeof item === "string")
-    const options = (value as Record<string, unknown>).options
-    if (Array.isArray(options)) return options.filter((item): item is string => typeof item === "string")
-  }
-  return []
-}
-
-/** Does this section carry anything a learner can read? */
-function sectionHasContent(section: LessonSection): boolean {
-  if (contentText(sectionContent(section)).trim()) return true
-  return contentItems(section).length > 0
-}
-
 function objectivesForLesson(lesson: Lesson): string[] {
   if (lesson.objectives?.length) return lesson.objectives
 
   const section = lesson.sections.find((candidate) => sectionType(candidate) === "objectives")
   if (!section) return []
 
-  const items = contentItems(section)
+  const items = sectionItems(section)
   if (items.length > 0) return items
 
-  const text = contentText(sectionContent(section)).trim()
+  const text = sectionText(section).trim()
   return text ? [text] : []
 }
 
@@ -111,14 +81,52 @@ function sortSections(sections: LessonSection[]): LessonSection[] {
   })
 }
 
-function SectionView({ lessonID, section }: { lessonID: string; section: LessonSection }) {
+function SectionView({
+  lessonID,
+  section,
+  editing,
+  draft,
+  onDraftChange,
+}: {
+  lessonID: string
+  section: LessonSection
+  editing: boolean
+  draft: string
+  onDraftChange: (value: string) => void
+}) {
   const type = sectionType(section)
   if (type === "practice") return <LessonPractice lessonID={lessonID} section={section} />
 
-  const text = contentText(sectionContent(section))
-  const items = contentItems(section)
-  const isQuiz = type === "practice" || type === "quiz"
   const title = section.title || sectionLabels[type] || type
+  const isQuiz = type === "quiz"
+
+  // Editing is a textarea per section, empty ones included: filling in a draft
+  // is exactly what this is for, and a section with no content has no card to
+  // click otherwise.
+  if (editing && isEditableSection(section)) {
+    const kind = sectionContentKind(section)
+    return (
+      <article data-section-kind={type} className="grid gap-3 rounded-xl border border-primary/35 bg-card p-4 shadow-sm sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <CheckCircle2 aria-hidden="true" className="size-4 text-primary" />
+          <h2 className="font-heading text-lg font-semibold">{title}</h2>
+          {section.required ? <Badge variant="outline">必看</Badge> : null}
+          <span className="ml-auto text-xs text-muted-foreground">
+            {kind === "items" ? "一行一条" : kind === "markdown" ? "支持 Markdown" : "一段文字"}
+          </span>
+        </div>
+        <textarea
+          aria-label={`${title}内容`}
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          className="min-h-24 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm leading-6 outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </article>
+    )
+  }
+
+  const text = sectionText(section)
+  const items = sectionItems(section)
 
   // An empty section is one line of the outline, not a card of its own. A draft
   // is ten of them at once, and ten identical "还没有内容" panels pushed the one
@@ -161,6 +169,61 @@ export default function LessonDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
+  const [editing, setEditing] = useState(false)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState("")
+
+  function startEditing() {
+    if (!lesson) return
+    setDrafts(Object.fromEntries(
+      lesson.sections.map((section) => [section.id, sectionEditorText(section)]),
+    ))
+    setNotice("")
+    setEditing(true)
+  }
+
+  function cancelEditing() {
+    setEditing(false)
+    setDrafts({})
+    setNotice("")
+  }
+
+  /**
+   * Write the whole document back, at the version that was read.
+   *
+   * The document version is immutable and the server refuses a write that is not
+   * current, so the reader's own two tabs cannot silently overwrite each other.
+   * A refusal says so and leaves the edits on screen rather than reloading over
+   * them -- the text is the one thing here that cannot be recovered.
+   */
+  async function saveEdits() {
+    if (!lesson || saving) return
+    setSaving(true)
+    setNotice("")
+    try {
+      const sections = lesson.sections.map((section) => (
+        drafts[section.id] !== undefined && isEditableSection(section)
+          ? { ...section, content: sectionContentFromText(section, drafts[section.id]) }
+          : section
+      ))
+      const updated = await updateLesson(lesson.id, {
+        version: lesson.version ?? 1,
+        document: { schema_version: lesson.document?.schema_version ?? 1, sections },
+      })
+      setLesson(updated)
+      setEditing(false)
+      setDrafts({})
+      setNotice(updated.version ? `已保存 · 版本 ${updated.version}` : "已保存")
+    } catch (failure) {
+      const conflict = failure instanceof ApiError && failure.status === 409
+      setNotice(conflict
+        ? "这节课在别处已被修改（版本冲突）：先复制你的改动，再刷新重来。"
+        : "保存失败，请确认本地后端正在运行。")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -210,7 +273,20 @@ export default function LessonDetail() {
           <BookOpenCheck aria-hidden="true" className="size-5 text-primary" />
           <Badge variant={lesson.status === "published" ? "default" : "secondary"}>{statusLabel(lesson.status)}</Badge>
           <span className="text-sm text-muted-foreground">{subjectName(lesson.subject)}</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {editing ? (
+              <>
+                <Button size="sm" disabled={saving} onClick={() => void saveEdits()}>{saving ? "保存中…" : "保存"}</Button>
+                <Button size="sm" variant="outline" disabled={saving} onClick={cancelEditing}>取消</Button>
+              </>
+            ) : (
+              <Button size="sm" variant="outline" onClick={startEditing}>
+                <Pencil data-icon="inline-start" />编辑内容
+              </Button>
+            )}
+          </div>
         </div>
+        {notice ? <p role="status" aria-live="polite" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</p> : null}
         <h1 className="font-heading text-3xl font-semibold tracking-tight">{lesson.title}</h1>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5"><FileText aria-hidden="true" className="size-4" />来源：{sourceLabel(lesson)}</span>
@@ -227,12 +303,21 @@ export default function LessonDetail() {
       ) : null}
 
       <div className="grid gap-3" aria-label="课程环节">
-        {sections.length > 0 && !hasAnyContent ? (
+        {sections.length > 0 && !hasAnyContent && !editing ? (
           <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-            这门课程还是一份空草稿：下面是固定十段的骨架，内容还没有写进来。
+            这门课程还是一份空草稿：下面是固定十段的骨架，内容还没有写进来。按「编辑内容」就能开始填。
           </p>
         ) : null}
-        {sections.length > 0 ? sections.map((section) => <SectionView key={section.id} lessonID={lesson.id} section={section} />) : (
+        {sections.length > 0 ? sections.map((section) => (
+          <SectionView
+            key={section.id}
+            lessonID={lesson.id}
+            section={section}
+            editing={editing}
+            draft={drafts[section.id] ?? ""}
+            onDraftChange={(value) => setDrafts((current) => ({ ...current, [section.id]: value }))}
+          />
+        )) : (
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">这门课程还没有可预习的环节。</CardContent></Card>
         )}
       </div>

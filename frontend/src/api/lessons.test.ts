@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { getLesson, listLessons, normalizeLesson } from "./lessons"
+import { getLesson, listLessons, normalizeLesson, updateLesson } from "./lessons"
 
 const mocks = vi.hoisted(() => ({ apiRequest: vi.fn() }))
 
@@ -48,6 +48,26 @@ describe("lessons api", () => {
     await getLesson("lesson/1")
 
     expect(mocks.apiRequest).toHaveBeenCalledWith("/lessons/lesson%2F1")
+  })
+
+  it("writes a lesson back as a PATCH carrying the version it edited", async () => {
+    // The version is what keeps two tabs from overwriting each other, so it must
+    // travel with every write rather than being assumed current.
+    mocks.apiRequest.mockResolvedValue({ id: "lesson-1", version: 4, sections: [] })
+
+    const updated = await updateLesson("lesson-1", {
+      version: 3,
+      document: { schema_version: 1, sections: [{ id: "concept", type: "concept", title: "核心概念", content: { items: ["F = ma"] } }] },
+    })
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/lessons/lesson-1", {
+      method: "PATCH",
+      body: JSON.stringify({
+        version: 3,
+        document: { schema_version: 1, sections: [{ id: "concept", type: "concept", title: "核心概念", content: { items: ["F = ma"] } }] },
+      }),
+    })
+    expect(updated.version).toBe(4)
   })
 
   it("normalizes a document envelope while preserving source and section order", () => {

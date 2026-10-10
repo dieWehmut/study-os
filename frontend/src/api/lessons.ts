@@ -216,3 +216,19 @@ export function createLesson(input: LessonCreateInput): Promise<Lesson> {
   return apiRequest<unknown>("/lessons", { method: "POST", body: JSON.stringify(input) })
     .then(normalizeLesson)
 }
+
+export interface LessonUpdateInput {
+  /** The version being edited. The server refuses a write that is not current. */
+  version: number
+  title?: string
+  subject?: string
+  status?: string
+  document?: { schema_version?: number; sections: LessonSection[] }
+}
+
+export function updateLesson(id: string, input: LessonUpdateInput): Promise<Lesson> {
+  return apiRequest<unknown>(`/lessons/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  }).then(normalizeLesson)
+}
