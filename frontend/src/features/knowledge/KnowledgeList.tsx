@@ -2,6 +2,7 @@ import { BookOpenText } from "lucide-react"
 
 import type { KnowledgeItem } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { itemTypeLabel } from "@/lib/labels"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
@@ -11,14 +12,27 @@ interface KnowledgeListProps {
   loading?: boolean
   onSelect: (item: KnowledgeItem) => void
   selectedId?: string
+  /** How many the server says match, when that is more than are in hand. */
+  remaining?: number
+  loadingMore?: boolean
+  onLoadMore?: () => void
 }
 
-export function KnowledgeList({ items, loading = false, onSelect, selectedId }: KnowledgeListProps) {
+export function KnowledgeList({
+  items,
+  loading = false,
+  onSelect,
+  selectedId,
+  remaining = 0,
+  loadingMore = false,
+  onLoadMore,
+}: KnowledgeListProps) {
   if (loading) return <p className="py-10 text-center text-sm text-muted-foreground">正在整理知识点…</p>
   if (items.length === 0) return <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">没有找到匹配的知识点</p>
 
   return (
-    <div className="grid content-start gap-2" role="list" aria-label="知识点列表">
+    <div className="grid content-start gap-2">
+      <div className="grid content-start gap-2" role="list" aria-label="知识点列表">
       {items.map((item) => (
         <div key={item.id} role="listitem">
           <button
@@ -46,6 +60,20 @@ export function KnowledgeList({ items, loading = false, onSelect, selectedId }: 
           </button>
         </div>
       ))}
+      </div>
+      {/* Said as well as offered: the count is what tells you whether there is
+          anything left to look at, and "加载更多" alone does not. */}
+      {onLoadMore && remaining > 0 ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-1 w-full"
+          disabled={loadingMore}
+          onClick={onLoadMore}
+        >
+          {loadingMore ? "正在读取…" : `加载更多（还有 ${remaining} 条）`}
+        </Button>
+      ) : null}
     </div>
   )
 }

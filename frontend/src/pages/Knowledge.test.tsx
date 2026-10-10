@@ -710,6 +710,39 @@ describe("showing what is already in the review queue", () => {
     expect(await screen.findByText("选择一个知识点查看百科")).toBeInTheDocument()
   })
 
+  it("loads the next page instead of stopping at the first hundred", async () => {
+    // The page says how many match, so one request of 100 is not the library --
+    // and 搜索 answers "is it there", not "what else is".
+    const page = (offset: number) =>
+      offset === 0
+        ? { count: 4, items: Array.from({ length: 3 }, (_, index) => ({ id: `k${index}`, item_type: "word_sense", term: `第 ${index} 个`, concise_definition: "释义" })), scheduled_ids: [] }
+        : { count: 4, items: [{ id: "k3", item_type: "word_sense", term: "第四页", concise_definition: "释义" }], scheduled_ids: ["k3"] }
+    mocks.listKnowledge.mockImplementation((options?: { offset?: number }) => Promise.resolve(page(options?.offset ?? 0)))
+    render(<Knowledge />)
+    await screen.findByRole("button", { name: /第 0 个/ })
+
+    fireEvent.click(screen.getByRole("button", { name: "加载更多（还有 1 条）" }))
+
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ offset: 3 })))
+    expect(await screen.findByRole("button", { name: /第四页/ })).toBeInTheDocument()
+    // Nothing left, so nothing left to offer.
+    expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
+    // The rows the page already had keep their 复习状态.
+    expect(await screen.findByRole("button", { name: /第 1 个/ })).toBeInTheDocument()
+  })
+
+  it("offers nothing to load when the first page is the whole library", async () => {
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "word_sense", term: "只有一个", concise_definition: "释义" }],
+      scheduled_ids: [],
+    })
+    render(<Knowledge />)
+    await screen.findByRole("button", { name: /只有一个/ })
+
+    expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
+  })
+
   it("asks for the whole library again when the review filter is cleared", async () => {
     // A filter that cannot be undone is a trap: the page would keep hiding
     // rows after the learner stopped asking it to.

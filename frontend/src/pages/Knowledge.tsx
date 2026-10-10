@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { GitCompareArrows, LibraryBig, RotateCcw, Search } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 
@@ -69,6 +69,7 @@ function KnowledgePage({
   const [fallbackSelectedId, setFallbackSelectedId] = useState<string | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<KnowledgeItem | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState("")
   const [requestVersion, setRequestVersion] = useState(0)
   const [tag, setTag] = useState("")
@@ -80,17 +81,44 @@ function KnowledgePage({
   const setSubject = useSubjectStore((state) => state.setSubject)
   const selectedId = requestedId ?? fallbackSelectedId
 
-  useEffect(() => {
-    const controller = new AbortController()
-    const options: Parameters<typeof listKnowledge>[0] = {
-      query,
-      group: group || undefined,
-      limit: 100,
-      offset: 0,
-    }
+  /** The filters in hand, as the request they become -- one page at `offset`. */
+  const listOptions = useCallback((offset: number): Parameters<typeof listKnowledge>[0] => {
+    const options: Parameters<typeof listKnowledge>[0] = { query, group: group || undefined, limit: 100, offset }
     if (subject !== "all") options.subject = subject
     if (tag) options.tag = tag
     if (scheduled) options.scheduled = scheduled
+    return options
+  }, [query, group, subject, tag, scheduled])
+
+  /**
+   * The next page, appended.
+   *
+   * The list is one request of 100 and the page says how many there are, so
+   * without this the library is browsable only as far as its first page --
+   * and 搜索 answers "is it there", not "what else is".
+   */
+  async function loadMore() {
+    if (loadingMore) return
+    setLoadingMore(true)
+    setError("")
+    try {
+      const result = await listKnowledge(listOptions(items.length))
+      setItems((current) => {
+        const seen = new Set(current.map((item) => item.id))
+        return [...current, ...result.items.filter((item) => !seen.has(item.id))]
+      })
+      setCount(result.count)
+      setScheduledIds((current) => new Set([...current, ...(result.scheduled_ids ?? [])]))
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : "读取更多知识点失败，请重试。")
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const options = listOptions(0)
     void listKnowledge(options)
       .then((result) => {
         if (controller.signal.aborted) return
@@ -109,7 +137,7 @@ function KnowledgePage({
         if (!controller.signal.aborted) setLoading(false)
     })
     return () => controller.abort()
-  }, [query, group, subject, tag, scheduled, requestVersion])
+  }, [listOptions, requestVersion])
 
   useEffect(() => {
     let active = true
@@ -361,7 +389,15 @@ function KnowledgePage({
             </div>
           ) : null}
           <div className="grid gap-4 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
-            <KnowledgeList items={items} selectedId={selectedId ?? undefined} loading={loading} onSelect={(item) => selectItem(item.id)} />
+            <KnowledgeList
+              items={items}
+              selectedId={selectedId ?? undefined}
+              loading={loading}
+              onSelect={(item) => selectItem(item.id)}
+              remaining={Math.max(0, count - items.length)}
+              loadingMore={loadingMore}
+              onLoadMore={() => void loadMore()}
+            />
             <WikiPanel
               key={selected?.id ?? "none"}
               item={selected}
