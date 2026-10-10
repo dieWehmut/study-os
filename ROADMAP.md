@@ -132,6 +132,38 @@ GitHub Pages 的 `VITE_STATIC_DEMO` 适配器提供这门课程的 GET 预览 fi
 下一步边界：把材料解析、知识抽取、组件选择和质量检查拆成可重试的 Agent 阶段，并用已有课程关联与
 即时练习证据驱动选题和质量回查。
 
+#### 一节多题：形状已定，未实现
+
+「一门课只有一题」不是模板偷懒，是四处结构性约束叠出来的：`NewLessonDocument` 每种类型一节且
+`LessonSection.ID` 就等于类型名（`practice`），「再来一节练习」会撞 id；作答的键是
+`(lesson_id, section_id)`，**一节只能有一条作答**；`lesson_attempts` 加列要动 schema 版本并同步本文件
+顶部那行；前端 `PracticePanel` 只读 `content.question`。
+
+选定形状：**练习节 `content` 里加 `questions[]`**，而不是「多节练习」——目录、深链接、Markdown 导出
+都不用动，只有作答表加一列。规则：
+
+- `questions` 缺省或为空 → 与今天完全一致（单题），**旧文档不需要迁移**；
+  两套字段同时存在时以 `questions` 为准，`question`/`options`/`expected_answers` 视为 `questions[0]`
+  的冗余写法（读取忽略，写入端不再产生）；
+- `id` 节内唯一，缺省按 `q1`、`q2`… 补；上限 20 题，超出返回 400 而不是静默截断。
+
+迁移（唯一动数据库的地方）：
+
+```sql
+ALTER TABLE lesson_attempts ADD COLUMN question_id TEXT NOT NULL DEFAULT '';
+DROP INDEX lesson_attempts_lesson_section_idx;
+CREATE INDEX lesson_attempts_lesson_section_idx
+    ON lesson_attempts(lesson_id, section_id, question_id, created_at DESC, id DESC);
+```
+
+空串 = 旧数据、也是单题文档的作答；写入仍是「同一键上后写覆盖」，于是「重答覆盖」与「不同题各自
+留痕」两条规则同时成立。界面：作答面一节的 N 题按顺序渲染、每题各自判定、轮末汇总「答对 x/N」；
+编辑面给「再加一题」；列表页标出「练习题数」。
+
+验收（照这个写测试）：① 只有 `question` 的旧文档行为与今天逐字节等价；② 三题各自留一条作答、
+同一题重答仍是覆盖；③ 超过 20 题报 400 且说明上限；④ 只答两题就提交时提示未答的那题；
+⑤ Markdown 导出把多题按题号列出，单题情形与今天一致。
+
 ### 第 4 阶段：任务 Task 与系统想法 System Idea
 
 放最后。它们是元系统，在前面几个对象产生足够真实记录之前，
