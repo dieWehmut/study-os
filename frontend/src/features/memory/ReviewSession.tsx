@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { failureMessage } from "@/lib/errors"
 import { Progress } from "@/components/ui/progress"
 import { itemTypeLabel } from "@/lib/labels"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
@@ -73,9 +74,9 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
         setLibraryCount(library.count)
         setIndex(0)
       })
-      .catch(() => {
+      .catch((reason) => {
         if (active) {
-          setError("暂时无法读取复习队列，请确认本地服务正在运行。")
+          setError(failureMessage(reason, "无法读取复习队列"))
           setLibraryCount(null)
         }
       })

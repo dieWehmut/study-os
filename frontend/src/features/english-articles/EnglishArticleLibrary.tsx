@@ -8,6 +8,7 @@ import {
   type EnglishArticle,
 } from "@/api/english-articles"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { failureMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 
 function displayDate(value?: string): string {
@@ -38,8 +39,8 @@ export default function EnglishArticleLibrary() {
     try {
       const response = await listEnglishArticles({ limit: 100 })
       setArticles(response.items)
-    } catch {
-      setError("无法加载英语时文，请确认本地后端正在运行后重试。")
+    } catch (reason) {
+      setError(failureMessage(reason, "无法加载英语时文"))
     } finally {
       setLoading(false)
     }
@@ -51,8 +52,8 @@ export default function EnglishArticleLibrary() {
       .then((response) => {
         if (active) setArticles(response.items)
       })
-      .catch(() => {
-        if (active) setError("无法加载英语时文，请确认本地后端正在运行后重试。")
+      .catch((reason) => {
+        if (active) setError(failureMessage(reason, "无法加载英语时文"))
       })
       .finally(() => {
         if (active) setLoading(false)

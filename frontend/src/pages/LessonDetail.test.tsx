@@ -126,7 +126,7 @@ describe("lesson detail page", () => {
     mocks.getLesson.mockRejectedValueOnce(new Error("offline"))
     renderPage()
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("课程暂时无法读取")
+    expect(await screen.findByRole("alert")).toHaveTextContent("无法读取课程，请确认本地后端正在运行。")
     expect(screen.getByRole("link", { name: "返回课程" })).toHaveAttribute("href", "/lessons")
   })
 

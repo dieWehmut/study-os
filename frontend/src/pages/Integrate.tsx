@@ -17,6 +17,7 @@ import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { subjectName } from "@/lib/subjects"
 import { useSubjectStore } from "@/store/useSubjectStore"
 import { CapabilityCatalog } from "@/features/whiteboard/CapabilityCatalog"
+import { failureMessage } from "@/lib/errors"
 
 function cardTypeLabel(cardType: string): string {
   switch (cardType) {
@@ -161,8 +162,8 @@ export default function Integrate() {
         ...(note ? {} : { document: { schema_version: 1, sections: [{ type: "visualization", content: { markdown: text.trim() } }] } }),
       })
       navigate(`/lessons/${encodeURIComponent(lesson.id)}`)
-    } catch {
-      setError("存成课程失败，请确认本地后端正在运行。")
+    } catch (reason) {
+      setError(failureMessage(reason, "存成课程失败"))
     } finally {
       setSavingLesson(false)
     }

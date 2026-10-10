@@ -16,6 +16,7 @@ import {
   summarizeReadingSession,
   writeReadingSession,
 } from "@/lib/reading-session"
+import { failureMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { SubjectPicker } from "@/features/subjects/SubjectPicker"
@@ -72,8 +73,8 @@ export default function Home() {
     setError("")
     try {
       setDashboard(await getDashboard(subjectFilter))
-    } catch {
-      setError("无法读取学习进度，请确认本地后端正在运行。")
+    } catch (reason) {
+      setError(failureMessage(reason, "无法读取学习进度"))
     } finally {
       setLoading(false)
     }
@@ -85,8 +86,8 @@ export default function Home() {
       .then((value) => {
         if (active) setDashboard(value)
       })
-      .catch(() => {
-        if (active) setError("无法读取学习进度，请确认本地后端正在运行。")
+      .catch((reason) => {
+        if (active) setError(failureMessage(reason, "无法读取学习进度"))
       })
       .finally(() => {
         if (active) setLoading(false)

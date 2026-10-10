@@ -12,6 +12,7 @@ import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { subjectName, SUBJECTS } from "@/lib/subjects"
 import { cn } from "@/lib/utils"
 import { useSubjectStore } from "@/store/useSubjectStore"
+import { failureMessage } from "@/lib/errors"
 
 const statusLabels: Record<string, string> = {
   draft: "草稿",
@@ -119,8 +120,8 @@ export default function Lessons() {
         if (!active) return
         setItems(result.items)
         setCount(result.count)
-      } catch {
-        if (active) setError("课程暂时无法读取，请确认本地后端正在运行。")
+      } catch (reason) {
+        if (active) setError(failureMessage(reason, "无法读取课程"))
       } finally {
         if (active) setLoading(false)
       }

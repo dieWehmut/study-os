@@ -12,6 +12,7 @@ import {
   type LessonVersionSummary,
 } from "@/api/lessons"
 import { ApiError } from "@/api/client"
+import { failureMessage } from "@/lib/errors"
 import { Badge } from "@/components/ui/badge"
 import LessonPractice from "@/components/lessons/LessonPractice"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -561,8 +562,8 @@ export default function LessonDetail() {
             setEditing(true)
           }
         }
-      } catch {
-        if (active) setError("课程暂时无法读取，请确认本地后端正在运行。")
+      } catch (reason) {
+        if (active) setError(failureMessage(reason, "无法读取课程"))
       } finally {
         if (active) setLoading(false)
       }

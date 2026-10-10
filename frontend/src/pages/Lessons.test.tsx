@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { Lesson } from "@/api/lessons"
+import { ApiError } from "@/api/client"
 import Lessons from "./Lessons"
 
 const mocks = vi.hoisted(() => ({ listLessons: vi.fn(), createLesson: vi.fn() }))
@@ -73,8 +74,18 @@ describe("lessons page", () => {
     mocks.listLessons.mockRejectedValueOnce(new Error("offline"))
     renderPage()
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("课程暂时无法读取")
+    // Nothing answered, so suspecting the backend is the likely cause.
+    expect(await screen.findByRole("alert")).toHaveTextContent("无法读取课程，请确认本地后端正在运行。")
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument()
+  })
+
+  it("does not ask whether the backend is running when it just answered", async () => {
+    // An ApiError means the server replied: the advice would be false, and it is
+    // the one party that knows what happened.
+    mocks.listLessons.mockRejectedValueOnce(new ApiError(500, "list lessons failed"))
+    renderPage()
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("无法读取课程：服务出错（500）")
   })
 
   it("finds an older course the first page never carried", async () => {

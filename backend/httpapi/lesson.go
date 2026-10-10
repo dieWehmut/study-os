@@ -259,7 +259,11 @@ func writeLessonError(response http.ResponseWriter, err error) {
 	case errors.Is(err, db.ErrLessonVersionConflict):
 		writeJSON(response, http.StatusConflict, map[string]string{"error": err.Error()})
 	case errors.Is(err, db.ErrNotFound):
-		writeJSON(response, http.StatusNotFound, map[string]string{"error": err.Error()})
+		// Reader-facing: a stale link is the usual way to see this one, and the
+		// page shows it as-is, so it is written in the reader's language rather
+		// than as "lesson: record not found". The 版本 panel catches its own 404
+		// and says something more specific.
+		writeJSON(response, http.StatusNotFound, map[string]string{"error": "课程不存在，可能已被删除"})
 	case errors.Is(err, db.ErrInvalidLesson):
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
 	default:
