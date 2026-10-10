@@ -111,6 +111,20 @@ function practiceRecord(section: LessonSection): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
+/** The questions a section lists, when it uses the multi-question shape. */
+export function practiceQuestionsOf(section: LessonSection): Record<string, unknown>[] {
+  const questions = practiceRecord(section).questions
+  if (!Array.isArray(questions)) return []
+  return questions.filter(
+    (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item),
+  )
+}
+
+/** A question's own fields, or the section's when it uses the flat shape. */
+function practiceQuestionRecord(section: LessonSection): Record<string, unknown> {
+  return practiceQuestionsOf(section)[0] ?? practiceRecord(section)
+}
+
 function practiceAnswerText(record: Record<string, unknown>): string {
   for (const key of ["correct_answer", "correctAnswer", "answer"]) {
     const value = record[key]
@@ -122,7 +136,11 @@ function practiceAnswerText(record: Record<string, unknown>): string {
 }
 
 export function practiceDraftFromSection(section: LessonSection): LessonPracticeDraft {
-  const record = practiceRecord(section)
+  // A section that holds several questions shows its first one here. The editor
+  // can only change that one, and practiceContentFromDraft keeps the rest: reading
+  // and writing only the flat fields would have deleted every other question the
+  // moment someone pressed 保存.
+  const record = practiceQuestionRecord(section)
   const question = typeof record.question === "string"
     ? record.question
     : typeof record.prompt === "string"
@@ -140,7 +158,7 @@ export function practiceDraftFromSection(section: LessonSection): LessonPractice
   }
 }
 
-export function practiceContentFromDraft(draft: LessonPracticeDraft): unknown {
+export function practiceContentFromDraft(draft: LessonPracticeDraft, section?: LessonSection): unknown {
   const options = practiceOptions(draft)
   const question = draft.question.trim()
   const explanation = draft.explanation.trim()
@@ -148,6 +166,17 @@ export function practiceContentFromDraft(draft: LessonPracticeDraft): unknown {
   // Only an answer that is one of the options: anything else cannot be graded.
   if (draft.correctAnswer && options.includes(draft.correctAnswer)) content.correct_answer = draft.correctAnswer
   if (explanation) content.explanation = explanation
+
+  // A multi-question section keeps the questions the editor did not show. Writing
+  // the flat shape here is what made 保存 quietly delete them.
+  if (section) {
+    const questions = practiceQuestionsOf(section)
+    if (questions.length > 0) {
+      const [first, ...rest] = questions
+      const id = typeof first.id === "string" ? first.id : ""
+      return { questions: [{ ...content, ...(id ? { id } : {}) }, ...rest] }
+    }
+  }
   return content
 }
 

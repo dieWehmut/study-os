@@ -104,4 +104,47 @@ describe("lesson content", () => {
       explanation: "F = ma。",
     })
   })
+
+  it("edits the first question of a multi-question section without deleting the rest", () => {
+    // The editor shows one question. Reading or writing only the flat fields is
+    // how pressing 保存 used to throw the other questions away.
+    const practice = section({
+      type: "practice",
+      content: {
+        questions: [
+          { id: "q1", question: "速度单位？", options: ["m/s", "N"], correct_answer: "m/s", explanation: "速度。" },
+          { id: "q2", question: "力的单位？", options: ["m/s", "N"], correct_answer: "N" },
+          { id: "q3", question: "功的单位？", options: ["J", "N"], correct_answer: "J" },
+        ],
+      },
+    })
+
+    expect(practiceDraftFromSection(practice)).toEqual({
+      question: "速度单位？",
+      optionsText: "m/s\nN",
+      correctAnswer: "m/s",
+      explanation: "速度。",
+    })
+
+    const edited = practiceContentFromDraft(
+      { question: "速度的单位？", optionsText: "m/s\nN", correctAnswer: "N", explanation: "速度是位移随时间的变化。" },
+      practice,
+    )
+    expect(edited).toEqual({
+      questions: [
+        { id: "q1", question: "速度的单位？", options: ["m/s", "N"], correct_answer: "N", explanation: "速度是位移随时间的变化。" },
+        { id: "q2", question: "力的单位？", options: ["m/s", "N"], correct_answer: "N" },
+        { id: "q3", question: "功的单位？", options: ["J", "N"], correct_answer: "J" },
+      ],
+    })
+  })
+
+  it("still writes the flat shape when the section had no questions list", () => {
+    // Equivalence for every document written before sections could hold several.
+    const flat = section({ type: "practice", content: { question: "合力？", options: ["4 N", "8 N"], correct_answer: "8 N" } })
+    expect(practiceContentFromDraft(
+      { question: "合力？", optionsText: "4 N\n8 N", correctAnswer: "8 N", explanation: "" },
+      flat,
+    )).toEqual({ question: "合力？", options: ["4 N", "8 N"], correct_answer: "8 N" })
+  })
 })

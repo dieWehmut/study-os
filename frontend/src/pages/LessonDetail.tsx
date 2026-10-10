@@ -443,7 +443,7 @@ export default function LessonDetail() {
       const sections = lesson.sections.map((section) => {
         const practice = practiceDrafts[section.id]
         if (practice && sectionType(section) === "practice") {
-          return { ...section, content: practiceContentFromDraft(practice) }
+          return { ...section, content: practiceContentFromDraft(practice, section) }
         }
         return drafts[section.id] !== undefined && isEditableSection(section)
           ? { ...section, content: sectionContentFromText(section, drafts[section.id]) }
