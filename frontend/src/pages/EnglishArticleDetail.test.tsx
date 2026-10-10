@@ -12,11 +12,15 @@ const mocks = vi.hoisted(() => ({
   exportArticlePdf: vi.fn(),
   playPronunciation: vi.fn(),
   saveTextFile: vi.fn(),
+  // The Pages build keeps the route inside the hash; the page composes the copied
+  // link differently there, and that branch is worth pinning.
+  routerMode: vi.fn(() => "browser" as const),
 }))
 
 vi.mock("@/api/english-articles", () => mocks)
 vi.mock("@/features/english-articles/export-pdf", () => ({ exportArticlePdf: mocks.exportArticlePdf }))
 vi.mock("@/api/audio", () => ({ playPronunciation: mocks.playPronunciation }))
+vi.mock("@/lib/runtime", () => ({ routerMode: mocks.routerMode }))
 // The file itself is the browser's job; what this page decides is the text and the
 // name, which is what the test asserts.
 vi.mock("@/lib/download", () => ({ saveTextFile: mocks.saveTextFile }))
@@ -69,6 +73,7 @@ function renderDetail() {
 describe("EnglishArticleDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.routerMode.mockReturnValue("browser")
     mocks.getEnglishArticle.mockResolvedValue(article)
     mocks.regenerateEnglishArticle.mockResolvedValue(article)
     mocks.deleteEnglishArticle.mockResolvedValue(undefined)
@@ -103,6 +108,22 @@ describe("EnglishArticleDetail", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(writeText.mock.calls[0][0]).toContain("#section-2-the-turn")
     expect(writeText.mock.calls[0][0]).toContain("/reading/articles/article-1")
+  })
+
+  it("keeps the route inside the hash when the app is running from the Pages build", async () => {
+    // HashRouter keeps the route after the #, so a link that puts the path first
+    // lands on the site root: the section would be gone even though the anchor is
+    // right.
+    mocks.routerMode.mockReturnValue("hash")
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    renderDetail()
+    await screen.findByRole("heading", { name: "市场变化" })
+
+    fireEvent.click(screen.getByRole("button", { name: "复制「The Turn」的链接" }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0]).toMatch(/#\/reading\/articles\/article-1#section-2-the-turn$/)
   })
 
   it("says so when the browser refuses the clipboard instead of staying quiet", async () => {
