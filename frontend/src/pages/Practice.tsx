@@ -16,7 +16,7 @@ import {
 import {
   correctMistake,
   deleteMistake,
-  listMistakes,
+  listMistakePage,
   recordMistake,
   scheduleMistake,
 } from "@/api/mistakes"
@@ -194,6 +194,13 @@ export default function Practice() {
   // page of the newest mistakes, so without this the rest are unreachable.
   const [recordQuery, setRecordQuery] = useState("")
   const [recordDraft, setRecordDraft] = useState("")
+  // How many rows the log holds, and how many of them came from the server --
+  // counted apart because 记录 also carries a browser log that was migrated over
+  // and rows filed since the page opened, neither of which the next offset is
+  // about.
+  const [recordTotal, setRecordTotal] = useState(0)
+  const [serverRecords, setServerRecords] = useState(0)
+  const [loadingMoreRecords, setLoadingMoreRecords] = useState(false)
   // Shared by every action that acts on one row -- 排进复习 and 订正 both fail
   // the same way, and one line under the list is where you are already looking.
   const [rowError, setRowError] = useState("")
@@ -218,23 +225,27 @@ export default function Practice() {
     let active = true
     pendingLocalRecords.current = []
     const currentSubjectRequest = subject === "all" ? {} : { subject }
-    const currentRecordsRequest = listMistakes({
+    const listRequest = {
       ...currentSubjectRequest,
       ...(recordQuery ? { query: recordQuery } : {}),
-    })
+    }
+    const currentRecordsRequest = listMistakePage(listRequest)
     // The 六科诊断总览 counts every mistake, not the search result: 搜索 finds a
     // row, it does not redefine what "每科保留自己的错因" is counting. So the
     // whole library is read whenever the visible list is narrowed at all.
     const allRecordsRequest = subject === "all" && !recordQuery
-      ? Promise.resolve<MistakeRecord[] | null>(null)
-      : listMistakes({}).catch(() => null)
+      ? Promise.resolve<{ items: MistakeRecord[]; count: number } | null>(null)
+      : listMistakePage({}).catch(() => null)
     currentRecordsRequest
-      .then((loaded) => {
+      .then((page) => {
         if (!active) return null
+        const loaded = page.items
         setCorrectionID("")
         setEvidenceID("")
         setCorrectionAnswer("")
         setCorrectionStartedAt(null)
+        setRecordTotal(page.count)
+        setServerRecords(loaded.length)
         const pending = pendingLocalRecords.current
         pendingLocalRecords.current = []
         const merge = (base: MistakeRecord[]) => {
@@ -244,10 +255,10 @@ export default function Practice() {
         setRecords(merge(loaded))
         setDiagnosticRecords(merge(loaded))
         setError("")
-        void allRecordsRequest.then((allLoaded) => {
-          if (active && allLoaded) {
+        void allRecordsRequest.then((allPage) => {
+          if (active && allPage) {
             setDiagnosticRecords((current) => {
-              const merged = [...allLoaded, ...current]
+              const merged = [...allPage.items, ...current]
               const seen = new Set<string>()
               return merged.filter((record) => {
                 if (seen.has(record.id)) return false
@@ -318,12 +329,56 @@ export default function Practice() {
     }
   }
 
+  /**
+   * The next page of the log, appended.
+   *
+   * One request of 50 and the card knows how many there are; searching answers
+   * "is it there", this answers "what else is".
+   */
+  async function loadMoreRecords() {
+    if (loadingMoreRecords || recordTotal <= serverRecords) return
+    setLoadingMoreRecords(true)
+    setError("")
+    try {
+      const page = await listMistakePage({
+        ...(subject === "all" ? {} : { subject }),
+        ...(recordQuery ? { query: recordQuery } : {}),
+        offset: serverRecords,
+      })
+      const seen = new Set<string>()
+      const fresh = page.items.filter((record) => {
+        if (seen.has(record.id)) return false
+        seen.add(record.id)
+        return true
+      })
+      const append = (current: MistakeRecord[]) => {
+        const known = new Set(current.map((record) => record.id))
+        return [...current, ...fresh.filter((record) => !known.has(record.id))]
+      }
+      // The diagnostics list covers the whole library, and a row that just came
+      // off the server belongs in it too.
+      setRecords(append)
+      setDiagnosticRecords(append)
+      setServerRecords((current) => current + fresh.length)
+      setRecordTotal(page.count)
+    } catch {
+      setError("读取更多错题失败，请重试。")
+    } finally {
+      setLoadingMoreRecords(false)
+    }
+  }
+
   async function remove(id: string) {
     try {
       await deleteMistake(id)
       setRecords((current) => current.filter((entry) => entry.id !== id))
       setDiagnosticRecords((current) => current.filter((entry) => entry.id !== id))
       pendingLocalRecords.current = pendingLocalRecords.current.filter((entry) => entry.id !== id)
+      // Both counts drop by one with it. A row that was only ever local would
+      // make the next offset one short -- re-reading a row that is then deduped
+      // -- and the total re-settles on the next page, so neither drifts far.
+      setRecordTotal((current) => Math.max(0, current - 1))
+      setServerRecords((current) => Math.max(0, current - 1))
       if (correctionID === id) {
         setCorrectionID("")
         setCorrectionAnswer("")
@@ -768,6 +823,17 @@ export default function Practice() {
               })}
             </ul>
           )}
+          {recordTotal > serverRecords ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full"
+              disabled={loadingMoreRecords}
+              onClick={() => void loadMoreRecords()}
+            >
+              {loadingMoreRecords ? "正在读取…" : `加载更多（还有 ${recordTotal - serverRecords} 条）`}
+            </Button>
+          ) : null}
           {rowError ? (
             <p role="alert" className="mt-3 text-sm text-destructive">
               {rowError}

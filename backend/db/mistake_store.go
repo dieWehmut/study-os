@@ -114,29 +114,52 @@ const mistakeSelect = `
 	FROM question_attempts a
 	JOIN questions q ON q.id = a.question_id`
 
-// ListMistakes returns the most recent attempts, newest first, narrowed to a
-// subject when one is given -- every list in the app follows the 首页 switch.
+// mistakeFilter is the WHERE every read of the log shares, so a page and its
+// total cannot be about different sets.
 //
 // Only attempts that blame something are mistakes. The 订正 retry lives in the
 // same table and would otherwise take a row on the page and a slot out of the
 // limit, pushing a real mistake off the end for having been fixed.
+func mistakeFilter(options models.MistakeListOptions) (string, []any) {
+	where := ` WHERE a.cause <> ''`
+	arguments := make([]any, 0, 2)
+	if subject := strings.TrimSpace(options.Subject); subject != "" {
+		where += ` AND q.subject = ?`
+		arguments = append(arguments, subject)
+	}
+	if needle := strings.TrimSpace(options.Query); needle != "" {
+		where += ` AND q.stem LIKE ? ESCAPE '\'`
+		arguments = append(arguments, "%"+escapeLike(needle)+"%")
+	}
+	return where, arguments
+}
+
+// CountMistakes answers how many are on the log, not how many fit on a page --
+// the 记录 card says "还有 N 条" and offers a next page from it.
+func (s *Store) CountMistakes(ctx context.Context, options models.MistakeListOptions) (int, error) {
+	where, arguments := mistakeFilter(options)
+	var total int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM question_attempts a
+		JOIN questions q ON q.id = a.question_id`+where, arguments...).Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("count mistakes: %w", err)
+	}
+	return total, nil
+}
+
 func (s *Store) ListMistakes(ctx context.Context, options models.MistakeListOptions) ([]models.Mistake, error) {
 	limit := options.Limit
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	query := mistakeSelect + ` WHERE a.cause <> ''`
-	arguments := make([]any, 0, 2)
-	if subject := strings.TrimSpace(options.Subject); subject != "" {
-		query += ` AND q.subject = ?`
-		arguments = append(arguments, subject)
+	offset := options.Offset
+	if offset < 0 {
+		offset = 0
 	}
-	if needle := strings.TrimSpace(options.Query); needle != "" {
-		query += ` AND q.stem LIKE ? ESCAPE '\'`
-		arguments = append(arguments, "%"+escapeLike(needle)+"%")
-	}
-	query += ` ORDER BY a.occurred_at DESC, a.id DESC LIMIT ?`
-	arguments = append(arguments, limit)
+	where, arguments := mistakeFilter(options)
+	query := mistakeSelect + where + ` ORDER BY a.occurred_at DESC, a.id DESC LIMIT ? OFFSET ?`
+	arguments = append(arguments, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, arguments...)
 	if err != nil {

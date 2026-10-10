@@ -44,6 +44,7 @@ export interface ListMistakesOptions {
   /** Narrows by the question as it was written down. The list is capped. */
   query?: string
   limit?: number
+  offset?: number
 }
 
 /**
@@ -91,13 +92,28 @@ function toRecord(pair: MistakePair): MistakeRecord {
 }
 
 export async function listMistakes(options: ListMistakesOptions = {}): Promise<MistakeRecord[]> {
+  return (await listMistakePage(options)).items
+}
+
+/**
+ * The same read, with the total.
+ *
+ * `count` is how many mistakes are on the log, not how many fit in the page --
+ * the 记录 card offers a next page from it. `listMistakes` is this function
+ * without the total, so the two can never disagree about what they read.
+ */
+export async function listMistakePage(
+  options: ListMistakesOptions = {},
+): Promise<{ items: MistakeRecord[]; count: number }> {
   const params = new URLSearchParams()
   if (options.subject !== undefined) params.set("subject", options.subject)
   if (options.query !== undefined) params.set("q", options.query)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
+  if (options.offset !== undefined) params.set("offset", String(options.offset))
   const suffix = params.toString()
   const page = await apiRequest<MistakeListResponse>(`/mistakes${suffix ? `?${suffix}` : ""}`)
-  return (page.items ?? []).map(toRecord)
+  const items = (page.items ?? []).map(toRecord)
+  return { items, count: typeof page.count === "number" ? page.count : items.length }
 }
 
 export async function recordMistake(filed: {

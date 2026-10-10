@@ -231,6 +231,9 @@ type MistakeListOptions struct {
 	// no longer holds it.
 	Query string
 	Limit int
+	// Offset walks the log a page at a time. The list is capped, so without it
+	// the older half is reachable only by searching for it.
+	Offset int
 }
 
 // ChatConversationListOptions lists the conversations themselves, not their

@@ -15,7 +15,16 @@ const mocks = vi.hoisted(() => ({
   listErrorCauses: vi.fn(),
 }))
 
-vi.mock("@/api/mistakes", () => mocks)
+vi.mock("@/api/mistakes", () => ({
+  ...mocks,
+  // The page reads a page of records together with its total. These cases only
+  // ever needed the rows, so an array is read as a page exactly its own length --
+  // the paging case below returns the object shape instead.
+  listMistakePage: async (options?: unknown) => {
+    const result = await mocks.listMistakes(options)
+    return Array.isArray(result) ? { items: result, count: result.length } : result
+  },
+}))
 vi.mock("@/api/error-causes", () => ({ listErrorCauses: mocks.listErrorCauses }))
 
 let filed = 0
@@ -170,6 +179,25 @@ describe("Practice page", () => {
     fireEvent.click(screen.getByRole("button", { name: "清除" }))
 
     await waitFor(() => expect(screen.getByText(/还没有记录/)).toBeInTheDocument())
+  })
+
+  it("loads more of the log than the first page holds", async () => {
+    // One page of 50, and the card knows how many there are: searching answers
+    // "is it there", this answers "what else is".
+    const first = { id: "qa-1", subject: "math", question: "第一页的题", cause: "method", createdAt: "2026-08-09T00:00:02Z" }
+    const second = { id: "qa-2", subject: "math", question: "第二页的题", cause: "method", createdAt: "2026-08-09T00:00:01Z" }
+    mocks.listMistakes.mockImplementation((options?: { offset?: number }) =>
+      Promise.resolve(options?.offset ? { items: [second], count: 2 } : { items: [first], count: 2 }),
+    )
+    render(<Practice />)
+    await screen.findByText("第一页的题")
+
+    fireEvent.click(screen.getByRole("button", { name: "加载更多（还有 1 条）" }))
+
+    await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalledWith(expect.objectContaining({ offset: 1 })))
+    expect(await screen.findByText("第二页的题")).toBeInTheDocument()
+    // Nothing left, so nothing left to offer.
+    expect(screen.queryByRole("button", { name: /加载更多/ })).not.toBeInTheDocument()
   })
 
   it("says how much of the log review can actually fix", async () => {

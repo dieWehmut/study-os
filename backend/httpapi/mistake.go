@@ -138,14 +138,22 @@ func handleMistakeList(response http.ResponseWriter, request *http.Request, appl
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
 		return
 	}
-	mistakes, err := application.Store.ListMistakes(request.Context(), models.MistakeListOptions{
+	options := models.MistakeListOptions{
 		Subject: strings.ToLower(strings.TrimSpace(request.URL.Query().Get("subject"))),
 		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
 		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 200),
-	})
+		Offset:  parseOffset(request.URL.Query().Get("offset")),
+	}
+	mistakes, err := application.Store.ListMistakes(request.Context(), options)
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取错题失败"})
 		return
 	}
-	writeJSON(response, http.StatusOK, map[string]any{"items": mistakes, "count": len(mistakes)})
+	// The total, not the page: the 记录 card says "还有 N 条".
+	total, err := application.Store.CountMistakes(request.Context(), options)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "统计错题失败"})
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"items": mistakes, "count": total})
 }
