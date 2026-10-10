@@ -2,15 +2,19 @@
 
 ## 未发布
 
-### 导出：补上桌面壳的鉴权（此前会 401）
+### 导出：CSV 导出改走客户端统一的文件请求路径（并更正一条说法）
 
-- 第 42、44 轮加的 CSV 导出（知识库、错题）是用 `fetch(resolveApiBase() + …)` 直接拼的，
-  **没带桌面壳的 token**：浏览器版正常，桌面壳里会 401。第 45 轮给备份下载修了同一类问题时
-  （「直接 `<a href>` 到接口会没有鉴权」），我漏看了这两处。
-- 现在统一走客户端新加的 `apiRequestText`（与 `apiRequestBlob` 共用同一个请求函数：解析
-  `error` 信封、带 Authorization、演示版拒绝），两处导出各删掉一段重复的 fetch 与错误处理。
+- 第 42、44 轮加的 CSV 导出（知识库、错题）是各自 `fetch(resolveApiBase() + …)` 拼的，没有和
+  其它请求共用客户端那条路径。这次统一到 `apiRequestText`（与 `apiRequestBlob` 共用同一个
+  请求函数：解析 `error` 信封、带 `Authorization`、演示版拒绝），两处各删掉一段重复的 fetch
+  与错误处理。
+- **更正**：我上一轮说这两处「桌面壳里会 401」——**这是错的**。查过之后：后端 httpapi 里
+  **没有任何 token 校验**（`APIToken` 只由桌面壳生成并交给前端，服务端从不读它）；真正的门是
+  `loopbackHostOnly`（非环回 Host 直接 421）与 `trustedOriginOnly`（跨源 Origin 直接 403）。
+  所以这两处此前并不会 401；`Authorization` 头现在只是「已经带上、将来若收紧就能用」。
+- 顺带记一条待办：若将来要真正校验 token，必须先让**用 URL 直取的资源**也带上它
+  （`<audio src>`、头像 `<img>`、附件下载），否则桌面壳里朗读与图片会先坏。这条不在这轮做。
 - 用例 1 条：桥接给出 token 时，文件请求确实带上 `Authorization: Bearer desk-token`。
-  （这条用例正好补上我原来漏掉的检查——三处文件请求，只有一处曾验证过鉴权。）
 
 ### 错题导出也跟着搜索框走
 

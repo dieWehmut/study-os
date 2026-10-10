@@ -35,6 +35,16 @@ export function resolveApiBase(): string {
   return "/api"
 }
 
+/**
+ * Where the API is, and the token to greet it with.
+ *
+ * The desktop shell generates the token and the client sends it on every request
+ * -- but the server does not verify it yet. Its guards are the Host check (a
+ * non-loopback Host is answered 421) and the Origin check (an untrusted Origin is
+ * answered 403). The header is therefore readiness, not enforcement: tightening
+ * that would also have to cover the resources taken straight from a URL
+ * (`<audio src>`, avatar images), which cannot carry one.
+ */
 export async function resolveApiConfig(): Promise<ApiConfig> {
   const bridge = window.go?.main?.DesktopApp
   if (!bridge) return { baseUrl: resolveApiBase() }
