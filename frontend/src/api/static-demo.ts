@@ -350,6 +350,16 @@ function makeLesson(): Lesson {
       if (Array.isArray(content)) return content.length > 0
       return Object.keys(content).length > 0
     }).length,
+    // The same rule the real list uses for its 即时练习 count: a practice section either
+    // carries a list of questions or the single flat one.
+    practice_questions: sections.reduce((total, section) => {
+      if (section.type !== "practice") return total
+      const content = section.content
+      if (!content || typeof content !== "object" || Array.isArray(content)) return total
+      const record = content as { question?: string; questions?: unknown[] }
+      if (Array.isArray(record.questions)) return total + record.questions.length
+      return total + (record.question ? 1 : 0)
+    }, 0),
     version: 1,
     created_at: DEMO_NOW,
     updated_at: DEMO_NOW,

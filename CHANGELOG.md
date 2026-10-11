@@ -2,6 +2,28 @@
 
 ## 未发布
 
+### 把「演示版必须和真机说同样的话」变成一条可执行的契约
+
+- 这一类分歧**已经被手抓到五次**（只会失败的按钮、导出没跟筛选、演示版跳过筛选与搜索、每日上限对队列无效、
+  派生数字只在真机存在）。靠"下次注意"显然不够——这轮把它写成用例：**逐个路由列出页面真正读到的字段**，
+  共同断言演示适配器必须答得出来：
+  `
+  /english/articles  items[].vocabulary_count, items[].section_count
+  /lessons           items[].sections_count, items[].filled_sections, items[].practice_questions
+  /groups            items[].item_count
+  /knowledge         items, count, scheduled_ids
+  /mistakes          items, count
+  /reviews/due       items
+  /reviews/forecast  days
+  /dashboard         knowledge_count, due_count, reviewed_today, current_streak, subjects_due
+  /error-causes      items
+  `
+  关键判据是 **`toHaveProperty` 而不是"有值"**：字段为 0 也要在，因为`undefined`正是页面渲染成
+  「整块标签消失」的那种情况——前五次全是这么发生的。
+- **这条契约第一次运行就抓到第六处**：`/lessons` 缺 `practice_questions` ⇒ 演示版课程卡片上的
+  「N 道练习题」从来不出现。已按后端的同一规则补上（`questions` 数组优先，否则看单个 `question`）。
+- 用例：`static-demo.test.ts` +1（九个路由的字段契约）；实测**它确实能抓到新缺口**（先红后绿）。
+
 ### 演示版补上我最近三轮加的三个「派生数字」
 
 - 这段时间给列表行加的三种数字——**生词 N**（第 141 轮）、**已填 N/M**（第 135 轮）、**分组条数**（第 131 轮）

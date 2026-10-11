@@ -347,6 +347,44 @@ describe("static Pages API fixtures", () => {
     })
   })
 
+  it("answers every field the list pages read, the way the real backend does", async () => {
+    // This divergence has been found five times by hand: buttons that could only fail,
+    // an export that ignored the filter, filters and search the adapter skipped, a
+    // daily limit that changed nothing, and derived counts that only existed off the
+    // Pages build. So it is a contract now, spelled out route by route: whatever a row
+    // or a screen reads, the demo has to answer it.
+    const required: Array<[string, string[]]> = [
+      ["/english/articles", ["items[].vocabulary_count", "items[].section_count"]],
+      ["/lessons", ["items[].sections_count", "items[].filled_sections", "items[].practice_questions"]],
+      ["/groups", ["items[].item_count"]],
+      ["/knowledge", ["items", "count", "scheduled_ids"]],
+      ["/mistakes", ["items", "count"]],
+      ["/reviews/due", ["items"]],
+      ["/reviews/forecast", ["days"]],
+      ["/dashboard", ["knowledge_count", "due_count", "reviewed_today", "current_streak", "subjects_due"]],
+      ["/error-causes", ["items"]],
+    ]
+
+    for (const [route, expectations] of required) {
+      const body = await staticDemoRequest<Record<string, unknown>>(route)
+      for (const expectation of expectations) {
+        const [head, leaf] = expectation.split("[].")
+        if (leaf) {
+          const rows = body[head] as Array<Record<string, unknown>> | undefined
+          expect(rows, `${route} -> ${head}`).toBeDefined()
+          expect(rows!.length, `${route} has no rows to check`).toBeGreaterThan(0)
+          // Present on the row, even when the value is 0: `undefined` is what a page
+          // renders as "no label at all", which is how these went missing.
+          for (const key of leaf.split(",")) {
+            expect(rows![0], `${route} -> ${expectation}`).toHaveProperty(key)
+          }
+        } else {
+          expect(body, `${route} -> ${expectation}`).toHaveProperty(expectation)
+        }
+      }
+    }
+  })
+
   it("carries the derived counts the pages draw from, not only the real backend", async () => {
     // Three labels were added to list rows in the app (生词 N, 已填 N/M, group counts).
     // A count that only exists on the real backend is a feature the Pages build
