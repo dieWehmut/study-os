@@ -54,6 +54,9 @@ export default function Reading() {
   // no second paste box to keep in sync with this one.
   const map = useMemo(() => markdownToMindMap(markdown), [markdown])
   const readIds = useMemo(() => new Set(session.readIds), [session.readIds])
+  // The same summary the shelf rows show, for the document in the box: the shelf was
+  // the only place progress appeared, so what is open right now had none.
+  const currentSummary = useMemo(() => summarizeReadingSession(session), [session])
   const stuckIds = useMemo(() => new Set(session.stuckIds), [session.stuckIds])
   const keptIds = useMemo(() => new Set(session.keptIds), [session.keptIds])
   // A place stored against a longer draft has to land somewhere real in this
@@ -289,6 +292,16 @@ export default function Reading() {
               save({ ...emptyReadingSession, markdown: value })
             }}
           />
+          {/* Silent while there is nothing to read, and silent about stuck sections at
+              zero -- the same convention as the shelf rows just below. */}
+          {currentSummary && currentSummary.total > 0 ? (
+            <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-reading-progress="true">
+              <span>这篇已读 {currentSummary.read} / {currentSummary.total} 节</span>
+              {currentSummary.stuck > 0 ? (
+                <span className="font-medium text-amber-600 dark:text-amber-400">{currentSummary.stuck} 节没看懂</span>
+              ) : null}
+            </p>
+          ) : null}
           {map.nodes.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowMap((open) => !open)}>

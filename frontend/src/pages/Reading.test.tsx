@@ -97,6 +97,21 @@ describe("Reading page", () => {
     expect(screen.getByText("已读 1 / 2")).toBeInTheDocument()
   })
 
+  it("shows the progress of the document in the box, not only of shelved ones", () => {
+    // Progress used to appear only on shelf rows, so the document being read right now
+    // had none of it.
+    renderReading()
+
+    expect(document.querySelector("[data-reading-progress='true']")).toBeNull()
+
+    paste(source)
+    fireEvent.click(screen.getByRole("button", { name: /读完/ }))
+
+    const line = document.querySelector("[data-reading-progress='true']")
+    expect(line).not.toBeNull()
+    expect(line!.textContent).toContain("这篇已读 1 / 2 节")
+  })
+
   it("shows the document's stops once something is pasted", () => {
     renderReading()
     paste(source)
