@@ -194,6 +194,29 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
                 ].filter(Boolean).join("、")}
               </p>
             ) : null}
+            {/* The same numbers as a picture. Three widths against one another say
+                "most of this round was solid" or "half of it was guesses" faster than
+                the sentence above does, and this is the moment the round is judged. */}
+            {verdicts.length > 0 ? (
+              <div className="mt-3 grid w-full gap-1.5" data-round-bars="true">
+                {([
+                  { key: "correct", label: "正确", count: counts.correct, className: "bg-primary" },
+                  { key: "partial", label: "部分正确", count: counts.partial, className: "bg-accent-foreground/60" },
+                  { key: "incorrect", label: "需要重学", count: counts.incorrect, className: "bg-destructive/70" },
+                ] as const).filter((row) => row.count > 0).map((row) => (
+                  <div key={row.key} className="flex items-center gap-2 text-xs">
+                    <span className="w-16 shrink-0 text-muted-foreground">{row.label}</span>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <span
+                        className={`block h-full ${row.className}`}
+                        style={{ width: `${Math.round((row.count / verdicts.length) * 100)}%` }}
+                      />
+                    </span>
+                    <span className="w-8 shrink-0 text-right tabular-nums">{row.count}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <p className="mt-1 text-sm text-muted-foreground">
               新导入或新学的知识会自动进入这里；还没排复习的知识点不会自己进来。
             </p>

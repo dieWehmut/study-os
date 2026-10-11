@@ -255,6 +255,15 @@ describe("ReviewSession", () => {
 
     const tally = await screen.findByText(/这一轮做了/)
     expect(tally).toHaveTextContent("这一轮做了 1 张：正确 1")
+
+    // And the same round as a picture: one bar per verdict that happened, so the
+    // shape of the round is readable without doing the arithmetic.
+    const bars = document.querySelector("[data-round-bars='true']")
+    expect(bars).not.toBeNull()
+    const rows = bars!.querySelectorAll("span.w-16")
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.textContent).toBe("正确")
+    expect(bars!.textContent).toContain("1")
   })
 
   it("counts a 改判 once, with the corrected verdict", async () => {
