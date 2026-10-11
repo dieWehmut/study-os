@@ -1,5 +1,5 @@
 import { RotateCcw } from "lucide-react"
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import { answerReview, overrideAttempt } from "@/api/reviews"
 import type { DueReview, ReviewEvaluation } from "@/api/types"
@@ -23,7 +23,8 @@ export function ProductionPrompt({ current, onNext, onError, onRated }: Producti
   const isChoicePrompt =
     current.prompt.prompt_type === "context_cloze" && (current.prompt.options?.length ?? 0) > 0
 
-  async function submitAnswer(payload?: string) {
+  // Stable so the key listener is not torn down and rebuilt on every render.
+  const submitAnswer = useCallback(async (payload?: string) => {
     const value = payload ?? answer.trim()
     if (!value || submitting) return
     setSubmitting(true)
@@ -36,9 +37,9 @@ export function ProductionPrompt({ current, onNext, onError, onRated }: Producti
     } finally {
       setSubmitting(false)
     }
-  }
+  }, [answer, current.prompt.id, onError, onRated, submitting])
 
-  async function correctRating(rating: 1 | 2 | 3) {
+  const correctRating = useCallback(async (rating: 1 | 2 | 3) => {
     if (!evaluation || submitting) return
     setSubmitting(true)
     try {
@@ -52,7 +53,38 @@ export function ProductionPrompt({ current, onNext, onError, onRated }: Producti
     } finally {
       setSubmitting(false)
     }
-  }
+  }, [evaluation, onError, onRated, submitting])
+
+  // The keyboard rules differ by what is on screen: a digit picks a choice, but the
+  // same digit typed into the answer box is text -- and after the verdict it is a
+  // 改判, which is the same three-way scale the self-rated cards use.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return
+      if (evaluation) {
+        if (event.key === "Enter") {
+          event.preventDefault()
+          onNext()
+          return
+        }
+        const rating = { "1": 1, "2": 2, "3": 3 }[event.key] as 1 | 2 | 3 | undefined
+        if (!rating || submitting) return
+        event.preventDefault()
+        void correctRating(rating)
+        return
+      }
+      if (!isChoicePrompt || submitting) return
+      const index = Number(event.key) - 1
+      const option = current.prompt.options?.[index]
+      if (!option) return
+      event.preventDefault()
+      void submitAnswer(option)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [correctRating, current.prompt.options, evaluation, isChoicePrompt, onNext, submitAnswer, submitting])
 
   return (
     <>
@@ -140,8 +172,14 @@ export function ProductionPrompt({ current, onNext, onError, onRated }: Producti
 
       <div className="flex justify-end">
         {evaluation ? (
-          <Button onClick={onNext}>下一题</Button>
-        ) : isChoicePrompt ? null : (
+          <>
+            {/* Drilling: say the keys instead of leaving them to be discovered. */}
+            <p className="mr-auto self-center text-xs text-muted-foreground">键盘：1/2/3 改判 · 回车下一题</p>
+            <Button onClick={onNext}>下一题</Button>
+          </>
+        ) : isChoicePrompt ? (
+          <p className="text-xs text-muted-foreground">键盘：按 1–{current.prompt.options?.length ?? 0} 选择</p>
+        ) : (
           <Button disabled={!answer.trim() || submitting} onClick={() => void submitAnswer()}>
             {submitting ? <RotateCcw aria-hidden="true" className="animate-spin" /> : null}
             提交答案
