@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 
 import { submitSelfRating } from "@/api/reviews"
 import type { DueReview, ReviewEvaluation } from "@/api/types"
@@ -37,10 +37,16 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
     }
   }, [current.prompt.id, evaluation, onError, onRated, submitting])
 
-  // Typing into a field is not a shortcut, and a card being rated twice is not a
-  // rating: the listener stands down for both.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
+  // One listener for the life of the card, reading the newest handler through a ref.
+  //
+  // The same race the fill-in card had: a listener registered per render keeps the
+  // state it closed over, so between the verdict appearing and the effect re-running
+  // there is a window where the old closure still believes nothing was answered --
+  // and Enter for 下一题 is swallowed. A layout effect runs in the same commit, so no
+  // event can arrive in that window.
+  const keyHandler = useRef<(event: KeyboardEvent) => void>(() => {})
+  useLayoutEffect(() => {
+    keyHandler.current = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const target = event.target as HTMLElement | null
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return
@@ -55,9 +61,15 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
       event.preventDefault()
       void rate(rating)
     }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [evaluation, onNext, rate, submitting])
+  })
+
+  // Typing into a field is not a shortcut, and a card being rated twice is not a
+  // rating: the handler above stands down for both.
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => keyHandler.current(event)
+    window.addEventListener("keydown", listener)
+    return () => window.removeEventListener("keydown", listener)
+  }, [])
 
   return (
     <>
