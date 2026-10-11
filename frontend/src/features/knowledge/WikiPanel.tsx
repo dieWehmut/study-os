@@ -302,6 +302,18 @@ export function WikiPanel({
         {item.part_of_speech || item.pronunciation ? (
           <CardDescription>{[item.part_of_speech, item.pronunciation].filter(Boolean).join(" · ")}</CardDescription>
         ) : null}
+        {/* Which grouping this belongs to, said on its own line. The family section
+            below shows groups too, but only when there are siblings to list -- so an
+            item that is in a group and alone in the library used to show no group at
+            all, which reads as "belongs to nothing". */}
+        {family.groups.length > 0 ? (
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" data-item-groups="true">
+            所属分组
+            {family.groups.map((group) => (
+              <Badge key={group.id} variant="outline">{group.name}</Badge>
+            ))}
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent className="pt-4">
         <Tabs defaultValue="concise">

@@ -64,6 +64,20 @@ describe("WikiPanel node renaming", () => {
     })
   })
 
+  it("says which group an item belongs to even when it has no siblings", async () => {
+    // The family section below needs siblings to list, so a grouped item that is alone
+    // in the library used to show no group at all -- which reads as "belongs to none".
+    mocks.listRelatedKnowledge.mockResolvedValue({
+      items: [],
+      groups: [{ id: "g1", name: "abandon 词族", kind: "word_family" }],
+    })
+    render(<Harness start={item} />)
+
+    const line = await screen.findByText(/所属分组/)
+    expect(line.closest("[data-item-groups='true']")).not.toBeNull()
+    expect(screen.getAllByText("abandon 词族").length).toBeGreaterThan(0)
+  })
+
   it("writes a renamed node back into the wiki it was drawn from", async () => {
     mocks.saveKnowledgeWiki.mockImplementation((id: string, next: string) =>
       Promise.resolve({ ...item, id, detailed_markdown: next }),
