@@ -103,3 +103,42 @@ test("lesson documentation describes the versioned write and preview contract", 
   assert.match(roadmap, /固定十段|十段模板/)
   assert.match(roadmap, /VITE_STATIC_DEMO[\s\S]*GET 预览 fixture[\s\S]*浏览器会话内模拟即时练习证据的 POST\/GET/)
 })
+
+test("the 第 4 阶段 gate reads the same numbers in ROADMAP and on screen", () => {
+  // The gate is what keeps Task / System Idea from being built to avoid studying. It
+  // is only a gate if both the plan and the settings card say the same number -- the
+  // two disagreed once already (环节 vs 知识点), which is why this is checked here
+  // instead of by reading carefully.
+  const gateSource = read("frontend/src/features/settings/PhaseGateNote.tsx")
+
+  const gate = gateSource.match(/const GATE = \{([\s\S]*?)\} as const/)
+  assert.ok(gate, "PhaseGateNote.tsx must declare its thresholds as a literal")
+
+  const numbers = {}
+  for (const [, key, value] of gate[1].matchAll(/(\w+):\s*(\d+)/g)) {
+    numbers[key] = Number(value)
+  }
+  assert.deepEqual(
+    numbers,
+    { correctedMistakes: 20, attempts: 30, knowledge: 30 },
+    "the on-screen thresholds changed; ROADMAP has to change with them",
+  )
+
+  // ROADMAP states the same three, each with where it is read from.
+  for (const [label, value] of [
+    ["已订正的错题", numbers.correctedMistakes],
+    ["复习作答次数", numbers.attempts],
+    ["知识点", numbers.knowledge],
+  ]) {
+    assert.match(
+      roadmap,
+      new RegExp(`\\|\\s*${label}\\s*\\|\\s*≥\\s*${value}\\s*\\|`),
+      `ROADMAP 第 4 阶段 must keep 「${label} ≥ ${value}」 in its gate table`,
+    )
+  }
+
+  // And each row names an endpoint that exists, so the gate stays computable.
+  assert.match(roadmap, /corrected=yes[\s\S]*count/)
+  assert.match(roadmap, /dashboard[\s\S]*attempt_count/)
+  assert.match(roadmap, /dashboard[\s\S]*knowledge_count/)
+})
