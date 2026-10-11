@@ -16,6 +16,12 @@ interface KnowledgeListProps {
   remaining?: number
   loadingMore?: boolean
   onLoadMore?: () => void
+  /**
+   * The ids on this page that already have a review plan. A knowledge item that is not
+   * in the plan will never be asked about, and the row is where that is worth saying --
+   * it is the difference between "I know this" and "I will be tested on this".
+   */
+  scheduledIds?: ReadonlySet<string>
 }
 
 export function KnowledgeList({
@@ -26,6 +32,7 @@ export function KnowledgeList({
   remaining = 0,
   loadingMore = false,
   onLoadMore,
+  scheduledIds,
 }: KnowledgeListProps) {
   if (loading) return <p className="py-10 text-center text-sm text-muted-foreground">正在整理知识点…</p>
   if (items.length === 0) return <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">没有找到匹配的知识点</p>
@@ -53,6 +60,20 @@ export function KnowledgeList({
                   {item.part_of_speech ? <Badge variant="outline">{item.part_of_speech}</Badge> : null}
                   {item.subject ? <SubjectBadge subject={item.subject} /> : null}
                   {item.level ? <span className="text-xs text-muted-foreground">{item.level}</span> : null}
+                  {/* Said on the row, not only in the 复习状态 filter: the fact decides
+                      whether this item will ever come back to you. */}
+                  {scheduledIds ? (
+                    <span
+                      data-scheduled-marker={scheduledIds.has(item.id) ? "yes" : "no"}
+                      className={
+                        scheduledIds.has(item.id)
+                          ? "text-xs text-muted-foreground"
+                          : "text-xs font-medium text-amber-600 dark:text-amber-400"
+                      }
+                    >
+                      {scheduledIds.has(item.id) ? "已排复习" : "还没排复习"}
+                    </span>
+                  ) : null}
                 </div>
                 <CardDescription className="line-clamp-2">{item.concise_definition}</CardDescription>
               </CardHeader>

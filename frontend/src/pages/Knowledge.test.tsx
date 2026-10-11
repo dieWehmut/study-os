@@ -117,6 +117,28 @@ describe("Knowledge page", () => {
     ))
   })
 
+  it("says on each row whether it is in the review plan", async () => {
+    // An item nobody scheduled is one that will never be asked about. The 复习状态
+    // filter could tell you that about a whole list; the row is where it is true of
+    // the thing you are looking at.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 2,
+      items: [
+        { id: "k1", item_type: "word_sense", term: "在计划里", concise_definition: "释义" },
+        { id: "k2", item_type: "word_sense", term: "不在计划里", concise_definition: "释义" },
+      ],
+      scheduled_ids: ["k1"],
+    })
+    render(<Knowledge />)
+
+    const scheduled = await screen.findByText("在计划里")
+    const row = scheduled.closest("[data-scheduled-marker], div")
+    expect(row).not.toBeNull()
+    expect(document.querySelectorAll("[data-scheduled-marker='yes']").length).toBe(1)
+    expect(document.querySelectorAll("[data-scheduled-marker='no']").length).toBe(1)
+    expect(screen.getByText("还没排复习")).toBeInTheDocument()
+  })
+
   it("renders a selected item in concise and detail tabs", async () => {
     render(<Knowledge />)
 

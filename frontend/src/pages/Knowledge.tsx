@@ -553,6 +553,7 @@ function KnowledgePage({
               remaining={Math.max(0, count - items.length)}
               loadingMore={loadingMore}
               onLoadMore={() => void loadMore()}
+              scheduledIds={scheduledIds}
             />
             <WikiPanel
               key={selected?.id ?? "none"}
