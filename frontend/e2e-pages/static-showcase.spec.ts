@@ -91,6 +91,9 @@ test("renders deep links from static fixtures without a backend", async ({ page 
   await expect(page.getByRole("button", { name: "\u7acb\u5373\u5907\u4efd" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "\u6821\u9a8c" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "\u4e0b\u8f7d", exact: true })).toHaveCount(0)
+  // 试听 needs the speech endpoint: the demo shows voice roles, so the button would
+  // render and fail on every press.
+  await expect(page.getByRole("button", { name: /\u8bd5\u542c/ })).toHaveCount(0)
 
   // Copying a link is client-side and works here -- and this build keeps the route
   // inside the hash, which is the branch a link written from window.location gets

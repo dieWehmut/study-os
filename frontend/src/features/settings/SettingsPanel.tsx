@@ -797,21 +797,26 @@ export default function SettingsPanel() {
                           <span className="truncate text-xs text-muted-foreground" title={role.bio?.trim() || undefined}>{role.bio?.trim() ? role.bio : "尚无简介"}</span>
                         </div>
                         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            aria-label={previewRoleId === role.id ? `停止试听 ${role.name}` : `试听 ${role.name}`}
-                            title={role.bio?.trim() ? "试听这句简介" : "试听（该角色还没写简介，读名字）"}
-                            onClick={() => void togglePreview(role)}
-                          >
-                            {previewRoleId !== role.id ? (
-                              <Volume2 aria-hidden="true" />
-                            ) : previewPhase === "loading" ? (
-                              <Loader2 aria-hidden="true" className="animate-spin" />
-                            ) : (
-                              <Square aria-hidden="true" />
-                            )}
-                          </Button>
+                          {/* 试听 needs the speech endpoint, which the Pages build has
+                              no server for: it could only fail, and a button that can
+                              only fail is worse than no button. */}
+                          {isStaticDemo() ? null : (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              aria-label={previewRoleId === role.id ? `停止试听 ${role.name}` : `试听 ${role.name}`}
+                              title={role.bio?.trim() ? "试听这句简介" : "试听（该角色还没写简介，读名字）"}
+                              onClick={() => void togglePreview(role)}
+                            >
+                              {previewRoleId !== role.id ? (
+                                <Volume2 aria-hidden="true" />
+                              ) : previewPhase === "loading" ? (
+                                <Loader2 aria-hidden="true" className="animate-spin" />
+                              ) : (
+                                <Square aria-hidden="true" />
+                              )}
+                            </Button>
+                          )}
                           {role.id === activeVoiceRoleId ? null : (
                             <Button size="xs" variant="outline" aria-label={`将 ${role.name} 设为当前角色`} onClick={() => void activateVoiceRole(role.id)}>设为当前</Button>
                           )}
