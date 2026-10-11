@@ -17,8 +17,15 @@ const knowledgeMocks = vi.hoisted(() => ({
   listKnowledge: vi.fn(),
 }))
 
+const audioMocks = vi.hoisted(() => ({
+  playPronunciation: vi.fn(),
+}))
+
 vi.mock("@/api/reviews", () => mocks)
 vi.mock("@/api/knowledge", () => knowledgeMocks)
+// Mocked so the shortcut can be asserted at all; unmocked it would reach for a real
+// audio endpoint that jsdom has no server for.
+vi.mock("@/api/audio", () => audioMocks)
 
 function renderSession(props: { recovery?: boolean } = {}) {
   return render(
@@ -34,6 +41,7 @@ describe("ReviewSession", () => {
     useSubjectStore.setState({ subject: "all" })
     useSettingsStore.setState({ settings: { dailyLimit: 20 } })
     knowledgeMocks.listKnowledge.mockResolvedValue({ items: [{ id: "k1" }], count: 1 })
+    audioMocks.playPronunciation.mockResolvedValue("file")
     mocks.getDueReviews.mockResolvedValue({
       items: [
         {
@@ -85,6 +93,15 @@ describe("ReviewSession", () => {
 
     await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalledWith("p1", 3))
     expect(await screen.findByText("放弃；抛弃")).toBeInTheDocument()
+  })
+
+  it("plays the card's pronunciation from the keyboard, so drilling needs no mouse", async () => {
+    renderSession()
+    await screen.findByRole("button", { name: "播放发音" })
+
+    fireEvent.keyDown(window, { key: "p" })
+
+    await waitFor(() => expect(audioMocks.playPronunciation).toHaveBeenCalled())
   })
 
   it("renders zh_to_en as a typed production card and allows an override", async () => {

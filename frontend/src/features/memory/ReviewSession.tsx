@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { CheckCircle2, Headphones, LibraryBig, Volume2 } from "lucide-react"
 import { Link } from "react-router-dom"
 
@@ -143,6 +143,29 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
       active = false
     }
   }, [current])
+
+  // P plays the card's pronunciation, so a drilling session never needs the mouse. One
+// listener for the life of the session, reading the newest handler through a ref: the
+// same shape the prompt cards use, and for the same reason (a listener registered per
+// render keeps the state it closed over and drops a press that lands a moment later).
+  const lessonKeyHandler = useRef<(event: KeyboardEvent) => void>(() => {})
+  useLayoutEffect(() => {
+    lessonKeyHandler.current = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key.toLowerCase() !== "p") return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return
+      if (!current || current.prompt.prompt_type !== "en_to_zh") return
+      event.preventDefault()
+      void speakTerm()
+    }
+  })
+
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => lessonKeyHandler.current(event)
+    window.addEventListener("keydown", listener)
+    return () => window.removeEventListener("keydown", listener)
+  }, [])
 
   if (loading) {
     return <p className="py-16 text-center text-sm text-muted-foreground">正在整理今天的复习队列…</p>
@@ -326,14 +349,17 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
               ) : null}
             </div>
             {current.prompt.prompt_type === "en_to_zh" ? (
-              <Button
-                variant="outline"
-                size="icon-lg"
-                aria-label="播放发音"
-                onClick={() => void speakTerm()}
-              >
-                <Volume2 aria-hidden="true" />
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="icon-lg"
+                  aria-label="播放发音"
+                  onClick={() => void speakTerm()}
+                >
+                  <Volume2 aria-hidden="true" />
+                </Button>
+                <span className="self-center text-xs text-muted-foreground" aria-hidden="true">P</span>
+              </>
             ) : null}
           </div>
         </CardHeader>
