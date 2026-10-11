@@ -2,6 +2,17 @@
 
 ## 未发布
 
+### e2e 也吃到同一个教训：断言等待 5 秒 → 15 秒
+
+- 上一轮的完整 sweep 在 **e2e 这一步**红了：`qa-record-queue.spec.ts › returns a learning record's knowledge point
+  to the review queue`。单独重跑该 spec，**桌面与移动都过**——又是一个「整轮负载下的超时」。
+- 于是把同一条教训往外套一层：`playwright.config.ts` 里 `expect.timeout` 由默认 5s 提到 **15s**，
+  注释写明这是第三次（`vite.config.ts` 的 `testTimeout`、`src/test/setup.tsx` 的 `asyncUtilTimeout`、
+  现在是 Playwright 的 `expect`），并注明它是被哪次真实失败推动的。
+- **证据（这轮的重点）**：`node scripts/sweep.mjs` 完整跑通，**15 步全绿**——
+  go vet/test、全量 vitest（JSON 报告落盘）、lint、build、e2e 14 条、Pages 构建与冒烟、7 个脚本测试、
+  末尾还原普通构建。这是上一轮承诺的那个「完整且干净的全量验证」。
+
 ### 30 多轮的那类偶发红，找到了runner 层的根因：findBy* 的 1 秒等待
 
 - 上一轮的 `scripts/sweep.mjs` 第一次全量运行就把详情留住了（这正是它存在的意义）：
