@@ -146,7 +146,9 @@ describe("Today page", () => {
     )
 
     const row = await screen.findByRole("link", { name: /还有 5 条错题没订正/ })
-    expect(row).toHaveAttribute("href", "/practice")
+    // The link carries the filter, not just the page: landing on the unfiltered log
+    // would be exactly where the 5 stops being true.
+    expect(row).toHaveAttribute("href", "/practice?corrected=no")
     expect(mocks.listMistakePage).toHaveBeenCalledWith(expect.objectContaining({ corrected: "no" }))
   })
 

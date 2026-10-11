@@ -2,7 +2,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ApiError } from "@/api/client"
+import { MemoryRouter } from "react-router-dom"
+
 import Practice from "./Practice"
+
+function renderPractice(initialEntry = "/practice") {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <Practice />
+    </MemoryRouter>,
+  )
+}
 import { mistakesStorageKey } from "@/lib/mistakes"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
@@ -100,7 +110,7 @@ describe("Practice page", () => {
   })
 
   it("says plainly that nothing has gone wrong yet", async () => {
-    render(<Practice />)
+    renderPractice()
 
     expect(await screen.findByText(/还没有记录/)).toBeInTheDocument()
   })
@@ -112,7 +122,7 @@ describe("Practice page", () => {
       { id: "method", label: "方法不对", reviewFixes: true, sort_order: 0 },
       { id: "misread", label: "看错条件", reviewFixes: true, sort_order: 1 },
     ])
-    render(<Practice />)
+    renderPractice()
     await screen.findByText(/还没有记录/)
 
     fireEvent.click(screen.getByRole("combobox", { name: "按错因筛选" }))
@@ -126,10 +136,30 @@ describe("Practice page", () => {
     expect(await screen.findByText(/只显示「方法不对」的错题/)).toBeInTheDocument()
   })
 
+  it("opens already filtered when the link says so", async () => {
+    // The dashboard's "还有 K 条错题没订正" sends the reader here with ?corrected=no.
+    // A filter that only lived in memory would land them on the unfiltered log, which
+    // is where the number they just read stops being true.
+    renderPractice("/practice?corrected=no")
+
+    await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalledWith(
+      expect.objectContaining({ corrected: "no" }),
+    ))
+    expect(document.querySelector("[data-corrected-filter='no']")).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("ignores a 订正 value it does not know instead of passing it on", async () => {
+    renderPractice("/practice?corrected=maybe")
+
+    await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalled())
+    expect(mocks.listMistakes).not.toHaveBeenCalledWith(expect.objectContaining({ corrected: "maybe" }))
+    expect(document.querySelector("[data-corrected-filter='all']")).toHaveAttribute("aria-pressed", "true")
+  })
+
   it("narrows the log to what is still open, and exports that same view", async () => {
     // The progress bar counts 订正 state; the chips make it a filter, because "what is
     // still open" is the list worth reading before a test. The file follows the screen.
-    render(<Practice />)
+    renderPractice()
     await screen.findByText(/还没有记录/)
 
     const chip = document.querySelector("[data-corrected-filter='no']")
@@ -157,7 +187,7 @@ describe("Practice page", () => {
   })
 
   it("does not call the log empty when the 订正 filter emptied it", async () => {
-    render(<Practice />)
+    renderPractice()
     await screen.findByText(/还没有记录/)
 
     fireEvent.click(document.querySelector("[data-corrected-filter='no']")!)
@@ -173,7 +203,7 @@ describe("Practice page", () => {
       { id: "method", label: "方法不对", reviewFixes: true, sort_order: 0 },
     ])
     mocks.exportMistakes.mockResolvedValue("题干\n")
-    render(<Practice />)
+    renderPractice()
     await screen.findByText(/还没有记录/)
 
     fireEvent.click(screen.getByRole("combobox", { name: "按错因筛选" }))
@@ -202,7 +232,7 @@ describe("Practice page", () => {
     mocks.listErrorCauses.mockResolvedValue([
       { id: "method", label: "方法不对", reviewFixes: true, sort_order: 0 },
     ])
-    render(<Practice />)
+    renderPractice()
     await screen.findByText(/还没有记录/)
 
     fireEvent.click(screen.getByRole("combobox", { name: "按错因筛选" }))
@@ -215,7 +245,7 @@ describe("Practice page", () => {
   })
 
   it("shows a six-subject diagnostic overview and can focus a subject", async () => {
-    render(<Practice />)
+    renderPractice()
 
     expect(await screen.findByRole("heading", { name: "六科诊断总览" })).toBeInTheDocument()
     const subjectRows = screen.getAllByTestId("subject-diagnostic-row")
@@ -228,7 +258,7 @@ describe("Practice page", () => {
   })
 
   it("files a mistake under the cause you picked", async () => {
-    render(<Practice />)
+    renderPractice()
     log("光合作用第 3 问", "看错题")
 
     expect(await screen.findByText("光合作用第 3 问")).toBeInTheDocument()
@@ -242,7 +272,7 @@ describe("Practice page", () => {
   it("takes the cause click as the whole record, not a step before saving", async () => {
     // Type, pick, done. A separate 保存 button is a third action at the moment
     // you least want one -- right after getting something wrong.
-    render(<Practice />)
+    renderPractice()
     log("速度与加速度", "想不起来")
 
     await waitFor(() => expect(screen.getByLabelText("错题")).toHaveValue(""))
@@ -251,7 +281,7 @@ describe("Practice page", () => {
   it("says what it filed instead of leaving an empty box as the only sign", async () => {
     // An emptied input looks the same whether the write landed or you cleared
     // it yourself, and the row it created is far below this form.
-    render(<Practice />)
+    renderPractice()
     log("速度与加速度", "想不起来")
 
     expect(await screen.findByRole("status")).toHaveTextContent("已记下「速度与加速度」")
@@ -262,7 +292,7 @@ describe("Practice page", () => {
   })
 
   it("has nothing to file while the box is empty", async () => {
-    render(<Practice />)
+    renderPractice()
 
     expect(await screen.findByRole("button", { name: "想不起来" })).toBeDisabled()
   })
@@ -277,7 +307,7 @@ describe("Practice page", () => {
           : [],
       ),
     )
-    render(<Practice />)
+    renderPractice()
     await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalled())
 
     fireEvent.change(screen.getByLabelText("搜索错题内容"), { target: { value: "极值" } })
@@ -300,7 +330,7 @@ describe("Practice page", () => {
     mocks.listMistakes.mockImplementation((options?: { offset?: number }) =>
       Promise.resolve(options?.offset ? { items: [second], count: 2 } : { items: [first], count: 2 }),
     )
-    render(<Practice />)
+    renderPractice()
     await screen.findByText("第一页的题")
 
     fireEvent.click(screen.getByRole("button", { name: "加载更多（还有 1 条）" }))
@@ -314,7 +344,7 @@ describe("Practice page", () => {
   it("says how much of the log review can actually fix", async () => {
     // The rest of the app answers every wrong answer with "see it again
     // sooner". This is the number that says when that answer is wrong.
-    render(<Practice />)
+    renderPractice()
     log("第 1 题", "想不起来")
     await screen.findByText("第 1 题")
     log("第 2 题", "看错题")
@@ -349,7 +379,7 @@ describe("Practice page", () => {
       cause: "physics:model-selection",
       createdAt: "2026-08-20T00:00:00Z",
     })
-    render(<Practice />)
+    renderPractice()
 
     expect(await screen.findByRole("button", { name: "模型选择错误" })).toBeDisabled()
     fireEvent.change(screen.getByLabelText("错题"), { target: { value: "模型选错的一题" } })
@@ -365,14 +395,14 @@ describe("Practice page", () => {
   })
 
   it("says what to do about a cause review will not fix", async () => {
-    render(<Practice />)
+    renderPractice()
     log("第 1 题", "看错题")
 
     expect(await screen.findByText(/圈出条件/)).toBeInTheDocument()
   })
 
   it("lets you take back a row you filed wrong", async () => {
-    render(<Practice />)
+    renderPractice()
     log("第 1 题", "看错题")
     await screen.findByText("第 1 题")
 
@@ -384,7 +414,7 @@ describe("Practice page", () => {
   })
 
   it("puts the newest mistake on top, where you are looking", async () => {
-    render(<Practice />)
+    renderPractice()
     log("旧的", "看错题")
     await screen.findByText("旧的")
     log("新的", "看错题")
@@ -407,7 +437,7 @@ describe("Practice page", () => {
       },
     ])
 
-    render(<Practice />)
+    renderPractice()
 
     expect(await screen.findByText("上次记的题")).toBeInTheDocument()
     expect(screen.getByText("复习能解决 1")).toBeInTheDocument()
@@ -416,7 +446,7 @@ describe("Practice page", () => {
   it("asks only for the subject in hand", async () => {
     useSubjectStore.setState({ subject: "physics" })
 
-    render(<Practice />)
+    renderPractice()
 
     await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalledWith({ subject: "physics" }))
   })
@@ -425,7 +455,7 @@ describe("Practice page", () => {
     // A row that looks saved when nothing was written is worse than one that
     // failed loudly: you stop double-checking, and the log quietly diverges.
     mocks.recordMistake.mockRejectedValueOnce(new Error("网络断了"))
-    render(<Practice />)
+    renderPractice()
     await screen.findByText(/还没有记录/)
 
     fireEvent.change(screen.getByLabelText("错题"), { target: { value: "写不进去的题" } })
@@ -441,7 +471,7 @@ describe("Practice page", () => {
     // server answered. Asking the reader to check a backend that just replied
     // would be false, and it hides the reason the server sent.
     mocks.recordMistake.mockRejectedValueOnce(new ApiError(500, "保存错题失败"))
-    render(<Practice />)
+    renderPractice()
     await screen.findByText(/还没有记录/)
 
     fireEvent.change(screen.getByLabelText("错题"), { target: { value: "写不进去的题" } })
@@ -467,7 +497,7 @@ describe("Practice page", () => {
       .mockResolvedValueOnce({ id: "qa-a", subject: "physics", question: "旧一点的", cause: "recall", createdAt: "2026-08-09T00:00:00Z" })
       .mockResolvedValueOnce({ id: "qa-b", subject: "physics", question: "新一点的", cause: "misread", createdAt: "2026-08-09T00:00:01Z" })
 
-    render(<Practice />)
+    renderPractice()
 
     expect(await screen.findByText("新一点的")).toBeInTheDocument()
     expect(screen.getByText("旧一点的")).toBeInTheDocument()
@@ -506,7 +536,7 @@ describe("Practice page", () => {
       createdAt: "2026-08-09T00:00:00Z",
     })
 
-    render(<Practice />)
+    renderPractice()
 
     await waitFor(() => {
       expect(mocks.recordMistake).toHaveBeenCalledWith({
@@ -537,7 +567,7 @@ describe("Practice page", () => {
       },
     ])
 
-    render(<Practice />)
+    renderPractice()
 
     fireEvent.click(await screen.findByRole("button", { name: "继续诊断" }))
     const derivation = screen.getByLabelText("把过程一行一行写下来")
@@ -567,7 +597,7 @@ describe("Practice page", () => {
     )
     mocks.recordMistake.mockRejectedValueOnce(new Error("网络断了"))
 
-    render(<Practice />)
+    renderPractice()
 
     expect(await screen.findByText(/网络断了/)).toBeInTheDocument()
     expect(localStorage.getItem(mistakesStorageKey)).not.toBeNull()
@@ -576,7 +606,7 @@ describe("Practice page", () => {
   it("offers to queue the one kind of mistake more review actually fixes", async () => {
     // Until now the page could only *say* 想不起来 is what review repairs. The
     // button is what makes the sentence do something.
-    render(<Practice />)
+    renderPractice()
     log("速度与加速度", "想不起来")
     await screen.findByText("速度与加速度")
 
@@ -587,7 +617,7 @@ describe("Practice page", () => {
     // Rescheduling a card you misread reshuffles something that was never the
     // problem, and the mistake comes back looking like a memory failure it
     // never was. The row already says what to do instead.
-    render(<Practice />)
+    renderPractice()
     log("光合作用第 3 问", "看错题")
     await screen.findByText("光合作用第 3 问")
 
@@ -595,7 +625,7 @@ describe("Practice page", () => {
   })
 
   it("marks the row queued once the card was written", async () => {
-    render(<Practice />)
+    renderPractice()
     log("速度与加速度", "想不起来")
     await screen.findByText("速度与加速度")
 
@@ -610,7 +640,7 @@ describe("Practice page", () => {
     // A control that looks saved when nothing was written is worse than one
     // that failed loudly.
     mocks.scheduleMistake.mockRejectedValueOnce(new Error("安排复习失败"))
-    render(<Practice />)
+    renderPractice()
     log("速度与加速度", "想不起来")
     await screen.findByText("速度与加速度")
 
@@ -625,7 +655,7 @@ describe("Practice page", () => {
     // a drawing. The shared sentence -- 找同类题再做两道 -- sends you to do more
     // of the thing that just failed.
     useSubjectStore.setState({ subject: "physics" })
-    render(<Practice />)
+    renderPractice()
     log("斜面上的木块", "思路不对")
 
     // Anchored on the sentence's own wording: the button it now offers says
@@ -636,7 +666,7 @@ describe("Practice page", () => {
   it("keeps to the shared advice while the log mixes every subject", async () => {
     // 全部学科 is the default, and a sentence naming 受力图 would then sit under
     // a bar counting 语文 rows too.
-    render(<Practice />)
+    renderPractice()
     log("斜面上的木块", "思路不对")
     await screen.findByText("斜面上的木块")
 
@@ -658,7 +688,7 @@ describe("Practice page", () => {
       },
     ])
 
-    render(<Practice />)
+    renderPractice()
     await screen.findByText("上次排过的题")
 
     expect(screen.getByText("已排进复习")).toBeInTheDocument()
@@ -668,7 +698,7 @@ describe("Practice page", () => {
   it("offers to mark a mistake as one you have since got right", async () => {
     // Offered on every cause, not just the ones review fixes: a 手滑 you have
     // learned to catch is as much a fixed mistake as a word you finally learnt.
-    render(<Practice />)
+    renderPractice()
     log("光合作用第 3 问", "算错 / 手滑")
 
     fireEvent.click(await screen.findByRole("button", { name: /^订正$/ }))
@@ -680,7 +710,7 @@ describe("Practice page", () => {
   it("keeps the row on the list after you put it right", async () => {
     // 订正 is not 删除. "I got this wrong once and fixed it" is the sentence the
     // log exists to be able to say, and a row that vanished could not say it.
-    render(<Practice />)
+    renderPractice()
     log("光合作用第 3 问", "看错题")
     await screen.findByText("光合作用第 3 问")
 
@@ -699,7 +729,7 @@ describe("Practice page", () => {
   it("still counts a corrected mistake under the cause it happened for", async () => {
     // A bar that shrank on 订正 would erase the diagnosis as a reward for
     // acting on it. The count of what you fixed sits beside the chart instead.
-    render(<Practice />)
+    renderPractice()
     log("光合作用第 3 问", "看错题")
     await screen.findByText("光合作用第 3 问")
 
@@ -718,7 +748,7 @@ describe("Practice page", () => {
 
   it("leaves the row correctable when the mark could not be written", async () => {
     mocks.correctMistake.mockRejectedValueOnce(new Error("订正没写进去"))
-    render(<Practice />)
+    renderPractice()
     log("光合作用第 3 问", "看错题")
     await screen.findByText("光合作用第 3 问")
 
@@ -732,7 +762,7 @@ describe("Practice page", () => {
   })
 
   it("lets the learner cancel an open correction without writing", async () => {
-    render(<Practice />)
+    renderPractice()
     log("光合作用第 3 问", "看错题")
     await screen.findByText("光合作用第 3 问")
 
@@ -759,7 +789,7 @@ describe("Practice page", () => {
       },
     ])
 
-    render(<Practice />)
+    renderPractice()
     await screen.findByText("上次订正过的题")
 
     expect(screen.getByText("已订正")).toBeInTheDocument()
@@ -779,14 +809,14 @@ describe("drawing the 受力图 物理 keeps being told to draw", () => {
   it("offers the board where the advice to draw one is printed", async () => {
     // 物理's 思路不对 advice says "重画受力图，先标接触面再标场力". A sentence
     // telling you to do something the app cannot do is worse than no sentence.
-    render(<Practice />)
+    renderPractice()
     log("斜面上的滑块", "思路不对")
 
     expect(await screen.findByRole("button", { name: "画受力图" })).toBeInTheDocument()
   })
 
   it("opens a real board, not a picture of one", async () => {
-    render(<Practice />)
+    renderPractice()
     log("斜面上的滑块", "思路不对")
     fireEvent.click(await screen.findByRole("button", { name: "画受力图" }))
 
@@ -803,7 +833,7 @@ describe("drawing the 受力图 物理 keeps being told to draw", () => {
     // The board is 物理's own tool. Offering it under 默写不出来 would be the
     // generic-advice problem the per-subject table was written to end.
     useSubjectStore.setState({ subject: "chinese" })
-    render(<Practice />)
+    renderPractice()
     log("默写第三句", "思路不对")
 
     await screen.findByText("默写第三句")
@@ -823,14 +853,14 @@ describe("dividing the process 物理 keeps being told to divide", () => {
   it("offers the board under the advice that asks for it", async () => {
     // 物理's 看错题 advice says "先把过程分段，写出每段的初末状态" -- another
     // sentence the app has been printing without being able to carry it out.
-    render(<Practice />)
+    renderPractice()
     log("小球落地前后", "看错题")
 
     expect(await screen.findByRole("button", { name: "把过程分段" })).toBeInTheDocument()
   })
 
   it("opens a real board, not a picture of one", async () => {
-    render(<Practice />)
+    renderPractice()
     log("小球落地前后", "看错题")
     fireEvent.click(await screen.findByRole("button", { name: "把过程分段" }))
 
@@ -847,7 +877,7 @@ describe("dividing the process 物理 keeps being told to divide", () => {
     // Both boards hang off the same 物理 log. Two open at once would leave the
     // 受力图 sitting under a sentence about 分段, which is the generic-advice
     // problem again, one level down.
-    render(<Practice />)
+    renderPractice()
     log("斜面上的滑块", "思路不对")
     // Awaited before the second: filing sets busy, which disables every cause
     // button until the write comes back, so a click fired now lands on nothing.
@@ -863,7 +893,7 @@ describe("dividing the process 物理 keeps being told to divide", () => {
 
   it("does not offer 分段 to 地理", async () => {
     useSubjectStore.setState({ subject: "geography" })
-    render(<Practice />)
+    renderPractice()
     log("等高线判读", "看错题")
 
     await screen.findByText("等高线判读")
@@ -883,14 +913,14 @@ describe("re-checking the 配平 化学 keeps being told to re-check", () => {
   it("offers the board under the advice that asks for it", async () => {
     // 化学's 手滑 advice says "配平系数和状态符号回查一遍" -- an instruction to
     // re-read your own handwriting, which is what already failed.
-    render(<Practice />)
+    renderPractice()
     log("氢氧化钙受热", "算错 / 手滑")
 
     expect(await screen.findByRole("button", { name: "核对配平" })).toBeInTheDocument()
   })
 
   it("opens a real board, not a picture of one", async () => {
-    render(<Practice />)
+    renderPractice()
     log("氢氧化钙受热", "算错 / 手滑")
     fireEvent.click(await screen.findByRole("button", { name: "核对配平" }))
 
@@ -901,7 +931,7 @@ describe("re-checking the 配平 化学 keeps being told to re-check", () => {
 
   it("does not offer 配平 to 数学", async () => {
     useSubjectStore.setState({ subject: "math" })
-    render(<Practice />)
+    renderPractice()
     log("求导算错", "算错 / 手滑")
 
     await screen.findByText("求导算错")
@@ -922,14 +952,14 @@ describe("locating the step 数学 keeps being told to locate", () => {
     // 数学's 思路不对 advice says "定位到出错的那一步，而不是整题重做" -- and
     // finding that step by re-reading is exactly what does not work, since
     // every line below the break still follows from the one above it.
-    render(<Practice />)
+    renderPractice()
     log("解一元二次方程", "思路不对")
 
     expect(await screen.findByRole("button", { name: "逐行核对" })).toBeInTheDocument()
   })
 
   it("opens a real board, not a picture of one", async () => {
-    render(<Practice />)
+    renderPractice()
     log("解一元二次方程", "思路不对")
     fireEvent.click(await screen.findByRole("button", { name: "逐行核对" }))
 
@@ -944,7 +974,7 @@ describe("locating the step 数学 keeps being told to locate", () => {
     // Both subjects call the cause 思路不对 and mean different things by it:
     // 物理's is the wrong model, and the fix is a 受力图, not a line check.
     useSubjectStore.setState({ subject: "physics" })
-    render(<Practice />)
+    renderPractice()
     log("斜面上的木块", "思路不对")
 
     expect(await screen.findByRole("button", { name: "画受力图" })).toBeInTheDocument()
@@ -964,14 +994,14 @@ describe("writing out the 因果链 地理 keeps being told to write out", () =>
   it("offers the board under the advice that asks for it", async () => {
     // 地理's 思路不对 advice says 把因果链一环一环写出来，缺哪一环就是丢分点 --
     // and a chain read back as prose joins up in your head, gap and all.
-    render(<Practice />)
+    renderPractice()
     log("撒哈拉为什么干旱", "思路不对")
 
     expect(await screen.findByRole("button", { name: "串因果链" })).toBeInTheDocument()
   })
 
   it("opens a real board, not a picture of one", async () => {
-    render(<Practice />)
+    renderPractice()
     log("撒哈拉为什么干旱", "思路不对")
     fireEvent.click(await screen.findByRole("button", { name: "串因果链" }))
 
@@ -989,7 +1019,7 @@ describe("writing out the 因果链 地理 keeps being told to write out", () =>
     // Three subjects now call the cause 思路不对 and mean three different
     // things by it. The board is picked by the pair, never by the cause alone.
     useSubjectStore.setState({ subject: "math" })
-    render(<Practice />)
+    renderPractice()
     log("解一元二次方程", "思路不对")
 
     expect(await screen.findByRole("button", { name: "逐行核对" })).toBeInTheDocument()
@@ -1009,14 +1039,14 @@ describe("pulling the answer apart 语文 keeps being told to pull apart", () =>
   it("offers the board under the advice that asks for it", async () => {
     // 语文's 思路不对 advice says 对着得分点拆答案：踩到几个点，缺的是哪一类 --
     // and your own answer always reads complete, because you wrote all of it.
-    render(<Practice />)
+    renderPractice()
     log("赏析这两句诗", "思路不对")
 
     expect(await screen.findByRole("button", { name: "对得分点" })).toBeInTheDocument()
   })
 
   it("opens a real board, not a picture of one", async () => {
-    render(<Practice />)
+    renderPractice()
     log("赏析这两句诗", "思路不对")
     fireEvent.click(await screen.findByRole("button", { name: "对得分点" }))
 
@@ -1032,7 +1062,7 @@ describe("pulling the answer apart 语文 keeps being told to pull apart", () =>
 
   it("does not offer 得分点 to 地理, which is told to chain causes instead", async () => {
     useSubjectStore.setState({ subject: "geography" })
-    render(<Practice />)
+    renderPractice()
     log("撒哈拉为什么干旱", "思路不对")
 
     expect(await screen.findByRole("button", { name: "串因果链" })).toBeInTheDocument()
@@ -1053,14 +1083,14 @@ describe("taking apart the 长难句 英语 keeps being told to look at structur
     // 英语's 思路不对 advice says 语法题看结构不看词义：先找主谓，再定从句 -- and
     // 找主谓 is the half that fails, because the two are pushed apart by
     // everything hanging off the subject.
-    render(<Practice />)
+    renderPractice()
     log("这句从句套从句读不动", "思路不对")
 
     expect(await screen.findByRole("button", { name: "拆长难句" })).toBeInTheDocument()
   })
 
   it("opens a real board, not a picture of one", async () => {
-    render(<Practice />)
+    renderPractice()
     log("这句从句套从句读不动", "思路不对")
     fireEvent.click(await screen.findByRole("button", { name: "拆长难句" }))
 
@@ -1073,7 +1103,7 @@ describe("taking apart the 长难句 英语 keeps being told to look at structur
 
   it("does not offer 长难句 to 语文, which is told to check 得分点 instead", async () => {
     useSubjectStore.setState({ subject: "chinese" })
-    render(<Practice />)
+    renderPractice()
     log("赏析这两句诗", "思路不对")
 
     expect(await screen.findByRole("button", { name: "对得分点" })).toBeInTheDocument()
@@ -1095,7 +1125,7 @@ describe("taking apart the 长难句 英语 keeps being told to look at structur
     URL.createObjectURL = vi.fn(() => "blob:mistakes") as unknown as typeof URL.createObjectURL
     URL.revokeObjectURL = vi.fn()
     try {
-      render(<Practice />)
+      renderPractice()
       fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
 
       await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith({ subject: undefined, query: undefined, cause: undefined }))
@@ -1110,7 +1140,7 @@ describe("taking apart the 长难句 英语 keeps being told to look at structur
 
   it("says so when the 错题本 cannot be exported", async () => {
     mocks.exportMistakes.mockRejectedValue(new Error("导出错题失败"))
-    render(<Practice />)
+    renderPractice()
 
     fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
 

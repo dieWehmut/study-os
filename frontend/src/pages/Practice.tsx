@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useSearchParams } from "react-router-dom"
 import {
   CalendarPlus,
   CheckCheck,
@@ -58,6 +59,12 @@ import { isStaticDemo } from "@/lib/runtime"
 import { cn } from "@/lib/utils"
 import { failureMessage } from "@/lib/errors"
 import { useSubjectStore } from "@/store/useSubjectStore"
+
+// Anything but the two known values means "no filter": a hand-edited link must not
+// hand the server a value it will reject.
+function correctedFromSearch(value: string | null): "" | "yes" | "no" {
+  return value === "yes" || value === "no" ? value : ""
+}
 
 function taxonomySpecs(causes: ErrorCause[]): MistakeCauseSpec[] {
   return mergeMistakeCauses(
@@ -200,8 +207,12 @@ export default function Practice() {
   const [recordCause, setRecordCause] = useState("")
   // 订正 state as a filter, not just a number: "what is still open" is the list a
   // reader actually wants before a test, and it is the same condition the progress bar
-  // counts.
-  const [recordCorrected, setRecordCorrected] = useState<"" | "yes" | "no">("")
+  // counts. It also lives in the URL, so another page can send you here already
+  // filtered -- the dashboard does exactly that with "还有 K 条错题没订正".
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [recordCorrected, setRecordCorrected] = useState<"" | "yes" | "no">(
+    correctedFromSearch(searchParams.get("corrected")),
+  )
   const [recordDraft, setRecordDraft] = useState("")
   // How many rows the log holds, and how many of them came from the server --
   // counted apart because 记录 also carries a browser log that was migrated over
@@ -718,7 +729,16 @@ export default function Practice() {
                 type="button"
                 data-corrected-filter={value || "all"}
                 aria-pressed={recordCorrected === value}
-                onClick={() => setRecordCorrected(value)}
+                onClick={() => {
+                  setRecordCorrected(value)
+                  // In the link as well as in state: the dashboard sends a reader here
+                  // with ?corrected=no, and a filter that only lives in memory cannot
+                  // survive that trip.
+                  const next = new URLSearchParams(searchParams)
+                  if (value) next.set("corrected", value)
+                  else next.delete("corrected")
+                  setSearchParams(next, { replace: true })
+                }}
                 className={cn(
                   "rounded-full border px-3 py-1 text-xs transition-colors",
                   recordCorrected === value

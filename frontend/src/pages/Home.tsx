@@ -257,7 +257,7 @@ export default function Home() {
               nobody goes back to is a mistake that will happen again. */}
           {(uncorrected ?? 0) > 0 ? (
             <Link
-              to="/practice"
+              to="/practice?corrected=no"
               className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
             >
               <span>
