@@ -127,6 +127,11 @@ describe("EnglishArticleDetail", () => {
     expect(card!.textContent).toContain("shifted")
     expect(card!.textContent).toContain("变化")
     expect(card!.textContent).not.toContain("重复")
+    // The header keeps the frame the article was chosen by: the same two numbers the
+    // list row showed.
+    const header = article.content.sections.length
+    expect(screen.getByText(`${header} 节`)).toBeInTheDocument()
+    expect(screen.getByText("2 个生词")).toBeInTheDocument()
   })
 
   it("copies the address of one section", async () => {

@@ -270,6 +270,10 @@ export default function EnglishArticleDetail() {
               {info.author ? <span>{info.author}</span> : null}
               {info.sourceURL ? <a className="break-all text-primary underline underline-offset-2" href={info.sourceURL} target="_blank" rel="noreferrer">{info.sourceName || info.sourceURL}</a> : info.sourceName ? <span>{info.sourceName}</span> : null}
               {info.publishedAt ? <time dateTime={info.publishedAt}>{info.publishedAt}</time> : null}
+              {/* The same two numbers the list row carries, so opening an article does
+                  not lose the frame the reader chose it by. */}
+              {article.content?.sections?.length ? <span>{article.content.sections.length} 节</span> : null}
+              {articleVocabulary.length > 0 ? <span>{articleVocabulary.length} 个生词</span> : null}
             </div>
           </header>
           <div className="pt-8">
