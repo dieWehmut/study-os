@@ -83,7 +83,11 @@ test("creates, reads, deep-links, and exports a Mock AI English article", async 
   await expectNoOverlap(directory, article)
 
   const secondSection = page.locator('section[id^="section-2-"]')
-  await page.mouse.wheel(0, 1_400)
+  // Scroll the section itself to the top rather than wheeling a fixed 1400px: the
+  // article page grows (a glossary card was added above the text) and the magic
+  // distance stopped reaching the second section, which failed a test about the hash
+  // for a reason that had nothing to do with the hash.
+  await secondSection.evaluate((element) => element.scrollIntoView({ block: "start" }))
   await expect(secondSection).toBeInViewport()
   await expect(page).toHaveURL(new RegExp(`${savedPath}#section-2-`))
   await expect(directoryLinks.nth(1)).toHaveAttribute("aria-current", "true")
