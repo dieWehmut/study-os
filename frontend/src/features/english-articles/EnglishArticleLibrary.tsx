@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowRight, BookOpenText, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Link } from "react-router-dom"
 
@@ -39,6 +39,16 @@ export default function EnglishArticleLibrary() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [deletingID, setDeletingID] = useState("")
+  // Sorting is a view, not a request: the list is already one page of everything, and
+  // re-asking the server would only reorder the same rows while losing the rest.
+  const [sort, setSort] = useState<"updated" | "vocabulary">("updated")
+  const ordered = useMemo(() => {
+    if (sort === "updated") return articles
+    // Most words first. Ties keep the server's order (newest first), so the list does
+    // not shuffle between reads. Articles whose content could not be read (-1) sink to
+    // the bottom rather than pretending to have none.
+    return [...articles].sort((left, right) => (right.vocabulary_count ?? 0) - (left.vocabulary_count ?? 0))
+  }, [articles, sort])
 
   function applyPage(items: EnglishArticle[]) {
     setArticles(items.slice(0, englishArticlePageSize))
@@ -104,9 +114,33 @@ export default function EnglishArticleLibrary() {
           {articles.length > 0
             ? hasMore
               ? `显示最近 ${articles.length} 篇 · 更早的时文还在库里，暂时只能从这里删掉它们`
-              : `共 ${articles.length} 篇 · 最近更新在前`
+              : `共 ${articles.length} 篇 · ${sort === "vocabulary" ? "生词多的在前" : "最近更新在前"}`
             : "从一篇原始英文开始建立精读材料"}
         </p>
+        {articles.length > 1 ? (
+          // The glossary size is already on every row, so ordering by it costs nothing
+          // and answers a real question: "what can I actually read tonight?"
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">排序</span>
+            {(["updated", "vocabulary"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                data-article-sort={value}
+                aria-pressed={sort === value}
+                onClick={() => setSort(value)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs transition-colors",
+                  sort === value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {value === "updated" ? "最近更新" : "生词多少"}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {articles.length > 0 ? (
           <Link className={buttonVariants()} to="/reading/articles/new">
             <Plus data-icon="inline-start" />添加文章
@@ -138,7 +172,7 @@ export default function EnglishArticleLibrary() {
         </div>
       ) : (
         <div role="list" aria-label="英语时文列表" className="divide-y divide-border rounded-lg border bg-card">
-          {articles.map((article) => {
+          {ordered.map((article) => {
             const id = article.id ?? ""
             const sectionCount = article.section_count ?? article.content?.sections.length
             return (

@@ -90,6 +90,29 @@ describe("EnglishArticleLibrary", () => {
     expect(mocks.listEnglishArticles).toHaveBeenCalledWith({ limit: 101 })
   })
 
+  it("sorts by how many words an article glosses, without re-asking the server", async () => {
+    // The count is already on every row, so ordering by it answers "what can I read
+    // tonight?" for free -- and it is a view, not another request.
+    mocks.listEnglishArticles.mockResolvedValue({
+      items: [
+        { id: "a-1", title: "生词少的一篇", vocabulary_count: 1, updated_at: "2026-08-22T00:00:00Z" },
+        { id: "a-2", title: "生词多的一篇", vocabulary_count: 9, updated_at: "2026-08-20T00:00:00Z" },
+      ],
+      count: 2,
+    })
+
+    renderLibrary()
+    await screen.findByText("生词少的一篇")
+    const callsBefore = mocks.listEnglishArticles.mock.calls.length
+
+    fireEvent.click(document.querySelector("[data-article-sort='vocabulary']")!)
+
+    const titles = screen.getAllByRole("link", { name: /一篇/ }).map((link) => link.textContent)
+    expect(titles[0]).toBe("生词多的一篇")
+    expect(screen.getByText(/生词多的在前/)).toBeInTheDocument()
+    expect(mocks.listEnglishArticles.mock.calls.length).toBe(callsBefore)
+  })
+
   it("claims the whole library only when it really has it", async () => {
     mocks.listEnglishArticles.mockResolvedValue({ items: [{ id: "a-1", title: "唯一一篇" }], count: 1 })
 
