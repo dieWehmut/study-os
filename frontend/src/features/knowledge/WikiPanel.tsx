@@ -181,6 +181,10 @@ export function WikiPanel({
     setScheduleNote(null)
     try {
       const result = await scheduleKnowledge(current.id)
+      // Whatever 取消排复习 did earlier, a successful schedule means the item IS in the
+      // queue -- leaving that flag set is how the cancel button disappeared after a
+      // cancel-then-reschedule, which only showed up in a browser.
+      setScheduleRemoved(false)
       setScheduleNote(
         result.status === "already_scheduled"
           ? { tone: "known", text: "已经在复习计划里" }

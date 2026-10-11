@@ -94,6 +94,15 @@ describe("WikiPanel node renaming", () => {
 
     await waitFor(() => expect(mocks.unscheduleKnowledge).toHaveBeenCalledWith("k1"))
     expect(await screen.findByText(/已取消复习安排 · 移出 3 张卡/)).toBeInTheDocument()
+
+    // And it can go back in: the flag that hid the cancel button is cleared by a
+    // successful schedule. Without this, 取消 then 排进复习 left the panel reading
+    // 「已排进复习」 with no way to cancel again -- a browser probe is what surfaced it.
+    mocks.scheduleKnowledge.mockResolvedValue({ status: "scheduled", knowledge_id: "k1", prompt_count: 3 })
+    fireEvent.click(screen.getByRole("button", { name: "排进复习" }))
+
+    await waitFor(() => expect(mocks.scheduleKnowledge).toHaveBeenCalledWith("k1"))
+    expect(await screen.findByRole("button", { name: "取消排复习" })).toBeInTheDocument()
   })
 
   it("writes a renamed node back into the wiki it was drawn from", async () => {
