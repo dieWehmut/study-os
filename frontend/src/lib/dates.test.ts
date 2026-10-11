@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { formatDay, formatShortDay } from "./dates"
+import { formatDay, formatShortDay, formatStamp } from "./dates"
 
 describe("date helpers", () => {
   it("leaves a plain date alone and formats a timestamp", () => {
@@ -17,5 +17,14 @@ describe("date helpers", () => {
     expect(formatShortDay("2026-08-22T10:00:00Z")).toMatch(/\d/)
     expect(formatShortDay(undefined)).toBe("")
     expect(formatShortDay("不是日期")).toBe("不是日期")
+  })
+
+  it("keeps the time for the places where the moment matters", () => {
+    // A backup file and an import run want the clock; a list of things to read does
+    // not. Empty reads as empty, so the caller can say what "nothing" means there.
+    expect(formatStamp("2026-08-22T10:00:00Z")).toMatch(/2026/)
+    expect(formatStamp("2026-08-22T10:00:00Z").length).toBeGreaterThan(formatDay("2026-08-22T10:00:00Z").length)
+    expect(formatStamp(undefined)).toBe("")
+    expect(formatStamp("不是日期")).toBe("不是日期")
   })
 })

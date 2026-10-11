@@ -26,13 +26,10 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { MAX_DAILY_LIMIT, MIN_DAILY_LIMIT, normalizeDailyLimit } from "@/lib/settings"
 import { useSettingsStore } from "@/store/useSettingsStore"
+import { formatStamp } from "@/lib/dates"
 import { isStaticDemo } from "@/lib/runtime"
 
-function formatDate(value?: string): string {
-  if (!value) return "尚无备份"
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN")
-}
+// The formatting moved to `@/lib/dates`; only what "no date" means here stays local.
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 1) return "0 B"
@@ -1076,7 +1073,7 @@ export default function SettingsPanel() {
               {/* A list that silently drops its oldest copy is a surprise: the rule
                   is read from the service, not copied here where it can drift. */}
               {status.backup.retention?.daily ? ` · 每日保留最近 ${status.backup.retention.daily} 份` : ""}
-              {" "}· 最近：{formatDate(status.backup.last_created_at)}
+              {" "}· 最近：{formatStamp(status.backup.last_created_at) || "还没有备份"}
             </CardDescription>
             {/* The other half of the same question -- what makes a backup appear,
                 not what removes one. Mirrors CreateDailyIfNeeded: at startup, at
@@ -1145,7 +1142,7 @@ export default function SettingsPanel() {
                     )}
                   </span>
                 </div>
-                <span className="text-xs text-muted-foreground">{formatDate(backup.created_at)}</span>
+                <span className="text-xs text-muted-foreground">{formatStamp(backup.created_at)}</span>
                 <code className="truncate text-xs" title={backup.path}>{backup.path}</code>
                 {verifiedBackups[backup.id] ? (
                   <span role="status" className="text-xs text-muted-foreground">
@@ -1182,7 +1179,7 @@ export default function SettingsPanel() {
                   {restoreStatus.last_ok
                     // Which file, and when: "上次恢复已完成" with neither is a claim
                     // the reader cannot check against the list in front of them.
-                    ? `上次恢复已完成（${restoreStatus.last_path?.split(/[\\/]/).pop() ?? "备份文件"} · ${formatDate(restoreStatus.last_resolved_at)}）。`
+                    ? `上次恢复已完成（${restoreStatus.last_path?.split(/[\\/]/).pop() ?? "备份文件"} · ${formatStamp(restoreStatus.last_resolved_at) || "时间未知"}）。`
                     : `上次恢复没有成功，数据保持原样：${failureMessage(new Error(restoreStatus.last_detail ?? ""), "原因不明")}`}
                 </p>
                 <Button type="button" variant="ghost" size="sm" disabled={restoring} onClick={() => void dismissRestoreReport()}>
