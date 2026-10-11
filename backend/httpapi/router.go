@@ -610,7 +610,7 @@ func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, app
 		writeStoreError(response, err)
 		return
 	}
-	queued, err := scheduledPromptCount(request.Context(), application.Store, item.ID)
+	queued, err := scheduledStateCount(request.Context(), application.Store, item.ID)
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习状态失败"})
 		return

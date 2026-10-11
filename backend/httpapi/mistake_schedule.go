@@ -53,7 +53,7 @@ func handleMistakeSchedule(response http.ResponseWriter, request *http.Request, 
 	// tell it already did this. Answered 200 rather than a conflict: nothing
 	// went wrong, the mistake is already where the caller wants it.
 	if mistake.Question.KnowledgeItemID != "" {
-		existing, err := scheduledPromptCount(ctx, application.Store, mistake.Question.KnowledgeItemID)
+		existing, err := scheduledStateCount(ctx, application.Store, mistake.Question.KnowledgeItemID)
 		if err != nil {
 			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习安排失败"})
 			return

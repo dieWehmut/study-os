@@ -43,7 +43,7 @@ func handleKnowledgeSchedule(response http.ResponseWriter, request *http.Request
 	// the same card twice for the rest of the item's life. Answered with 200
 	// rather than a conflict: nothing went wrong, the item is already where the
 	// caller wants it.
-	existing, err := scheduledPromptCount(ctx, application.Store, item.ID)
+	existing, err := scheduledStateCount(ctx, application.Store, item.ID)
 	if err != nil {
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习安排失败"})
 		return
@@ -130,11 +130,19 @@ func handleKnowledgeSchedule(response http.ResponseWriter, request *http.Request
 	})
 }
 
-// scheduledPromptCount answers how many cards this item already contributes to
-// the queue.
-func scheduledPromptCount(ctx context.Context, store *db.Store, knowledgeID string) (int, error) {
+// scheduledStateCount answers how many cards this item currently contributes to the
+// queue.
+//
+// It counts review STATES, not prompts. That is what "in the queue" means here, and the
+// difference matters the moment 取消排复习 exists: that undo removes the schedules and
+// leaves the prompts in place (a prompt that was ever answered cannot be deleted --
+// `attempts.prompt_id REFERENCES prompts(id) ON DELETE RESTRICT`), so a count of prompts
+// would keep answering 「already_scheduled」 for an item that is not in the queue at all.
+func scheduledStateCount(ctx context.Context, store *db.Store, knowledgeID string) (int, error) {
 	var count int
-	err := store.SQL().QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM prompts WHERE knowledge_item_id = ?`, knowledgeID).Scan(&count)
+	err := store.SQL().QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM review_states rs
+		JOIN prompts p ON p.id = rs.prompt_id
+		WHERE p.knowledge_item_id = ?`, knowledgeID).Scan(&count)
 	return count, err
 }
