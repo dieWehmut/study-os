@@ -31,6 +31,8 @@ export interface KnowledgeGroup {
   id: string
   name: string
   kind?: string
+  /** Items in the group, or -1 when the server could not count it. */
+  item_count?: number
 }
 
 export interface KnowledgeGroupListResponse {

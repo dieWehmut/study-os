@@ -72,8 +72,12 @@ describe("Knowledge page", () => {
       dimensions: [],
     })
     mocks.listGroups.mockResolvedValue({
-      count: 1,
-      items: [{ id: "g1", name: "abandon 词族", kind: "word_family" }],
+      count: 2,
+      items: [
+        { id: "g1", name: "abandon 词族", kind: "word_family", item_count: 3 },
+        // -1 is "could not be counted": the chip must not claim the group is empty.
+        { id: "g2", name: "水循环", kind: "topic", item_count: -1 },
+      ],
     })
     // Most items belong to no group, so the quiet answer is the default one.
     mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
@@ -89,6 +93,22 @@ describe("Knowledge page", () => {
       knowledge_id: "k1",
       prompt_count: 3,
     })
+  })
+
+  it("lists the 知识分组 with how many items each holds, and filters from there", async () => {
+    // The groups were a dropdown of names only: a name does not say whether the group
+    // is worth opening, and an uncountable group must not read as an empty one.
+    render(<Knowledge />)
+
+    const chip = await screen.findByRole("button", { name: /abandon 词族/ })
+    expect(chip.textContent).toContain("3")
+    const uncounted = screen.getByRole("button", { name: "水循环" })
+    expect(uncounted.textContent).toBe("水循环")
+
+    fireEvent.click(chip)
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(
+      expect.objectContaining({ group: "g1" }),
+    ))
   })
 
   it("renders a selected item in concise and detail tabs", async () => {

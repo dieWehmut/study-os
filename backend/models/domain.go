@@ -53,6 +53,10 @@ type KnowledgeGroup struct {
 	Kind      string    `json:"kind,omitempty"`
 	ParentID  string    `json:"parent_id,omitempty"`
 	SortOrder int       `json:"sort_order,omitempty"`
+	// ItemCount is how many knowledge items are in the group, or -1 when it could
+	// not be counted. The group list is also what fills the filter dropdown, so an
+	// uncountable group still has to be listed -- it just does not claim to be empty.
+	ItemCount int       `json:"item_count,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

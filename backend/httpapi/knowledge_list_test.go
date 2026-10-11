@@ -185,6 +185,48 @@ func TestKnowledgeListNarrowsAGroupByReviewQueueToo(t *testing.T) {
 	}
 }
 
+// The group list is also what the page draws as chips with numbers, so each group
+// has to say how big it is -- and that number has to be the one the `?group=` filter
+// would produce, or the chip and the list it opens disagree.
+func TestGroupsReportHowManyItemsTheyHold(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+	first := createDumpedItem(t, router, "resilience")
+	second := createDumpedItem(t, router, "watershed")
+	groupID := createGroupWithItems(t, application, "watercycle", first, second)
+
+	response := requestJSON(t, router, http.MethodGet, "/api/groups", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("groups = %d, body = %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Items []struct {
+			ID        string `json:"id"`
+			ItemCount int    `json:"item_count"`
+		} `json:"items"`
+	}
+	decodeJSON(t, response, &payload)
+	byID := map[string]int{}
+	for _, item := range payload.Items {
+		byID[item.ID] = item.ItemCount
+	}
+	if byID[groupID] != 2 {
+		t.Fatalf("group %s counts %d, want 2 (%v)", groupID, byID[groupID], byID)
+	}
+
+	// The same number as the filter: three items in the library, two in the group.
+	var listed struct {
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+		Count int `json:"count"`
+	}
+	decodeJSON(t, requestJSON(t, router, http.MethodGet, "/api/knowledge?group="+groupID, nil), &listed)
+	if len(listed.Items) != byID[groupID] {
+		t.Fatalf("group filter returned %d items but the chip says %d", len(listed.Items), byID[groupID])
+	}
+}
+
 func createGroupWithItems(t *testing.T, application *app.App, name string, itemIDs ...string) string {
 	t.Helper()
 	ctx := context.Background()

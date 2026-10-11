@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { appUrl, copyUrl } from "@/lib/link"
+import { cn } from "@/lib/utils"
 import { SubjectChips } from "@/features/subjects/SubjectChips"
 import { KnowledgeList } from "@/features/knowledge/KnowledgeList"
 import { WikiPanel } from "@/features/knowledge/WikiPanel"
@@ -378,6 +379,57 @@ function KnowledgePage({
               </label>
             </div>
           </div>
+          {/* The groups as a list with numbers, not only as a dropdown: a name on its
+              own does not say whether the group is worth opening, and the count comes
+              from the same store call the filter itself uses. Groups are hidden when
+              the library has none, so an empty library shows no empty heading. */}
+          {groups.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">知识分组</span>
+              <button
+                type="button"
+                aria-pressed={group === ""}
+                onClick={() => {
+                  setGroup("")
+                  setLoading(true)
+                  setError("")
+                }}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs transition-colors",
+                  group === ""
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted",
+                )}
+              >
+                全部
+              </button>
+              {groups.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={group === item.id}
+                  onClick={() => {
+                    setGroup(item.id)
+                    setLoading(true)
+                    setError("")
+                  }}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs transition-colors",
+                    group === item.id
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {item.name}
+                  {/* -1 is "could not be counted", not zero: showing 0 would claim
+                      the group is empty. */}
+                  {typeof item.item_count === "number" && item.item_count >= 0 ? (
+                    <span className="ml-1.5 tabular-nums opacity-75">{item.item_count}</span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <label className="relative block" htmlFor="knowledge-search">
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input

@@ -6,6 +6,7 @@ import (
 
 	"study-os/backend/app"
 	"study-os/backend/english"
+	"study-os/backend/models"
 )
 
 func handleGroups(response http.ResponseWriter, request *http.Request, application *app.App) {
@@ -15,8 +16,21 @@ func handleGroups(response http.ResponseWriter, request *http.Request, applicati
 	}
 	groups, err := application.Store.ListKnowledgeGroups(request.Context())
 	if err != nil {
-		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "list groups failed"})
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取知识分组失败"})
 		return
+	}
+	// How many items are in each group, because the page draws them as a list with
+	// numbers -- a group name on its own does not say whether it is worth opening.
+	// Counting uses the same store call the `?group=` filter uses, so the number and
+	// the list it filters can never disagree. A group that fails to count reads as
+	// "unknown" (-1) rather than as zero: the dropdown still needs it.
+	for index := range groups {
+		counted, countErr := application.Store.CountItemsByGroup(request.Context(), groups[index].ID, models.KnowledgeListOptions{})
+		if countErr != nil {
+			groups[index].ItemCount = -1
+			continue
+		}
+		groups[index].ItemCount = counted
 	}
 	writeJSON(response, http.StatusOK, map[string]any{"items": groups, "count": len(groups)})
 }
