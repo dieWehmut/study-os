@@ -84,6 +84,9 @@ interface StaticState {
   scheduled: Set<string>
   groups: KnowledgeGroup[]
   due: DueReview[]
+  // The cards this session answered wrong, which is what 恢复模式 asks for. Without
+  // them the recovery toggle had nothing to recover and simply redrew the queue.
+  recovery: DueReview[]
   messages: ChatMessage[]
   qaRecords: Map<string, StaticQARecord>
   notes: IntegratedNote[]
@@ -396,6 +399,7 @@ function makeInitialState(): StaticState {
       { id: "mechanics", name: "Mechanics", kind: "tag" },
     ],
     due: [makeDue(knowledge[0], 0), makeDue(knowledge[1], 1), makeDue(knowledge[2], 2)],
+    recovery: [],
     messages,
     qaRecords: new Map(),
     notes: [makeNote()],
@@ -977,9 +981,12 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
 
   if (root === "reviews" && id === "due" && method === "GET") {
     const subject = subjectFrom(url.searchParams.get("subject"))
+    // 恢复模式 asks for the cards this session got wrong; without them the toggle
+    // had nothing to recover and simply redrew today's queue.
+    const source = url.searchParams.get("mode") === "recovery" ? state.recovery : state.due
     const matching = subject
-      ? state.due.filter((entry) => state.knowledge.find((item) => item.id === entry.knowledge.id)?.subject === subject)
-      : state.due
+      ? source.filter((entry) => state.knowledge.find((item) => item.id === entry.knowledge.id)?.subject === subject)
+      : source
     // 每日记忆上限 is the size of today's queue, and the settings page says so. A demo
     // that answers with every due card makes that setting look like it does nothing.
     const requested = Number(url.searchParams.get("limit") ?? 0)
@@ -1006,11 +1013,24 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     state.due = state.due.filter((entry) => entry.prompt.id !== id)
     const knowledge = state.knowledge.find((entry) => entry.id === due.knowledge.id)
     const expectedAnswer = knowledge?.concise_definition ?? due.prompt.options?.[0] ?? ""
+    // Graded, not applauded. This used to answer "correct" to everything the demo was
+    // given, which made the wrong answers indistinguishable -- and left 恢复模式 with
+    // nothing to recover. The rule is deliberately plain (the answer has to be the
+    // expected one, ignoring case and surrounding space), and the feedback says so.
+    const submitted = String(body.answer ?? "").trim()
+    const expected = expectedAnswer.trim()
+    const correct = expected !== "" && submitted.toLowerCase() === expected.toLowerCase()
+    const outcome: ReviewEvaluation["outcome"] = expected === "" ? "partial" : correct ? "correct" : "incorrect"
+    if (!correct) state.recovery = [...state.recovery.filter((entry) => entry.prompt.id !== id), due]
     const evaluation: ReviewEvaluation = {
       attempt_id: newID("attempt"),
-      outcome: "correct",
-      rating: 3,
-      feedback: "Good retrieval. The next interval is longer.",
+      outcome,
+      rating: correct ? 3 : 1,
+      feedback: expected === ""
+        ? "Pages 演示：这张卡没有登记参考答案，只能算部分正确。"
+        : correct
+          ? "Pages 演示：与参考答案一致。"
+          : `Pages 演示：参考答案是「${expected}」；答错的卡会进入恢复模式。`,
       due_at: DEMO_NOW,
       expected_answers: expectedAnswer ? [expectedAnswer] : [],
     }

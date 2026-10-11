@@ -546,6 +546,37 @@ describe("static Pages API fixtures", () => {
     expect(grouped.items.every((item) => item.subject === "english")).toBe(true)
   })
 
+  it("grades a demo answer instead of applauding everything, and remembers the misses", async () => {
+    // It used to answer "correct" to whatever it was given, which made a wrong answer
+    // indistinguishable -- and left 恢复模式 with nothing to recover.
+    const due = await staticDemoRequest<{ items: Array<{ prompt: { id: string; options?: string[] }; knowledge: { id: string } }> }>("/reviews/due")
+    const card = due.items[0]!
+    const knowledge = await staticDemoRequest<{ concise_definition?: string }>(`/knowledge/${card.knowledge.id}`)
+    const expected = (knowledge.concise_definition ?? "").trim()
+    expect(expected).not.toBe("")
+
+    const wrong = await staticDemoRequest<{ outcome: string; expected_answers: string[] }>(
+      `/reviews/${card.prompt.id}/answer`,
+      { method: "POST", body: JSON.stringify({ answer: "definitely not the answer" }) },
+    )
+    expect(wrong.outcome).toBe("incorrect")
+    expect(wrong.expected_answers).toEqual([expected])
+
+    const recovery = await staticDemoRequest<{ items: Array<{ prompt: { id: string } }> }>("/reviews/due?mode=recovery")
+    expect(recovery.items.map((entry) => entry.prompt.id)).toContain(card.prompt.id)
+
+    // Getting one right does not put it in recovery, and the queue says so.
+    const next = (await staticDemoRequest<{ items: Array<{ prompt: { id: string }; knowledge: { id: string } }> }>("/reviews/due")).items[0]!
+    const nextKnowledge = await staticDemoRequest<{ concise_definition?: string }>(`/knowledge/${next.knowledge.id}`)
+    const right = await staticDemoRequest<{ outcome: string }>(
+      `/reviews/${next.prompt.id}/answer`,
+      { method: "POST", body: JSON.stringify({ answer: nextKnowledge.concise_definition ?? "" }) },
+    )
+    expect(right.outcome).toBe("correct")
+    const after = await staticDemoRequest<{ items: Array<{ prompt: { id: string } }> }>("/reviews/due?mode=recovery")
+    expect(after.items.map((entry) => entry.prompt.id)).not.toContain(next.prompt.id)
+  })
+
   it("cuts the demo review queue down to the daily limit it was asked for", async () => {
     // 每日记忆上限 is the size of today's queue, and the settings page says so: a
     // demo that answers with every due card makes that setting look inert.
