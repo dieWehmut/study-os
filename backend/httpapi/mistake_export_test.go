@@ -97,6 +97,16 @@ func TestMistakeExportWritesAReadableRow(t *testing.T) {
 	if strings.Contains(missed.Body.String(), "斜面上的木块受力") {
 		t.Fatalf("search did not narrow the file: %s", missed.Body.String())
 	}
+	// 错因 is a filter on screen, so it is a filter in the file: exporting while
+	// looking at the method mistakes must not hand over every mistake.
+	byCause := mistakeExport(t, router, "?cause=method")
+	if !strings.Contains(byCause.Body.String(), "斜面上的木块受力") {
+		t.Fatalf("cause filter dropped the matching row: %s", byCause.Body.String())
+	}
+	otherCause := mistakeExport(t, router, "?cause=misread")
+	if strings.Contains(otherCause.Body.String(), "斜面上的木块受力") {
+		t.Fatalf("cause filter did not narrow the file: %s", otherCause.Body.String())
+	}
 }
 
 func TestMistakeExportKeepsACauseItCannotName(t *testing.T) {

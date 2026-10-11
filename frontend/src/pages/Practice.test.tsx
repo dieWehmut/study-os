@@ -126,6 +126,36 @@ describe("Practice page", () => {
     expect(await screen.findByText(/只显示「方法不对」的错题/)).toBeInTheDocument()
   })
 
+  it("exports what the 错因 filter leaves on screen, not the whole log", async () => {
+    // Filtering the list and then exporting is how a reader hands someone "my
+    // method mistakes"; a file that quietly contains every mistake is wrong.
+    mocks.listErrorCauses.mockResolvedValue([
+      { id: "method", label: "方法不对", reviewFixes: true, sort_order: 0 },
+    ])
+    mocks.exportMistakes.mockResolvedValue("题干\n")
+    render(<Practice />)
+    await screen.findByText(/还没有记录/)
+
+    fireEvent.click(screen.getByRole("combobox", { name: "按错因筛选" }))
+    const option = await screen.findByRole("option", { name: "方法不对" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+
+    const download = vi.fn()
+    const originalClick = HTMLAnchorElement.prototype.click
+    HTMLAnchorElement.prototype.click = download
+    URL.createObjectURL = vi.fn(() => "blob:filtered") as unknown as typeof URL.createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
+      await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith(
+        expect.objectContaining({ cause: "method" }),
+      ))
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick
+    }
+  })
+
   it("shows a six-subject diagnostic overview and can focus a subject", async () => {
     render(<Practice />)
 
@@ -1006,7 +1036,7 @@ describe("taking apart the 长难句 英语 keeps being told to look at structur
       render(<Practice />)
       fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
 
-      await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith({ subject: undefined, query: undefined }))
+      await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith({ subject: undefined, query: undefined, cause: undefined }))
       expect(downloads[0]).toMatch(/错题.*\.csv$/)
       await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mistakes"))
     } finally {

@@ -85,6 +85,8 @@ func handleMistakeExport(response http.ResponseWriter, request *http.Request, ap
 		// The search box narrows the list; the file has to mean the same thing as
 		// the list, or the reader exports "everything" while looking at three rows.
 		Query: strings.TrimSpace(request.URL.Query().Get("q")),
+		// Same for 错因: it is a filter on screen, so it is a filter in the file.
+		Cause: strings.TrimSpace(request.URL.Query().Get("cause")),
 		Limit: exportPageSize,
 	}
 	for offset := 0; ; offset += exportPageSize {

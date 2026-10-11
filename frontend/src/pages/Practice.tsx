@@ -390,6 +390,7 @@ export default function Practice() {
         subject: subject === "all" ? undefined : subject,
         // Same as the list on screen: the search box has already narrowed it.
         query: recordQuery || undefined,
+        cause: recordCause || undefined,
       })
       saveTextFile(text, `study-os-错题-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8")
     } catch (failure) {
