@@ -894,19 +894,19 @@ func handleDueReviews(response http.ResponseWriter, request *http.Request, appli
 		Mode:    request.URL.Query().Get("mode"),
 	})
 	if err != nil {
-		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习队列失败"})
 		return
 	}
 	items := make([]reviewItemResponse, 0, len(prompts))
 	for _, prompt := range prompts {
 		item, itemErr := application.Store.GetKnowledgeItem(request.Context(), prompt.KnowledgeItemID)
 		if itemErr != nil {
-			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": itemErr.Error()})
+			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习队列的学习内容失败"})
 			return
 		}
 		state, stateErr := application.Store.GetReviewState(request.Context(), prompt.ID)
 		if stateErr != nil {
-			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": stateErr.Error()})
+			writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习进度失败"})
 			return
 		}
 		items = append(items, reviewItemResponse{
