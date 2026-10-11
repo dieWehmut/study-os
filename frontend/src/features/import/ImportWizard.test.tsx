@@ -63,7 +63,10 @@ describe("ImportWizard", () => {
     fireEvent.click(await screen.findByRole("button", { name: "上传文件" }))
     await waitFor(() => expect(mocks.uploadImport).toHaveBeenCalledWith(file))
 
-    fireEvent.click(screen.getByRole("button", { name: "预览导入" }))
+    // Waiting on the call is not the same as waiting on the render: 预览导入 appears
+    // when the upload *result* lands, and a synchronous lookup after an unrelated await
+    // is a race that only shows up under a full-suite load.
+    fireEvent.click(await screen.findByRole("button", { name: "预览导入" }))
     expect(await screen.findByRole("alert")).toHaveTextContent("请选择「单词」和「释义」的源列")
 
     fireEvent.change(screen.getByLabelText("单词 源列"), { target: { value: "word" } })
