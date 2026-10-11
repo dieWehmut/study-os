@@ -62,6 +62,8 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
   // of counting it twice, so the session can say what it just did.
   const [outcomes, setOutcomes] = useState<Record<string, ReviewEvaluation["outcome"]>>({})
   const [audioSource, setAudioSource] = useState<"file" | "browser" | "unavailable" | null>(null)
+  // 还没排复习的知识点条数, for the link the completion card offers.
+  const [unscheduled, setUnscheduled] = useState<number | null>(null)
 
   // Loading is derived rather than stored so the effect never has to call
   // setState synchronously in its body just to show the spinner again when the
@@ -123,6 +125,25 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
     setIndex(0)
   }
 
+  // How many knowledge items still carry no cards. Asked once the round is over (while
+// cards are on screen the answer cannot change it) and before every early return,
+// because hooks cannot live after them.
+  useEffect(() => {
+    if (current) return
+    let active = true
+    listKnowledge({ scheduled: "no", limit: 1 })
+      .then((page) => {
+        if (active) setUnscheduled(page.count)
+      })
+      .catch(() => {
+        // Without a number the link is not offered at all: a link to an empty list is
+        // a dead end wearing a button's clothes.
+      })
+    return () => {
+      active = false
+    }
+  }, [current])
+
   if (loading) {
     return <p className="py-16 text-center text-sm text-muted-foreground">正在整理今天的复习队列…</p>
   }
@@ -157,6 +178,9 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
     )
   }
 
+  // How many knowledge items still carry no cards. Asked only once the round is over:
+// while cards are on screen the answer cannot change it, and the link that uses it is
+// in the completion card.
   if (!current) {
     const verdicts = Object.values(outcomes)
     const counts = {
@@ -248,10 +272,14 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
           ) : null}
           {/* Finishing today's cards is the moment the gap is visible: an item
               carrying no cards can never surface here, so point at the ones
-              that are not in the plan at all instead of stopping at "done". */}
-          <Link to="/knowledge?scheduled=no" className={buttonVariants({ variant: "outline" })}>
-            去整理还没排复习的知识点
-          </Link>
+              that are not in the plan at all instead of stopping at "done".
+              Offered only when there are some: a link to an empty list is a
+              dead end wearing a button's clothes. */}
+          {(unscheduled ?? 0) > 0 ? (
+            <Link to="/knowledge?scheduled=no" className={buttonVariants({ variant: "outline" })}>
+              去整理还没排复习的 {unscheduled} 个知识点
+            </Link>
+          ) : null}
         </CardContent>
       </Card>
     )

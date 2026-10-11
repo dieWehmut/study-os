@@ -200,8 +200,24 @@ describe("ReviewSession", () => {
     expect(await screen.findByText("今天的到期内容已经完成")).toBeInTheDocument()
     expect(screen.queryByRole("link", { name: "去导入" })).not.toBeInTheDocument()
     // 完成不是终点：没有卡的知识点根本不会出现在这里，所以把下一件事说清楚。
-    expect(screen.getByRole("link", { name: "去整理还没排复习的知识点" }))
+    expect(screen.getByRole("link", { name: "去整理还没排复习的 1 个知识点" }))
       .toHaveAttribute("href", "/knowledge?scheduled=no")
+  })
+
+  it("does not offer a link to an empty list", async () => {
+    // "去整理还没排复习的知识点" with nothing to tidy is a dead end wearing a button's
+    // clothes; the number is read first, and the link waits for it.
+    knowledgeMocks.listKnowledge.mockImplementation((options?: { scheduled?: string }) =>
+      Promise.resolve(
+        options?.scheduled === "no"
+          ? { items: [], count: 0 }
+          : { items: [{ id: "k1" }], count: 1 },
+      ))
+    mocks.getDueReviews.mockResolvedValueOnce({ items: [] })
+    renderSession()
+
+    await screen.findByText(/今天的到期内容已经完成/)
+    expect(screen.queryByRole("link", { name: /去整理还没排复习/ })).not.toBeInTheDocument()
   })
 
   it("says whose day is finished when one subject is selected", async () => {
