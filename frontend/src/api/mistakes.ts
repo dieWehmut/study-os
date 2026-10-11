@@ -45,6 +45,8 @@ export interface ListMistakesOptions {
   query?: string
   /** Narrows to one 错因, so "show me every method mistake" is a question the log can answer. */
   cause?: string
+  /** 订正 state: "yes" (answered right since), "no" (still open). Absent means both. */
+  corrected?: "yes" | "no"
   limit?: number
   offset?: number
 }
@@ -111,6 +113,7 @@ export async function listMistakePage(
   if (options.subject !== undefined) params.set("subject", options.subject)
   if (options.query !== undefined) params.set("q", options.query)
   if (options.cause !== undefined) params.set("cause", options.cause)
+  if (options.corrected !== undefined) params.set("corrected", options.corrected)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   if (options.offset !== undefined) params.set("offset", String(options.offset))
   const suffix = params.toString()

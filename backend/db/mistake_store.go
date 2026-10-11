@@ -137,6 +137,16 @@ func mistakeFilter(options models.MistakeListOptions) (string, []any) {
 		where += ` AND a.cause = ?`
 		arguments = append(arguments, cause)
 	}
+	// 订正 state, as the exact predicate the row's own flag uses: a later attempt on
+	// the same question that was answered right (attachMistakeCorrection's query). The
+	// two must agree, or the count on the dashboard and the rows on the log disagree
+	// about the same mistake.
+	switch strings.ToLower(strings.TrimSpace(options.Corrected)) {
+	case "yes":
+		where += ` AND EXISTS (SELECT 1 FROM question_attempts c WHERE c.question_id = a.question_id AND c.is_correct = 1)`
+	case "no":
+		where += ` AND NOT EXISTS (SELECT 1 FROM question_attempts c WHERE c.question_id = a.question_id AND c.is_correct = 1)`
+	}
 	return where, arguments
 }
 

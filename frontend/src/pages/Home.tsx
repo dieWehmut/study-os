@@ -58,6 +58,8 @@ export default function Home() {
   // The newest mistakes, so the dashboard shows the other half of the work: 最近加入
   // lists what was learned, and this lists what did not stick yet.
   const [recentMistakes, setRecentMistakes] = useState<MistakeRecord[]>([])
+  // 还没订正完的错题条数, for the same 接下来 list the queue lives in.
+  const [uncorrected, setUncorrected] = useState<number | null>(null)
   // Read and summarized once, on the way in. Nothing on this page edits the
   // reading session, so recomputing it per render would only re-chunk the same
   // document to reach the same answer.
@@ -118,6 +120,15 @@ export default function Home() {
       })
       .catch(() => {
         // The card simply does not render; nothing else on the page depends on it.
+      })
+    // How many are still open. A separate ask, because the count of 还没订正 is not
+    // the count of mistakes -- that is the whole point of the row it feeds.
+    listMistakePage({ corrected: "no", limit: 1, ...(subject === "all" ? {} : { subject }) })
+      .then((page) => {
+        if (active) setUncorrected(page.count)
+      })
+      .catch(() => {
+        // No row rather than a wrong number.
       })
     return () => {
       active = false
@@ -241,6 +252,20 @@ export default function Home() {
           ) : null}
           {!loading && dashboard.due_count === 0 && unscheduled === null ? (
             <p className="text-xs text-muted-foreground">读不到库里的知识点数量，队列那一行仍然准。</p>
+          ) : null}
+          {/* The third thing to do, and the one that is easiest to leave: a mistake
+              nobody goes back to is a mistake that will happen again. */}
+          {(uncorrected ?? 0) > 0 ? (
+            <Link
+              to="/practice"
+              className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+            >
+              <span>
+                还有 <strong>{uncorrected}</strong> 条错题没订正
+                <span className="ml-2 text-xs text-muted-foreground">不回头看一眼，下次还会错同一处</span>
+              </span>
+              <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-primary" />
+            </Link>
           ) : null}
         </CardContent>
       </Card>

@@ -237,7 +237,10 @@ type MistakeListOptions struct {
 	// Cause narrows to one 错因. The taxonomy is the point of the log -- "show me
 	// every method mistake" is how a reader decides what to drill.
 	Cause string
-	Limit int
+	// Corrected narrows by 订正 state: "yes" (answered right since), "no" (still
+	// open), or "" for both. The dashboard asks for the count of the open ones.
+	Corrected string
+	Limit     int
 	// Offset walks the log a page at a time. The list is capped, so without it
 	// the older half is reachable only by searching for it.
 	Offset int

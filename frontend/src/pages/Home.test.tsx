@@ -134,6 +134,22 @@ describe("Today page", () => {
     ))
   })
 
+  it("says how many mistakes are still open, and links to them", async () => {
+    // A mistake nobody goes back to is a mistake that happens again. The count is its
+    // own ask, because 还没订正 is not the same number as "mistakes".
+    mocks.listMistakePage.mockImplementation((options?: { corrected?: string }) =>
+      Promise.resolve(options?.corrected === "no" ? { items: [], count: 5 } : { items: [], count: 9 }))
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    const row = await screen.findByRole("link", { name: /还有 5 条错题没订正/ })
+    expect(row).toHaveAttribute("href", "/practice")
+    expect(mocks.listMistakePage).toHaveBeenCalledWith(expect.objectContaining({ corrected: "no" }))
+  })
+
   it("says the day is clear instead of showing two empty rows", async () => {
     mocks.getDashboard.mockResolvedValue({
       knowledge_count: 0,

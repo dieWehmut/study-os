@@ -138,12 +138,18 @@ func handleMistakeList(response http.ResponseWriter, request *http.Request, appl
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
 		return
 	}
+	corrected := strings.ToLower(strings.TrimSpace(request.URL.Query().Get("corrected")))
+	if corrected != "" && corrected != "yes" && corrected != "no" {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "corrected 只能是 yes 或 no"})
+		return
+	}
 	options := models.MistakeListOptions{
-		Subject: strings.ToLower(strings.TrimSpace(request.URL.Query().Get("subject"))),
-		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
-		Cause:   strings.TrimSpace(request.URL.Query().Get("cause")),
-		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 200),
-		Offset:  parseOffset(request.URL.Query().Get("offset")),
+		Subject:   strings.ToLower(strings.TrimSpace(request.URL.Query().Get("subject"))),
+		Query:     strings.TrimSpace(request.URL.Query().Get("q")),
+		Cause:     strings.TrimSpace(request.URL.Query().Get("cause")),
+		Corrected: corrected,
+		Limit:     parseLimit(request.URL.Query().Get("limit"), 50, 200),
+		Offset:    parseOffset(request.URL.Query().Get("offset")),
 	}
 	mistakes, err := application.Store.ListMistakes(request.Context(), options)
 	if err != nil {

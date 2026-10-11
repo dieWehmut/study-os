@@ -59,6 +59,60 @@ func TestRecordMistakeStoresQuestionAndAttempt(t *testing.T) {
 // The taxonomy is the point of the log: "show me every method mistake" is how a
 // reader decides what to drill. The total has to narrow with the list, or the
 // card says "还有 3 条" above a page of one.
+// 订正 state has to mean the same thing in the filter as it does on each row, or the
+// dashboard's "还有 K 条没订正" disagrees with the log it links to.
+func TestListMistakesNarrowsByCorrected(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	now := time.Date(2026, 8, 22, 9, 0, 0, 0, time.UTC)
+
+	open, err := store.RecordMistake(ctx, models.MistakeInput{Subject: "math", Stem: "还没订正", Cause: "method", OccurredAt: now})
+	if err != nil {
+		t.Fatalf("record open: %v", err)
+	}
+	fixed, err := store.RecordMistake(ctx, models.MistakeInput{Subject: "math", Stem: "已经订正", Cause: "method", OccurredAt: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatalf("record fixed: %v", err)
+	}
+	if _, err := store.RecordMistakeCorrection(ctx, fixed.Attempt.ID, models.MistakeCorrectionInput{Answer: "对了", ElapsedMS: 500}); err != nil {
+		t.Fatalf("correct: %v", err)
+	}
+
+	stillOpen, err := store.ListMistakes(ctx, models.MistakeListOptions{Corrected: "no", Limit: 10})
+	if err != nil {
+		t.Fatalf("list open: %v", err)
+	}
+	if len(stillOpen) != 1 || stillOpen[0].Attempt.ID != open.Attempt.ID {
+		t.Fatalf("open mistakes = %#v, want only %s", stillOpen, open.Attempt.ID)
+	}
+	openTotal, err := store.CountMistakes(ctx, models.MistakeListOptions{Corrected: "no"})
+	if err != nil {
+		t.Fatalf("count open: %v", err)
+	}
+	if openTotal != len(stillOpen) {
+		t.Fatalf("open count = %d but the list has %d", openTotal, len(stillOpen))
+	}
+
+	corrected, err := store.ListMistakes(ctx, models.MistakeListOptions{Corrected: "yes", Limit: 10})
+	if err != nil {
+		t.Fatalf("list corrected: %v", err)
+	}
+	if len(corrected) != 1 || corrected[0].Attempt.ID != fixed.Attempt.ID || !corrected[0].Corrected {
+		t.Fatalf("corrected mistakes = %#v, want only %s", corrected, fixed.Attempt.ID)
+	}
+
+	// And the row's own flag agrees with the filter that selected it.
+	for _, mistake := range stillOpen {
+		if mistake.Corrected {
+			t.Fatalf("a mistake selected as uncorrected reports corrected: %#v", mistake)
+		}
+	}
+}
+
 func TestListAndCountMistakesNarrowByCause(t *testing.T) {
 	ctx := context.Background()
 	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
