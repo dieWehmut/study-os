@@ -705,6 +705,12 @@ describe("Practice page", () => {
 
     expect(screen.getByText("已排进复习")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^排进复习$/ })).not.toBeInTheDocument()
+    // And the row can take you to the thing itself: knowing a card exists is not the
+    // same as being able to read it, and reading it is where 重学 happens.
+    expect(screen.getByRole("link", { name: "看知识点" })).toHaveAttribute(
+      "href",
+      "/knowledge?item=k-mistake-1",
+    )
   })
 
   it("offers to mark a mistake as one you have since got right", async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { useSearchParams } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import {
   CalendarPlus,
   CheckCheck,
@@ -851,7 +851,17 @@ export default function Practice() {
                         that was never the problem -- and the row already says
                         what to do instead. */}
                     {item.knowledgeItemId ? (
-                      <span className="shrink-0 text-xs text-muted-foreground">已排进复习</span>
+                      <>
+                        <span className="shrink-0 text-xs text-muted-foreground">已排进复习</span>
+                        {/* The row already says a card exists; this is where to go and
+                            read the thing itself, which is where 重学 happens. */}
+                        <Link
+                          to={`/knowledge?item=${encodeURIComponent(item.knowledgeItemId)}`}
+                          className="shrink-0 text-xs text-primary underline underline-offset-4"
+                        >
+                          看知识点
+                        </Link>
+                      </>
                     ) : spec?.reviewFixes ? (
                       <Button
                         variant="outline"
