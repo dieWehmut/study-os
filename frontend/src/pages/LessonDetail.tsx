@@ -682,6 +682,7 @@ export default function LessonDetail() {
   const sections = useMemo(() => (lesson ? sortSections(lesson.sections) : []), [lesson])
   const objectives = useMemo(() => (lesson ? objectivesForLesson(lesson) : []), [lesson])
   const hasAnyContent = useMemo(() => sections.some(sectionHasContent), [sections])
+  const filledCount = useMemo(() => sections.filter(sectionHasContent).length, [sections])
 
   if (loading) {
     return <section aria-busy="true" className="grid gap-4"><p className="text-sm text-muted-foreground">正在打开课程…</p></section>
@@ -855,29 +856,65 @@ export default function LessonDetail() {
       ) : null}
 
       <div className="grid gap-3" aria-label="课程环节">
+        {/* 十个环节一次看全：课程页原来只有一条总进度，写到第五段还是不知道后面有几段、
+            哪些还是空的。这一列既是目录，也是「还差什么」的清单。 */}
+        {sections.length > 0 ? (
+          <Card data-lesson-outline="true">
+            <CardHeader className="gap-1.5">
+              <CardTitle className="text-base">环节速览</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                共 {sections.length} 个环节，
+                {filledCount} 个已填写内容。点一行跳到那一段。
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ul className="grid gap-1.5 sm:grid-cols-2">
+                {sections.map((section, index) => {
+                  const filled = sectionHasContent(section)
+                  return (
+                    <li key={section.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40"
+                        onClick={() => {
+                          document.getElementById(`lesson-section-${section.id}`)?.scrollIntoView({ block: "start", behavior: "smooth" })
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{index + 1}. {section.title}</span>
+                        <Badge variant={filled ? "default" : "outline"} className="shrink-0">
+                          {filled ? "已填" : "待补"}
+                        </Badge>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
         {sections.length > 0 && !hasAnyContent && !editing ? (
           <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
             这门课程还是一份空草稿：下面是固定十段的骨架，内容还没有写进来。按「编辑内容」就能开始填。
           </p>
         ) : null}
         {sections.length > 0 ? sections.map((section) => (
-          editing && practiceDrafts[section.id] ? (
-            <PracticeSectionEditor
-              key={section.id}
-              section={section}
-              draft={practiceDrafts[section.id]}
-              onChange={(draft) => setPracticeDrafts((current) => ({ ...current, [section.id]: draft }))}
-            />
-          ) : (
-            <SectionView
-              key={section.id}
-              lessonID={lesson.id}
-              section={section}
-              editing={editing}
-              draft={drafts[section.id] ?? ""}
-              onDraftChange={(value) => setDrafts((current) => ({ ...current, [section.id]: value }))}
-            />
-          )
+          <div key={section.id} id={`lesson-section-${section.id}`} className="scroll-mt-4">
+            {editing && practiceDrafts[section.id] ? (
+              <PracticeSectionEditor
+                section={section}
+                draft={practiceDrafts[section.id]}
+                onChange={(draft) => setPracticeDrafts((current) => ({ ...current, [section.id]: draft }))}
+              />
+            ) : (
+              <SectionView
+                lessonID={lesson.id}
+                section={section}
+                editing={editing}
+                draft={drafts[section.id] ?? ""}
+                onDraftChange={(value) => setDrafts((current) => ({ ...current, [section.id]: value }))}
+              />
+            )}
+          </div>
         )) : (
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">这门课程还没有可预习的环节。</CardContent></Card>
         )}

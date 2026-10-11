@@ -166,6 +166,34 @@ describe("lesson detail page", () => {
     expect(within(objectiveCard as HTMLElement).getByText("用公式解释一个例子")).toBeInTheDocument()
   })
 
+  it("lists every 环节 with what is still empty, and jumps to it", async () => {
+    // The page used to show one total progress line: halfway down the document there
+    // was no way to see how many sections were left or which ones were still blank.
+    renderPage()
+
+    const outline = (await screen.findByText("环节速览")).closest("[data-lesson-outline='true']")
+    expect(outline).not.toBeNull()
+    const rows = within(outline as HTMLElement).getAllByRole("button")
+    // One row per rendered section -- read from the page, not from a fixture this test
+    // does not own: the default lesson here has two sections, and assuming the
+    // three-section fixture used by the practice test below cost a round trip.
+    const rendered = document.querySelectorAll("[data-section-kind]")
+    expect(rendered.length).toBeGreaterThan(0)
+    expect(rows).toHaveLength(rendered.length)
+    const text = (outline as HTMLElement).textContent ?? ""
+    expect(text).toContain("1. ")
+    expect(rows[0]!.textContent?.startsWith("1. ")).toBe(true)
+    expect(within(outline as HTMLElement).getAllByText(/^(已填|待补)$/).length).toBe(rendered.length)
+
+    // The row jumps to the section it names.
+    const target = document.querySelectorAll('[id^="lesson-section-"]')[0]
+    expect(target).not.toBeNull()
+    const scrollIntoView = vi.fn()
+    ;(target as HTMLElement).scrollIntoView = scrollIntoView
+    fireEvent.click(rows[0]!)
+    expect(scrollIntoView).toHaveBeenCalled()
+  })
+
   it("turns a structured practice section into an immediate local check", async () => {
     mocks.getLesson.mockResolvedValue({
       ...lesson,
