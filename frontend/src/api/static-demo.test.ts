@@ -347,6 +347,31 @@ describe("static Pages API fixtures", () => {
     })
   })
 
+  it("carries the derived counts the pages draw from, not only the real backend", async () => {
+    // Three labels were added to list rows in the app (生词 N, 已填 N/M, group counts).
+    // A count that only exists on the real backend is a feature the Pages build
+    // silently does not have -- the same divergence that was fixed for filters, search
+    // and the daily limit.
+    const articles = await staticDemoRequest<{ items: Array<{ vocabulary_count?: number; content?: { sections: Array<{ vocabulary?: unknown[] }> } }> }>("/english/articles")
+    const article = articles.items[0]!
+    const expected = (article.content?.sections ?? []).reduce((total, section) => total + (section.vocabulary?.length ?? 0), 0)
+    expect(article.vocabulary_count).toBe(expected)
+    expect(expected).toBeGreaterThan(0)
+
+    const lessons = await staticDemoRequest<{ items: Array<{ id: string; sections_count?: number; filled_sections?: number }> }>("/lessons")
+    const lesson = lessons.items[0]!
+    expect(typeof lesson.filled_sections).toBe("number")
+    expect(lesson.filled_sections).toBeLessThanOrEqual(lesson.sections_count ?? 0)
+    expect(lesson.filled_sections).toBeGreaterThan(0)
+
+    const groups = await staticDemoRequest<{ items: Array<{ id: string; name: string; item_count?: number }> }>("/groups")
+    const group = groups.items[0]!
+    expect(typeof group.item_count).toBe("number")
+    // And it matches what the ?group= filter itself returns, like the real one does.
+    const inGroup = await staticDemoRequest<{ items: unknown[]; count: number }>(`/knowledge?group=${encodeURIComponent(group.id)}`)
+    expect(group.item_count).toBe(inGroup.items.length)
+  })
+
   it("narrows the demo mistake list by search and 错因, not just by subject", async () => {
     // A filter the demo ignores is one a visitor spends a request on and sees
     // nothing change, which reads as broken rather than as a demo limitation.

@@ -340,6 +340,16 @@ function makeLesson(): Lesson {
     objectives: ["先看懂关系，再开始计算"],
     estimated_minutes: 15,
     sections_count: sections.length,
+    // The lesson list draws "已填 N/M" from this; the real backend computes it from the
+    // stored document. The demo has the same sections here, so it says the same thing
+    // rather than showing a feature that only exists off the Pages build.
+    filled_sections: sections.filter((section) => {
+      const content = section.content
+      if (content === null || content === undefined) return false
+      if (typeof content === "string") return content.trim() !== ""
+      if (Array.isArray(content)) return content.length > 0
+      return Object.keys(content).length > 0
+    }).length,
     version: 1,
     created_at: DEMO_NOW,
     updated_at: DEMO_NOW,
@@ -916,7 +926,19 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor({ id: item.id, term: item.term }) as T
   }
 
-  if (root === "groups" && method === "GET") return responseFor({ items: state.groups, count: state.groups.length }) as T
+  // The real backend hands the lesson list a `filled_sections` count (computed from the
+// stored document) and the row draws a progress bar from it; the demo has the same
+// sections in hand, so it says the same thing. A count that only exists on the real
+// backend is a feature the demo silently does not have.
+  if (root === "groups" && method === "GET") {
+    const items = state.groups.map((group) => ({
+      ...group,
+      item_count: state.knowledge.filter((item) =>
+        (item.tags ?? []).some((tag) => tag === group.id || tag.toLowerCase() === group.name.toLowerCase()),
+      ).length,
+    }))
+    return responseFor({ items, count: items.length }) as T
+  }
   if (root === "knowledge" && id === "lookup" && method === "POST") {
     const term = String(body.term ?? "").trim()
     if (!term) throw new StaticDemoError("Static demo lookup needs a term")
@@ -1311,7 +1333,19 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return undefined as T
   }
 
-  if (root === "english" && id === "articles" && !action && method === "GET") return responseFor({ items: state.articles, count: state.articles.length }) as T
+  // The list rows say how many words each article glosses (the real backend counts them
+// off the stored content); the demo counts its own fixture the same way, so the row
+// reads the same on both.
+  if (root === "english" && id === "articles" && !action && method === "GET") {
+    const items = state.articles.map((article) => ({
+      ...article,
+      vocabulary_count: (article.content?.sections ?? []).reduce(
+        (total, section) => total + (section.vocabulary?.length ?? 0),
+        0,
+      ),
+    }))
+    return responseFor({ items, count: items.length }) as T
+  }
   if (root === "english" && id === "articles" && action === "generate" && method === "POST") return responseFor(articleFrom(body)) as T
   if (root === "english" && id === "articles" && !action && method === "POST") {
     const article = articleFrom(body, typeof body.id === "string" ? body.id : newID("article"))
