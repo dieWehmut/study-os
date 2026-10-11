@@ -1,5 +1,5 @@
 import { RotateCcw } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 
 import { answerReview, overrideAttempt } from "@/api/reviews"
 import type { DueReview, ReviewEvaluation } from "@/api/types"
@@ -55,11 +55,16 @@ export function ProductionPrompt({ current, onNext, onError, onRated }: Producti
     }
   }, [evaluation, onError, onRated, submitting])
 
-  // The keyboard rules differ by what is on screen: a digit picks a choice, but the
-  // same digit typed into the answer box is text -- and after the verdict it is a
-  // 改判, which is the same three-way scale the self-rated cards use.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
+  // One listener for the life of the card, reading the newest handler through a ref.
+  //
+  // Registering the listener per render (with the state in its closure) lost a
+  // press: between the verdict landing and the effect re-running there is a window
+  // where the old closure still believes nothing has been answered, so "1" for a
+  // 改判 was read as "no evaluation, not a choice card" and dropped. A layout effect
+  // closes that window -- it runs in the same commit, before any event can arrive.
+  const keyHandler = useRef<(event: KeyboardEvent) => void>(() => {})
+  useLayoutEffect(() => {
+    keyHandler.current = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const target = event.target as HTMLElement | null
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return
@@ -82,9 +87,13 @@ export function ProductionPrompt({ current, onNext, onError, onRated }: Producti
       event.preventDefault()
       void submitAnswer(option)
     }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [correctRating, current.prompt.options, evaluation, isChoicePrompt, onNext, submitAnswer, submitting])
+  })
+
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => keyHandler.current(event)
+    window.addEventListener("keydown", listener)
+    return () => window.removeEventListener("keydown", listener)
+  }, [])
 
   return (
     <>
