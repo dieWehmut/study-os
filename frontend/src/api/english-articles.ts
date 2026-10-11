@@ -54,6 +54,8 @@ export interface EnglishArticle {
   provider?: string
   model?: string
   section_count?: number
+  /** Glossary entries, on list rows. -1 means the content could not be read. */
+  vocabulary_count?: number
   created_at?: string
   updated_at?: string
 }

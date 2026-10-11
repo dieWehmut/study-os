@@ -156,6 +156,13 @@ export default function EnglishArticleLibrary() {
                     <span>{byline(article)}</span>
                     <span>发布 {displayDate(article.published_at)}</span>
                     {sectionCount !== undefined ? <span>{sectionCount} 章</span> : null}
+                    {/* How many words the article glosses: the list is where a reader
+                        picks something to read, and the glossary is how hard it will be.
+                        Silence for none and for "could not be read" (-1) alike -- a
+                        number is only printed when there is one. */}
+                    {typeof article.vocabulary_count === "number" && article.vocabulary_count > 0 ? (
+                      <span>{article.vocabulary_count} 个生词</span>
+                    ) : null}
                     <span>更新 {displayDate(article.updated_at)}</span>
                   </p>
                 </div>

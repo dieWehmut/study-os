@@ -97,4 +97,24 @@ describe("EnglishArticleLibrary", () => {
 
     expect(await screen.findByText(/共 1 篇/)).toBeInTheDocument()
   })
+
+  it("says how many words an article glosses before it is opened", async () => {
+    // The glossary is how hard the article will be, and the list is where the choice
+    // is made. Silence for none, and for a content that could not be read (-1): a
+    // number is only printed when there is one.
+    mocks.listEnglishArticles.mockResolvedValue({
+      items: [
+        { id: "a-1", title: "有生词的一篇", vocabulary_count: 4, updated_at: "2026-08-20T00:00:00Z" },
+        { id: "a-2", title: "没有生词的一篇", vocabulary_count: 0, updated_at: "2026-08-20T00:00:00Z" },
+        { id: "a-3", title: "读不了内容的一篇", vocabulary_count: -1, updated_at: "2026-08-20T00:00:00Z" },
+      ],
+      count: 3,
+    })
+
+    renderLibrary()
+
+    expect(await screen.findByText("4 个生词")).toBeInTheDocument()
+    expect(screen.queryByText("0 个生词")).not.toBeInTheDocument()
+    expect(screen.queryByText(/个生词/)).toHaveTextContent("4 个生词")
+  })
 })

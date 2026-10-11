@@ -762,8 +762,13 @@ type EnglishArticle struct {
 	Markdown      string          `json:"markdown,omitempty"`
 	Provider      string          `json:"provider,omitempty"`
 	Model         string          `json:"model,omitempty"`
-	CreatedAt     time.Time       `json:"created_at"`
-	UpdatedAt     time.Time       `json:"updated_at"`
+	// VocabularyCount is how many glossary entries the article carries, filled in on
+	// list rows only: the list is where a reader picks something to read, and "how many
+	// words will I have to look up" is part of that. Zero means none, -1 means the
+	// article's content could not be read.
+	VocabularyCount int       `json:"vocabulary_count,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type ChatAttachment struct {

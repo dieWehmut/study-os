@@ -77,7 +77,7 @@ func (s *Store) ListEnglishArticles(ctx context.Context, limit int) ([]models.En
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, title, original_title, author, source_name, source_url, published_at,
-		       provider, model, created_at, updated_at
+		       provider, model, created_at, updated_at, content_json
 		FROM english_articles
 		ORDER BY updated_at DESC, id DESC
 		LIMIT ?`, limit)
@@ -89,11 +89,15 @@ func (s *Store) ListEnglishArticles(ctx context.Context, limit int) ([]models.En
 	for rows.Next() {
 		var article models.EnglishArticle
 		var createdAt, updatedAt string
+		var contentJSON string
 		if err := rows.Scan(&article.ID, &article.Title, &article.OriginalTitle, &article.Author,
 			&article.SourceName, &article.SourceURL, &article.PublishedAt, &article.Provider,
-			&article.Model, &createdAt, &updatedAt); err != nil {
+			&article.Model, &createdAt, &updatedAt, &contentJSON); err != nil {
 			return nil, err
 		}
+		// Read from the same row rather than a second query: the list already had to
+		// fetch it to answer "how many words does this article gloss".
+		article.VocabularyCount = vocabularyCount(contentJSON)
 		var err error
 		if article.CreatedAt, err = parseTime(createdAt); err != nil {
 			return nil, fmt.Errorf("parse english article created time: %w", err)
@@ -104,6 +108,33 @@ func (s *Store) ListEnglishArticles(ctx context.Context, limit int) ([]models.En
 		articles = append(articles, article)
 	}
 	return articles, rows.Err()
+}
+
+// vocabularyCount reads how many glossary entries a stored article carries.
+//
+// Unreadable content counts as -1 rather than 0: the list prints a count for a
+// number it knows and stays quiet for one it does not, and "0 words" is a claim.
+func vocabularyCount(contentJSON string) int {
+	if strings.TrimSpace(contentJSON) == "" {
+		return 0
+	}
+	var content struct {
+		Sections []struct {
+			Vocabulary json.RawMessage `json:"vocabulary"`
+		} `json:"sections"`
+	}
+	if err := json.Unmarshal([]byte(contentJSON), &content); err != nil {
+		return -1
+	}
+	total := 0
+	for _, section := range content.Sections {
+		var entries []json.RawMessage
+		if err := json.Unmarshal(section.Vocabulary, &entries); err != nil {
+			continue
+		}
+		total += len(entries)
+	}
+	return total
 }
 
 func (s *Store) DeleteEnglishArticle(ctx context.Context, id string) error {

@@ -12,6 +12,59 @@ import (
 	"study-os/backend/models"
 )
 
+// The article list shows how many words each one glosses, so the count has to come
+// back with the row -- and a row whose content cannot be read says so (-1) instead of
+// claiming the article glosses nothing.
+func TestListEnglishArticlesCountsVocabulary(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	now := time.Date(2026, 8, 20, 9, 0, 0, 0, time.UTC)
+	for _, article := range []models.EnglishArticle{
+		{
+			ID: "article-glossed", Title: "有生词", OriginalText: "The plan shifted.", Markdown: "# 有生词`n", Provider: "mock", Model: "mock",
+			ContentJSON: json.RawMessage(`{"sections":[{"vocabulary":[{"term":"shifted"}]},{"vocabulary":[{"term":"plan"},{"term":"risk"}]}]}`),
+			CreatedAt:   now, UpdatedAt: now,
+		},
+		{
+			ID: "article-plain", Title: "没生词", OriginalText: "A plain article.", Markdown: "# 没生词`n", Provider: "mock", Model: "mock",
+			ContentJSON: json.RawMessage(`{"sections":[{"paragraphs":[]}]}`),
+			CreatedAt:   now, UpdatedAt: now.Add(time.Minute),
+		},
+		{
+			ID: "article-broken", Title: "内容损坏", OriginalText: "Broken content.", Markdown: "# 内容损坏`n", Provider: "mock", Model: "mock",
+			ContentJSON: json.RawMessage(`{not json`),
+			CreatedAt:   now, UpdatedAt: now.Add(2 * time.Minute),
+		},
+	} {
+		if err := store.CreateEnglishArticle(ctx, article); err != nil {
+			t.Fatalf("create %s: %v", article.ID, err)
+		}
+	}
+
+	articles, err := store.ListEnglishArticles(ctx, 20)
+	if err != nil {
+		t.Fatalf("list articles: %v", err)
+	}
+	counts := make(map[string]int, len(articles))
+	for _, article := range articles {
+		counts[article.ID] = article.VocabularyCount
+	}
+	if counts["article-glossed"] != 3 {
+		t.Fatalf("glossed article counts %d, want 3 (%v)", counts["article-glossed"], counts)
+	}
+	if counts["article-plain"] != 0 {
+		t.Fatalf("plain article counts %d, want 0 (%v)", counts["article-plain"], counts)
+	}
+	if counts["article-broken"] != -1 {
+		t.Fatalf("broken article counts %d, want -1 (%v)", counts["article-broken"], counts)
+	}
+}
+
 func TestEnglishArticleStoreLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
