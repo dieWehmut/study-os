@@ -16,6 +16,11 @@ import { spawnSync } from "node:child_process"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+// Windows needs a shell for pnpm/npx, and node prints DEP0190 for each spawn. This
+// script's whole job is to keep output readable, so that one warning is off rather
+// than repeated five times per sweep.
+process.noDeprecation = true
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const frontend = join(root, "frontend")
 const reports = join(root, "flake", `sweep-${new Date().toISOString().replace(/[:.]/g, "-")}`)
@@ -28,14 +33,16 @@ const only = process.argv.slice(2)
 function run(command, args, options = {}) {
   const label = [command, ...args].join(" ")
   console.log(`\n=== ${options.title ?? label} ===`)
-  // Only the package runners need a shell on Windows; passing everything through
-  // one makes node warn about unescaped arguments on every step.
-  const needsShell = process.platform === "win32" && (command === "pnpm" || command === "npx")
+  // The package runners are .cmd shims on Windows, so they need a shell -- and node
+  // warns once per spawn when one is used. Spawning the shim directly without a shell
+  // looked tidier and did not work: it exited non-zero with no output at all, which is
+  // exactly the kind of silence this script exists to prevent. The warning is turned
+  // off instead (see the top of the file), and every step still prints its own output.
   const result = spawnSync(command, args, {
     cwd: options.cwd ?? root,
     stdio: "inherit",
     env: { ...process.env, ...options.env },
-    shell: needsShell,
+    shell: process.platform === "win32" && (command === "pnpm" || command === "npx"),
   })
   return { label, status: result.status ?? 1 }
 }
@@ -78,10 +85,23 @@ const order = [...selected]
 // Leave the repository with its normal build: the pages step keeps the demo build
 // in place so the artifact test can read what was just built.
 if (order.includes("pages")) order.push("restore")
+if (order.includes("docs") && !order.includes("pages") && !order.includes("pages-build")) {
+  order.splice(order.indexOf("docs"), 0, "pages-build")
+  order.push("restore")
+}
 
 const stepsWithRestore = {
   ...steps,
   restore: () => [run("pnpm", ["--dir", "frontend", "build"], { title: "restore the normal build" })],
+  // github-pages-artifact.test.mjs reads the Pages *demo* build out of dist, so asking
+  // for the docs tests alone is asking for a failure unless the demo build is what is
+  // sitting there. Build it first instead of reporting a red that means nothing.
+  "pages-build": () => [
+    run("pnpm", ["--dir", "frontend", "build"], {
+      env: { VITE_STATIC_DEMO: "true", VITE_BASE_PATH: "/study-os/" },
+      title: "pages build (needed by the artifact test)",
+    }),
+  ],
 }
 
 for (const name of order) {
