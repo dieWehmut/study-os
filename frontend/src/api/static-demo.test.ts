@@ -347,6 +347,30 @@ describe("static Pages API fixtures", () => {
     })
   })
 
+  it("narrows the demo mistake list by search and 错因, not just by subject", async () => {
+    // A filter the demo ignores is one a visitor spends a request on and sees
+    // nothing change, which reads as broken rather than as a demo limitation.
+    const all = await staticDemoRequest<{ items: Array<{ attempt: { cause?: string }; question: { stem: string } }> }>("/mistakes")
+    expect(all.items.length).toBeGreaterThan(1)
+    const target = all.items[0]!
+    const cause = target.attempt.cause ?? ""
+
+    const byQuery = await staticDemoRequest<{ items: Array<{ question: { stem: string } }> }>(
+      `/mistakes?q=${encodeURIComponent(target.question.stem.slice(0, 4))}`,
+    )
+    expect(byQuery.items.length).toBeGreaterThan(0)
+    expect(byQuery.items.every((item) => item.question.stem.includes(target.question.stem.slice(0, 4)))).toBe(true)
+
+    const byCause = await staticDemoRequest<{ items: Array<{ attempt: { cause?: string } }> }>(
+      `/mistakes?cause=${encodeURIComponent(cause)}`,
+    )
+    expect(byCause.items.length).toBeGreaterThan(0)
+    expect(byCause.items.every((item) => item.attempt.cause === cause)).toBe(true)
+
+    const missed = await staticDemoRequest<{ items: unknown[] }>("/mistakes?cause=definitely-not-a-cause")
+    expect(missed.items).toHaveLength(0)
+  })
+
   it("rejects malformed evidence request bodies without clearing saved evidence", async () => {
     const evidence = {
       version: 1,

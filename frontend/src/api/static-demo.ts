@@ -755,8 +755,19 @@ function articleFrom(input: Record<string, unknown>, id = newID("article")): Eng
   }
 }
 
-function mistakeList(subject: string | undefined) {
-  const items = subject ? state.mistakes.filter((entry) => entry.question.subject === subject) : state.mistakes
+// Every filter the page offers, or the demo silently ignores it: typing a word into
+// 搜索 or picking a 错因 would spend a request and change nothing, which reads as a
+// broken filter rather than as a demo limitation.
+function mistakeList(url: URL) {
+  const subject = subjectFrom(url.searchParams.get("subject"))
+  const query = url.searchParams.get("q")?.trim().toLowerCase() ?? ""
+  const cause = url.searchParams.get("cause")?.trim().toLowerCase() ?? ""
+  const items = state.mistakes.filter((entry) => {
+    if (subject && entry.question.subject !== subject) return false
+    if (query && !entry.question.stem.toLowerCase().includes(query)) return false
+    if (cause && (entry.attempt.cause ?? "").toLowerCase() !== cause) return false
+    return true
+  })
   return { items: clone(items), count: items.length }
 }
 
@@ -1138,7 +1149,7 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor(cause) as T
   }
 
-  if (root === "mistakes" && !id && method === "GET") return responseFor(mistakeList(subjectFrom(url.searchParams.get("subject")))) as T
+  if (root === "mistakes" && !id && method === "GET") return responseFor(mistakeList(url)) as T
   if (root === "mistakes" && !id && method === "POST") {
     if (!init?.body || typeof init.body !== "string" || init.body.trim() === "") {
       throw new StaticDemoError("Request body is required", 400)
