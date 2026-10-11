@@ -94,6 +94,41 @@ test("schema v18 records restorable six-subject diagnostic evidence", () => {
   assert.doesNotMatch(roadmap, /当前仍缺按错因聚合的诊断视图/)
 })
 
+test("the 一节多题 acceptance markers name tests that still exist", () => {
+  // ROADMAP 第 3 阶段 marks acceptance items 「已覆盖」 and names what covers them. A
+  // marker is only worth reading if the test behind it is still there -- otherwise the
+  // document keeps promising coverage the repository no longer has.
+  const lessonTests = [
+    read("backend/httpapi/lesson_test.go"),
+    read("backend/httpapi/lesson_practice_test.go"),
+    read("backend/db/lesson_attempt_store_test.go"),
+    read("backend/models/lesson_practice_test.go"),
+    read("frontend/src/lib/lesson-markdown.test.ts"),
+  ].join("\n")
+
+  const covered = [
+    // ② 三题各自留一条作答、同一题重答仍是覆盖
+    "TestLessonPracticeAttemptsSeparateQuestionsWithinOneSection",
+    "TestLessonPracticeAttemptPersistsAndListsNewestFirst",
+    // ③ 超过 20 题报 400 且说明上限（含 HTTP 层）
+    "TestNormalizeLessonDocumentChecksPracticeQuestions",
+    "TestLessonRoutesRefuseAPracticeSectionWithTooManyQuestions",
+    // ⑤ Markdown 导出把多题按题号列出
+    "prints every question of a section that asks several, numbered",
+  ]
+  for (const name of covered) {
+    assert.match(lessonTests, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${name} is gone; ROADMAP says this is covered`)
+  }
+
+  // And the markers themselves stay in the document, with ④ explained rather than
+  // silently dropped. `[^；]` rather than `[^\n]`: the list wraps mid-item, so a marker
+  // can sit a line below its number.
+  for (const marker of ["①", "②", "③", "⑤"]) {
+    assert.match(roadmap, new RegExp(`${marker}[^；]*已覆盖`), `acceptance ${marker} lost its 已覆盖 marker`)
+  }
+  assert.match(roadmap, /④[^；]*不适用/)
+})
+
 test("lesson documentation describes the versioned write and preview contract", () => {
   assert.match(roadmap, /POST \/api\/lessons/)
   assert.match(roadmap, /PATCH \/api\/lessons\/{lessonID}/)
