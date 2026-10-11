@@ -2,6 +2,23 @@
 
 ## 未发布
 
+### 30 多轮的那类偶发红，找到了runner 层的根因：findBy* 的 1 秒等待
+
+- 上一轮的 `scripts/sweep.mjs` 第一次全量运行就把详情留住了（这正是它存在的意义）：
+  `
+  Chat:        Unable to find role="region" and name "回流到复习计划"
+  Knowledge:   Unable to find role="button" and name /abandonment/
+  `
+  再跑一次，**红的是另外两条**（说出「already queued」那条、词族那条）——**每次都不一样**。
+- 关键证据：把这 5 个文件单独一起跑，**225 条全过**。也就是说失败属于**整轮运行**，不是某条用例的 bug。
+- 根因：`vite.config.ts` 早就为这一类把 `testTimeout` 提到 20s（注释里写着「同一台机器上的秒表，不是代码的」），
+  但**漏了下面一层**——`@testing-library` 的 `findBy*`/`waitFor` 默认只等 **1 秒**，`testTimeout` 管不到它。
+  加载中的机器（124 个文件、多个 worker）把路由渲染进 jsdom 就可能超过 1 秒，于是每次随机红几条。
+- 修法一行：`src/test/setup.tsx` 里 `configure({ asyncUtilTimeout: 5000 })`，并写明与上面那条同样的理由。
+- 证据：改前连续两次全量**分别红 5 条与 2 条**；改后 `flake-hunt 3` **连跑三轮全量全部干净**。
+  我要说清楚：这仍不是证明（机器也可能恰好安静下来了），但「同一类症状 + 每次不同的受害者 + 单跑全过 +
+  改的就是那个秒表」这四条合起来，是目前最站得住的解释。
+
 ### 复习卡可以用键盘作答
 
 - 认词卡（自评掌握程度）现在支持**键盘**：`1` 不认识 · `2` 模糊 · `3` 认识；看过答案后 `回车` 进入下一题。
