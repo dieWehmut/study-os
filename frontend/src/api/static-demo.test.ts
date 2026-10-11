@@ -546,6 +546,24 @@ describe("static Pages API fixtures", () => {
     expect(grouped.items.every((item) => item.subject === "english")).toBe(true)
   })
 
+  it("saves a wiki rename in the demo instead of failing every time", async () => {
+    // The mind map is editable here; a route the demo does not implement turned every
+    // rename into 「改名失败」 -- a control that could only fail.
+    const list = await staticDemoRequest<{ items: Array<{ id: string; detailed_markdown?: string }> }>("/knowledge?limit=1")
+    const item = list.items[0]!
+    const renamed = "# 新标题\n\n改写后的正文。\n"
+
+    const saved = await staticDemoRequest<{ id: string; detailed_markdown?: string }>(`/knowledge/${item.id}/wiki`, {
+      method: "PUT",
+      body: JSON.stringify({ detailed_markdown: renamed }),
+    })
+    expect(saved.detailed_markdown).toBe(renamed)
+
+    // And it sticks: the next read is the renamed one.
+    const reread = await staticDemoRequest<{ detailed_markdown?: string }>(`/knowledge/${item.id}`)
+    expect(reread.detailed_markdown).toBe(renamed)
+  })
+
   it("grades a demo answer instead of applauding everything, and remembers the misses", async () => {
     // It used to answer "correct" to whatever it was given, which made a wrong answer
     // indistinguishable -- and left 恢复模式 with nothing to recover.

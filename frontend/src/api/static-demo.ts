@@ -937,6 +937,15 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor({ source: "generated", item }) as T
   }
   if (root === "knowledge" && !id && method === "GET") return responseFor(knowledgeList(url)) as T
+  // Renaming a section of the wiki from the mind map. Without this the demo offered
+  // an editable map whose every rename ended in "改名失败" -- a control that could
+  // only fail, which is what the Pages build is supposed to avoid offering.
+  if (root === "knowledge" && id && action === "wiki" && method === "PUT") {
+    const item = state.knowledge.find((entry) => entry.id === id)
+    if (!item) throw new StaticDemoError("Static demo knowledge item not found", 404)
+    item.detailed_markdown = String(body.detailed_markdown ?? item.detailed_markdown ?? "")
+    return responseFor(clone(item)) as T
+  }
   if (root === "knowledge" && id && action === "related" && method === "GET") {
     const item = state.knowledge.find((entry) => entry.id === id)
     const tags = new Set(item?.tags ?? [])
