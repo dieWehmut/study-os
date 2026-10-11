@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   updateMistakeEvidence: vi.fn(),
   deleteMistake: vi.fn(),
   scheduleMistake: vi.fn(),
+  unscheduleKnowledge: vi.fn(),
   correctMistake: vi.fn(),
   listErrorCauses: vi.fn(),
   exportMistakes: vi.fn(),
@@ -38,6 +39,9 @@ vi.mock("@/api/mistakes", () => ({
   },
 }))
 vi.mock("@/api/error-causes", () => ({ listErrorCauses: mocks.listErrorCauses }))
+// 取消排复习 on a mistake row goes through the knowledge endpoint: 排进复习 created the
+// knowledge item and its cards, so the undo is a question about that item.
+vi.mock("@/api/knowledge", () => ({ unscheduleKnowledge: mocks.unscheduleKnowledge }))
 
 let filed = 0
 
@@ -714,6 +718,15 @@ describe("Practice page", () => {
       "href",
       "/knowledge?item=k-mistake-1",
     )
+    // And the way back out, from the row that put it in: 排进复习 created the knowledge
+    // item, so the undo is the same endpoint the panel uses.
+    mocks.unscheduleKnowledge.mockResolvedValue({ status: "unscheduled", knowledge_id: "k-mistake-1", prompts_removed: 3 })
+    fireEvent.click(screen.getByRole("button", { name: /取消排复习：上次排过的题/ }))
+
+    await waitFor(() => expect(mocks.unscheduleKnowledge).toHaveBeenCalledWith("k-mistake-1"))
+    // The row answers the press immediately: it is out of the plan, so the queue button
+    // is offered again instead.
+    await waitFor(() => expect(screen.getByRole("button", { name: /^排进复习$/ })).toBeInTheDocument())
   })
 
   it("offers to mark a mistake as one you have since got right", async () => {

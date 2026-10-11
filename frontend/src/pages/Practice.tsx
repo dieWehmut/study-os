@@ -23,6 +23,7 @@ import {
   recordMistake,
   scheduleMistake,
 } from "@/api/mistakes"
+import { unscheduleKnowledge } from "@/api/knowledge"
 import { listErrorCauses, type ErrorCause } from "@/api/error-causes"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -474,6 +475,34 @@ export default function Practice() {
   }
 
   /**
+   * The way back out of the queue, from the row that put it in.
+   *
+   * Same endpoint as the knowledge panel's 取消排复习: 排进复习 on a mistake creates the
+   * knowledge item and its cards, so cancelling is a question about that item. Cleared
+   * locally rather than by reloading the page -- the row is what the reader is looking
+   * at, and it should answer their press immediately.
+   */
+  async function cancelQueue(item: MistakeRecord) {
+    const knowledgeItemId = item.knowledgeItemId
+    if (!knowledgeItemId || queueing) return
+    setQueueing(item.id)
+    try {
+      await unscheduleKnowledge(knowledgeItemId)
+      setRecords((current) =>
+        current.map((entry) => (entry.id === item.id ? { ...entry, knowledgeItemId: undefined } : entry)),
+      )
+      setDiagnosticRecords((current) =>
+        current.map((entry) => (entry.id === item.id ? { ...entry, knowledgeItemId: undefined } : entry)),
+      )
+      setRowError("")
+    } catch (failure) {
+      setRowError(failureMessage(failure, "取消排复习失败"))
+    } finally {
+      setQueueing("")
+    }
+  }
+
+  /**
    * Mark one filed mistake as one you have since got right.
    *
    * Deliberately not remove(): 取消 is for a row filed by accident, 订正 is for
@@ -866,6 +895,16 @@ export default function Practice() {
                         >
                           看知识点
                         </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0"
+                          disabled={queueing === item.id}
+                          aria-label={`取消排复习：${item.question}`}
+                          onClick={() => void cancelQueue(item)}
+                        >
+                          取消排复习
+                        </Button>
                       </>
                     ) : spec?.reviewFixes ? (
                       <Button
