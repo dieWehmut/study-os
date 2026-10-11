@@ -192,6 +192,12 @@ describe("lesson detail page", () => {
     ;(target as HTMLElement).scrollIntoView = scrollIntoView
     fireEvent.click(rows[0]!)
     expect(scrollIntoView).toHaveBeenCalled()
+
+    // The same count sits in the header, where the reader looks before scrolling down
+    // to the list that also says it.
+    const summary = document.querySelector("[data-lesson-filled-summary='true']")
+    expect(summary).not.toBeNull()
+    expect(summary!.textContent).toMatch(/已填 \d+\/\d+/)
   })
 
   it("turns a structured practice section into an immediate local check", async () => {

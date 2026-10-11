@@ -728,6 +728,17 @@ export default function LessonDetail() {
             <>
               <Badge variant={lesson.status === "published" ? "default" : "secondary"}>{statusLabel(lesson.status)}</Badge>
               <span className="text-sm text-muted-foreground">{subjectName(lesson.subject)}</span>
+              {/* How much of it is written, at the top: the section list that says the
+                  same thing is a long way down, and "is this worth reading now" is the
+                  first question the header has to answer. */}
+              {sections.length > 0 ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" data-lesson-filled-summary="true">
+                  <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted align-middle">
+                    <span className="block h-full bg-primary" style={{ width: `${Math.round((filledCount / sections.length) * 100)}%` }} />
+                  </span>
+                  已填 {filledCount}/{sections.length}
+                </span>
+              ) : null}
             </>
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
