@@ -141,6 +141,7 @@ func handleMistakeList(response http.ResponseWriter, request *http.Request, appl
 	options := models.MistakeListOptions{
 		Subject: strings.ToLower(strings.TrimSpace(request.URL.Query().Get("subject"))),
 		Query:   strings.TrimSpace(request.URL.Query().Get("q")),
+		Cause:   strings.TrimSpace(request.URL.Query().Get("cause")),
 		Limit:   parseLimit(request.URL.Query().Get("limit"), 50, 200),
 		Offset:  parseOffset(request.URL.Query().Get("offset")),
 	}

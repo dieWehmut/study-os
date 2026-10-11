@@ -230,6 +230,9 @@ type MistakeListOptions struct {
 	// so without it an older mistake is reachable only by scrolling a page that
 	// no longer holds it.
 	Query string
+	// Cause narrows to one 错因. The taxonomy is the point of the log -- "show me
+	// every method mistake" is how a reader decides what to drill.
+	Cause string
 	Limit int
 	// Offset walks the log a page at a time. The list is capped, so without it
 	// the older half is reachable only by searching for it.

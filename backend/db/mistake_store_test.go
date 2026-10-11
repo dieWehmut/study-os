@@ -25,10 +25,10 @@ func TestRecordMistakeStoresQuestionAndAttempt(t *testing.T) {
 
 	now := time.Date(2026, 8, 8, 9, 0, 0, 0, time.UTC)
 	recorded, err := store.RecordMistake(ctx, models.MistakeInput{
-		Subject:  "physics",
-		Stem:     "小球从斜面顶端滑下，求到底端的速度。",
-		Cause:    "method",
-		Note:     "忘了摩擦力做负功",
+		Subject:    "physics",
+		Stem:       "小球从斜面顶端滑下，求到底端的速度。",
+		Cause:      "method",
+		Note:       "忘了摩擦力做负功",
 		OccurredAt: now,
 	})
 	if err != nil {
@@ -53,6 +53,60 @@ func TestRecordMistakeStoresQuestionAndAttempt(t *testing.T) {
 	}
 	if mistakes[0].Attempt.Cause != "method" || mistakes[0].Attempt.Note != "忘了摩擦力做负功" {
 		t.Fatalf("attempt = %#v", mistakes[0].Attempt)
+	}
+}
+
+// The taxonomy is the point of the log: "show me every method mistake" is how a
+// reader decides what to drill. The total has to narrow with the list, or the
+// card says "还有 3 条" above a page of one.
+func TestListAndCountMistakesNarrowByCause(t *testing.T) {
+	ctx := context.Background()
+	store, err := db.Open(ctx, filepath.Join(t.TempDir(), "study.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	now := time.Date(2026, 8, 22, 9, 0, 0, 0, time.UTC)
+	for _, input := range []models.MistakeInput{
+		{Subject: "math", Stem: "求导出错", Cause: "method", OccurredAt: now},
+		{Subject: "math", Stem: "看错条件", Cause: "misread", OccurredAt: now.Add(time.Minute)},
+		{Subject: "math", Stem: "又看错", Cause: "misread", OccurredAt: now.Add(2 * time.Minute)},
+	} {
+		if _, err := store.RecordMistake(ctx, input); err != nil {
+			t.Fatalf("record %q: %v", input.Stem, err)
+		}
+	}
+
+	byMethod, err := store.ListMistakes(ctx, models.MistakeListOptions{Cause: "method", Limit: 10})
+	if err != nil {
+		t.Fatalf("list by cause: %v", err)
+	}
+	if len(byMethod) != 1 || byMethod[0].Question.Stem != "求导出错" {
+		t.Fatalf("method mistakes = %#v", byMethod)
+	}
+	methodTotal, err := store.CountMistakes(ctx, models.MistakeListOptions{Cause: "method"})
+	if err != nil {
+		t.Fatalf("count by cause: %v", err)
+	}
+	if methodTotal != 1 {
+		t.Fatalf("method total = %d, want 1 (the same filter as the list)", methodTotal)
+	}
+
+	byMisread, err := store.ListMistakes(ctx, models.MistakeListOptions{Cause: "misread", Limit: 10})
+	if err != nil {
+		t.Fatalf("list misread: %v", err)
+	}
+	if len(byMisread) != 2 {
+		t.Fatalf("misread mistakes = %d, want 2", len(byMisread))
+	}
+
+	// No cause means every cause, as it did before the filter existed.
+	every, err := store.ListMistakes(ctx, models.MistakeListOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+	if len(every) != 3 {
+		t.Fatalf("all mistakes = %d, want 3", len(every))
 	}
 }
 

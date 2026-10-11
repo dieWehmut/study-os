@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import { EquationBoard } from "@/features/chemistry/EquationBoard"
 import { ScoringBoard } from "@/features/chinese/ScoringBoard"
 import { LongSentenceBoard } from "@/features/english/LongSentenceBoard"
@@ -194,6 +195,8 @@ export default function Practice() {
   // The query the log is filtered by, and the box you type in. The log is one
   // page of the newest mistakes, so without this the rest are unreachable.
   const [recordQuery, setRecordQuery] = useState("")
+  // One 错因 at a time, filtered by the server so the total narrows with the list.
+  const [recordCause, setRecordCause] = useState("")
   const [recordDraft, setRecordDraft] = useState("")
   // How many rows the log holds, and how many of them came from the server --
   // counted apart because 记录 also carries a browser log that was migrated over
@@ -231,6 +234,7 @@ export default function Practice() {
     const listRequest = {
       ...currentSubjectRequest,
       ...(recordQuery ? { query: recordQuery } : {}),
+      ...(recordCause ? { cause: recordCause } : {}),
     }
     const currentRecordsRequest = listMistakePage(listRequest)
     // The 六科诊断总览 counts every mistake, not the search result: 搜索 finds a
@@ -287,7 +291,7 @@ export default function Practice() {
     return () => {
       active = false
     }
-  }, [subject, recordQuery])
+  }, [subject, recordQuery, recordCause])
 
   useEffect(() => {
     let active = true
@@ -674,6 +678,30 @@ export default function Practice() {
             >
               搜索
             </Button>
+            {/* By 错因, not just by words: the taxonomy is the point of the log, and
+                "show me every method mistake" is how a reader picks what to drill.
+                The server narrows it, so the total narrows with the list. */}
+            <Select
+              ariaLabel="按错因筛选"
+              value={recordCause}
+              onValueChange={setRecordCause}
+              options={[
+                { value: "", label: "全部错因" },
+                ...taxonomy.map((spec) => ({ value: spec.cause, label: spec.label })),
+              ]}
+            />
+            {recordCause ? (
+              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                只显示「{taxonomy.find((spec) => spec.cause === recordCause)?.label ?? recordCause}」的错题
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  onClick={() => setRecordCause("")}
+                >
+                  清除
+                </button>
+              </span>
+            ) : null}
             {recordQuery ? (
               <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 只显示题干提到「{recordQuery}」的错题

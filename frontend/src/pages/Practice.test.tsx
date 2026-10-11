@@ -105,6 +105,27 @@ describe("Practice page", () => {
     expect(await screen.findByText(/还没有记录/)).toBeInTheDocument()
   })
 
+  it("filters the log by 错因, and asks the server for that one cause", async () => {
+    // The taxonomy is the point of the log: "show me every method mistake" is how a
+    // reader picks what to drill, and the total has to narrow with the list.
+    mocks.listErrorCauses.mockResolvedValue([
+      { id: "method", label: "方法不对", reviewFixes: true, sort_order: 0 },
+      { id: "misread", label: "看错条件", reviewFixes: true, sort_order: 1 },
+    ])
+    render(<Practice />)
+    await screen.findByText(/还没有记录/)
+
+    fireEvent.click(screen.getByRole("combobox", { name: "按错因筛选" }))
+    const option = await screen.findByRole("option", { name: "方法不对" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+
+    await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalledWith(
+      expect.objectContaining({ cause: "method" }),
+    ))
+    expect(await screen.findByText(/只显示「方法不对」的错题/)).toBeInTheDocument()
+  })
+
   it("shows a six-subject diagnostic overview and can focus a subject", async () => {
     render(<Practice />)
 

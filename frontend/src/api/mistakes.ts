@@ -43,6 +43,8 @@ export interface ListMistakesOptions {
   subject?: string
   /** Narrows by the question as it was written down. The list is capped. */
   query?: string
+  /** Narrows to one 错因, so "show me every method mistake" is a question the log can answer. */
+  cause?: string
   limit?: number
   offset?: number
 }
@@ -108,6 +110,7 @@ export async function listMistakePage(
   const params = new URLSearchParams()
   if (options.subject !== undefined) params.set("subject", options.subject)
   if (options.query !== undefined) params.set("q", options.query)
+  if (options.cause !== undefined) params.set("cause", options.cause)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   if (options.offset !== undefined) params.set("offset", String(options.offset))
   const suffix = params.toString()

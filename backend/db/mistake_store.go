@@ -131,6 +131,12 @@ func mistakeFilter(options models.MistakeListOptions) (string, []any) {
 		where += ` AND q.stem LIKE ? ESCAPE '\'`
 		arguments = append(arguments, "%"+escapeLike(needle)+"%")
 	}
+	// The cause is stored on the attempt, not on the question: the same question
+	// answered twice can be blamed differently.
+	if cause := strings.TrimSpace(options.Cause); cause != "" {
+		where += ` AND a.cause = ?`
+		arguments = append(arguments, cause)
+	}
 	return where, arguments
 }
 
