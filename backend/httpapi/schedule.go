@@ -57,16 +57,15 @@ func handleKnowledgeSchedule(response http.ResponseWriter, request *http.Request
 		return
 	}
 
-	generated := memory.GeneratePrompts(memory.KnowledgeItem{
-		ID:                item.ID,
-		ItemType:          item.ItemType,
-		Subject:           item.Subject,
-		Term:              item.Term,
-		ConciseDefinition: item.ConciseDefinition,
-		Example:           item.Example,
-		AcceptedMeanings:  []string{item.ConciseDefinition},
-		AcceptedTerms:     []string{item.Term},
-	})
+	// Cards that are already there are reused rather than recreated. Their ids are
+	// deterministic (`p-<itemID>-<n>`), so creating them again would collide -- and
+	// re-scheduling after 取消排复习 lands exactly here: the cards were left standing and
+	// only their schedules were removed.
+	existingPrompts, err := application.Store.ReviewPromptIDs(ctx, item.ID)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习卡失败"})
+		return
+	}
 
 	now := time.Now().UTC()
 	// Due a moment ago rather than exactly now: the queue asks for cards due at
@@ -74,31 +73,53 @@ func handleKnowledgeSchedule(response http.ResponseWriter, request *http.Request
 	// lose that race against the clock.
 	dueAt := now.Add(-time.Second)
 
+	// Counted inside the transaction, from the ids that are actually scheduled: the
+	// response is read by callers that show 「N 张卡」, and a number computed before the
+	// work is done is a number that can be wrong about the work.
+	scheduled := 0
+
 	err = application.Store.WithTx(ctx, func(tx *db.TxStore) error {
-		for index, generatedPrompt := range generated {
-			prompt := models.Prompt{
-				ID:              fmt.Sprintf("p-%s-%d", item.ID, index+1),
-				KnowledgeItemID: item.ID,
-				PromptType:      string(generatedPrompt.Type),
-				Question:        generatedPrompt.Question,
-				AcceptedAnswers: generatedPrompt.AcceptedAnswers,
-				CreatedAt:       now,
-				UpdatedAt:       now,
+		promptIDs := existingPrompts
+		if len(promptIDs) == 0 {
+			generated := memory.GeneratePrompts(memory.KnowledgeItem{
+				ID:                item.ID,
+				ItemType:          item.ItemType,
+				Subject:           item.Subject,
+				Term:              item.Term,
+				ConciseDefinition: item.ConciseDefinition,
+				Example:           item.Example,
+				AcceptedMeanings:  []string{item.ConciseDefinition},
+				AcceptedTerms:     []string{item.Term},
+			})
+			for index, generatedPrompt := range generated {
+				prompt := models.Prompt{
+					ID:              fmt.Sprintf("p-%s-%d", item.ID, index+1),
+					KnowledgeItemID: item.ID,
+					PromptType:      string(generatedPrompt.Type),
+					Question:        generatedPrompt.Question,
+					AcceptedAnswers: generatedPrompt.AcceptedAnswers,
+					CreatedAt:       now,
+					UpdatedAt:       now,
+				}
+				if err := tx.CreatePrompt(ctx, prompt); err != nil {
+					return err
+				}
+				promptIDs = append(promptIDs, prompt.ID)
 			}
-			if err := tx.CreatePrompt(ctx, prompt); err != nil {
-				return err
-			}
+		}
+		scheduled = len(promptIDs)
+		for _, promptID := range promptIDs {
 			card := fsrs.NewCard()
 			card.Due = dueAt
 			cardJSON, err := json.Marshal(card)
 			if err != nil {
 				return fmt.Errorf("encode card: %w", err)
 			}
-			// The prompt and its schedule are written together so "has prompts"
+			// The card and its schedule are written together so "has a schedule"
 			// and "is in the queue" can never disagree -- which is what makes
 			// the count above a sound idempotency check.
 			if err := tx.UpsertReviewState(ctx, models.ReviewState{
-				PromptID:  prompt.ID,
+				PromptID:  promptID,
 				CardJSON:  cardJSON,
 				DueAt:     dueAt,
 				UpdatedAt: now,
@@ -106,7 +127,7 @@ func handleKnowledgeSchedule(response http.ResponseWriter, request *http.Request
 				return err
 			}
 		}
-		payload, err := json.Marshal(map[string]any{"prompt_count": len(generated)})
+		payload, err := json.Marshal(map[string]any{"prompt_count": scheduled})
 		if err != nil {
 			return fmt.Errorf("encode schedule event: %w", err)
 		}
@@ -126,7 +147,62 @@ func handleKnowledgeSchedule(response http.ResponseWriter, request *http.Request
 	writeJSON(response, http.StatusCreated, map[string]any{
 		"status":       "scheduled",
 		"knowledge_id": item.ID,
-		"prompt_count": len(generated),
+		"prompt_count": scheduled,
+	})
+}
+
+// handleKnowledgeUnschedule is the way back out of the queue.
+//
+// It exists because 排进复习 was a one-way door: a reader who pressed it by mistake, or
+// who decided a word is not worth drilling, had no way to say so. What it removes is the
+// *plan* -- the review states -- and what it leaves standing is the cards and the
+// attempts, because a prompt that was ever answered cannot be deleted at all
+// (`attempts.prompt_id REFERENCES prompts(id) ON DELETE RESTRICT`) and history is what
+// that constraint is protecting. Cards left behind are not litter: 排进复习 reuses them,
+// which is what makes the round trip work for an item that has ever been reviewed.
+func handleKnowledgeUnschedule(response http.ResponseWriter, request *http.Request, application *app.App) {
+	if application == nil || application.Store == nil {
+		writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": "application unavailable"})
+		return
+	}
+	ctx := request.Context()
+	item, err := application.Store.GetKnowledgeItem(ctx, chi.URLParam(request, "knowledgeID"))
+	if err != nil {
+		writeStoreError(response, err)
+		return
+	}
+
+	now := time.Now().UTC()
+	var removed int
+	err = application.Store.WithTx(ctx, func(tx *db.TxStore) error {
+		count, removeErr := tx.RemoveReviewSchedule(ctx, item.ID)
+		if removeErr != nil {
+			return removeErr
+		}
+		removed = count
+		payload, marshalErr := json.Marshal(map[string]any{"prompts_removed": count})
+		if marshalErr != nil {
+			return fmt.Errorf("encode unschedule event: %w", marshalErr)
+		}
+		return tx.AppendDomainEvent(ctx, models.DomainEvent{
+			ID:          newRequestID("event-unschedule"),
+			EventType:   "knowledge_unscheduled",
+			AggregateID: item.ID,
+			PayloadJSON: payload,
+			OccurredAt:  now,
+		})
+	})
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "取消复习安排失败"})
+		return
+	}
+
+	// 200 whether or not anything was there: nothing went wrong, and the item is out of
+	// the queue -- the same reasoning the schedule side uses for its repeat press.
+	writeJSON(response, http.StatusOK, map[string]any{
+		"status":          "unscheduled",
+		"knowledge_id":    item.ID,
+		"prompts_removed": removed,
 	})
 }
 

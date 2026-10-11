@@ -40,6 +40,76 @@ func TestScheduleEndpointPutsAFiledItemIntoTheReviewQueue(t *testing.T) {
 	}
 }
 
+func TestUnscheduleTakesThePlanBackAndCanBeScheduledAgain(t *testing.T) {
+	// 排进复习 used to be a one-way door. The way back removes the *plan* (the review
+	// states) and leaves the cards: a card that was ever answered cannot be deleted at
+	// all (`attempts.prompt_id ... ON DELETE RESTRICT`), so re-scheduling has to reuse
+	// them -- and their ids are deterministic, so recreating them would collide.
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+	dumped := requestJSON(t, router, http.MethodPost, "/api/dump", map[string]any{"text": "撤销复习安排 / 来回都行"})
+	var created struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, dumped, &created)
+
+	first := requestJSON(t, router, http.MethodPost, "/api/knowledge/"+created.ID+"/schedule", nil)
+	if first.Code != http.StatusCreated {
+		t.Fatalf("schedule = %d, body = %s", first.Code, first.Body.String())
+	}
+	var firstBody struct {
+		PromptCount int `json:"prompt_count"`
+	}
+	decodeJSON(t, first, &firstBody)
+	if firstBody.PromptCount == 0 {
+		t.Fatalf("scheduling reported no cards: %s", first.Body.String())
+	}
+
+	removed := requestJSON(t, router, http.MethodDelete, "/api/knowledge/"+created.ID+"/schedule", nil)
+	if removed.Code != http.StatusOK {
+		t.Fatalf("unschedule = %d, body = %s", removed.Code, removed.Body.String())
+	}
+	var removedBody struct {
+		Removed int `json:"prompts_removed"`
+	}
+	decodeJSON(t, removed, &removedBody)
+	if removedBody.Removed != firstBody.PromptCount {
+		t.Fatalf("removed %d schedules, scheduled %d", removedBody.Removed, firstBody.PromptCount)
+	}
+
+	due := requestJSON(t, router, http.MethodGet, "/api/reviews/due?limit=20", nil)
+	if strings.Contains(due.Body.String(), "撤销复习安排") {
+		t.Fatalf("the item is still queued: %s", due.Body.String())
+	}
+
+	// And it can come back -- the cards were left in place precisely so this works.
+	again := requestJSON(t, router, http.MethodPost, "/api/knowledge/"+created.ID+"/schedule", nil)
+	if again.Code != http.StatusCreated || strings.Contains(again.Body.String(), "already_scheduled") {
+		t.Fatalf("re-scheduling = %d, body = %s", again.Code, again.Body.String())
+	}
+	var againBody struct {
+		PromptCount int `json:"prompt_count"`
+	}
+	decodeJSON(t, again, &againBody)
+	if againBody.PromptCount != firstBody.PromptCount {
+		t.Fatalf("re-scheduling reported %d cards, first time %d", againBody.PromptCount, firstBody.PromptCount)
+	}
+	back := requestJSON(t, router, http.MethodGet, "/api/reviews/due?limit=20", nil)
+	if !strings.Contains(back.Body.String(), "撤销复习安排") {
+		t.Fatalf("the item did not come back: %s", back.Body.String())
+	}
+}
+
+func TestUnscheduleRefusesAnItemThatIsNotThere(t *testing.T) {
+	application := testApplication(t, config.Config{})
+	router := httpapi.NewRouter(application)
+
+	missing := requestJSON(t, router, http.MethodDelete, "/api/knowledge/nope/schedule", nil)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unschedule of a missing item = %d, body = %s", missing.Code, missing.Body.String())
+	}
+}
+
 func TestScheduleEndpointDoesNotQueueTheSameItemTwice(t *testing.T) {
 	// There is no undo in the review queue, so a second click must not hand you
 	// the same card twice for the rest of the item's life.

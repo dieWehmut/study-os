@@ -216,6 +216,9 @@ func NewRouter(application *app.App) http.Handler {
 		api.Post("/knowledge/{knowledgeID}/schedule", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeSchedule(response, request, application)
 		})
+		api.Delete("/knowledge/{knowledgeID}/schedule", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeUnschedule(response, request, application)
+		})
 		api.Post("/chat", func(response http.ResponseWriter, request *http.Request) {
 			handleChatSend(response, request, application)
 		})

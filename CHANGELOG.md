@@ -2,6 +2,21 @@
 
 ## 未发布
 
+### 「取消排复习」接线完成：**排 → 撤 → 再排**，三处前置现在合上了
+
+- 接口：`DELETE /api/knowledge/{id}/schedule` → `handleKnowledgeUnschedule`：删**复习状态**（撤销计划），
+  **卡与作答历史都留着**；再排时 `handleKnowledgeSchedule` **复用已有的卡**（id 是确定性的 `p-<id>-<n>`，
+  重建必撞），并以事务内算出的 `prompt_count` 作答（第 183 轮踩过的坑）。
+- 三处前置一件件合上：数据层（第 182 轮：只删状态不动卡）→ 队列信号口径（第 184 轮：数 `review_states`）
+  → **接线（本轮）**。**它们必须按这个顺序**：先删状态再改口径，否则撤销之后永远 `already_scheduled`。
+- 用例：`TestUnscheduleTakesThePlanBackAndCanBeScheduledAgain` 走完整来回——
+  排（N 张）→ 撤（移除 N 条、队列里没有它）→ **再排（还是 N 张、又回到队列）**；
+  另有 `TestUnscheduleRefusesAnItemThatIsNotThere`（404）。httpapi 六个 schedule 用例全过。
+- **本轮没有一次盲改**：上次把文件改坏是因为一次改三处；这次**先只改复用（构建+跑用例）**，
+  再**加 handler（构建）**，最后**加路由与用例**，每一步都验证过。
+- 仍差**界面**：知识条目详情里给「取消排复习」按钮，并把第 180 轮那句「排进复习后暂时不能取消」
+  改掉——**API 已经有了，那句话现在会变成假话**。这是下一轮唯一的事。
+
 ### 「在队列里」的口径换成了它真正的含义：**看复习状态，不看卡**
 
 - 上一轮失败的教训是"一次改三处"。这一轮只改**一处语义**：`scheduledPromptCount` →
