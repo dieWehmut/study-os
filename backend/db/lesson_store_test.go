@@ -27,6 +27,36 @@ func openLessonStore(t *testing.T) (*db.Store, context.Context) {
 
 // The list is where a reader decides what to open, so it says how much practice a
 // lesson holds -- for both document shapes, without one query per lesson.
+func TestListLessonsCountsFilledSections(t *testing.T) {
+	// "10 个环节" looks the same on a skeleton and on a finished lesson; the list has
+	// to say how many of them actually carry content.
+	store, ctx := openLessonStore(t)
+	document := models.NewLessonDocument()
+	document.Sections[0].Content = json.RawMessage(`{"markdown":"什么是加速度"}`)
+	document.Sections[1].Content = json.RawMessage(`{}`) // explicitly blank
+	if err := store.CreateLesson(ctx, models.Lesson{ID: "lesson-half", Title: "半篇", Document: document}); err != nil {
+		t.Fatalf("create lesson: %v", err)
+	}
+	if err := store.CreateLesson(ctx, models.Lesson{ID: "lesson-skeleton", Title: "骨架", Document: models.NewLessonDocument()}); err != nil {
+		t.Fatalf("create skeleton: %v", err)
+	}
+
+	items, err := store.ListLessons(ctx, models.LessonListOptions{})
+	if err != nil {
+		t.Fatalf("list lessons: %v", err)
+	}
+	filled := make(map[string]int, len(items))
+	for _, item := range items {
+		filled[item.ID] = item.FilledSections
+	}
+	if filled["lesson-half"] != 1 {
+		t.Fatalf("lesson-half filled = %d, want 1 (%v)", filled["lesson-half"], filled)
+	}
+	if filled["lesson-skeleton"] != 0 {
+		t.Fatalf("lesson-skeleton filled = %d, want 0 (%v)", filled["lesson-skeleton"], filled)
+	}
+}
+
 func TestListLessonsCountsPracticeQuestions(t *testing.T) {
 	store, ctx := openLessonStore(t)
 

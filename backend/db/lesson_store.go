@@ -359,11 +359,25 @@ func (s *Store) attachPracticeQuestionCounts(ctx context.Context, items []models
 			continue
 		}
 		items[position].PracticeQuestions = practiceQuestionCount(documentJSON)
+		// Same document, already read: the list says how much of the lesson is filled.
+		items[position].FilledSections = filledSectionCount(documentJSON)
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate lesson documents: %w", err)
 	}
 	return nil
+}
+
+// filledSectionCount reads how many sections of a stored document carry content.
+//
+// Unparseable documents count as zero, for the same reason practiceQuestionCount does:
+// one bad row must not empty the page a reader is browsing.
+func filledSectionCount(documentJSON string) int {
+	var document models.LessonDocument
+	if err := json.Unmarshal([]byte(documentJSON), &document); err != nil {
+		return 0
+	}
+	return models.FilledSectionCount(document)
 }
 
 // practiceQuestionCount reads the 即时练习 section of a stored document.

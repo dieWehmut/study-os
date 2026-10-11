@@ -315,6 +315,21 @@ export default function Lessons() {
               <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5"><FileText aria-hidden="true" className="size-3.5" />来源：{sourceLabel(lesson)}</span>
                 <span>{lesson.sections_count ?? lesson.sections.length} 个环节</span>
+                {/* "10 个环节" says nothing about whether any of them are written: a
+                    lesson can be a skeleton of ten and look identical to a finished one. */}
+                {typeof lesson.filled_sections === "number" && (lesson.sections_count ?? lesson.sections.length) > 0 ? (
+                  <span className="inline-flex items-center gap-1.5" data-lesson-filled="true">
+                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted align-middle">
+                      <span
+                        className="block h-full bg-primary"
+                        style={{
+                          width: `${Math.round((lesson.filled_sections / (lesson.sections_count ?? lesson.sections.length)) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    已填 {lesson.filled_sections}/{lesson.sections_count ?? lesson.sections.length}
+                  </span>
+                ) : null}
                 {/* How much practice is in here is part of deciding whether to open
                     it; the section count alone does not say. */}
                 {lesson.practice_questions ? <span>{lesson.practice_questions} 道练习题</span> : null}

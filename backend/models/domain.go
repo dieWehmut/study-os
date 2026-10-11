@@ -48,11 +48,11 @@ type KnowledgeListOptions struct {
 }
 
 type KnowledgeGroup struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Kind      string    `json:"kind,omitempty"`
-	ParentID  string    `json:"parent_id,omitempty"`
-	SortOrder int       `json:"sort_order,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Kind      string `json:"kind,omitempty"`
+	ParentID  string `json:"parent_id,omitempty"`
+	SortOrder int    `json:"sort_order,omitempty"`
 	// ItemCount is how many knowledge items are in the group, or -1 when it could
 	// not be counted. The group list is also what fills the filter dropdown, so an
 	// uncountable group still has to be listed -- it just does not claim to be empty.
@@ -387,9 +387,13 @@ type LessonSummary struct {
 	// PracticeQuestions is how many questions the 即时练习 section asks. The list is
 	// where a reader decides whether to open a lesson, and "how much practice" is
 	// part of that.
-	PracticeQuestions int       `json:"practice_questions,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	PracticeQuestions int `json:"practice_questions,omitempty"`
+	// FilledSections is how many of the sections carry content. The list is where a
+	// reader picks a lesson, and "is this still a skeleton" is part of that -- the same
+	// number the version history shows, so the two cannot tell different stories.
+	FilledSections int       `json:"filled_sections,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // LessonVersion is an immutable document revision. The API exposes this shape
@@ -520,6 +524,29 @@ type LessonSection struct {
 	Position int             `json:"position"`
 	Required bool            `json:"required"`
 	Content  json.RawMessage `json:"content"`
+}
+
+// Filled reports whether a section carries anything a reader can see, whatever shape
+// its content takes. One definition, three callers (the version history, the lesson
+// list, and anything that follows): "已填" has to mean the same thing everywhere.
+func (section LessonSection) Filled() bool {
+	raw := strings.TrimSpace(string(section.Content))
+	switch raw {
+	case "", "{}", "null", `""`, "[]":
+		return false
+	}
+	return true
+}
+
+// FilledSectionCount answers how many sections of a document have content.
+func FilledSectionCount(document LessonDocument) int {
+	filled := 0
+	for _, section := range document.Sections {
+		if section.Filled() {
+			filled++
+		}
+	}
+	return filled
 }
 
 type LessonListOptions struct {

@@ -79,6 +79,27 @@ describe("lessons page", () => {
     expect(screen.queryByText(/道练习题/)).not.toBeInTheDocument()
   })
 
+  it("says how much of a lesson is actually written", async () => {
+    // "10 个环节" reads the same on a skeleton and on a finished lesson.
+    mocks.listLessons.mockResolvedValue({
+      items: [{ ...lesson, sections_count: 10, filled_sections: 4 }],
+      count: 1,
+    })
+    renderPage()
+
+    const filled = await screen.findByText(/已填 4\/10/)
+    expect(filled).toBeInTheDocument()
+    expect(filled.closest("[data-lesson-filled='true']")).not.toBeNull()
+  })
+
+  it("does not claim filled sections for an older backend that omits the count", async () => {
+    mocks.listLessons.mockResolvedValue({ items: [{ ...lesson, sections_count: 10 }], count: 1 })
+    renderPage()
+
+    expect(await screen.findByText("10 个环节")).toBeInTheDocument()
+    expect(screen.queryByText(/已填/)).not.toBeInTheDocument()
+  })
+
   it("shows an actionable empty state", async () => {
     mocks.listLessons.mockResolvedValue({ items: [], count: 0 })
     renderPage()

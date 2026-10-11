@@ -162,7 +162,7 @@ func handleLessonVersionList(response http.ResponseWriter, request *http.Request
 	for _, revision := range revisions {
 		filled := 0
 		for _, section := range revision.Document.Sections {
-			if lessonSectionFilled(section) {
+			if section.Filled() {
 				filled++
 			}
 		}
@@ -175,15 +175,8 @@ func handleLessonVersionList(response http.ResponseWriter, request *http.Request
 	writeJSON(response, http.StatusOK, map[string]any{"items": items, "count": len(items)})
 }
 
-// lessonSectionFilled reports whether a section carries anything a reader can
-// see, whatever shape its content takes.
-func lessonSectionFilled(section models.LessonSection) bool {
-	raw := strings.TrimSpace(string(section.Content))
-	if raw == "" || raw == "{}" || raw == "null" || raw == `""` || raw == "[]" {
-		return false
-	}
-	return true
-}
+// The rule lives on the model now (models.LessonSection.Filled): the lesson list shows
+// the same "已填" number, and two definitions would eventually disagree.
 
 func handleLessonUpdate(response http.ResponseWriter, request *http.Request, application *app.App) {
 	if application == nil || application.Store == nil {

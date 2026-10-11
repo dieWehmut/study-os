@@ -59,6 +59,8 @@ export interface Lesson {
   sections_count?: number
   /** How many questions the 即时练习 section asks, on list rows. */
   practice_questions?: number
+  /** How many sections carry content, on list rows -- the same number the history shows. */
+  filled_sections?: number
   version?: number
   created_at?: string
   updated_at?: string
@@ -104,6 +106,7 @@ interface RawLesson {
   estimated_minutes?: unknown
   sections_count?: unknown
   practice_questions?: unknown
+  filled_sections?: unknown
   version?: unknown
   created_at?: unknown
   updated_at?: unknown
@@ -164,6 +167,7 @@ export function normalizeLesson(value: unknown): Lesson {
   if (typeof raw.estimated_minutes === "number") lesson.estimated_minutes = raw.estimated_minutes
   if (typeof raw.version === "number") lesson.version = raw.version
   if (typeof raw.practice_questions === "number") lesson.practice_questions = raw.practice_questions
+  if (typeof raw.filled_sections === "number") lesson.filled_sections = raw.filled_sections
   if (typeof raw.created_at === "string") lesson.created_at = raw.created_at
   if (typeof raw.updated_at === "string") lesson.updated_at = raw.updated_at
   lesson.sections_count = typeof raw.sections_count === "number" ? raw.sections_count : sections.length
