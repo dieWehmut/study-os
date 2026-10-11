@@ -11,6 +11,12 @@ const originalText = [
 ].join(" ")
 
 async function expectWithinViewport(page: Page, locator: Locator) {
+  // Measured from the top of the page, because this page scrolls itself: opening an
+  // article jumps to its first section, so a toolbar is legitimately above the
+  // viewport when the page has just been deep-linked. Measuring there made box.y
+  // negative and blamed the layout for a scroll the app was asked to do.
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForFunction(() => window.scrollY === 0)
   const box = await locator.boundingBox()
   const viewport = page.viewportSize()
   expect(box).not.toBeNull()
