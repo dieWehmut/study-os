@@ -446,6 +446,27 @@ describe("static Pages API fixtures", () => {
     expect(group.item_count).toBe(inGroup.items.length)
   })
 
+  it("pages the lists the way the real endpoints do, so 加载更多 moves", async () => {
+    // The app asks for a page and reads `count` for 「还有 N 条」. A demo that ignored
+    // limit/offset answered every request with everything: 加载更多 appended the same
+    // rows again, and the count next to it could never be right.
+    const all = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }>; count: number }>("/mistakes")
+    expect(all.items.length).toBeGreaterThan(1)
+    expect(all.count).toBe(all.items.length)
+
+    const first = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }>; count: number }>("/mistakes?limit=1")
+    expect(first.items).toHaveLength(1)
+    // The total is the whole filtered list, not the page.
+    expect(first.count).toBe(all.count)
+
+    const second = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }> }>("/mistakes?limit=1&offset=1")
+    expect(second.items).toHaveLength(1)
+    expect(second.items[0]!.attempt.id).not.toBe(first.items[0]!.attempt.id)
+
+    const articles = await staticDemoRequest<{ items: unknown[] }>("/english/articles?limit=1")
+    expect(articles.items).toHaveLength(1)
+  })
+
   it("narrows the demo mistake list by search and 错因, not just by subject", async () => {
     // A filter the demo ignores is one a visitor spends a request on and sees
     // nothing change, which reads as broken rather than as a demo limitation.

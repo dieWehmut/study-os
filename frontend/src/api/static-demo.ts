@@ -801,7 +801,22 @@ function mistakeList(url: URL) {
     if (corrected === "no" && entry.corrected === true) return false
     return true
   })
-  return { items: clone(items), count: items.length }
+  return { items: clone(paged(items, url)), count: items.length }
+}
+
+/**
+ * A page of a filtered list, the way the real endpoints answer: `limit` caps the page
+ * (default 50, at most 200) and `offset` walks it. `count` stays the size of the whole
+ * filtered list -- the page reads it for 「还有 N 条」, and a page-sized number there
+ * would make 加载更多 look finished.
+ *
+ * Ignoring these made 加载更多 in the demo re-append the same rows.
+ */
+function paged<T>(items: T[], url: URL): T[] {
+  const requested = Number(url.searchParams.get("limit") ?? 50)
+  const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 200) : 50
+  const offset = Math.max(0, Math.trunc(Number(url.searchParams.get("offset") ?? 0)) || 0)
+  return items.slice(offset, offset + limit)
 }
 
 function errorCauseList(url: URL) {
@@ -1363,7 +1378,9 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
         0,
       ),
     }))
-    return responseFor({ items, count: items.length }) as T
+    // Paged like the real one: the page asks for one row more than it shows, to know
+    // whether there is anything older.
+    return responseFor({ items: paged(items, url), count: items.length }) as T
   }
   if (root === "english" && id === "articles" && action === "generate" && method === "POST") return responseFor(articleFrom(body)) as T
   if (root === "english" && id === "articles" && !action && method === "POST") {
