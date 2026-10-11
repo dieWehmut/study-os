@@ -87,7 +87,10 @@ func handleMistakeExport(response http.ResponseWriter, request *http.Request, ap
 		Query: strings.TrimSpace(request.URL.Query().Get("q")),
 		// Same for 错因: it is a filter on screen, so it is a filter in the file.
 		Cause: strings.TrimSpace(request.URL.Query().Get("cause")),
-		Limit: exportPageSize,
+		// And 订正 state, for the same reason: exporting while looking at "还没订正"
+		// must not hand over the ones that were fixed.
+		Corrected: strings.ToLower(strings.TrimSpace(request.URL.Query().Get("corrected"))),
+		Limit:     exportPageSize,
 	}
 	for offset := 0; ; offset += exportPageSize {
 		options.Offset = offset

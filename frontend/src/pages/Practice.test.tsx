@@ -126,6 +126,46 @@ describe("Practice page", () => {
     expect(await screen.findByText(/只显示「方法不对」的错题/)).toBeInTheDocument()
   })
 
+  it("narrows the log to what is still open, and exports that same view", async () => {
+    // The progress bar counts 订正 state; the chips make it a filter, because "what is
+    // still open" is the list worth reading before a test. The file follows the screen.
+    render(<Practice />)
+    await screen.findByText(/还没有记录/)
+
+    const chip = document.querySelector("[data-corrected-filter='no']")
+    expect(chip).not.toBeNull()
+    expect(chip!.textContent).toBe("未订正")
+    fireEvent.click(chip!)
+
+    await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalledWith(
+      expect.objectContaining({ corrected: "no" }),
+    ))
+
+    mocks.exportMistakes.mockResolvedValue("题干\n")
+    const originalClick = HTMLAnchorElement.prototype.click
+    HTMLAnchorElement.prototype.click = vi.fn()
+    URL.createObjectURL = vi.fn(() => "blob:open") as unknown as typeof URL.createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
+      await waitFor(() => expect(mocks.exportMistakes).toHaveBeenCalledWith(
+        expect.objectContaining({ corrected: "no" }),
+      ))
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick
+    }
+  })
+
+  it("does not call the log empty when the 订正 filter emptied it", async () => {
+    render(<Practice />)
+    await screen.findByText(/还没有记录/)
+
+    fireEvent.click(document.querySelector("[data-corrected-filter='no']")!)
+
+    expect(await screen.findByText(/没有还没订正的错题/)).toBeInTheDocument()
+    expect(screen.queryByText(/还没有记录/)).not.toBeInTheDocument()
+  })
+
   it("exports what the 错因 filter leaves on screen, not the whole log", async () => {
     // Filtering the list and then exporting is how a reader hands someone "my
     // method mistakes"; a file that quietly contains every mistake is wrong.

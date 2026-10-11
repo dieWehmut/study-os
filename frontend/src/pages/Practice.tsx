@@ -55,6 +55,7 @@ import {
 import { summarizeMistakeDiagnostics } from "@/lib/mistake-diagnostics"
 import { saveTextFile } from "@/lib/download"
 import { isStaticDemo } from "@/lib/runtime"
+import { cn } from "@/lib/utils"
 import { failureMessage } from "@/lib/errors"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
@@ -197,6 +198,10 @@ export default function Practice() {
   const [recordQuery, setRecordQuery] = useState("")
   // One 错因 at a time, filtered by the server so the total narrows with the list.
   const [recordCause, setRecordCause] = useState("")
+  // 订正 state as a filter, not just a number: "what is still open" is the list a
+  // reader actually wants before a test, and it is the same condition the progress bar
+  // counts.
+  const [recordCorrected, setRecordCorrected] = useState<"" | "yes" | "no">("")
   const [recordDraft, setRecordDraft] = useState("")
   // How many rows the log holds, and how many of them came from the server --
   // counted apart because 记录 also carries a browser log that was migrated over
@@ -235,6 +240,7 @@ export default function Practice() {
       ...currentSubjectRequest,
       ...(recordQuery ? { query: recordQuery } : {}),
       ...(recordCause ? { cause: recordCause } : {}),
+      ...(recordCorrected ? { corrected: recordCorrected } : {}),
     }
     const currentRecordsRequest = listMistakePage(listRequest)
     // The 六科诊断总览 counts every mistake, not the search result: 搜索 finds a
@@ -291,7 +297,7 @@ export default function Practice() {
     return () => {
       active = false
     }
-  }, [subject, recordQuery, recordCause])
+  }, [subject, recordQuery, recordCause, recordCorrected])
 
   useEffect(() => {
     let active = true
@@ -391,6 +397,7 @@ export default function Practice() {
         // Same as the list on screen: the search box has already narrowed it.
         query: recordQuery || undefined,
         cause: recordCause || undefined,
+        corrected: recordCorrected || undefined,
       })
       saveTextFile(text, `study-os-错题-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8")
     } catch (failure) {
@@ -703,6 +710,28 @@ export default function Practice() {
                 ...taxonomy.map((spec) => ({ value: spec.cause, label: spec.label })),
               ]}
             />
+            {/* 订正 state, as a filter rather than only a number: "what is still open"
+                is the list worth reading before a test. */}
+            {(["", "no", "yes"] as const).map((value) => (
+              <button
+                key={value || "all"}
+                type="button"
+                data-corrected-filter={value || "all"}
+                aria-pressed={recordCorrected === value}
+                onClick={() => setRecordCorrected(value)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs transition-colors",
+                  recordCorrected === value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {/* Wording note: the chips are named 「未订正」/「订正过」 rather than 「已订正」,
+                  because the rows already say 「已订正」 for one mistake -- two different
+                  things wearing the same words is how a page starts lying. */}
+                {value === "" ? "全部" : value === "no" ? "未订正" : "订正过"}
+              </button>
+            ))}
             {recordCause ? (
               <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 只显示「{taxonomy.find((spec) => spec.cause === recordCause)?.label ?? recordCause}」的错题
@@ -766,7 +795,11 @@ export default function Practice() {
                   ? `没有「${causeSpecFor(recordCause, taxonomy).label}」的错题。`
                   : recordQuery
                     ? `没有错题提到「${recordQuery}」。`
-                    : "还没有记录。做错一题就来记一笔，比考前翻整本书管用。"}
+                    : recordCorrected === "no"
+                      ? "没有还没订正的错题 —— 这一本已经清干净了。"
+                      : recordCorrected === "yes"
+                        ? "还没有订正过的错题。"
+                        : "还没有记录。做错一题就来记一笔，比考前翻整本书管用。"}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">

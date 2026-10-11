@@ -107,6 +107,16 @@ func TestMistakeExportWritesAReadableRow(t *testing.T) {
 	if strings.Contains(otherCause.Body.String(), "斜面上的木块受力") {
 		t.Fatalf("cause filter did not narrow the file: %s", otherCause.Body.String())
 	}
+	// 订正 state narrows the file as well. This mistake was corrected above, so the
+	// "still open" file must not contain it and the "fixed" one must.
+	stillOpen := mistakeExport(t, router, "?corrected=no")
+	if strings.Contains(stillOpen.Body.String(), "斜面上的木块受力") {
+		t.Fatalf("corrected=no kept a corrected mistake: %s", stillOpen.Body.String())
+	}
+	fixed := mistakeExport(t, router, "?corrected=yes")
+	if !strings.Contains(fixed.Body.String(), "斜面上的木块受力") {
+		t.Fatalf("corrected=yes dropped a corrected mistake: %s", fixed.Body.String())
+	}
 }
 
 func TestMistakeExportKeepsACauseItCannotName(t *testing.T) {
