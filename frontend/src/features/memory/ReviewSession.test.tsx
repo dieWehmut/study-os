@@ -266,6 +266,31 @@ describe("ReviewSession", () => {
     expect(bars!.textContent).toContain("1")
   })
 
+  it("turns a missed card into a way back to the knowledge it came from", async () => {
+    // The tally says how the round went; it does not say what to do next. Each missed
+    // card links to its own knowledge item, which is where 重学 actually happens.
+    mocks.submitSelfRating.mockResolvedValueOnce({
+      attempt_id: "a1",
+      outcome: "incorrect",
+      rating: 1,
+      expected_answers: ["abandon"],
+    })
+    renderSession()
+
+    fireEvent.click(await screen.findByRole("button", { name: "不认识" }))
+    await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole("button", { name: "下一题" }))
+
+    const missed = await screen.findByText(/这一轮没答上的/)
+    expect(missed).toBeInTheDocument()
+    const panel = document.querySelector("[data-round-missed='true']")
+    expect(panel).not.toBeNull()
+    const link = panel!.querySelector("a")
+    expect(link).not.toBeNull()
+    expect(link!.getAttribute("href")).toContain("/knowledge?item=")
+    expect(link!.textContent?.trim()).toBeTruthy()
+  })
+
   it("counts a 改判 once, with the corrected verdict", async () => {
     // The card was answered wrong and then the reader judged it correctly; the
     // round's tally has to follow the correction, not the first verdict.

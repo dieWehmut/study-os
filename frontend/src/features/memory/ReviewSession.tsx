@@ -222,6 +222,26 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
             </p>
           </div>
           {toRedo.length > 0 ? (
+            <div className="w-full rounded-xl border border-border bg-muted/25 p-3 text-left" data-round-missed="true">
+              {/* Numbers tell you how the round went; this tells you what to do about
+                  it. Each one goes back to the knowledge item it came from, which is
+                  where the 重学 actually happens. */}
+              <p className="text-xs text-muted-foreground">这一轮没答上的，点一下回到那条知识点：</p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {toRedo.map((item) => (
+                  <li key={item.prompt.id}>
+                    <Link
+                      to={`/knowledge?item=${encodeURIComponent(item.knowledge.id)}`}
+                      className="inline-flex max-w-full truncate rounded-full border border-border bg-card px-3 py-1 text-xs hover:bg-muted"
+                    >
+                      {item.prompt.question}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {toRedo.length > 0 ? (
             <Button onClick={() => redoMissed(toRedo)}>
               再练这 {toRedo.length} 张
             </Button>
