@@ -600,6 +600,18 @@ export default function Practice() {
                 </Badge>
               ) : null}
             </div>
+            {/* 订正进度 as its own row: the badge above counts, this one shows how far
+                through the log that is. Kept separate from the badge so the number a
+                test (and a reader) looks for does not change wording. */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground" data-correction-progress="true">
+              <span className="h-1.5 w-32 shrink-0 overflow-hidden rounded-full bg-muted sm:w-48">
+                <span
+                  className="block h-full bg-emerald-500/70"
+                  style={{ width: `${Math.round((summary.corrected / summary.total) * 100)}%` }}
+                />
+              </span>
+              <span className="tabular-nums">订正进度 {summary.corrected}/{summary.total}</span>
+            </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {summary.byCause.map(({ spec, count, percent }) => {

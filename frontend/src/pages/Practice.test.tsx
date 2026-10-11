@@ -670,6 +670,10 @@ describe("Practice page", () => {
 
     expect(screen.getByText("另有原因 1")).toBeInTheDocument()
     expect(screen.getByText("已订正 1")).toBeInTheDocument()
+    // And how far through the log that is, as its own row: one of one fixed.
+    const progress = document.querySelector("[data-correction-progress='true']")
+    expect(progress).not.toBeNull()
+    expect(progress!.textContent).toContain("订正进度 1/1")
   })
 
   it("leaves the row correctable when the mark could not be written", async () => {
