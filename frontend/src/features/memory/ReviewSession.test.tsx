@@ -204,6 +204,17 @@ describe("ReviewSession", () => {
       .toHaveAttribute("href", "/knowledge?scheduled=no")
   })
 
+  it("says whose day is finished when one subject is selected", async () => {
+    // The chips narrow the queue, so "today is done" without a scope reads as the
+    // whole day and a reader with one subject selected stops early.
+    useSubjectStore.setState({ subject: "math" })
+    mocks.getDueReviews.mockResolvedValueOnce({ items: [] })
+    renderSession()
+
+    expect(await screen.findByText(/「数学」今天的到期内容已经完成/)).toBeInTheDocument()
+    expect(screen.queryByText("今天的到期内容已经完成")).not.toBeInTheDocument()
+  })
+
   it("loads reviews and the library for the active subject", async () => {
     useSubjectStore.setState({ subject: "math" })
     renderSession()

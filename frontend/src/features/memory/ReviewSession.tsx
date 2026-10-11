@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { failureMessage } from "@/lib/errors"
+import { subjectName } from "@/lib/subjects"
 import { useSettingsStore } from "@/store/useSettingsStore"
 import { Progress } from "@/components/ui/progress"
 import { itemTypeLabel } from "@/lib/labels"
@@ -175,7 +176,12 @@ export function ReviewSession({ recovery = false, onProgress }: ReviewSessionPro
         <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
           <CheckCircle2 aria-hidden="true" className="size-12 text-primary" />
           <div>
-            <h2 className="font-heading text-lg font-semibold">今天的到期内容已经完成</h2>
+            <h2 className="font-heading text-lg font-semibold">
+              {/* The chips narrow the queue, so "today is done" has to say whose
+                  today: a reader with 物理 selected would otherwise take it as the
+                  whole day and stop. */}
+              {subject === "all" ? "今天的到期内容已经完成" : `「${subjectName(subject)}」今天的到期内容已经完成`}
+            </h2>
             {/* What this round actually was: finishing 20 cards and finishing none
                 looked identical, and the second is not an achievement. */}
             {verdicts.length > 0 ? (
