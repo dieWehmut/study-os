@@ -8,6 +8,7 @@ import type { KnowledgeItem } from "@/api/types"
 const mocks = vi.hoisted(() => ({
   getKnowledgeMastery: vi.fn(),
   listRelatedKnowledge: vi.fn(),
+  unscheduleKnowledge: vi.fn(),
   scheduleKnowledge: vi.fn(),
   saveKnowledgeWiki: vi.fn(),
   updateKnowledgeTag: vi.fn(),
@@ -37,9 +38,9 @@ const item: KnowledgeItem = {
  * all. Asserting on the mock call alone would pass even if the wiki never
  * changed.
  */
-function Harness({ start }: { start: KnowledgeItem }) {
+function Harness({ start, scheduled = false }: { start: KnowledgeItem; scheduled?: boolean }) {
   const [current, setCurrent] = useState(start)
-  return <WikiPanel item={current} onUpdated={setCurrent} />
+  return <WikiPanel item={current} onUpdated={setCurrent} scheduled={scheduled} />
 }
 
 function openMap() {
@@ -78,14 +79,21 @@ describe("WikiPanel node renaming", () => {
     expect(screen.getAllByText("abandon 词族").length).toBeGreaterThan(0)
   })
 
-  it("says 排进复习 is one-way before the button is pressed", async () => {
-    // There is no endpoint that takes a card back out of the plan, so the reader is owed
-    // that fact where they choose -- a note afterwards would be too late.
+  it("offers the way back out once an item is in the review plan", async () => {
+    // 排进复习 used to be one-way and the panel said so. Now there is an undo, so the
+    // sentence is gone and the control is here -- a note that outlives its truth is
+    // worse than no note.
     mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
-    render(<Harness start={item} />)
+    mocks.unscheduleKnowledge.mockResolvedValue({ status: "unscheduled", knowledge_id: "k1", prompts_removed: 3 })
+    render(<Harness start={item} scheduled />)
 
-    const note = await screen.findByText(/排进复习后暂时不能取消/)
-    expect(note.closest("[data-schedule-irreversible='true']")).not.toBeNull()
+    const cancel = await screen.findByRole("button", { name: "取消排复习" })
+    expect(screen.queryByText(/暂时不能取消/)).not.toBeInTheDocument()
+
+    fireEvent.click(cancel)
+
+    await waitFor(() => expect(mocks.unscheduleKnowledge).toHaveBeenCalledWith("k1"))
+    expect(await screen.findByText(/已取消复习安排 · 移出 3 张卡/)).toBeInTheDocument()
   })
 
   it("writes a renamed node back into the wiki it was drawn from", async () => {

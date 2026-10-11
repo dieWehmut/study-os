@@ -2,13 +2,14 @@ import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import { useEffect, useMemo, useState } from "react"
-import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight, Waypoints } from "lucide-react"
+import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight, Waypoints, X } from "lucide-react"
 
 import { updateKnowledgeTag } from "@/api/chat"
 import {
   listRelatedKnowledge,
   saveKnowledgeWiki,
   scheduleKnowledge,
+  unscheduleKnowledge,
   type RelatedKnowledge,
 } from "@/api/knowledge"
 import type { KnowledgeItem } from "@/api/types"
@@ -102,6 +103,7 @@ export function WikiPanel({
   const [tagPending, setTagPending] = useState("")
   const [schedulePending, setSchedulePending] = useState(false)
   const [scheduleNote, setScheduleNote] = useState<ScheduleNote | null>(null)
+  const [scheduleRemoved, setScheduleRemoved] = useState(false)
   const [renameNote, setRenameNote] = useState<RenameNote | null>(null)
   const [renamePending, setRenamePending] = useState(false)
   const [family, setFamily] = useState<RelatedKnowledge>(emptyFamily)
@@ -114,7 +116,7 @@ export function WikiPanel({
   // because a button that looks done when nothing was written is worse than
   // one that failed loudly. The prop is what the list knew before this panel
   // opened; the note is what this panel did since.
-  const inQueue = scheduled || scheduleNote?.tone === "ok" || scheduleNote?.tone === "known"
+  const inQueue = !scheduleRemoved && (scheduled || scheduleNote?.tone === "ok" || scheduleNote?.tone === "known")
 
   const chunks = current?.detailed_markdown ? chunkMarkdown(current.detailed_markdown) : []
 
@@ -186,6 +188,29 @@ export function WikiPanel({
       )
     } catch {
       setScheduleNote({ tone: "error", text: "排进复习失败，请重试" })
+    } finally {
+      setSchedulePending(false)
+    }
+  }
+
+  // The way back. 排进复习 used to be one-way; this is the undo, and it undoes the
+  // *plan* only -- the cards and the attempts stay, which is what lets 排进复习 put the
+  // item back exactly as it was.
+  async function cancelReview() {
+    if (!current || schedulePending) return
+    setSchedulePending(true)
+    setScheduleNote(null)
+    try {
+      const result = await unscheduleKnowledge(current.id)
+      setScheduleRemoved(true)
+      setScheduleNote({
+        tone: "ok",
+        text: result.prompts_removed > 0
+          ? `已取消复习安排 · 移出 ${result.prompts_removed} 张卡（知识点与作答记录都还在）`
+          : "这个条目本来就不在复习计划里",
+      })
+    } catch {
+      setScheduleNote({ tone: "error", text: "取消复习安排失败，请重试" })
     } finally {
       setSchedulePending(false)
     }
@@ -294,15 +319,25 @@ export function WikiPanel({
             <CalendarPlus data-icon="inline-start" />
             {inQueue ? "已排进复习" : "排进复习"}
           </Button>
+          {/* The way back out. It removes the plan, not the history: the cards and the
+              attempts stay, and 排进复习 reuses them -- so an item can be put back
+              exactly as it was. */}
+          {inQueue ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              disabled={schedulePending}
+              aria-label="取消排复习"
+              onClick={() => void cancelReview()}
+            >
+              <X data-icon="inline-start" />
+              取消排复习
+            </Button>
+          ) : null}
         </div>
-        {/* Said before the press, not after: there is no endpoint that takes a card
-            back out of the plan, so 排进复习 is a one-way door and the reader is owed
-            that fact at the moment of choosing. */}
-        {!inQueue ? (
-          <p className="text-xs text-muted-foreground" data-schedule-irreversible="true">
-            排进复习后暂时不能取消——不确定的话，先只排真正想反复过的。
-          </p>
-        ) : null}
+        {/* The note that used to sit here said 排进复习 could not be undone. Now it can, so
+            the sentence is gone rather than left to become a lie. */}
         {scheduleNote ? (
           <p className={`text-xs ${scheduleNoteClass[scheduleNote.tone]}`}>{scheduleNote.text}</p>
         ) : null}

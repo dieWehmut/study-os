@@ -146,6 +146,26 @@ export function scheduleKnowledge(id: string): Promise<ScheduleKnowledgeResponse
   })
 }
 
+export interface UnscheduleKnowledgeResponse {
+  status: "unscheduled"
+  knowledge_id: string
+  /** How many schedules were removed. 0 is not an error: it was already out. */
+  prompts_removed: number
+}
+
+/**
+ * Take one item back out of the review queue.
+ *
+ * The cards and the attempts stay -- a card that was ever answered cannot be deleted at
+ * all, and history is not what the undo is about. 排进复习 reuses those cards, so an item
+ * can be put back exactly as it was.
+ */
+export function unscheduleKnowledge(id: string): Promise<UnscheduleKnowledgeResponse> {
+  return apiRequest<UnscheduleKnowledgeResponse>(`/knowledge/${encodeURIComponent(id)}/schedule`, {
+    method: "DELETE",
+  })
+}
+
 /**
  * Replace one item's wiki prose.
  *
