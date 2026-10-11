@@ -700,6 +700,11 @@ export default function Practice() {
               placeholder="搜题干里的词"
               className="h-9 max-w-xs"
             />
+            {/* Said out loud, because the box looks local: it searches the whole log on
+                the server, not just the rows on screen -- the page loads a page at a
+                time, and a reader who thinks otherwise will conclude the search misses
+                things (it does the opposite). */}
+            <span className="text-xs text-muted-foreground">搜整本错题本</span>
             <Button
               type="button"
               variant="outline"

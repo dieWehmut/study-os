@@ -328,6 +328,9 @@ describe("Practice page", () => {
     await waitFor(() => expect(mocks.listMistakes).toHaveBeenCalledWith(expect.objectContaining({ query: "极值" })))
     expect(await screen.findByText("求函数极值")).toBeInTheDocument()
     expect(screen.getByText(/只显示题干提到「极值」的错题/)).toBeInTheDocument()
+    // The box says its reach: the search runs on the whole log, not on the page of rows
+    // that happens to be loaded.
+    expect(screen.getByText("搜整本错题本")).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "清除" }))
 
