@@ -4,6 +4,7 @@ import { Link } from "react-router-dom"
 
 import { getDashboard, seedDemo } from "@/api/dashboard"
 import { dumpThought } from "@/api/chat"
+import { listKnowledge } from "@/api/knowledge"
 import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -48,6 +49,8 @@ export default function Home() {
   // A filed thought is the clearest case of "in the library, not in the queue":
   // 暂存 files it and stops. The notice points at the filter that shows those.
   const [dumpFiled, setDumpFiled] = useState(false)
+  // 还没排复习的知识点, from the library rather than from the dashboard.
+  const [unscheduled, setUnscheduled] = useState<number | null>(null)
   // Read and summarized once, on the way in. Nothing on this page edits the
   // reading session, so recomputing it per render would only re-chunk the same
   // document to reach the same answer.
@@ -91,6 +94,16 @@ export default function Home() {
       })
       .finally(() => {
         if (active) setLoading(false)
+      })
+    // 还没排复习的知识点: the dashboard counts the queue, and this is the other half
+    // of "what should I do next" -- filed items that will never come back on their
+    // own. One item is enough to know there are some.
+    listKnowledge({ scheduled: "no", limit: 1, ...(subject === "all" ? {} : { subject }) })
+      .then((page) => {
+        if (active) setUnscheduled(page.count)
+      })
+      .catch(() => {
+        // A number this page can live without; the queue row still stands.
       })
     return () => {
       active = false
@@ -170,6 +183,51 @@ export default function Home() {
         </CardHeader>
         <CardContent>
           <SubjectPicker subject={subject} onSelect={setSubject} dueCounts={dashboard.subjects_due} />
+        </CardContent>
+      </Card>
+
+      {/* What to do next, in the order the day goes: clear the queue, then deal with
+          anything filed that will never come back on its own. Both rows are links,
+          because a dashboard that only reports is one nobody acts on. */}
+      <Card data-home-next-step="true">
+        <CardHeader className="gap-1.5">
+          <CardTitle>接下来</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {dashboard.due_count > 0 || (unscheduled ?? 0) > 0
+              ? "按下面的顺序做，今天就算完成了。"
+              : loading
+                ? "正在看今天还剩什么…"
+                : "今天没有待办：队列清空了，库里也没有落单的知识点。"}
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          {dashboard.due_count > 0 ? (
+            <Link
+              to="/memory"
+              className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+            >
+              <span>
+                先复习 <strong>{dashboard.due_count}</strong> 个到期知识点
+                <span className="ml-2 text-xs text-muted-foreground">今天该过的就这些</span>
+              </span>
+              <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-primary" />
+            </Link>
+          ) : null}
+          {(unscheduled ?? 0) > 0 ? (
+            <Link
+              to="/knowledge?scheduled=no"
+              className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+            >
+              <span>
+                还有 <strong>{unscheduled}</strong> 个知识点没排复习
+                <span className="ml-2 text-xs text-muted-foreground">不排进来就永远不会被问</span>
+              </span>
+              <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-primary" />
+            </Link>
+          ) : null}
+          {!loading && dashboard.due_count === 0 && unscheduled === null ? (
+            <p className="text-xs text-muted-foreground">读不到库里的知识点数量，队列那一行仍然准。</p>
+          ) : null}
         </CardContent>
       </Card>
 

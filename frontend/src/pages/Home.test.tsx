@@ -17,10 +17,12 @@ const mocks = vi.hoisted(() => ({
   getDashboard: vi.fn(),
   seedDemo: vi.fn(),
   dumpThought: vi.fn(),
+  listKnowledge: vi.fn(),
 }))
 
 vi.mock("@/api/dashboard", () => mocks)
 vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
+vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge }))
 
 describe("Today page", () => {
   beforeEach(() => {
@@ -44,6 +46,50 @@ describe("Today page", () => {
       prompt_count: 3,
     })
     mocks.dumpThought.mockResolvedValue({ id: "dump-1", term: "念头" })
+    mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
+  })
+
+  it("says what to do next, and links there", async () => {
+    // A dashboard that only reports is one nobody acts on: the queue and the items
+    // that will never come back on their own are the two things to actually do.
+    mocks.listKnowledge.mockResolvedValue({ items: [], count: 4 })
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    const next = await screen.findByText("接下来")
+    expect(next).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /先复习 3 个到期知识点/ })).toHaveAttribute("href", "/memory")
+    const unscheduled = screen.getByRole("link", { name: /还有 4 个知识点没排复习/ })
+    expect(unscheduled).toHaveAttribute("href", "/knowledge?scheduled=no")
+    await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(
+      expect.objectContaining({ scheduled: "no" }),
+    ))
+  })
+
+  it("says the day is clear instead of showing two empty rows", async () => {
+    mocks.getDashboard.mockResolvedValue({
+      knowledge_count: 0,
+      prompt_count: 0,
+      due_count: 0,
+      attempt_count: 0,
+      reviewed_today: 0,
+      current_streak: 0,
+      provider: "mock",
+      offline: true,
+      subjects_due: {},
+      recent_items: [],
+    })
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/今天没有待办/)).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /先复习/ })).not.toBeInTheDocument()
   })
 
   it("shows live progress and links to the focused memory session", async () => {
