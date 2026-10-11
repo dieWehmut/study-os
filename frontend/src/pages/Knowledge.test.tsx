@@ -104,6 +104,12 @@ describe("Knowledge page", () => {
     expect(chip.textContent).toContain("3")
     const uncounted = screen.getByRole("button", { name: "水循环" })
     expect(uncounted.textContent).toBe("水循环")
+    // 全部 carries the total, so the row reads as one scale rather than as a chip with
+    // a missing number. (It only shows while 全部 is the active filter: beside a
+    // filtered list the number would be the filtered count, not the library's.)
+    const allChip = document.querySelector("[data-group-chip='all']")
+    expect(allChip).not.toBeNull()
+    expect(allChip!.textContent).toContain("1")
 
     fireEvent.click(chip)
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(

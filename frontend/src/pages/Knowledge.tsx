@@ -388,6 +388,7 @@ function KnowledgePage({
               <span className="text-xs text-muted-foreground">知识分组</span>
               <button
                 type="button"
+                data-group-chip="all"
                 aria-pressed={group === ""}
                 onClick={() => {
                   setGroup("")
@@ -402,8 +403,19 @@ function KnowledgePage({
                 )}
               >
                 全部
+                {/* The library total, so the row reads as one scale: 「全部 42」 beside
+                    「abandon 词族 3」. Without it the first chip was the only one with
+                    no number, which reads as a missing value rather than as "everything". */}
+                {group === "" && count > 0 ? (
+                  <span className="ml-1.5 tabular-nums opacity-75">{count}</span>
+                ) : null}
               </button>
-              {groups.map((item) => (
+              {/* Biggest group first: with a page of chips the reader is looking for
+                  where the material actually is. Stable within equal counts, so the
+                  order does not shuffle between reads. */}
+              {[...groups]
+                .sort((left, right) => (right.item_count ?? -1) - (left.item_count ?? -1))
+                .map((item) => (
                 <button
                   key={item.id}
                   type="button"
