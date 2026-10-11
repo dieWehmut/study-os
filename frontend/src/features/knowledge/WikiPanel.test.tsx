@@ -78,6 +78,16 @@ describe("WikiPanel node renaming", () => {
     expect(screen.getAllByText("abandon 词族").length).toBeGreaterThan(0)
   })
 
+  it("says 排进复习 is one-way before the button is pressed", async () => {
+    // There is no endpoint that takes a card back out of the plan, so the reader is owed
+    // that fact where they choose -- a note afterwards would be too late.
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    render(<Harness start={item} />)
+
+    const note = await screen.findByText(/排进复习后暂时不能取消/)
+    expect(note.closest("[data-schedule-irreversible='true']")).not.toBeNull()
+  })
+
   it("writes a renamed node back into the wiki it was drawn from", async () => {
     mocks.saveKnowledgeWiki.mockImplementation((id: string, next: string) =>
       Promise.resolve({ ...item, id, detailed_markdown: next }),

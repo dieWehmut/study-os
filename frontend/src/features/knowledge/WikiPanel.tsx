@@ -295,6 +295,14 @@ export function WikiPanel({
             {inQueue ? "已排进复习" : "排进复习"}
           </Button>
         </div>
+        {/* Said before the press, not after: there is no endpoint that takes a card
+            back out of the plan, so 排进复习 is a one-way door and the reader is owed
+            that fact at the moment of choosing. */}
+        {!inQueue ? (
+          <p className="text-xs text-muted-foreground" data-schedule-irreversible="true">
+            排进复习后暂时不能取消——不确定的话，先只排真正想反复过的。
+          </p>
+        ) : null}
         {scheduleNote ? (
           <p className={`text-xs ${scheduleNoteClass[scheduleNote.tone]}`}>{scheduleNote.text}</p>
         ) : null}
