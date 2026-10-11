@@ -238,6 +238,58 @@ func (s *Store) CountReviewAttempts(ctx context.Context) (int, error) {
 	return total, nil
 }
 
+// ReviewPromptIDs lists the cards a knowledge item already contributes, oldest id
+// first. Re-scheduling needs them: prompts cannot be deleted once answered
+// (`attempts.prompt_id REFERENCES prompts(id) ON DELETE RESTRICT`), so the way back into
+// the queue is to give the *existing* prompts a schedule again.
+func (s *Store) ReviewPromptIDs(ctx context.Context, knowledgeItemID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id FROM prompts WHERE knowledge_item_id = ? ORDER BY id ASC`, knowledgeItemID)
+	if err != nil {
+		return nil, fmt.Errorf("list review prompts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	ids := make([]string, 0, 4)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan review prompt: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// RemoveReviewSchedule takes a knowledge item out of the review queue without touching
+// its prompts.
+//
+// Queue membership is the review STATE, not the prompt: a prompt that was ever answered
+// cannot be deleted at all (`ON DELETE RESTRICT`), and that constraint is doing its job --
+// history must not vanish because a plan changed. So the undo removes what the queue
+// reads, and the attempts already made stay: "I do not want to be asked this again" is
+// not "pretend I was never asked".
+func (s *Store) RemoveReviewSchedule(ctx context.Context, knowledgeItemID string) (int, error) {
+	return removeReviewSchedule(ctx, s.db, knowledgeItemID)
+}
+
+func (s *TxStore) RemoveReviewSchedule(ctx context.Context, knowledgeItemID string) (int, error) {
+	return removeReviewSchedule(ctx, s.tx, knowledgeItemID)
+}
+
+func removeReviewSchedule(ctx context.Context, database queryer, knowledgeItemID string) (int, error) {
+	result, err := database.ExecContext(ctx,
+		`DELETE FROM review_states WHERE prompt_id IN (SELECT id FROM prompts WHERE knowledge_item_id = ?)`,
+		knowledgeItemID)
+	if err != nil {
+		return 0, fmt.Errorf("remove review schedule: %w", err)
+	}
+	removed, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("count removed schedules: %w", err)
+	}
+	return int(removed), nil
+}
+
 func (s *Store) ListKnowledgeItems(ctx context.Context, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
 	limit := options.Limit
 	if limit <= 0 || limit > 500 {
