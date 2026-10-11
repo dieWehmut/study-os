@@ -2,6 +2,27 @@
 
 ## 未发布
 
+### `?corrected=` 之谜：范围缩小到一处（探针给了硬证据）
+
+上一轮只留下"路由写了标记、列表却看不见"。这一轮先用一个**临时探针**把每个环节的真相打出来：
+
+`
+CREATED           attempt-2  corrected= undefined  correction= undefined
+CORRECT RESPONSE  attempt-2  corrected= true       correction= true
+LIST ROW          attempt-2  corrected= true       correction= true     ← 关键
+`
+
+- **结论一**：订正确实生效，而且**列表读到的行也带着 `corrected: true`**——所以问题**不在状态**，
+  也不在"列表与订正路由操作的不是同一批对象"（那是我上一轮的假设，**错了**）。
+- **结论二**：既然行上是 `true`，同一份代码里的 `if (corrected === "no" && entry.corrected === true) return false`
+  却没有排除它 ⇒ **可疑对象只剩一个**：`mistakeList` 拿到的 `url` 里，`searchParams.get("corrected")`
+  要么为空、要么不是 `"no"`。也就是说，**参数在传给筛选之前就丢了**（而 `?q=`/`?cause=` 是好的，
+  所以不是"查询串整体丢失"）。
+- **做法**：探针用完即删；本轮仍然**没有提交那个筛选**（`git checkout` 还原两个文件）——
+  证据不足以支撑"它是对的"，就不放进仓库。下一轮从这个唯一的疑点入手：在 `mistakeList` 里打一行
+  `url.searchParams.get("corrected")`，看它到底收到了什么。
+- 这一轮的收获是**把嫌疑从两个减到一个**，并且是用证据减的，不是靠猜。
+
 ### 演示版的 `?corrected=` 筛选：查到一半，如实退回
 
 - 上一轮把「演示版必须和真机说同样的话」写成**字段契约**；这一轮想把它扩到**行为契约**
