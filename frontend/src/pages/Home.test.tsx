@@ -100,6 +100,9 @@ describe("Today page", () => {
     // The 错因 is shown as the reader's own word for it, not as an id.
     expect(within(card as HTMLElement).getAllByText(/思路不对|看错题/).length).toBe(2)
     expect(within(card as HTMLElement).getByRole("link", { name: "去练习" })).toHaveAttribute("href", "/practice")
+    // The date is part of what a mistake is, and the practice log already shows it:
+    // the same rows in two places should not disagree about what belongs in one.
+    expect(within(card as HTMLElement).getAllByText(/\d+月\d+日|\d+\/\d+/).length).toBeGreaterThan(0)
     expect(mocks.listMistakePage).toHaveBeenCalledWith(expect.objectContaining({ limit: 3 }))
   })
 

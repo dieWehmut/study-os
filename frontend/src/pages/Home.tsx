@@ -10,6 +10,7 @@ import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatShortDay } from "@/lib/dates"
 import { itemTypeLabel, providerLabel } from "@/lib/labels"
 import { MISTAKE_CAUSES, causeSpecFor, type MistakeRecord } from "@/lib/mistakes"
 import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
@@ -494,6 +495,14 @@ export default function Home() {
               {recentMistakes.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/25 px-3 py-2">
                   <span className="min-w-0 flex-1 truncate text-sm">{item.question}</span>
+                  {/* Same reading as the practice log's rows: the date is part of what
+                      a mistake is, and two lists showing the same rows should not
+                      disagree about what belongs in one. */}
+                  {item.createdAt ? (
+                    <span className="shrink-0 text-xs text-muted-foreground" data-mistake-date="true">
+                      {formatShortDay(item.createdAt)}
+                    </span>
+                  ) : null}
                   <Badge variant="outline">{causeSpecFor(item.cause, MISTAKE_CAUSES).label}</Badge>
                 </li>
               ))}
