@@ -165,7 +165,7 @@ describe("SettingsPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "将 本地离线 设为当前" }))
     await waitFor(() => expect(mocks.setActiveProvider).toHaveBeenCalledWith("mock"))
 
-    fireEvent.click(screen.getByRole("button", { name: "测试 Claude（Anthropic） 连通性" }))
+    fireEvent.click(await screen.findByRole("button", { name: "测试 Claude（Anthropic） 连通性" }))
     await waitFor(() => expect(mocks.testProvider).toHaveBeenCalledWith("claude"))
   })
 

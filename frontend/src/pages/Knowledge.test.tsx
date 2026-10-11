@@ -410,7 +410,7 @@ describe("Knowledge page", () => {
     fireEvent.click(option)
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ tag: "考点" })))
 
-    fireEvent.click(screen.getByRole("button", { name: "语文" }))
+    fireEvent.click(await screen.findByRole("button", { name: "语文" }))
 
     await waitFor(() => {
       const last = mocks.listKnowledge.mock.calls.at(-1)?.[0] as Record<string, unknown>

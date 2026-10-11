@@ -734,7 +734,7 @@ it("looks in mistakes and courses too, not only the knowledge library", async ()
     fireEvent.change(screen.getByLabelText("发给 AI 的消息"), { target: { value: "旧问题" } })
     fireEvent.click(screen.getByRole("button", { name: "发送" }))
     await waitFor(() => expect(mocks.sendChatMessage).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole("button", { name: "新对话" }))
+    fireEvent.click(await screen.findByRole("button", { name: "新对话" }))
 
     await act(async () => pendingSend.resolve({ session_id: "old-session", message_id: "old-answer", status: "pending" }))
 

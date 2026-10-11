@@ -267,7 +267,7 @@ describe("ReviewSession", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "认识" }))
     await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole("button", { name: "下一题" }))
+    fireEvent.click(await screen.findByRole("button", { name: "下一题" }))
 
     const tally = await screen.findByText(/这一轮做了/)
     expect(tally).toHaveTextContent("这一轮做了 1 张：正确 1")
@@ -295,7 +295,7 @@ describe("ReviewSession", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "不认识" }))
     await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole("button", { name: "下一题" }))
+    fireEvent.click(await screen.findByRole("button", { name: "下一题" }))
 
     const missed = await screen.findByText(/这一轮没答上的/)
     expect(missed).toBeInTheDocument()
@@ -389,7 +389,7 @@ describe("ReviewSession", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "认识" }))
     await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole("button", { name: "下一题" }))
+    fireEvent.click(await screen.findByRole("button", { name: "下一题" }))
 
     expect(await screen.findByText(/这一轮做了/)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /再练这/ })).not.toBeInTheDocument()
