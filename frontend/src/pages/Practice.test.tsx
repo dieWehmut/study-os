@@ -156,6 +156,24 @@ describe("Practice page", () => {
     }
   })
 
+  it("does not call the log empty when only the 错因 filter is", async () => {
+    // "还没有记录" while a cause is selected reads as "you have never filed a
+    // mistake", which is a different and wrong statement.
+    mocks.listErrorCauses.mockResolvedValue([
+      { id: "method", label: "方法不对", reviewFixes: true, sort_order: 0 },
+    ])
+    render(<Practice />)
+    await screen.findByText(/还没有记录/)
+
+    fireEvent.click(screen.getByRole("combobox", { name: "按错因筛选" }))
+    const option = await screen.findByRole("option", { name: "方法不对" })
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+
+    expect(await screen.findByText(/没有「方法不对」的错题/)).toBeInTheDocument()
+    expect(screen.queryByText(/还没有记录/)).not.toBeInTheDocument()
+  })
+
   it("shows a six-subject diagnostic overview and can focus a subject", async () => {
     render(<Practice />)
 

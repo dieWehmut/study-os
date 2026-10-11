@@ -746,9 +746,15 @@ export default function Practice() {
         <CardContent>
           {records.length === 0 ? (
             <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              {recordQuery
-                ? `没有错题提到「${recordQuery}」。`
-                : "还没有记录。做错一题就来记一笔，比考前翻整本书管用。"}
+              {/* A filtered miss is not an empty log: saying "还没有记录" while a
+                  cause is selected reads as "you have never filed a mistake". */}
+              {recordQuery && recordCause
+                ? `没有「${causeSpecFor(recordCause, taxonomy).label}」且提到「${recordQuery}」的错题。`
+                : recordCause
+                  ? `没有「${causeSpecFor(recordCause, taxonomy).label}」的错题。`
+                  : recordQuery
+                    ? `没有错题提到「${recordQuery}」。`
+                    : "还没有记录。做错一题就来记一笔，比考前翻整本书管用。"}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
