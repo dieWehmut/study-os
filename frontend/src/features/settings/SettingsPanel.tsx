@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { MAX_DAILY_LIMIT, MIN_DAILY_LIMIT, normalizeDailyLimit } from "@/lib/settings"
 import { useSettingsStore } from "@/store/useSettingsStore"
+import { PhaseGateNote } from "@/features/settings/PhaseGateNote"
 import { formatStamp } from "@/lib/dates"
 import { isStaticDemo } from "@/lib/runtime"
 
@@ -1206,6 +1207,9 @@ export default function SettingsPanel() {
           <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw data-icon="inline-start" />重试</Button>
         </div>
       ) : null}
+
+      {/* The gate ROADMAP 第 4 阶段 sets, in numbers: a gate nobody can compute is a mood. */}
+      <PhaseGateNote />
     </div>
   )
 }
