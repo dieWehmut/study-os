@@ -24,6 +24,7 @@ import { failureMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 import { SubjectBadge } from "@/features/subjects/SubjectBadge"
 import { SubjectPicker } from "@/features/subjects/SubjectPicker"
+import { ReviewForecast } from "@/features/memory/ReviewForecast"
 import { useSubjectStore } from "@/store/useSubjectStore"
 
 const emptyDashboard: DashboardData = {
@@ -243,6 +244,11 @@ export default function Home() {
           ) : null}
         </CardContent>
       </Card>
+
+      {/* The same panel the memory page ends with, on the page you start from: one
+          number (待复习) cannot show a pile-up, and the pile-up is the day people
+          quit. It renders nothing while loading, on failure, or with no schedule. */}
+      <ReviewForecast />
 
       <Card>
         <CardHeader className="gap-1.5">

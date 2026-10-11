@@ -19,12 +19,14 @@ const mocks = vi.hoisted(() => ({
   dumpThought: vi.fn(),
   listKnowledge: vi.fn(),
   listMistakePage: vi.fn(),
+  getReviewForecast: vi.fn(),
 }))
 
 vi.mock("@/api/dashboard", () => mocks)
 vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
 vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge }))
 vi.mock("@/api/mistakes", () => ({ listMistakePage: mocks.listMistakePage }))
+vi.mock("@/api/reviews", () => ({ getReviewForecast: mocks.getReviewForecast }))
 
 describe("Today page", () => {
   beforeEach(() => {
@@ -50,6 +52,30 @@ describe("Today page", () => {
     mocks.dumpThought.mockResolvedValue({ id: "dump-1", term: "念头" })
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
     mocks.listMistakePage.mockResolvedValue({ items: [], count: 0 })
+    mocks.getReviewForecast.mockResolvedValue({
+      days: [
+        { date: "2026-08-20", count: 3 },
+        { date: "2026-08-21", count: 1 },
+      ],
+      horizon: 7,
+    })
+  })
+
+  it("shows the coming week, because one number cannot show a pile-up", async () => {
+    // The panel is the same one the memory page ends with: on the dashboard it says
+    // whether this week is a slope or a wall.
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    // Asserted on the panel's own words, not on a loose /未来|到期/ that the 接下来
+    // card would also satisfy -- a test that passes for the wrong reason is worse
+    // than no test.
+    expect(await screen.findByText("接下来七天")).toBeInTheDocument()
+    expect(screen.getByText(/最多的一天 3 张/)).toBeInTheDocument()
+    expect(mocks.getReviewForecast).toHaveBeenCalled()
   })
 
   it("shows the newest mistakes in the words they were written in", async () => {
