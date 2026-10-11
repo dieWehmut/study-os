@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -18,11 +18,13 @@ const mocks = vi.hoisted(() => ({
   seedDemo: vi.fn(),
   dumpThought: vi.fn(),
   listKnowledge: vi.fn(),
+  listMistakePage: vi.fn(),
 }))
 
 vi.mock("@/api/dashboard", () => mocks)
 vi.mock("@/api/chat", () => ({ dumpThought: mocks.dumpThought }))
 vi.mock("@/api/knowledge", () => ({ listKnowledge: mocks.listKnowledge }))
+vi.mock("@/api/mistakes", () => ({ listMistakePage: mocks.listMistakePage }))
 
 describe("Today page", () => {
   beforeEach(() => {
@@ -47,6 +49,43 @@ describe("Today page", () => {
     })
     mocks.dumpThought.mockResolvedValue({ id: "dump-1", term: "念头" })
     mocks.listKnowledge.mockResolvedValue({ items: [], count: 0 })
+    mocks.listMistakePage.mockResolvedValue({ items: [], count: 0 })
+  })
+
+  it("shows the newest mistakes in the words they were written in", async () => {
+    // 最近加入 says what was learned; the dashboard was missing what did not stick.
+    mocks.listMistakePage.mockResolvedValue({
+      items: [
+        { id: "qa-1", subject: "math", question: "斜面木块受力方向搞反", cause: "method", createdAt: "2026-08-20T00:00:00Z" },
+        { id: "qa-2", subject: "math", question: "看漏了「静止」两个字", cause: "misread", createdAt: "2026-08-19T00:00:00Z" },
+      ],
+      count: 2,
+    })
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    const card = (await screen.findByText("最近错题")).closest("[data-home-mistakes='true']")
+    expect(card).not.toBeNull()
+    expect(within(card as HTMLElement).getByText("斜面木块受力方向搞反")).toBeInTheDocument()
+    expect(within(card as HTMLElement).getByText("看漏了「静止」两个字")).toBeInTheDocument()
+    // The 错因 is shown as the reader's own word for it, not as an id.
+    expect(within(card as HTMLElement).getAllByText(/思路不对|看错题/).length).toBe(2)
+    expect(within(card as HTMLElement).getByRole("link", { name: "去练习" })).toHaveAttribute("href", "/practice")
+    expect(mocks.listMistakePage).toHaveBeenCalledWith(expect.objectContaining({ limit: 3 }))
+  })
+
+  it("leaves the 最近错题 card out when there are none", async () => {
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText("接下来")
+    expect(screen.queryByText("最近错题")).not.toBeInTheDocument()
   })
 
   it("says what to do next, and links there", async () => {

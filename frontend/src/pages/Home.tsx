@@ -5,10 +5,13 @@ import { Link } from "react-router-dom"
 import { getDashboard, seedDemo } from "@/api/dashboard"
 import { dumpThought } from "@/api/chat"
 import { listKnowledge } from "@/api/knowledge"
+import { listMistakePage } from "@/api/mistakes"
 import type { DashboardData } from "@/api/types"
 import { buttonVariants, Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { itemTypeLabel, providerLabel } from "@/lib/labels"
+import { MISTAKE_CAUSES, causeSpecFor, type MistakeRecord } from "@/lib/mistakes"
 import { buildStuckQuestion, putAskDraft } from "@/lib/ask-draft"
 import { readShelf, restoreDocument } from "@/lib/reading-library"
 import {
@@ -51,6 +54,9 @@ export default function Home() {
   const [dumpFiled, setDumpFiled] = useState(false)
   // 还没排复习的知识点, from the library rather than from the dashboard.
   const [unscheduled, setUnscheduled] = useState<number | null>(null)
+  // The newest mistakes, so the dashboard shows the other half of the work: 最近加入
+  // lists what was learned, and this lists what did not stick yet.
+  const [recentMistakes, setRecentMistakes] = useState<MistakeRecord[]>([])
   // Read and summarized once, on the way in. Nothing on this page edits the
   // reading session, so recomputing it per render would only re-chunk the same
   // document to reach the same answer.
@@ -104,6 +110,13 @@ export default function Home() {
       })
       .catch(() => {
         // A number this page can live without; the queue row still stands.
+      })
+    listMistakePage({ limit: 3, ...(subject === "all" ? {} : { subject }) })
+      .then((page) => {
+        if (active) setRecentMistakes(page.items)
+      })
+      .catch(() => {
+        // The card simply does not render; nothing else on the page depends on it.
       })
     return () => {
       active = false
@@ -430,6 +443,33 @@ export default function Home() {
           )}
         </CardContent>
       </Card>
+
+      {/* The other half of the picture. 最近加入 says what was learned; this says what
+          has not stuck yet, in the words it was written in. Absent while there are no
+          mistakes, so a clean library shows no empty heading. */}
+      {recentMistakes.length > 0 ? (
+        <Card data-home-mistakes="true">
+          <CardHeader className="gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>最近错题</CardTitle>
+              <Link to="/practice" className="text-xs text-muted-foreground underline underline-offset-4">
+                去练习
+              </Link>
+            </div>
+            <p className="text-sm text-muted-foreground">还没订正完的，趁还记得住先把它们过一遍。</p>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-2">
+              {recentMistakes.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/25 px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-sm">{item.question}</span>
+                  <Badge variant="outline">{causeSpecFor(item.cause, MISTAKE_CAUSES).label}</Badge>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!loading && dashboard.knowledge_count === 0 ? (
         <Card className="border-dashed">
