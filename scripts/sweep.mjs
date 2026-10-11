@@ -33,6 +33,7 @@ const only = process.argv.slice(2)
 function run(command, args, options = {}) {
   const label = [command, ...args].join(" ")
   console.log(`\n=== ${options.title ?? label} ===`)
+  const startedAt = Date.now()
   // The package runners are .cmd shims on Windows, so they need a shell -- and node
   // warns once per spawn when one is used. Spawning the shim directly without a shell
   // looked tidier and did not work: it exited non-zero with no output at all, which is
@@ -44,7 +45,9 @@ function run(command, args, options = {}) {
     env: { ...process.env, ...options.env },
     shell: process.platform === "win32" && (command === "pnpm" || command === "npx"),
   })
-  return { label, status: result.status ?? 1 }
+  // Timed per step: the suite grows a file at a time, and "which step got slower" is
+  // the first question when a sweep starts taking too long to run before a commit.
+  return { label, status: result.status ?? 1, ms: Date.now() - startedAt }
 }
 
 const steps = {
@@ -114,8 +117,11 @@ for (const name of order) {
 
 console.log("\n=== sweep ===")
 for (const result of results) {
-  console.log(`${result.status === 0 ? "ok  " : "FAIL"} ${result.label}`)
+  const seconds = ((result.ms ?? 0) / 1000).toFixed(1).padStart(6)
+  console.log(`${result.status === 0 ? "ok  " : "FAIL"} ${seconds}s  ${result.label}`)
 }
+const total = results.reduce((sum, result) => sum + (result.ms ?? 0), 0)
+console.log(`\n${results.length} steps in ${(total / 1000).toFixed(1)}s`)
 const failed = results.filter((result) => result.status !== 0)
 if (failed.length > 0) {
   console.log(`\nstopped at: ${failed[0].label}`)
