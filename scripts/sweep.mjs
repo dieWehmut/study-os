@@ -50,6 +50,11 @@ function run(command, args, options = {}) {
   return { label, status: result.status ?? 1, ms: Date.now() - startedAt }
 }
 
+// The order is the object's order, and it is deliberate: the Pages build has to be
+// in dist when the artifact test reads it, and the normal build has to be last so it
+// both validates that variant and leaves the repository in it. A sweep of this used
+// to build three times (normal, pages, normal again) -- e2e runs against the vite dev
+// server and never reads dist, so the first one bought nothing.
 const steps = {
   go: () => [
     run("go", ["vet", "./..."]),
@@ -57,14 +62,10 @@ const steps = {
   ],
   vitest: () => [run("node", ["scripts/flake-hunt.mjs", "1", reports], { title: "vitest (full, via flake-hunt)" })],
   lint: () => [run("pnpm", ["--dir", "frontend", "lint"])],
-  build: () => [run("pnpm", ["--dir", "frontend", "build"])],
   e2e: () => [run("npx", ["playwright", "test"], { cwd: frontend, title: "e2e (desktop + mobile)" })],
   pages: () => [
     run("pnpm", ["--dir", "frontend", "build"], { env: { VITE_STATIC_DEMO: "true", VITE_BASE_PATH: "/study-os/" }, title: "pages build" }),
     run("npx", ["playwright", "test", "--config=playwright.pages.config.ts"], { cwd: frontend, env: { PAGES_PREVIEW: "true" }, title: "pages smoke" }),
-    // The demo build stays in dist on purpose: the artifact test reads it, and
-    // restoring the normal build here is what made that test fail the first time
-    // this sweep ran end to end.
   ],
   docs: () => {
     const results = []
@@ -74,6 +75,7 @@ const steps = {
     }
     return results
   },
+  build: () => [run("pnpm", ["--dir", "frontend", "build"], { title: "build (normal, leaves dist ready)" })],
 }
 
 const selected = only.length > 0 ? only.filter((name) => name in steps) : Object.keys(steps)
@@ -85,20 +87,21 @@ if (selected.length === 0) {
 mkdirSync(reports, { recursive: true })
 const results = []
 const order = [...selected]
-// Leave the repository with its normal build: the pages step keeps the demo build
-// in place so the artifact test can read what was just built.
-if (order.includes("pages")) order.push("restore")
-if (order.includes("docs") && !order.includes("pages") && !order.includes("pages-build")) {
-  order.splice(order.indexOf("docs"), 0, "pages-build")
-  order.push("restore")
+// github-pages-artifact.test.mjs reads the Pages *demo* build out of dist, so asking
+// for the docs tests alone is asking for a failure unless the demo build is what is
+// sitting there. Build it first instead of reporting a red that means nothing.
+const needsDemoBuild = order.includes("docs") && !order.includes("pages") && !order.includes("pages-build")
+if (needsDemoBuild) order.splice(order.indexOf("docs"), 0, "pages-build")
+// Whatever ordered the demo build into dist leaves the repository with it, so the
+// normal build goes at the end -- validating that variant and restoring it.
+if ((order.includes("pages") || order.includes("pages-build")) && !order.includes("build")) {
+  order.push("build")
 }
 
-const stepsWithRestore = {
+const stepsWithHelpers = {
   ...steps,
-  restore: () => [run("pnpm", ["--dir", "frontend", "build"], { title: "restore the normal build" })],
-  // github-pages-artifact.test.mjs reads the Pages *demo* build out of dist, so asking
-  // for the docs tests alone is asking for a failure unless the demo build is what is
-  // sitting there. Build it first instead of reporting a red that means nothing.
+  // The demo build stays in dist on purpose: the artifact test reads it, so the normal
+  // build has to come after docs. It is the same command as `build`, only ordered.
   "pages-build": () => [
     run("pnpm", ["--dir", "frontend", "build"], {
       env: { VITE_STATIC_DEMO: "true", VITE_BASE_PATH: "/study-os/" },
@@ -108,7 +111,7 @@ const stepsWithRestore = {
 }
 
 for (const name of order) {
-  for (const result of stepsWithRestore[name]()) {
+  for (const result of stepsWithHelpers[name]()) {
     results.push({ step: name, ...result })
     if (result.status !== 0) break
   }
