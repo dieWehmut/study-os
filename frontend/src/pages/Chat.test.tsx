@@ -622,7 +622,13 @@ it("looks in mistakes and courses too, not only the knowledge library", async ()
     fireEvent.click(await screen.findByRole("button", { name: /导数/ }))
     const box = await screen.findByLabelText("搜索关联对象")
     fireEvent.change(box, { target: { value: "极值" } })
-    fireEvent.click(screen.getByRole("button", { name: "搜索" }))
+    // The search button enables on the next render (it is disabled while the box is
+    // empty, and while a search is in flight). Clicking it before that render lands on
+    // a disabled button and is silently dropped -- which is exactly how this test
+    // failed once every dozen full runs.
+    const searchButton = screen.getByRole("button", { name: "搜索" })
+    await waitFor(() => expect(searchButton).toBeEnabled())
+    fireEvent.click(searchButton)
 
     expect(await screen.findByRole("option", { name: "错题：求函数极值" }, SEARCH_WAIT)).toBeInTheDocument()
     expect(await screen.findByRole("option", { name: "课程：极值一节课" }, SEARCH_WAIT)).toBeInTheDocument()
