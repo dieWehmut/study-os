@@ -1074,7 +1074,13 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     if (status && !["draft", "reviewed", "published", "archived"].includes(status)) {
       throw new StaticDemoError("invalid lesson status", 400)
     }
-    const filtered = state.lessons.filter((lesson) => (!subject || lesson.subject === subject) && (!status || lesson.status === status))
+    // The lessons page draws a 搜索课程标题 box, so `q` has to narrow here too: a
+    // search that answers with the same list reads as a broken search.
+    const query = url.searchParams.get("q")?.trim().toLowerCase() ?? ""
+    const filtered = state.lessons.filter((lesson) =>
+      (!subject || lesson.subject === subject)
+      && (!status || lesson.status === status)
+      && (!query || lesson.title.toLowerCase().includes(query)))
     const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0)
     const requestedLimit = url.searchParams.get("limit")
     const limit = Math.max(1, Number(requestedLimit ?? filtered.length) || filtered.length || 1)

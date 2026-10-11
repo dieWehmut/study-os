@@ -546,6 +546,25 @@ describe("static Pages API fixtures", () => {
     expect(grouped.items.every((item) => item.subject === "english")).toBe(true)
   })
 
+  it("narrows the demo lesson list by the search box", async () => {
+    // The lessons page draws 搜索课程标题; a demo that answers with the same list
+    // makes the search look broken.
+    const all = await staticDemoRequest<{ items: Array<{ id: string; title: string }> }>("/lessons")
+    const target = all.items[0]!
+    const word = target.title.slice(0, 4)
+
+    const found = await staticDemoRequest<{ items: Array<{ title: string }>; count: number }>(
+      `/lessons?q=${encodeURIComponent(word)}`,
+    )
+    expect(found.items.length).toBeGreaterThan(0)
+    expect(found.items.every((item) => item.title.includes(word))).toBe(true)
+    expect(found.count).toBe(found.items.length)
+
+    const missed = await staticDemoRequest<{ items: unknown[]; count: number }>("/lessons?q=zzz-no-such-course")
+    expect(missed.items).toHaveLength(0)
+    expect(missed.count).toBe(0)
+  })
+
   it("provides the fixed ten-section lesson preview fixture", async () => {
     const list = await staticDemoRequest<{ items: Array<{ id: string; sections_count?: number }> }>("/lessons")
     const lessonID = list.items[0]?.id
