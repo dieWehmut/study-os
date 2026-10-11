@@ -136,6 +136,18 @@ describe("Practice page", () => {
     expect(await screen.findByText(/只显示「方法不对」的错题/)).toBeInTheDocument()
   })
 
+  it("says when a mistake was filed, next to what it was", async () => {
+    // "Three weeks ago" is a different decision from "yesterday". The log had the
+    // question and the 错因 but never the when.
+    renderPractice()
+    log("很早就记下的错题", "看错题")
+
+    const date = await screen.findByText("很早就记下的错题")
+      .then((row) => document.querySelector("[data-mistake-date='true']"))
+    expect(date).not.toBeNull()
+    expect(date!.textContent).toMatch(/\d/)
+  })
+
   it("opens already filtered when the link says so", async () => {
     // The dashboard's "还有 K 条错题没订正" sends the reader here with ?corrected=no.
     // A filter that only lived in memory would land them on the unfiltered log, which

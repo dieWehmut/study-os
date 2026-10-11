@@ -9,22 +9,14 @@ import {
 } from "@/api/english-articles"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { failureMessage } from "@/lib/errors"
+import { formatDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 
 /** How many articles the library shows before it has to admit there are more. */
 const englishArticlePageSize = 100
 
-function displayDate(value?: string): string {
-  if (!value) return "日期未填写"
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const timestamp = Date.parse(value)
-  if (!Number.isFinite(timestamp)) return value
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(timestamp))
-}
+// Displayed through the shared helper (`@/lib/dates`), which the settings panel and the
+// practice log use too: three copies of "how a date reads" is three chances to disagree.
 
 function byline(article: EnglishArticle): string {
   return [article.author, article.source_name].filter(Boolean).join(" · ") || "来源未填写"
@@ -188,7 +180,7 @@ export default function EnglishArticleLibrary() {
                   {article.original_title ? <p className="mt-0.5 truncate text-sm text-muted-foreground">{article.original_title}</p> : null}
                   <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span>{byline(article)}</span>
-                    <span>发布 {displayDate(article.published_at)}</span>
+                    <span>发布 {formatDay(article.published_at)}</span>
                     {sectionCount !== undefined ? <span>{sectionCount} 章</span> : null}
                     {/* How many words the article glosses: the list is where a reader
                         picks something to read, and the glossary is how hard it will be.
@@ -197,7 +189,7 @@ export default function EnglishArticleLibrary() {
                     {typeof article.vocabulary_count === "number" && article.vocabulary_count > 0 ? (
                       <span>{article.vocabulary_count} 个生词</span>
                     ) : null}
-                    <span>更新 {displayDate(article.updated_at)}</span>
+                    <span>更新 {formatDay(article.updated_at)}</span>
                   </p>
                 </div>
                 <Button

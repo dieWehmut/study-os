@@ -56,6 +56,7 @@ import {
 import { summarizeMistakeDiagnostics } from "@/lib/mistake-diagnostics"
 import { saveTextFile } from "@/lib/download"
 import { isStaticDemo } from "@/lib/runtime"
+import { formatShortDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { failureMessage } from "@/lib/errors"
 import { useSubjectStore } from "@/store/useSubjectStore"
@@ -832,6 +833,13 @@ export default function Practice() {
                     className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/25 px-3 py-2"
                   >
                     <span className="truncate text-sm">{item.question}</span>
+                    {/* When it was filed, next to what it was: "three weeks ago" is a
+                        different decision from "yesterday". Silent on a missing date. */}
+                    {item.createdAt ? (
+                      <span className="shrink-0 text-xs text-muted-foreground" data-mistake-date="true">
+                        {formatShortDay(item.createdAt)}
+                      </span>
+                    ) : null}
                     <Badge
                       variant={spec?.reviewFixes ? "secondary" : "outline"}
                       className="ml-auto shrink-0"
