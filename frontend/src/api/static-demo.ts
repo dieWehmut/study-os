@@ -977,9 +977,13 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
 
   if (root === "reviews" && id === "due" && method === "GET") {
     const subject = subjectFrom(url.searchParams.get("subject"))
-    const items = subject
+    const matching = subject
       ? state.due.filter((entry) => state.knowledge.find((item) => item.id === entry.knowledge.id)?.subject === subject)
       : state.due
+    // 每日记忆上限 is the size of today's queue, and the settings page says so. A demo
+    // that answers with every due card makes that setting look like it does nothing.
+    const requested = Number(url.searchParams.get("limit") ?? 0)
+    const items = requested > 0 ? matching.slice(0, Math.trunc(requested)) : matching
     return responseFor({ items }) as T
   }
   if (root === "reviews" && id === "forecast" && method === "GET") {

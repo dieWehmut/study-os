@@ -546,6 +546,19 @@ describe("static Pages API fixtures", () => {
     expect(grouped.items.every((item) => item.subject === "english")).toBe(true)
   })
 
+  it("cuts the demo review queue down to the daily limit it was asked for", async () => {
+    // 每日记忆上限 is the size of today's queue, and the settings page says so: a
+    // demo that answers with every due card makes that setting look inert.
+    const all = await staticDemoRequest<{ items: unknown[] }>("/reviews/due")
+    expect(all.items.length).toBeGreaterThan(1)
+
+    const limited = await staticDemoRequest<{ items: unknown[] }>("/reviews/due?limit=1")
+    expect(limited.items).toHaveLength(1)
+
+    const none = await staticDemoRequest<{ items: unknown[] }>("/reviews/due?limit=0")
+    expect(none.items).toHaveLength(all.items.length)
+  })
+
   it("narrows the demo lesson list by the search box", async () => {
     // The lessons page draws 搜索课程标题; a demo that answers with the same list
     // makes the search look broken.
