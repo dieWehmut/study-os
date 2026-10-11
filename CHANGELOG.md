@@ -2,6 +2,21 @@
 
 ## 未发布
 
+### 把「监听器吃掉按键」这类问题扫了一遍（结论：没有第四处）
+
+上一程在键盘监听上栽了两次（都是「按渲染重新注册 → 闭包里的状态是旧的 → 读者刚做完动作的那一下被吞掉」），
+所以这轮**按机制**（不是按名字）把 `frontend/src` 里所有 `addEventListener` 找出来逐个看：
+
+| 位置 | 读的状态 | 结论 |
+|---|---|---|
+| `RecognitionPrompt` / `ProductionPrompt` | 判定结果、提交中 | 已改成「注册一次 + layout-effect ref」 |
+| `VocabularyPopover`（resize/scroll，deps `[selection.anchor]`） | 只读 anchor | 安全：它本来就应该随 anchor 重注册，闭包里没有别的状态 |
+| `VocabularyPopover`（pointerdown/keydown 关闭，deps 含 `onClose`） | 只调 `onClose` | 安全：最多是「刚打开时按 Esc 没反应」，而且**面板自己的 `onKeyDown` 也处理 Esc**，焦点在面板内时不受影响 |
+| `useArticleSectionRoute`（两个 scroll 监听） | 全部经 ref 读取 | 安全：那个文件本来就是为了绕开闭包旧值才改用 ref 的 |
+
+- **结论：没有第四处需要改**。这一轮的产出是「看过并说明为什么安全」，而不是又一次「我搜了关键字、没搜到就说没有」
+  （上一程正是在「只按字样搜」上误判过一次）。
+
 ### 把上一轮的竞态教训用到它的「兄弟」组件上
 
 - 认词卡（`RecognitionPrompt`）的键盘监听**也是按渲染重新注册**的，所以与上一轮在填空卡上发现的是同一个竞态：
