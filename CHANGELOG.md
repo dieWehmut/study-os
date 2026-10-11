@@ -2,6 +2,28 @@
 
 ## 未发布
 
+### `?corrected=` 之谜解开了：演示版的**生成 id 撞上了 fixture 的 id**
+
+三轮探针的最后一行给出了答案：
+
+`
+PROBE filter search= "?corrected=no" param= no rows= attempt-2:true,attempt-1:undefined,attempt-2:undefined
+`
+
+`state.mistakes` 里**出现了两条 id 相同的行**：一条 `corrected: true`、一条 `undefined`。
+原因不是筛选、不是参数、也不是"两处操作不同对象"，而是：`newID("attempt")` 从 `sequence` 计数，
+**fixture 自己就占用了 `attempt-1`/`attempt-2`** ⇒ 新建的错题拿到 `attempt-2`（撞名）⇒
+`POST /mistakes/{id}/correct` 用 `find(id)` 找到的是**先出现的那条（fixture 行）**并给它打了标记，
+而**新建的那条**（同 id）没被标记 ⇒ 于是 `?corrected=no` 永远排除不掉"这个 id"——
+**我的断言没错，是演示版的数据有重影。**
+
+- **修法**：`makeInitialState` 的 `sequence` 从 **1000** 起（附注释说明为什么不能从 1 开始）。
+- **验证**：两条新用例——① 新建记录在列表里**只有一个 id**（立刻抓到重影）；② `?corrected=no` 在订正后
+  不再包含它、`?corrected=yes` 包含它。`static-demo.test.ts` **41 条全过**（此前 39）。
+- 顺带把上一轮想加的 **`?corrected=` 行为筛选**一起提交了（现在它真的生效）。
+- **三个探针换来一句话**：当一个 observation 与逻辑矛盾时，先怀疑**数据里有重影**，而不是自己的推导。
+  这一轮把"三条互斥事实"变成了"一条数据缺陷"。
+
 ### `?corrected=` 之谜：现在是三条互斥的事实，下一轮找出哪条是假的
 
 上一个探针把嫌疑缩小到"参数在传给筛选之前丢了"。这一轮的探针**否掉了**这个假设：

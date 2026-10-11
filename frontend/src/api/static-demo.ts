@@ -410,7 +410,11 @@ function makeInitialState(): StaticState {
     },
   ]
   return {
-    sequence: 1,
+    // Generated ids start well past the fixtures' own (attempt-1, attempt-2, ...).
+    // A collision here made 订正 mark the fixture row while the new row kept the same
+    // id, so the list showed two rows under one id and the 未订正 filter could exclude
+    // neither -- which is what three probes were spent finding.
+    sequence: 1000,
     knowledge,
     scheduled: new Set(["knowledge-last", "knowledge-spaced-repetition"]),
     groups: [
@@ -786,10 +790,15 @@ function mistakeList(url: URL) {
   const subject = subjectFrom(url.searchParams.get("subject"))
   const query = url.searchParams.get("q")?.trim().toLowerCase() ?? ""
   const cause = url.searchParams.get("cause")?.trim().toLowerCase() ?? ""
+  // 订正 state, the filter the practice page added: a demo that ignored it would show an
+  // unfiltered log under a chip the reader just pressed.
+  const corrected = url.searchParams.get("corrected")?.trim().toLowerCase() ?? ""
   const items = state.mistakes.filter((entry) => {
     if (subject && entry.question.subject !== subject) return false
     if (query && !entry.question.stem.toLowerCase().includes(query)) return false
     if (cause && (entry.attempt.cause ?? "").toLowerCase() !== cause) return false
+    if (corrected === "yes" && entry.corrected !== true) return false
+    if (corrected === "no" && entry.corrected === true) return false
     return true
   })
   return { items: clone(items), count: items.length }

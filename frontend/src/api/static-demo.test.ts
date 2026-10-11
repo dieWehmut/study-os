@@ -385,6 +385,42 @@ describe("static Pages API fixtures", () => {
     }
   })
 
+  it("gives a new record an id of its own, so 订正 marks the row it was asked about", async () => {
+    // The generated ids used to restart at the fixtures' own numbers: `newID("attempt")`
+    // produced "attempt-2", which a fixture already had, so correcting the new mistake
+    // marked the fixture row and left the new one untouched -- two rows under one id.
+    const created = await staticDemoRequest<{ attempt: { id: string } }>("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({ subject: "math", stem: "新记的一题", cause: "method", note: "" }),
+    })
+    const list = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }> }>("/mistakes")
+    const ids = list.items.map((item) => item.attempt.id)
+    expect(ids.filter((id) => id === created.attempt.id)).toHaveLength(1)
+  })
+
+  it("honours the 订正 filter the pages offer, not only the fields they read", async () => {
+    // A demo that ignores ?corrected= shows an unfiltered log under a chip the reader
+    // just pressed -- their press, silently discarded.
+    const created = await staticDemoRequest<{ attempt: { id: string } }>("/mistakes", {
+      method: "POST",
+      body: JSON.stringify({ subject: "math", stem: "订正筛选演示题", cause: "method", note: "" }),
+    })
+    const id = created.attempt.id
+
+    const openBefore = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }> }>("/mistakes?corrected=no")
+    expect(openBefore.items.map((item) => item.attempt.id)).toContain(id)
+
+    await staticDemoRequest(`/mistakes/${id}/correct`, {
+      method: "POST",
+      body: JSON.stringify({ answer: "订正好了", elapsed_ms: 500 }),
+    })
+
+    const openAfter = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }> }>("/mistakes?corrected=no")
+    expect(openAfter.items.map((item) => item.attempt.id)).not.toContain(id)
+    const fixed = await staticDemoRequest<{ items: Array<{ attempt: { id: string } }> }>("/mistakes?corrected=yes")
+    expect(fixed.items.map((item) => item.attempt.id)).toContain(id)
+  })
+
   it("carries the derived counts the pages draw from, not only the real backend", async () => {
     // Three labels were added to list rows in the app (生词 N, 已填 N/M, group counts).
     // A count that only exists on the real backend is a feature the Pages build
