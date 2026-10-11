@@ -235,6 +235,26 @@ id 不重复、每题有题干，对旧形状保持沉默）；作答面一次�
 
 没到门槛之前，第 4 阶段**不开工**；到门槛之后，先做 Task（它更接近既有对象），Idea 再等一轮。
 
+**第一次实测（2026-10-12，``data/study.db``）**
+
+| 数字 | 实测 | 门槛 |
+|---|---|---|
+| 已订正的错题 | 0 | 20 |
+| 复习作答次数 | 7 | 30 |
+| 知识点 | 3 | 30 |
+
+**三个都远未达 ⇒ 不开工。** 写在这里而不是只留在 CHANGELOG：门槛的意义就是**有一天真的被数据回答**，
+那张表若从来没有读数，它和一句"再看看"没有区别。
+
+怎么再量一次（三个数字都在库层可取，不必起服务）：
+
+- 已订正错题：``Store.CountMistakes(MistakeListOptions{Corrected: "yes"})``
+- 复习作答次数：``Store.CountReviewAttempts()``（``attempts`` 表；**不是** ``question_attempts``）
+- 知识点：``Store.CountKnowledgeItems(KnowledgeListOptions{})``
+
+应用内的门槛进度卡（设置页底部）走的是同样的三项，只是经过 dashboard 接口。两边口径由
+``scripts/tests/architecture-docs-consistency.test.mjs`` 的第 4 阶段检查守着，不允许各说各的。
+
 **验收标准（实现时逐条对）**
 
 1. Task 与 Idea **两张表、两条路径**，互不为对方的字段；
