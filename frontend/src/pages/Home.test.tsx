@@ -124,10 +124,12 @@ describe("Today page", () => {
       </MemoryRouter>,
     )
 
-    const next = await screen.findByText("接下来")
-    expect(next).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /先复习 3 个到期知识点/ })).toHaveAttribute("href", "/memory")
-    const unscheduled = screen.getByRole("link", { name: /还有 4 个知识点没排复习/ })
+    // The heading renders immediately; the rows wait for the dashboard (and the library
+// count) to arrive. Asserting them synchronously after the heading is a race that
+// passes alone and fails in a full run -- the sweep caught exactly that.
+    const next = await screen.findByRole("link", { name: /先复习 3 个到期知识点/ })
+    expect(next).toHaveAttribute("href", "/memory")
+    const unscheduled = await screen.findByRole("link", { name: /还有 4 个知识点没排复习/ })
     expect(unscheduled).toHaveAttribute("href", "/knowledge?scheduled=no")
     await waitFor(() => expect(mocks.listKnowledge).toHaveBeenCalledWith(
       expect.objectContaining({ scheduled: "no" }),
