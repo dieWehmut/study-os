@@ -142,8 +142,8 @@ describe("Practice page", () => {
     renderPractice()
     log("很早就记下的错题", "看错题")
 
-    const date = await screen.findByText("很早就记下的错题")
-      .then((row) => document.querySelector("[data-mistake-date='true']"))
+    await screen.findByText("很早就记下的错题")
+    const date = document.querySelector("[data-mistake-date='true']")
     expect(date).not.toBeNull()
     expect(date!.textContent).toMatch(/\d/)
   })
