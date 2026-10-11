@@ -222,6 +222,22 @@ func (s *Store) CountKnowledgeItems(ctx context.Context, options models.Knowledg
 	return total, nil
 }
 
+// CountReviewAttempts answers how many review answers have been recorded.
+//
+// 复习作答次数 is one of the three numbers 第 4 阶段 waits for, and it has to be readable
+// without going through the dashboard handler: a gate only the page can compute cannot
+// be checked against the page.
+//
+// `attempts` is the review table and `question_attempts` is the practice one. Counting
+// the wrong one would be a number that looks right and means something else.
+func (s *Store) CountReviewAttempts(ctx context.Context) (int, error) {
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM attempts`).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count review attempts: %w", err)
+	}
+	return total, nil
+}
+
 func (s *Store) ListKnowledgeItems(ctx context.Context, options models.KnowledgeListOptions) ([]models.KnowledgeItem, error) {
 	limit := options.Limit
 	if limit <= 0 || limit > 500 {
