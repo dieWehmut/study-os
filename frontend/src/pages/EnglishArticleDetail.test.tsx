@@ -95,6 +95,40 @@ describe("EnglishArticleDetail", () => {
     expect(document.getElementById("section-2-the-turn")).toBeInTheDocument()
   })
 
+  it("collects the article's glossary above the text, once per word", async () => {
+    // The entries are already on the sections, but one at a time inside the text: a
+    // reader preparing for the article wants the whole list first.
+    mocks.getEnglishArticle.mockResolvedValue({
+      ...article,
+      content: {
+        ...article.content,
+        sections: [
+          {
+            ...article.content.sections[0]!,
+            vocabulary: [
+              { term: "shifted", definition: "发生变化", british_phonetic: "/ˈʃɪftɪd/", part_of_speech: "v." },
+              { term: "plan", definition: "计划" },
+            ],
+          },
+          {
+            ...article.content.sections[1]!,
+            // The same word again: the list is a study aid, so it says it once.
+            vocabulary: [{ term: "Shifted", definition: "发生变化（重复）" }],
+          },
+        ],
+      },
+    })
+    renderDetail()
+
+    await screen.findByRole("heading", { name: "市场变化" })
+    const card = document.querySelector("[data-article-vocabulary='true']")
+    expect(card).not.toBeNull()
+    expect(card!.textContent).toContain("本篇生词（2）")
+    expect(card!.textContent).toContain("shifted")
+    expect(card!.textContent).toContain("变化")
+    expect(card!.textContent).not.toContain("重复")
+  })
+
   it("copies the address of one section", async () => {
     // The anchors have been there for a while; this is what makes one usable away
     // from the page.

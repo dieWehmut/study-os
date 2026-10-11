@@ -11,6 +11,8 @@ import {
 } from "@/api/english-articles"
 import { ApiError } from "@/api/client"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import type { EnglishArticleVocabulary } from "@/api/english-articles"
 import { EnglishArticleBody } from "@/features/english-articles/EnglishArticleBody"
 import { exportArticlePdf } from "@/features/english-articles/export-pdf"
 import { articleSectionID, sectionHash } from "@/features/english-articles/article-sections"
@@ -151,6 +153,20 @@ export default function EnglishArticleDetail() {
     window.setTimeout(() => setLinkCopied((current) => (current === sectionID ? "" : current)), 1500)
   }
 
+  // The same word can be glossed in two sections; the list is a study aid, so it shows
+  // each term once, in the order the article introduces them. Above the early returns,
+  // because hooks cannot live after them.
+  const articleVocabulary = useMemo(() => {
+    const seen = new Map<string, EnglishArticleVocabulary>()
+    for (const section of article?.content?.sections ?? []) {
+      for (const entry of section.vocabulary ?? []) {
+        const key = entry.term.trim().toLowerCase()
+        if (key && !seen.has(key)) seen.set(key, entry)
+      }
+    }
+    return [...seen.values()]
+  }, [article])
+
   if (loading) {
     return <p className="py-12 text-center text-sm text-muted-foreground">正在打开文章…</p>
   }
@@ -257,6 +273,43 @@ export default function EnglishArticleDetail() {
             </div>
           </header>
           <div className="pt-8">
+            {/* Every word this article glosses, in one place. They are already on the
+                sections, but a reader preparing for the article wants the list before
+                the text, not one entry at a time inside it. */}
+            {articleVocabulary.length > 0 ? (
+              <Card data-article-vocabulary="true" className="mb-8">
+                <CardHeader className="gap-1.5">
+                  <CardTitle className="text-base">本篇生词（{articleVocabulary.length}）</CardTitle>
+                  <p className="text-sm text-muted-foreground">先扫一眼这些词，再读正文会顺很多。</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {articleVocabulary.map((entry) => (
+                      <li key={entry.term} className="rounded-lg border bg-muted/25 px-3 py-2">
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                          <button
+                            type="button"
+                            className="font-heading text-sm font-semibold hover:text-primary"
+                            onClick={() => void playPronunciation(entry.term)}
+                          >
+                            {entry.term}
+                          </button>
+                          {entry.part_of_speech ? (
+                            <span className="text-xs text-muted-foreground">{entry.part_of_speech}</span>
+                          ) : null}
+                          {[entry.british_phonetic, entry.american_phonetic].filter(Boolean).length > 0 ? (
+                            <span className="text-xs text-muted-foreground">
+                              {[entry.british_phonetic, entry.american_phonetic].filter(Boolean).join(" · ")}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-sm leading-6 text-muted-foreground">{entry.definition}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
             <EnglishArticleBody content={article.content} onSpeak={(term) => void playPronunciation(term)} />
           </div>
         </article>
