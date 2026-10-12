@@ -467,6 +467,21 @@ describe("static Pages API fixtures", () => {
     expect(articles.items).toHaveLength(1)
   })
 
+  it("restores the demo to its fixture instead of refusing the operation", async () => {
+    // 恢复备份 is wired to DELETE /backups/restore. In the demo it can honestly mean
+    // "put the sample data back": without a branch the button threw
+    // 「展示模式没有实现这个操作」, and a control that always fails is worse than none.
+    await staticDemoRequest("/knowledge/knowledge-last/schedule", { method: "DELETE" })
+    const changed = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
+    expect(changed.scheduled_ids).not.toContain("knowledge-last")
+
+    const restored = await staticDemoRequest<{ status: string }>("/backups/restore", { method: "DELETE" })
+    expect(restored.status).toBe("restored")
+
+    const after = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
+    expect(after.scheduled_ids).toContain("knowledge-last")
+  })
+
   it("takes a scheduled item back out of the queue, the way the real endpoint does", async () => {
     // 取消排复习 shipped before the demo learned it: the button existed and threw
     // 「展示模式没有实现这个操作」. A control that exists and fails is worse than one that

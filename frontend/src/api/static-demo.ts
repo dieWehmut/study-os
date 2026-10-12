@@ -1423,6 +1423,14 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     state.backups.unshift(backup)
     return responseFor(backup) as T
   }
+  if (root === "backups" && id === "restore" && method === "DELETE") {
+    // 恢复备份 in the demo means what it can honestly mean here: put the browser-side
+    // state back to the fixture. Without this the button threw
+    // 「展示模式没有实现这个操作」 -- and a demo control that always fails is worse than
+    // one that is not offered.
+    state = makeInitialState()
+    return responseFor({ status: "restored", message: "展示模式：已恢复到初始示例数据" }) as T
+  }
   if (root === "settings" && method === "PATCH") {
     state.dailyLimit = Math.max(1, Math.trunc(Number(body.daily_limit ?? state.dailyLimit)))
     return responseFor({ daily_limit: state.dailyLimit }) as T
