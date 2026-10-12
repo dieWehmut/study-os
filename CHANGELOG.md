@@ -2,6 +2,37 @@
 
 ## 未发布
 
+### `archived_ids` 的**逐字执行配方**（两个锚点已抄下来，下一轮直接写）
+
+- 这一轮只做了一件事：把要照抄的两处**原文**读出来 ✓ ——这是第 4 次用"先只读一步"（前三次：217→218、
+  223→224、265→267 ✓ 每次都换来"下一轮一次写成" ✓）。
+- **锚点 1（`backend/db/store.go`，照抄 `ScheduledKnowledgeIDs` 的形状）**：
+
+  `go
+  func (s *Store) ScheduledKnowledgeIDs(ctx context.Context, ids []string) (map[string]bool, error) {
+      scheduled := make(map[string]bool, len(ids))
+      if len(ids) == 0 { return scheduled, nil }
+      placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+      …
+      rows, err := s.db.QueryContext(ctx,
+          SELECT DISTINCT knowledge_item_id FROM prompts WHERE knowledge_item_id IN (+placeholders+), arguments...)
+  `
+  ⇒ 新增 `ArchivedKnowledgeIDs`：**同形**，SQL 换成
+  `SELECT DISTINCT id FROM knowledge_items WHERE archived_at != '' AND id IN (`+placeholders+`)` ✓
+  （**只看这一列** ✓ ——与 `SetKnowledgeArchived` 写、`knowledgeFilter` 读的是同一个字段 ✓）。
+- **锚点 2（`backend/httpapi/router.go`，响应那一行）**：
+
+  `go
+  writeJSON(response, http.StatusOK, map[string]any{
+      "items": items, "count": total, "scheduled_ids": scheduledIDs,
+  `
+  ⇒ 在同一行里加 `"archived_ids": archivedIDs` ✓；`archivedIDs` 的来源照 `scheduledIDs` 的那两行
+  （`scheduled, err := …ScheduledKnowledgeIDs(request.Context(), ids)` 与随后的切片拼装 ✓）
+  **在旁边加一份** ✓。
+- ⇒ 下一轮就是**照抄 + 一条 Go 用例**（`?archived=yes` 的响应带 `archived_ids`，且只含归档的那些 ✓）+ 完整 sweep ✓；
+  再下一轮做前端三处（响应类型 / prop / 行标记 ✓）与契约 ✓。
+- 本轮无代码改动；工作区与远端一致 ✓（无待推送 ✓）。
+
 ### 上一轮那处缺口的形状**改好了**：不必给每行加字段，照 `scheduled_ids` 的样子做
 
 - 上一轮定的形状是「`models.KnowledgeItem` 加 `Archived` + 列表/详情 SELECT 带上」✗。
