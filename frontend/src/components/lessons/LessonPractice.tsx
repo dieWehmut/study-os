@@ -552,6 +552,27 @@ function PracticeQuestionForm({
               ) : null}
             </div>
           ) : null}
+          {/* Answering again is allowed and overwrites -- the backend says so ("同一键上后
+             写覆盖") and a reload already lets you do it. Within the session the form
+              used to be a one-way door: after 提交答案 the button was disabled, so the
+              only way to try again was to reload the page. Unlike 收进知识库 this is not
+              a side effect; it is the normal way to use a practice question. */}
+          {submitted ? (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelected(null)
+                  setSubmitted(false)
+                  setResult(null)
+                }}
+              >
+                再答一次
+              </Button>
+            </div>
+          ) : null}
           {/* Only after a wrong answer: a card for something already known is
               noise in the queue. */}
           {submitted && visibleResult?.kind === "incorrect" ? (

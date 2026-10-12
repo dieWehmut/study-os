@@ -65,6 +65,15 @@ describe("LessonPractice", () => {
     expect(screen.getByRole("status")).toHaveTextContent("回答正确")
     expect(screen.getByRole("status")).toHaveTextContent("先确认单位，再使用 F = ma。")
     expect(screen.getByRole("radio", { name: "8 N" })).toBeDisabled()
+
+    // Answering again is what the backend already allows (同一键上后写覆盖) and what a
+    // reload already gave you; the form used to be a one-way door until you reloaded.
+    fireEvent.click(screen.getByRole("button", { name: "再答一次" }))
+
+    const retry = screen.getByRole("button", { name: "提交答案" })
+    expect(retry).toBeDisabled()
+    expect(screen.getByRole("radio", { name: "8 N" })).toBeEnabled()
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
   })
 
   it("accepts correct_answer and reports a wrong choice with the reference", () => {
