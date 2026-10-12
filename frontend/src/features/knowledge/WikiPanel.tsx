@@ -32,6 +32,8 @@ interface WikiPanelProps {
   item: KnowledgeItem | null
   /** The item already carries review cards, as of the last list request. */
   scheduled?: boolean
+  /** §8.1: the item was already put away when the panel opened. */
+  archived?: boolean
   onUpdated?: (item: KnowledgeItem) => void
   /**
    * Open one of the item's family. Takes an id rather than an item because the
@@ -95,6 +97,7 @@ function familyLabel(groups: RelatedKnowledge["groups"]): string {
 export function WikiPanel({
   item,
   scheduled = false,
+  archived = false,
   onUpdated,
   onSelectRelated,
   unmatched = false,
@@ -204,7 +207,7 @@ export function WikiPanel({
   // item back exactly as it was.
   // 归档 / 取消归档. The panel keeps this locally: the list it came from decides what is
 // visible, and the item's own archive state is not part of the shape it was given.
-  const [archivedHere, setArchivedHere] = useState(false)
+  const [archivedHere, setArchivedHere] = useState(archived ?? false)
   const [archivePending, setArchivePending] = useState(false)
 
   async function toggleArchived() {

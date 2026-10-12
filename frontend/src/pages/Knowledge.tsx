@@ -215,8 +215,13 @@ function KnowledgePage({
   // that hid it is the reason the link exists -- and the panel then offered
   // 排进复习 for something already queued. The detail read is by id and answers
   // for that item, so it decides whenever the page has nothing to say.
-  const selectedQueued = selected
-    ? scheduledIds.has(selected.id) || (selectedDetail?.id === selected.id && selectedDetail.scheduled === true)
+  const selectedQueued = selected
+    ? scheduledIds.has(selected.id) || (selectedDetail?.id === selected.id && selectedDetail.scheduled === true)
+    : false  // Same two sources for 归档 (§8.1), and for the same reason the comment above gives: the
+  // list answers through `archived_ids`, the detail read by id. Without the second source a
+  // deep link to an archived item showed 归档 -- a button saying the opposite of the truth.
+  const selectedArchived = selected
+    ? archivedIds.has(selected.id) || (selectedDetail?.id === selected.id && selectedDetail.archived === true)
     : false
   // Every filter the page can narrow by, except the subject chip: that one is
   // the learner's own lens across pages, not something this page set.
@@ -602,6 +607,7 @@ function KnowledgePage({
               key={selected?.id ?? "none"}
               item={selected}
               scheduled={selectedQueued}
+              archived={selectedArchived}
               unmatched={items.length === 0 && filtersActive}
               onClearFilters={clearFilters}
               onUpdated={(updated) => {

@@ -2,6 +2,25 @@
 
 ## 未发布
 
+### 那个说谎的按钮**修好了**：面板现在按真实归档状态初始化
+
+- `Knowledge.tsx`：`selectedArchived` 与 `selectedQueued` **一字同形** ✓（列表来源 `archivedIds` ✓ +
+  详情来源 `selectedDetail.archived` ✓，缺一不可 ✓），并把它作为 `archived` 传给 `<WikiPanel>` ✓。
+- `WikiPanel.tsx`：接口加 `archived?: boolean` ✓、解构出 `archived = false` ✓、
+  `archivedHere` 的初值改为 `archived ?? false` ✓ ——**外部传入 + 本地覆盖** ✓：
+  打开时就是已归档 ⇒ 按钮显示「**取消归档**」✓；**刚点过** ⇒ 本地 `setArchivedHere` 立刻生效 ✓
+  （那几处一行没动 ✓）。
+- ⇒ **「打开一条已归档条目，按钮却写着『归档』」不再成立** ✓（深链接也一样 ✓ ——那正是加
+  `KnowledgeArchived` 单条查询的原因 ✓）。
+- **一处过程如实记**：这一步 5 处编辑里有 4 处锚点命中 ✓，**第 5 处（解构）没命中** ✗ ——
+  我第一次猜的解构写法（`  scheduled,` 单行）根本不存在 ✓（实际是 `  scheduled = false,`✓）。
+  **构建立刻报** `Cannot find name 'archived'` ✓ ⇒ 我读一眼真实代码、补上解构 ✓ ⇒
+  `build` ✓ `lint` ✓ 相关用例 **57 条全过** ✓。
+  **教训重申**：**锚点要用读出来的原文** ✗（这一程第 N 次验证 ✓，也是第 N 次靠"构建先报错"兜住 ✓）。
+- 验证：`pnpm build` ✓、`pnpm lint` ✓、`src/features/knowledge` + `src/pages/Knowledge.test.tsx`
+  **57 条全过** ✓；随后完整 sweep。
+- **还差**：界面用例（深链接打开已归档条目 ⇒ 按钮显示「取消归档」✗）与契约字段（`archived` ✗）—— 下一轮 ✓。
+
 ### 最后一环的配方齐了（第 7 次"先只读一步"）
 
 | # | 位置（已核实） | 改动 |
