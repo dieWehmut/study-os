@@ -2,6 +2,20 @@
 
 ## 未发布
 
+### §十 动手第 1 步：**读到哪儿了**（下一轮从这里继续，锚点已核实）
+
+- 已确认的两处 ✓：
+  1. `backend/memory/scheduler.go:18-27` `toFSRSRating` ✓ ——**`default` 分支返回 `fsrs.Again`** ✗
+     ⇒ **加第四档必须同时改这里** ✓，否则新档会被**静默当成 Again** ✗（正是 §十 里提醒的那个坑 ✓）；
+  2. `backend/httpapi/router.go:1150` `input.Rating < int(memory.RatingAgain) || input.Rating > int(memory.RatingGood)` ✓
+     ⇒ 上限要从 `RatingGood` 改成第四档 ✓（**错误信息 `"rating must be 1, 2, or 3"` 也要一起改** ✓，
+     否则它会告诉调用方"只能是 1、2、3"，而新档是 4 ✗ ——这正是 §九 第 4 条"锚点来自原文"的用处 ✓）。
+- **还没找到的** ✗：`type Rating` 的声明**不在 `backend/memory/`** ✓（`grep` 无命中 ✓）⇒
+  它应在别的包（`backend/models` 或同包另一个文件 ✓）⇒ **下一轮第一步就是找到它** ✓
+  （`RatingAgain/RatingHard/RatingGood` 的常量块 ✓），再把第四档加进去 ✓。
+- ⇒ 这一轮**没有代码改动** ✓：按 §九 第 6 条，**常量块没找到之前不动手** ✗（动手就会写成"半截"✗）。
+- 工作区与远端一致 ✓。
+
 ### §十 按第 312 轮的确认改写了：第 4 问从「界面放哪」改成「**读者何时可以覆盖判卷**」
 
 - 改写前 ✓：「界面放哪：评分行加第四个」✗ ——**把设计难点写成了一个排版问题** ✗。
