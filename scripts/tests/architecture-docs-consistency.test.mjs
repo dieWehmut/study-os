@@ -243,3 +243,18 @@ test("§一 的对象盘点表与它自己宣称的 13 个对象一一对应", (
   const numbers = [...section[0].matchAll(/^\| (\d+) \|/gm)].map((match) => Number(match[1]))
   assert.deepEqual(numbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], `§一 的表格编号是 ${numbers.join(",")}`)
 })
+test("恢复模式筛的题型，界面上都有名字", () => {
+  // 恢复模式 is a prompt-type filter (db/store.go), and the card side names those types
+  // (ReviewSession.tsx). If a type is admitted and has no name, the reader gets a card whose
+  // kind the UI cannot say -- and nothing else would notice.
+  const store = read("backend/db/store.go")
+  const filter = /"recovery"\)\s*\{[\s\S]{0,220}?IN \(([^)]*)\)/.exec(store)
+  assert.ok(filter, "找不到恢复模式筛的题型")
+  const types = filter[1].split(",").map((part) => part.trim().replace(/'/g, ""))
+  assert.ok(types.length > 0, "恢复模式一个题型都没筛")
+
+  const session = read("frontend/src/features/memory/ReviewSession.tsx")
+  for (const type of types) {
+    assert.match(session, new RegExp(`^\\s*${type}:`, "m"), `${type} 在界面上没有名字`)
+  }
+})
