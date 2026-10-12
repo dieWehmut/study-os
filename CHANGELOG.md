@@ -2,6 +2,26 @@
 
 ## 未发布
 
+### 上一轮那处缺口的形状**改好了**：不必给每行加字段，照 `scheduled_ids` 的样子做
+
+- 上一轮定的形状是「`models.KnowledgeItem` 加 `Archived` + 列表/详情 SELECT 带上」✗。
+  这一轮去数了代价：`scanKnowledgeItem` 有 **4 个调用点**（`store.go` 128/143/344 + `groups_store.go` 168 ✓），
+  **每个都自己写了一份 SELECT** ✗ ⇒ 那要改 **4 处 SELECT + 1 处 scan + 1 处 model = 6 处** ✗
+  ⇒ 超出余量 ✓，而且**容易漏掉一处**（漏了就会在某个视图里静默不对 ✓）。
+- **更好的形状**（这一轮真正的产出 ✓）：**复用这套接口里已经存在的机制** ✓ ——
+  `/api/knowledge` 的响应**本来就带 `scheduled_ids`** ✓（"这一页里哪些排过复习" ✓），
+  而 `KnowledgeList` 组件**本来就接收 `scheduledIds` 这个 prop** ✓ 并用它给行加「已排复习 / 还没排复习」✓。
+  ⇒ 照同一形状加一个 **`archived_ids`** 即可 ✓：
+  1. **store**：一个 `ArchivedKnowledgeIDs(ids)`（与 `ScheduledKnowledgeIDs` 并排 ✓，**只查一次、不碰任何 SELECT** ✓）；
+  2. **handler**：与 `scheduled_ids` 同一处、同一行附近 ✓，把 `archived_ids` 一起写进响应 ✓；
+  3. **前端**：`KnowledgeListResponse` 加 `archived_ids` ✓ + 页面把它作为新 prop 传给 `KnowledgeList` ✓
+     （照 `scheduledIds` 原样 ✓）+ 行上加「**已归档**」标记 ✓；
+  4. **用例**：`?archived=yes` 下归档那条带标记、未归档那条不带 ✓；
+  5. **契约**：`/knowledge?archived=yes` 的字段表加 `archived_ids` ✓（第 239 轮那行 ✓）。
+- ⇒ 从「6 处、分散在 4 个 SELECT 里」变成「**1 个新方法 + 1 处响应 + 1 个 prop**」✓，
+  而且**与既有机制完全同形** ✓ ⇒ 漏改的风险小得多 ✓。
+- 本轮无代码改动；工作区与远端一致 ✓（无待推送 ✓）。
+
 ### 查到一处**有证据**的真缺口（本轮只记不动手）：**已归档的行在列表里认不出来**
 
 - 用「先确认，再断言」的办法查（第 257-260 轮的教训 ✓）：grep `archived_at` / `archived` ✓ ⇒
