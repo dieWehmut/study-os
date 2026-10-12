@@ -2,6 +2,19 @@
 
 ## 未发布
 
+### 面板那处的第 1 步：`Store.KnowledgeArchived`（单条查询，零行为变化 ✓）
+
+- 与 `ArchivedKnowledgeIDs` 并排 ✓，一行 SQL：
+  `SELECT 1 FROM knowledge_items WHERE id = ? AND archived_at != ''` ✓ ——
+  **仍然只看 `archived_at`** ✓（与写它、与过滤器读的是同一个字段 ✓）。
+- 注释里写清了**为什么用一条查询而不是给模型加字段** ✓：
+  给 `knowledge_items` 的扫描加一列，就得**同时改四处 SELECT** ✗（`scanKnowledgeItem` 是四处共用的 ✓），
+  而这个答案**只有详情读取需要** ✓ ⇒ 一处小查询更小、更不容易漏 ✓。
+- `sql.ErrNoRows` ⇒ 返回 `false, nil` ✓（**"没有这一行"与"没有归档"都答 false** ✓ ——
+  调用方是详情读取，它已经先确认过条目存在 ✓）。
+- **如实说明**：目前还没有调用方 ✗ ⇒ 行为零变化 ✓（与前两次"先落数据层"同样的切法 ✓）。
+- 验证：`go build ./...` ✓、`go test ./backend/db/` ✓；随后完整 sweep。
+
 ### 自我更正：上一轮那句"**只动详情那一处**"是错的 —— 但换来的形状更便宜
 
 - 上一轮我写下三步形状，其中第 2 步说"给 `models.KnowledgeItem` 加 `Archived` 并让**详情那一处**

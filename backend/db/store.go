@@ -442,6 +442,25 @@ func (s *Store) DuePrompts(ctx context.Context, before time.Time, limit int) ([]
 // needs exactly the same treatment. It also means no SELECT has to change -- `archived_at`
 // stays read in one place (here) and written in one place (SetKnowledgeArchived), and the
 // default list keeps hiding them through knowledgeFilter.
+// KnowledgeArchived answers the same question for a single item, for the detail read.
+//
+// The list reports it through `archived_ids`; the single-item read has no list to look in,
+// and a deep link to an archived item must be able to say so -- otherwise the panel offers
+// 归档 for something already put away. A one-row query rather than a column on
+// knowledge_items: that column would have to be added to all four SELECTs that feed
+// scanKnowledgeItem, and this answer is only ever needed here.
+func (s *Store) KnowledgeArchived(ctx context.Context, id string) (bool, error) {
+	var found int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT 1 FROM knowledge_items WHERE id = ? AND archived_at != ''`, id).Scan(&found)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read knowledge archived state: %w", err)
+	}
+	return true, nil
+}
 func (s *Store) ArchivedKnowledgeIDs(ctx context.Context, ids []string) (map[string]bool, error) {
 	archived := make(map[string]bool, len(ids))
 	if len(ids) == 0 {
