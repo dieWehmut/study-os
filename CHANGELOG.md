@@ -2,6 +2,21 @@
 
 ## 未发布
 
+### 前端三处：**锚点全齐了**（下一轮纯打字，无未知项）
+
+| # | 文件 | 锚点（本轮已核实） | 改动 |
+|---|---|---|---|
+| 1 | `frontend/src/api/knowledge.ts` | **:25** `export interface KnowledgeListResponse`（含 `items` `count` 与带注释的可选 `scheduled_ids` ✓） | 加 `archived_ids?: string[]` ✓（**同样可选、同样注释说明"旧后端可能不答"** ✓ ——这与 `scheduled_ids` 的处理一字不差 ✓） |
+| 2 | `frontend/src/pages/Knowledge.tsx` | **:87** `const [scheduledIds, setScheduledIds] = useState<ReadonlySet<string>>(new Set())` | 旁边加 `archivedIds` 状态 ✓ |
+| 3 | 同上 | **:157**（追加下一页 ✓）与 **:173**（整页替换 ✓）：`setScheduledIds(… result.scheduled_ids …)` | 同两处各加一份 `result.archived_ids` ✓（**两处都要 ✓**——只改一处会让"加载更多"之后标记错乱 ✓，第 236 轮那个"演示版分页"的教训同族 ✓） |
+| 4 | 同上 | **:585** `<KnowledgeList`（props 从 :586 起 ✓） | 加 `archivedIds={archivedIds}` ✓ |
+| 5 | `frontend/src/features/knowledge/KnowledgeList.tsx` | **:24** `scheduledIds?: ReadonlySet<string>` + 行内 :65-74（`data-scheduled-marker` 与「已排复习 / 还没排复习」✓） | 加 `archivedIds?: ReadonlySet<string>` ✓ + 行上加「**已归档**」标记 ✓（**同一形状** ✓） |
+| 6 | 用例 | `Knowledge.test.tsx` | `?archived=yes` 下归档那条**带标记**、未归档那条**不带** ✓ |
+| 7 | 契约 | 第 239 轮那行 | 字段表加 `archived_ids` ✓ |
+
+- ⇒ **下一轮没有任何需要先查的东西** ✓（第 5 次"先只读一步"到此结束 ✓，前四次分别换来 218、224、267、277 的"一次写成" ✓）。
+- 本轮无代码改动；工作区与远端一致 ✓（无待推送 ✓）。
+
 ### 前端三处的锚点**已查到大半**（第 5 次"先只读一步"）
 
 - 上一轮把后端接好了 ✓，这一轮读前端三处的地址 ✓：
