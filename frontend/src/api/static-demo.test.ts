@@ -432,6 +432,10 @@ describe("static Pages API fixtures", () => {
       // would break 记忆 as soon as a chip was pressed.
       ["/reviews/due?subject=math", ["items"]],
       ["/reviews/forecast", ["days"]],
+      // 答疑: the conversation list and one conversation's messages. Both answer the list
+      // envelope; the messages route additionally keys on `session_id`.
+      ["/chat/conversations", ["items", "count"]],
+      ["/chat/messages?session_id=session-demo", ["items"]],
       ["/dashboard", ["knowledge_count", "due_count", "reviewed_today", "current_streak", "subjects_due"]],
       ["/error-causes", ["items"]],
     ]

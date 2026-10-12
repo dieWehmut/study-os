@@ -2,6 +2,15 @@
 
 ## 未发布
 
+### 契约补第 16 条（两条）：答疑的会话列表与消息
+
+- 按上一轮定下的"先读形状、再照抄"：`chatConversations` 的 `return` 是
+  `{ items, count }` ✓ ⇒ 两条契约行一次写成、**一次通过** ✓：
+  - `/chat/conversations` ⇒ `items` + `count`；
+  - `/chat/messages?session_id=session-demo` ⇒ `items`（带 session 键的那条路）。
+- 契约覆盖：**17 条路由**（含两条带查询串的）。
+- 45 条全过；随后完整 sweep。
+
 ### 只读一步：聊天读路由的形状还没看全，**所以这一轮不加契约**（无代码改动）
 
 - 想给契约补第 16 条（`/chat/conversations` / `/chat/messages`，答疑页读的路由）。
