@@ -1125,14 +1125,28 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     const submitted = String(body.answer ?? "").trim()
     const expected = expectedAnswer.trim()
     const correct = expected !== "" && submitted.toLowerCase() === expected.toLowerCase()
-    const outcome: ReviewEvaluation["outcome"] = expected === "" ? "partial" : correct ? "correct" : "incorrect"
-    if (!correct) state.recovery = [...state.recovery.filter((entry) => entry.prompt.id !== id), due]
+    // A self-rating (self_rating 1-4) comes from the reader rather than from judging the text,
+    // and 4 means 一眼就会 (§十). The Pages app has no scheduler, so it just has to report the
+    // rating back honestly -- but it must do that, or the 4 button does nothing here.
+    const selfRating = Number(body.self_rating ?? 0)
+    if (body.self_rating !== undefined && body.self_rating !== null &&
+        (!Number.isInteger(selfRating) || selfRating < 1 || selfRating > 4)) {
+      throw new StaticDemoError("self_rating must be 1, 2, 3, or 4", 400)
+    }
+    const graded: ReviewEvaluation["outcome"] = expected === "" ? "partial" : correct ? "correct" : "incorrect"
+    const selfRated = body.self_rating === undefined || body.self_rating === null ? null : (
+      { 1: "incorrect", 2: "partial", 3: "correct", 4: "correct" } as const
+    )[selfRating as 1 | 2 | 3 | 4]
+    const outcome: ReviewEvaluation["outcome"] = selfRated ?? graded
+    if (outcome === "incorrect") state.recovery = [...state.recovery.filter((entry) => entry.prompt.id !== id), due]
     const evaluation: ReviewEvaluation = {
       attempt_id: newID("attempt"),
       outcome,
-      rating: correct ? 3 : 1,
+      rating: (selfRated ? selfRating : correct ? 3 : 1) as ReviewEvaluation["rating"],
       feedback: expected === ""
         ? "Pages 演示：这张卡没有登记参考答案，只能算部分正确。"
+        : selfRated
+          ? `Pages 演示：已按你的自评记为 ${selfRating} 档。`
         : correct
           ? "Pages 演示：与参考答案一致。"
           : `Pages 演示：参考答案是「${expected}」；答错的卡会进入恢复模式。`,
@@ -1142,7 +1156,12 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor(evaluation) as T
   }
   if (root === "attempts" && id && action === "override" && method === "POST") {
-    return responseFor({ attempt_id: id, outcome: "correct", rating: Number(body.rating ?? 3), feedback: "Saved in the Pages demo.", due_at: DEMO_NOW, expected_answers: [] }) as T
+    const overrideRating = Number(body.rating ?? 3)
+    // Same bound as the real handler (1-4): a demo that accepts 9 teaches the wrong thing.
+    if (!Number.isInteger(overrideRating) || overrideRating < 1 || overrideRating > 4) {
+      throw new StaticDemoError("rating must be 1, 2, 3, or 4", 400)
+    }
+    return responseFor({ attempt_id: id, outcome: overrideRating === 1 ? "incorrect" : overrideRating === 2 ? "partial" : "correct", rating: overrideRating, feedback: "Saved in the Pages demo.", due_at: DEMO_NOW, expected_answers: [] }) as T
   }
 
   if (root === "chat" && id === "conversations" && method === "GET") return responseFor(chatConversations(subjectFrom(url.searchParams.get("subject")))) as T
