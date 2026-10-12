@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   listRelatedKnowledge: vi.fn(),
   unscheduleKnowledge: vi.fn(),
   scheduleKnowledge: vi.fn(),
+  archiveKnowledge: vi.fn(),
+  unarchiveKnowledge: vi.fn(),
   saveKnowledgeWiki: vi.fn(),
   updateKnowledgeTag: vi.fn(),
 }))
@@ -77,6 +79,25 @@ describe("WikiPanel node renaming", () => {
     const line = await screen.findByText(/所属分组/)
     expect(line.closest("[data-item-groups='true']")).not.toBeNull()
     expect(screen.getAllByText("abandon 词族").length).toBeGreaterThan(0)
+  })
+
+  it("puts an item away without deleting it, and says where it went", async () => {
+    // 归档 is not 删除: the cards, the review states and every attempt stay, and a link to
+    // the item still opens -- so the note has to say what actually happened.
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.archiveKnowledge.mockResolvedValue({ status: "archived", knowledge_id: "k1" })
+    mocks.unarchiveKnowledge.mockResolvedValue({ status: "unarchived", knowledge_id: "k1" })
+    render(<Harness start={item} />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "归档" }))
+
+    await waitFor(() => expect(mocks.archiveKnowledge).toHaveBeenCalledWith("k1"))
+    expect(await screen.findByText(/已归档 · 默认列表里不再显示它，链接仍能打开/)).toBeInTheDocument()
+
+    // And back again: the control flips, so nothing is a one-way door.
+    fireEvent.click(screen.getByRole("button", { name: "取消归档" }))
+    await waitFor(() => expect(mocks.unarchiveKnowledge).toHaveBeenCalledWith("k1"))
+    expect(await screen.findByText(/已取消归档 · 回到默认列表/)).toBeInTheDocument()
   })
 
   it("offers the way back out once an item is in the review plan", async () => {

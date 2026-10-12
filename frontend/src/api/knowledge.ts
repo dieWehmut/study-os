@@ -166,6 +166,31 @@ export function unscheduleKnowledge(id: string): Promise<UnscheduleKnowledgeResp
   })
 }
 
+export interface ArchiveKnowledgeResponse {
+  status: "archived" | "unarchived"
+  knowledge_id: string
+}
+
+/**
+ * 归档 hides an item from the default library view; `unarchiveKnowledge` brings it back.
+ *
+ * Neither deletes anything: the item keeps its cards, its review states and every attempt,
+ * and a link to it keeps working while archived (ROADMAP §8.1). That is why this is not
+ * called "delete" anywhere -- and why the button sits next to 取消排复习 rather than
+ * replacing it: one is "I do not want to see this", the other "I do not want to drill it".
+ */
+export function archiveKnowledge(id: string): Promise<ArchiveKnowledgeResponse> {
+  return apiRequest<ArchiveKnowledgeResponse>(`/knowledge/${encodeURIComponent(id)}/archive`, {
+    method: "POST",
+  })
+}
+
+export function unarchiveKnowledge(id: string): Promise<ArchiveKnowledgeResponse> {
+  return apiRequest<ArchiveKnowledgeResponse>(`/knowledge/${encodeURIComponent(id)}/archive`, {
+    method: "DELETE",
+  })
+}
+
 /**
  * Replace one item's wiki prose.
  *

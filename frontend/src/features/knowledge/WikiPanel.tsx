@@ -2,13 +2,15 @@ import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import { useEffect, useMemo, useState } from "react"
-import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight, Waypoints, X } from "lucide-react"
+import { BookOpenText, CalendarPlus, ChevronLeft, ChevronRight, Waypoints, X, Archive } from "lucide-react"
 
 import { updateKnowledgeTag } from "@/api/chat"
 import {
   listRelatedKnowledge,
   saveKnowledgeWiki,
+  archiveKnowledge,
   scheduleKnowledge,
+  unarchiveKnowledge,
   unscheduleKnowledge,
   type RelatedKnowledge,
 } from "@/api/knowledge"
@@ -200,6 +202,32 @@ export function WikiPanel({
   // The way back. 排进复习 used to be one-way; this is the undo, and it undoes the
   // *plan* only -- the cards and the attempts stay, which is what lets 排进复习 put the
   // item back exactly as it was.
+  // 归档 / 取消归档. The panel keeps this locally: the list it came from decides what is
+// visible, and the item's own archive state is not part of the shape it was given.
+  const [archivedHere, setArchivedHere] = useState(false)
+  const [archivePending, setArchivePending] = useState(false)
+
+  async function toggleArchived() {
+    if (!current || archivePending) return
+    setArchivePending(true)
+    setScheduleNote(null)
+    try {
+      const result = archivedHere ? await unarchiveKnowledge(current.id) : await archiveKnowledge(current.id)
+      const nowArchived = result.status === "archived"
+      setArchivedHere(nowArchived)
+      setScheduleNote({
+        tone: "ok",
+        text: nowArchived
+          ? "已归档 · 默认列表里不再显示它，链接仍能打开，卡片与作答都还在"
+          : "已取消归档 · 回到默认列表",
+      })
+    } catch {
+      setScheduleNote({ tone: "error", text: archivedHere ? "取消归档失败，请重试" : "归档失败，请重试" })
+    } finally {
+      setArchivePending(false)
+    }
+  }
+
   async function cancelReview() {
     if (!current || schedulePending) return
     setSchedulePending(true)
@@ -339,6 +367,21 @@ export function WikiPanel({
               取消排复习
             </Button>
           ) : null}
+          {/* 归档 is a different question from 取消排复习: "I do not want to see this in
+              the library" rather than "I do not want to drill it". Nothing is deleted --
+              the item keeps its cards and its attempts, and a link to it still opens
+              (that is why this is not called 删除 anywhere). */}
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            disabled={archivePending}
+            aria-label={archivedHere ? "取消归档" : "归档"}
+            onClick={() => void toggleArchived()}
+          >
+            <Archive data-icon="inline-start" />
+            {archivedHere ? "取消归档" : "归档"}
+          </Button>
         </div>
         {/* The note that used to sit here said 排进复习 could not be undone. Now it can, so
             the sentence is gone rather than left to become a lie. */}
