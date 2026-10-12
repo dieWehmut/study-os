@@ -254,7 +254,18 @@ test("恢复模式筛的题型，界面上都有名字", () => {
   assert.ok(types.length > 0, "恢复模式一个题型都没筛")
 
   const session = read("frontend/src/features/memory/ReviewSession.tsx")
-  for (const type of types) {
-    assert.match(session, new RegExp(`^\\s*${type}:`, "m"), `${type} 在界面上没有名字`)
+  const labels = types.map((type) => {
+    const found = new RegExp(`^\\s*${type}:\\s*"([^"]+)"`, "m").exec(session)
+    assert.ok(found, `${type} 在界面上没有名字`)
+    return found[1]
+  })
+
+  // And the sentence that explains the toggle has to name them too. Prose cannot be bound
+  // exactly, but it can be required to mention every label -- otherwise adding a third type
+  // would leave the copy quietly describing a queue that no longer exists.
+  const memory = read("frontend/src/pages/Memory.tsx")
+  for (const label of labels) {
+    const loose = label.replace(/,/g, "[，,]").replace(/，/g, "[，,]")
+    assert.match(memory, new RegExp(loose), `恢复模式的说明里没提「${label}」`)
   }
 })
