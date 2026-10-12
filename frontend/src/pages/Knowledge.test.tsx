@@ -117,6 +117,20 @@ describe("Knowledge page", () => {
     ))
   })
 
+  it("marks the row the server reports as 已归档", async () => {
+    // The widened view is the only place an archived row appears, and without the mark the
+    // reader can see them but cannot tell which ones they put away themselves.
+    mocks.listKnowledge.mockResolvedValue({
+      count: 1,
+      items: [{ id: "k1", item_type: "word_sense", term: "abandon", concise_definition: "放弃；抛弃" }],
+      archived_ids: ["k1"],
+    })
+    render(<Knowledge />)
+
+    const marker = await screen.findByText("已归档")
+    expect(marker).toHaveAttribute("data-archived-marker", "true")
+  })
+
   it("asks for archived items when the reader switches 显示已归档 on", async () => {
     // 归档 hides by default, so this switch is the way back to them -- and it has to reach
     // the server, because the list only ever held the visible page.
