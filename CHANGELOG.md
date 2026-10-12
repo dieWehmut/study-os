@@ -2,9 +2,39 @@
 
 ## 未发布
 
+### 第三个「孤儿审计」方向（负结果 ✓）：**没有"写好了却没人调用"的 API 封装**
+
+- 第 353 轮查过**端点**（`/reviews/forecast` 有没有界面 ✓ ⇒ 有 ✓）；
+  第 15/16 条检查守着**路由两端**（真机 ↔ 演示版 ✓、前端 ↔ 真机 ✓）；
+  这一轮查**函数级**：`system.ts` / `agent.ts` 导出的 **14 个封装**，有没有**一个都没人调**的 ✗。
+- 用一条命令逐个问 ✓（除这两个文件自身外，全前端搜名字 ✓）⇒ **14/14 都有调用方** ✓：
+  `getSystemStatus` ✓ `revealDataDirectory` ✓ `listBackups` ✓ `updateSettings` ✓ `createBackup` ✓
+  `downloadBackup` ✓ `verifyBackup` ✓ `requestBackupRestore` ✓ `cancelBackupRestore` ✓ `getVendors` ✓
+  `setActiveProvider` ✓ `testProvider` ✓ `saveVendorConfig` ✓ `normalizeSystemStatus` ✓。
+- ⇒ **没有孤儿封装** ✓（与第 353、354、355 轮那几次"扫了但没有"一致 ✓）——
+  **"实现了但到不了"这类问题，在这套代码里被处理得比较干净** ✓。
+- **三个方向合起来** ✓ 才敢说这句话 ✓：**端点**（功能有没有界面 ✓）、**路由**（两端接得对不对 ✓）、
+  **封装**（封装有没有调用方 ✓）——**任一方向空着，"没有孤儿"就只是印象** ✗；现在**三个都问过了** ✓。
+- 本轮无代码改动（负结果 ✓）；工作区与远端一致 ✓。
+
 ### 一个该决定、而不是该动手的事：**这份 CHANGELOG 已经 1888 行**（结论：不切分 ✓）
 
-- 数出来 ✓：`CHANGELOG.md` **1888** 行 ✓，其中 `## 未发布` 下面是这一程**逐轮追加的几百条记录** ✓
+- 数出来 ✓：`CHANGELOG.md` **1888** 行 ✓，其中 `## 未发布
+
+### 第三个「孤儿审计」方向（负结果 ✓）：**没有"写好了却没人调用"的 API 封装**
+
+- 第 353 轮查过**端点**（`/reviews/forecast` 有没有界面 ✓ ⇒ 有 ✓）；
+  第 15/16 条检查守着**路由两端**（真机 ↔ 演示版 ✓、前端 ↔ 真机 ✓）；
+  这一轮查**函数级**：`system.ts` / `agent.ts` 导出的 **14 个封装**，有没有**一个都没人调**的 ✗。
+- 用一条命令逐个问 ✓（除这两个文件自身外，全前端搜名字 ✓）⇒ **14/14 都有调用方** ✓：
+  `getSystemStatus` ✓ `revealDataDirectory` ✓ `listBackups` ✓ `updateSettings` ✓ `createBackup` ✓
+  `downloadBackup` ✓ `verifyBackup` ✓ `requestBackupRestore` ✓ `cancelBackupRestore` ✓ `getVendors` ✓
+  `setActiveProvider` ✓ `testProvider` ✓ `saveVendorConfig` ✓ `normalizeSystemStatus` ✓。
+- ⇒ **没有孤儿封装** ✓（与第 353、354、355 轮那几次"扫了但没有"一致 ✓）——
+  **"实现了但到不了"这类问题，在这套代码里被处理得比较干净** ✓。
+- **三个方向合起来** ✓ 才敢说这句话 ✓：**端点**（功能有没有界面 ✓）、**路由**（两端接得对不对 ✓）、
+  **封装**（封装有没有调用方 ✓）——**任一方向空着，"没有孤儿"就只是印象** ✗；现在**三个都问过了** ✓。
+- 本轮无代码改动（负结果 ✓）；工作区与远端一致 ✓。` 下面是这一程**逐轮追加的几百条记录** ✓
   （每条都在最前面 ✓，所以最新在最上 ✓）。打开它会看到一堵墙 ✗。
 - **考虑过切分** ✗（把旧的搬到 `CHANGELOG-archive.md` ✓，前面留指针 ✓）⇒ **决定不做** ✗，理由两条 ✓：
   1. **它是一份日志** ✓ ——日志长是正常的 ✓；**而"最近发生了什么"永远在第一屏** ✓（最新的在最上 ✓）
