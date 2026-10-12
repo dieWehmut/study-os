@@ -30,6 +30,32 @@ const only = process.argv.slice(2)
   .flatMap((argument) => argument.slice("--only=".length).split(","))
   .filter(Boolean)
 
+/**
+ * Kill Playwright's own orphaned browsers before starting.
+ *
+ * Round 219: two tests looked reproducibly broken -- failures that moved between files,
+ * a collection-time error, and every step running 8-10x slower (go vet 8s -> 86s). The
+ * cause was leftover browsers from interrupted e2e runs competing for the machine:
+ * clearing them took one heavy test file from 33.9s to 9.35s and the sweep went green.
+ *
+ * Only processes launched from Playwright's bundled browser directory are touched, and
+ * only when the sweep is about to run (or when asked): the user's own Chrome lives
+ * somewhere else and is never a candidate. An empty result is the normal case.
+ */
+function clearStrayBrowsers() {
+  if (process.platform !== "win32") return
+  const query = [
+    "Get-Process -Name chrome,chromium,msedge -ErrorAction SilentlyContinue",
+    "| Where-Object { $_.Path -like '*ms-playwright*' }",
+    "| ForEach-Object { $_.Id }",
+  ].join(" ")
+  const found = spawnSync("pwsh", ["-NoProfile", "-Command", query], { encoding: "utf8" })
+  const ids = (found.stdout ?? "").split(/\s+/).filter((value) => /^\d+$/.test(value))
+  if (ids.length === 0) return
+  spawnSync("pwsh", ["-NoProfile", "-Command", `Stop-Process -Id ${ids.join(",")} -Force -ErrorAction SilentlyContinue`])
+  console.log(`cleared ${ids.length} orphaned Playwright browser process(es) before the sweep`)
+}
+
 function run(command, args, options = {}) {
   const label = [command, ...args].join(" ")
   console.log(`\n=== ${options.title ?? label} ===`)
@@ -111,6 +137,9 @@ const stepsWithHelpers = {
 }
 
 for (const name of order) {
+  // Before the first step, not after a failure: the whole point is that the sweep is
+  // measuring the code rather than whatever an interrupted earlier run left behind.
+  if (name === order[0]) clearStrayBrowsers()
   for (const result of stepsWithHelpers[name]()) {
     results.push({ step: name, ...result })
     if (result.status !== 0) break
