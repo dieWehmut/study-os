@@ -88,8 +88,6 @@ interface StaticState {
   archived: Set<string>
   groups: KnowledgeGroup[]
   due: DueReview[]
-  // The cards this session answered wrong, which is what 恢复模式 asks for. Without
-  // them the recovery toggle had nothing to recover and simply redrew the queue.
 
   messages: ChatMessage[]
   qaRecords: Map<string, StaticQARecord>
