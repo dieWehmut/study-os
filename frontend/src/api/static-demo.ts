@@ -1086,9 +1086,14 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
 
   if (root === "reviews" && id === "due" && method === "GET") {
     const subject = subjectFrom(url.searchParams.get("subject"))
-    // 恢复模式 asks for the cards this session got wrong; without them the toggle
-    // had nothing to recover and simply redrew today's queue.
-    const source = url.searchParams.get("mode") === "recovery" ? state.recovery : state.due
+    // 恢复模式 narrows the queue to the two card types that make you recall, mirroring the
+    // real backend (db/store.go:624-626 filters prompt_type IN en_to_zh, context_cloze).
+    // It used to answer "the cards this session got wrong" -- a different feature wearing the
+    // same name, and one that left the toggle showing an empty queue to a fresh reader.
+    const recoveryTypes = ["en_to_zh", "context_cloze"]
+    const source = url.searchParams.get("mode") === "recovery"
+      ? state.due.filter((entry) => recoveryTypes.includes(entry.prompt.prompt_type))
+      : state.due
     const matching = subject
       ? source.filter((entry) => state.knowledge.find((item) => item.id === entry.knowledge.id)?.subject === subject)
       : source

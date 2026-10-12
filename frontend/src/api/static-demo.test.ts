@@ -872,8 +872,13 @@ describe("static Pages API fixtures", () => {
     expect(wrong.outcome).toBe("incorrect")
     expect(wrong.expected_answers).toEqual([expected])
 
-    const recovery = await staticDemoRequest<{ items: Array<{ prompt: { id: string } }> }>("/reviews/due?mode=recovery")
-    expect(recovery.items.map((entry) => entry.prompt.id)).toContain(card.prompt.id)
+    // The card leaves the queue: answering consumes it, wrong or not.
+    const remaining = await staticDemoRequest<{ items: Array<{ prompt: { id: string } }> }>("/reviews/due?limit=50")
+    expect(remaining.items.map((entry) => entry.prompt.id)).not.toContain(card.prompt.id)
+
+    // 恢复模式 used to mean "the cards you got wrong this session", and this line used to pin
+    // that. The backend's meaning is a prompt-type filter (db/store.go:624-626), so the claim
+    // moved to its own test above instead of being deleted here.
 
     // Getting one right does not put it in recovery, and the queue says so.
     const next = (await staticDemoRequest<{ items: Array<{ prompt: { id: string }; knowledge: { id: string } }> }>("/reviews/due")).items[0]!
@@ -1105,4 +1110,20 @@ it("reads the fourth self-rating back, and refuses one that is out of range", as
   // would make a rejected request cost the reader a review.
   const after = await staticDemoRequest<{ items: { prompt: { id: string } }[] }>("/reviews/due?limit=50")
   expect(after.items.map((entry) => entry.prompt.id)).toContain(due.items[1].prompt.id)
+})
+it("narrows 恢复模式 to the two recall card types, the way the backend does", async () => {
+  // Same `?mode=recovery` on both sides, same meaning: db/store.go:624-626 keeps only
+  // en_to_zh and context_cloze. This used to be "the cards you got wrong this session",
+  // which is a different question -- and it answered it with an empty list for a reader
+  // who had not answered anything yet.
+  const all = await staticDemoRequest<{ items: { prompt: { prompt_type: string } }[] }>("/reviews/due?limit=50")
+  const recovery = await staticDemoRequest<{ items: { prompt: { prompt_type: string } }[] }>(
+    "/reviews/due?mode=recovery&limit=50",
+  )
+
+  expect(recovery.items.length).toBeGreaterThan(0)
+  expect(recovery.items.length).toBeLessThanOrEqual(all.items.length)
+  for (const entry of recovery.items) {
+    expect(["en_to_zh", "context_cloze"]).toContain(entry.prompt.prompt_type)
+  }
 })
