@@ -1097,8 +1097,13 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
       : source
     // 每日记忆上限 is the size of today's queue, and the settings page says so. A demo
     // that answers with every due card makes that setting look like it does nothing.
-    const requested = Number(url.searchParams.get("limit") ?? 0)
-    const items = requested > 0 ? matching.slice(0, Math.trunc(requested)) : matching
+    // Same two numbers as the backend's parseLimit (router.go:945): a missing or unreadable
+    // limit means 20, and anything larger is capped at 100. Without this the demo answered
+    // with the whole queue, so a caller that omitted the parameter got a different queue here
+    // than against the real backend -- invisible while the app always sends its own number.
+    const rawLimit = Number(url.searchParams.get("limit") ?? 0)
+    const requested = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.trunc(rawLimit), 100) : 20
+    const items = matching.slice(0, requested)
     return responseFor({ items }) as T
   }
   if (root === "reviews" && id === "forecast" && method === "GET") {

@@ -269,3 +269,17 @@ test("恢复模式筛的题型，界面上都有名字", () => {
     assert.match(memory, new RegExp(loose), `恢复模式的说明里没提「${label}」`)
   }
 })
+test("演示版的 limit 默认值与上限，和真机的 parseLimit 是同一组数字", () => {
+  // A behaviour test cannot see this: the demo's own queue is shorter than both numbers, so
+  // "20 by default" and "no default at all" look identical through the API. Binding the two
+  // numbers is what keeps them equal -- the app always sends its own limit, so nothing on the
+  // main path would ever notice them drifting apart.
+  const handler = read("backend/httpapi/router.go")
+  const call = /parseLimit\([\s\S]*?,\s*(\d+),\s*(\d+)\)/.exec(handler)
+  assert.ok(call, "找不到真机的 parseLimit 调用")
+  const [, fallback, ceiling] = call
+
+  const demo = read("frontend/src/api/static-demo.ts")
+  assert.match(demo, new RegExp(`Math\\.min\\([\\s\\S]*?,\\s*${ceiling}\\)`), `演示版没有 ${ceiling} 这个上限`)
+  assert.match(demo, new RegExp(`:\\s*${fallback}\\b`), `演示版没有 ${fallback} 这个默认值`)
+})
