@@ -117,6 +117,21 @@ describe("Knowledge page", () => {
     ))
   })
 
+  it("asks for archived items when the reader switches 显示已归档 on", async () => {
+    // 归档 hides by default, so this switch is the way back to them -- and it has to reach
+    // the server, because the list only ever held the visible page.
+    render(<Knowledge />)
+
+    const toggle = await screen.findByRole("button", { name: "显示已归档" })
+    expect(toggle).toHaveAttribute("aria-pressed", "false")
+
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ archived: "yes" })),
+    )
+  })
+
   it("says on each row whether it is in the review plan", async () => {
     // An item nobody scheduled is one that will never be asked about. The 复习状态
     // filter could tell you that about a whole list; the row is where it is true of

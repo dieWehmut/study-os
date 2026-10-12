@@ -30,6 +30,10 @@ export default function Knowledge() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedId = searchParams.get("item")
   const scheduled = scheduledFromSearch(searchParams.get("scheduled"))
+  // 归档（§8.1）: the default view hides what was put away, so this reads the other way
+  // round from `scheduled` -- "yes" is the widening request, and it belongs in the link
+  // for the same reason: a page that wants to show them can send you here.
+  const archived = scheduledFromSearch(searchParams.get("archived")) === "yes"
   return (
     <KnowledgePage
       requestedId={requestedId}
@@ -37,6 +41,13 @@ export default function Knowledge() {
       // question another page can now send you here to answer, and the answer
       // has to survive the trip.
       scheduled={scheduled}
+      archived={archived}
+      onArchivedChange={(value) => {
+        const next = new URLSearchParams(searchParams)
+        if (value) next.set("archived", "yes")
+        else next.delete("archived")
+        setSearchParams(next)
+      }}
       onScheduledChange={(value) => {
         const next = new URLSearchParams(searchParams)
         if (value) next.set("scheduled", value)
@@ -55,11 +66,15 @@ export default function Knowledge() {
 function KnowledgePage({
   requestedId,
   scheduled,
+  archived,
+  onArchivedChange,
   onScheduledChange,
   onSelectId,
 }: {
   requestedId: string | null
   scheduled: "" | "yes" | "no"
+  archived: boolean
+  onArchivedChange(value: boolean): void
   onScheduledChange(value: "" | "yes" | "no"): void
   onSelectId(id: string): void
 }) {
@@ -115,8 +130,11 @@ function KnowledgePage({
     if (subject !== "all") options.subject = subject
     if (tag) options.tag = tag
     if (scheduled) options.scheduled = scheduled
+    // 归档 widens instead of narrowing, so it rides along with the other filters rather
+    // than being folded into them: ?archived=yes asks the server for the whole library.
+    if (archived) options.archived = "yes"
     return options
-  }, [query, group, subject, tag, scheduled])
+  }, [query, group, subject, tag, scheduled, archived])
 
   /**
    * The next page, appended.
@@ -377,6 +395,22 @@ function KnowledgePage({
                   className="min-w-32"
                 />
               </label>
+              {/* 显示已归档: the default view hides what was put away, so this is a
+                  widening switch rather than a filter for them -- and it says so, because
+                  "已归档" on its own could read as "only archived". */}
+              <Button
+                type="button"
+                size="sm"
+                variant={archived ? "default" : "outline"}
+                aria-pressed={archived}
+                onClick={() => {
+                  onArchivedChange(!archived)
+                  setLoading(true)
+                  setError("")
+                }}
+              >
+                {archived ? "显示已归档 · 开" : "显示已归档"}
+              </Button>
             </div>
           </div>
           {/* The groups as a list with numbers, not only as a dropdown: a name on its
