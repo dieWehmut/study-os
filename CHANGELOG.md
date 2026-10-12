@@ -2,6 +2,26 @@
 
 ## 未发布
 
+### 归档（§8.1）的**可执行清单**：四处改动 + 一处同步，全部锚点已核实
+
+这一轮不切那个原子改动，只把它写成"照着做"的清单（锚点于本轮复核过 ✓）：
+
+| # | 文件 | 锚点（本轮行号） | 改动 |
+|---|---|---|---|
+| 1 | `backend/db/db.go` | 19 `const currentSchemaVersion = 19` | 19 → **20** |
+| 2 | `backend/db/db.go` | migrate 的 `case 19:` 块之后（`default:` 之前） | 加 `case 20:`：`if hasTable(knowledge_items) && !hasColumn(…, "archived_at")` 就 `ALTER TABLE knowledge_items ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''`。**不要提前 return**（第 202 轮试过：会跳过 verifySchema） |
+| 3 | `backend/db/db.go` | verifySchema 的 `case 19:` 块之后 | 加 `case 20:`：**先 `verifySchema(ctx, tx, 19)`**（这条链是逐版本回溯的，15/16/17 的 "lesson dependencies" 全靠它报出），再校验 `archived_at` 存在 |
+| 4 | `backend/db/schema.sql` | 26 `level TEXT NOT NULL DEFAULT '',`（在 `knowledge_items` 内） | 其后加 `archived_at TEXT NOT NULL DEFAULT '',` |
+| 5 | `ROADMAP.md` | 26 `schema 版本 19` | 19 → **20** |
+
+**必须一起提交**（第 203 轮实验证明）：只改常量会让 `unsupported migration version 20` 大面积变红 ✗。
+判官用例：`TestStoreRejects*`（4 条老库用例）与 `TestStoreUpgrades*`（多条升级用例）✓。
+
+**做完成功的判据**：`go test ./backend/db/` 全绿 + `node scripts/sweep.mjs` 15 步全绿 ✓。
+之后才是 store / 接口 / 界面三步（§8.1 验收四条在那些步里逐条对）✓。
+
+本轮无代码改动；工作区绿灯 ✓。
+
 ### 契约补第 16 条（两条）：答疑的会话列表与消息
 
 - 按上一轮定下的"先读形状、再照抄"：`chatConversations` 的 `return` 是
