@@ -2,6 +2,22 @@
 
 ## 未发布
 
+### §十 后端切片落地：第四档 `RatingEasy`（数据层 + 映射 + 接口边界）
+
+- **`memory/types.go`**：常量块加 `RatingEasy` ✓（注释写明**它由人给出、判卷永远不会产生它** ✓，
+  所以它需要自己的接口与界面通路 ✓，而不是在 evaluator 里加一个分支 ✓）。
+- **`memory/scheduler.go`**：`toFSRSRating` 加 `case RatingEasy: return fsrs.Easy` ✓ ——
+  **这一处是必须的** ✓：原来的 `default` 会把它**静默当成 Again** ✗（第 312 轮就标记了这个坑 ✓）。
+- **`httpapi/router.go`**：校验上限 `RatingGood → RatingEasy` ✓，**并把那句错误信息一起改**
+  （`rating must be 1, 2, or 3` → `1, 2, 3, or 4` ✓）——否则它会**告诉调用方新档不存在** ✗。
+- **一处新的工具教训**（§九 第 4 条的细化 ✓）：同一个仓库里**文件的行尾并不统一** ✗ ——
+  `router.go` 是 CRLF ✓ 而 `types.go`/`scheduler.go` 是 LF ✓ ⇒ 我的锚点按 CRLF 拼，
+  **两处没命中** ✗ ⇒ `go build` 立刻报 `undefined: memory.RatingEasy` ✓
+  （**构建又一次兜住了半截改动** ✓）。改成"**先试 CRLF、再试 LF**"的写法后一次通过 ✓。
+  **记下来：锚点不仅要来自原文，还要容忍行尾差异。**
+- 验证：`go build ./...` ✓、`go test ./backend/memory/ ./backend/httpapi/` **两个包都过** ✓；随后完整 sweep。
+- **还差**：读卡界面的第四个键 ✗、以及"判卷与人工判定并存"的记录方式 ✗（§十 倾向乙 ✓）—— 下一轮 ✓。
+
 ### §十 动手第 1 步：**读到哪儿了**（下一轮从这里继续，锚点已核实）
 
 - 已确认的两处 ✓：

@@ -1147,8 +1147,8 @@ func handleOverride(response http.ResponseWriter, request *http.Request, applica
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	if input.Rating < int(memory.RatingAgain) || input.Rating > int(memory.RatingGood) {
-		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "rating must be 1, 2, or 3"})
+	if input.Rating < int(memory.RatingAgain) || input.Rating > int(memory.RatingEasy) {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "rating must be 1, 2, 3, or 4"})
 		return
 	}
 	attemptID := chi.URLParam(request, "attemptID")

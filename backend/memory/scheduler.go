@@ -21,6 +21,8 @@ func toFSRSRating(rating Rating) fsrs.Rating {
 		return fsrs.Hard
 	case RatingGood:
 		return fsrs.Good
+	case RatingEasy:
+		return fsrs.Easy
 	default:
 		return fsrs.Again
 	}

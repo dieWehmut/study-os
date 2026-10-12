@@ -51,6 +51,10 @@ const (
 	RatingAgain Rating = iota + 1
 	RatingHard
 	RatingGood
+	// RatingEasy is the reader saying 一眼就会 (§十). The evaluator never produces it: it is the
+	// one rating that comes from the person rather than from 判卷, which is why it needs its own
+	// path through 接口 and 界面 instead of a new branch in the evaluator.
+	RatingEasy
 )
 
 type Evaluation struct {
