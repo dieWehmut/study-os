@@ -426,6 +426,9 @@ describe("static Pages API fixtures", () => {
       // which is what the client's practicePath() passes.
       ["/lessons/lesson-newton/practice/practice/attempts", ["items", "count"]],
       ["/mistakes", ["items", "count"]],
+      // 订正状态 is a chip on the practice page, so the filtered route is what a press
+      // actually asks for. Same envelope; an empty page is a valid answer.
+      ["/mistakes?corrected=yes", ["items", "count"]],
       ["/reviews/due", ["items"]],
       // The same queue under a subject chip. It answers the same envelope; an empty page
       // is fine (the demo may have nothing due for that subject), but a different shape
