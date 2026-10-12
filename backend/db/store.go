@@ -435,6 +435,40 @@ func (s *Store) DuePrompts(ctx context.Context, before time.Time, limit int) ([]
 // Carrying prompts is the same thing as being in the queue -- the two are
 // written in one transaction -- so this needs no flag column that could drift
 // from the rows it describes.
+// ArchivedKnowledgeIDs answers which of these items are currently put away (归档, §8.1).
+//
+// Same shape as ScheduledKnowledgeIDs beside it, and deliberately so: the list response
+// reports review state through `scheduled_ids` rather than a field on every row, and 归档
+// needs exactly the same treatment. It also means no SELECT has to change -- `archived_at`
+// stays read in one place (here) and written in one place (SetKnowledgeArchived), and the
+// default list keeps hiding them through knowledgeFilter.
+func (s *Store) ArchivedKnowledgeIDs(ctx context.Context, ids []string) (map[string]bool, error) {
+	archived := make(map[string]bool, len(ids))
+	if len(ids) == 0 {
+		return archived, nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	arguments := make([]any, 0, len(ids))
+	for _, id := range ids {
+		arguments = append(arguments, id)
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT id FROM knowledge_items WHERE archived_at != '' AND id IN (`+placeholders+`)`,
+		arguments...)
+	if err != nil {
+		return nil, fmt.Errorf("list archived knowledge ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan archived knowledge id: %w", err)
+		}
+		archived[id] = true
+	}
+	return archived, rows.Err()
+}
+
 func (s *Store) ScheduledKnowledgeIDs(ctx context.Context, ids []string) (map[string]bool, error) {
 	scheduled := make(map[string]bool, len(ids))
 	if len(ids) == 0 {

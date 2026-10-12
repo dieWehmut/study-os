@@ -2,6 +2,18 @@
 
 ## 未发布
 
+### 按上一轮的配方写第 1 步：`Store.ArchivedKnowledgeIDs`（零行为变化 ✓）
+
+- 照 `ScheduledKnowledgeIDs` 的形状写 ✓，SQL 是
+  `SELECT DISTINCT id FROM knowledge_items WHERE archived_at != '' AND id IN (…)` ✓ ——
+  **只看 `archived_at` 这一列** ✓，与 `SetKnowledgeArchived` 写、`knowledgeFilter` 读的是**同一个字段** ✓
+  （"一件事一个定义" ✓）。
+- **为什么这样写**（注释里也写了 ✓）：列表响应报告复习状态用的是 `scheduled_ids`，而**不是给每行加字段** ✓；
+  归档要的正是同一种处理 ✓ ⇒ **没有任何 SELECT 需要改** ✓（这正是上一轮把"6 处"降到"1 个方法"的原因 ✓）。
+- **如实说明**：这个方法**目前还没有调用方** ✗ ⇒ **行为零变化、回归风险为零** ✓，
+  接线（响应里的 `archived_ids`）是下一轮的事 ✓ ——与第 182 轮那次的切法相同 ✓（当时也是"先落数据层、再接线" ✓）。
+- 验证：`go build ./...` ✓、`go test ./backend/db/` 通过 ✓；随后完整 sweep。
+
 ### `archived_ids` 的**逐字执行配方**（两个锚点已抄下来，下一轮直接写）
 
 - 这一轮只做了一件事：把要照抄的两处**原文**读出来 ✓ ——这是第 4 次用"先只读一步"（前三次：217→218、
