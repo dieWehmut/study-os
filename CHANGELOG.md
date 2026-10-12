@@ -2,6 +2,24 @@
 
 ## 未发布
 
+### 同一把尺子第三用：**`frontend/coverage` 没被忽略**（补上 ✓）
+
+- 沿用上一轮**正确**的问法 ✓（问"**目录里面的文件**算不算忽略"✓，不是问还不存在的裸目录 ✗ ——第 361 轮吃过这个亏 ✓），
+  把常见的生成物一次问清 ✓：
+  | 路径 | 结果 |
+  |---|---|
+  | `frontend/tsconfig.app.tsbuildinfo` | ✓ 已忽略（`.gitignore:35 `*.tsbuildinfo`） |
+  | `frontend/node_modules/.vite/…` | ✓ 已忽略（`:10 node_modules`） |
+  | `frontend/dist/assets/app.js` | ✓ 已忽略（`:11 dist`） |
+  | `.playwright-mcp/…` | ✓ 已忽略（`:30`） |
+  | `study.db` / `backend/study.db` | ✓ 已忽略（`:15 `*.db`） |
+  | **`frontend/coverage/index.html`** | ✗ **没被忽略** |
+- ⇒ **补上** ✓（`frontend/coverage/` ✓，注释写清它是 vitest 的覆盖率输出 ✓）。
+- **为什么它算真问题** ✓：`npx vitest run --coverage` 一旦被谁跑一次 ✓，会生成**一整个 HTML 站点** ✗
+  ⇒ `git add -A` 就会把**几十上百个文件**带进仓库 ✗ ——与上一轮那个 `playwright-report` 完全同型 ✓。
+- **三连（361、362、363）的结论** ✓：`.gitignore` 覆盖面基本完整 ✓，**但"报告类"输出有两处漏洞** ✓
+  （`playwright-report` ✓、`coverage` ✓）——**都不是靠猜找出来的** ✗，而是**一条条问 git** ✓。
+
 ### 紧接着查了那个经典陷阱（负结果 ✓）：**没有"被忽略但仍在版本控制里"的文件**
 
 - 上一轮补了 `.gitignore` 之后 ✓，接着问那个老陷阱 ✓：「`.gitignore` **对已经跟踪的文件无效**」✗ ——

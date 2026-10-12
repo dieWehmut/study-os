@@ -47,3 +47,6 @@ frontend/package.json.md5
 *.njsproj
 *.sln
 *.sw?
+
+# vitest coverage output (frontend)
+frontend/coverage/
