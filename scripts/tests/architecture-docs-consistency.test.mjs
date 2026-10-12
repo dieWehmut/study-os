@@ -177,3 +177,17 @@ test("the 第 4 阶段 gate reads the same numbers in ROADMAP and on screen", ()
   assert.match(roadmap, /dashboard[\s\S]*attempt_count/)
   assert.match(roadmap, /dashboard[\s\S]*knowledge_count/)
 })
+
+test("撤与不撤：计划有撤销路由，证据没有被删除的路由", () => {
+  // ROADMAP 第八节的判据是「撤之前先问抹掉的是打算还是发生过的事」。判据只有能被检查才算数：
+  // 计划（排进复习）必须有撤销路由；证据（订正写的是一条作答）**不该**有删除路由。
+  const router = read("backend/httpapi/router.go")
+  assert.match(router, /api\.Delete\("\/knowledge\/\{knowledgeID\}\/schedule"/, "计划应该能撤：缺少取消排复习的路由")
+
+  // 订正不是开关，是一条作答（corrected 由 EXISTS(question_attempts WHERE is_correct=1) 推导）。
+  // 给它加"撤销"就是加"删证据"，所以这条路由必须一直不存在。
+  assert.doesNotMatch(router, /api\.Delete\(\s*"\/mistakes\/\{[^}]+\}\/correct"/, "订正是证据，不该有删除路由")
+
+  // 同理：练习作答也没有"删掉那次作答"的路由。
+  assert.doesNotMatch(router, /api\.Delete\(\s*"\/lessons\/[^"]*practice[^"]*"/, "练习作答是证据，不该有删除路由")
+})
