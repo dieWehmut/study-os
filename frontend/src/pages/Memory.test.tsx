@@ -143,7 +143,7 @@ describe("Memory page", () => {
     // already committed. Whoever needs it is the person least able to guess.
     renderPage()
 
-    expect(await screen.findByText(/恢复模式：脑雾时只推低阻力任务/)).toBeInTheDocument()
+    expect(await screen.findByText(/恢复模式：脑雾时只推两类卡/)).toBeInTheDocument()
 
     const toggle = screen.getByRole("button", { name: "恢复模式" })
     expect(toggle).toHaveAttribute("aria-pressed", "false")
@@ -151,6 +151,6 @@ describe("Memory page", () => {
     fireEvent.click(toggle)
 
     expect(screen.getByRole("button", { name: "恢复模式已开启" })).toHaveAttribute("aria-pressed", "true")
-    expect(screen.getByText(/恢复模式：脑雾时只推低阻力任务/)).toBeInTheDocument()
+    expect(screen.getByText(/恢复模式：脑雾时只推两类卡/)).toBeInTheDocument()
   })
 })

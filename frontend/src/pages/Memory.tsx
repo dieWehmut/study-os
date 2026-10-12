@@ -62,7 +62,7 @@ export default function Memory() {
               is a label with no promise attached, and the badge that explained
               it only appeared once you had already committed to it. */}
           <p className="text-xs text-muted-foreground">
-            恢复模式：脑雾时只推低阻力任务（看词回忆 / 四选一猜词）。
+            恢复模式：脑雾时只推两类卡——看英文说中文、语境填空。
           </p>
         </div>
         <Button
