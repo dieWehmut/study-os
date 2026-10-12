@@ -117,6 +117,23 @@ describe("Knowledge page", () => {
     ))
   })
 
+  it("shows 取消归档 when the item a link opened was already put away", async () => {
+    // The panel used to start from its own local state, so an archived item opened by a
+    // deep link offered 「归档」 -- a button saying the opposite of the truth. The detail
+    // read answers `archived` for exactly this case: there is no list to look in.
+    mocks.getKnowledge.mockResolvedValue({
+      id: "k1",
+      item_type: "word_sense",
+      term: "abandon",
+      concise_definition: "放弃；抛弃",
+      archived: true,
+    })
+    render(<Knowledge />, ["/knowledge?item=k1"])
+
+    expect(await screen.findByRole("button", { name: "取消归档" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "归档" })).not.toBeInTheDocument()
+  })
+
   it("marks the row the server reports as 已归档", async () => {
     // The widened view is the only place an archived row appears, and without the mark the
     // reader can see them but cannot tell which ones they put away themselves.
