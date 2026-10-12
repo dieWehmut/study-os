@@ -2,6 +2,22 @@
 
 ## 未发布
 
+### 最后一环的配方齐了（第 7 次"先只读一步"）
+
+| # | 位置（已核实） | 改动 |
+|---|---|---|
+| 1 | `Knowledge.tsx` `selectedQueued` 那段（`:213-220` ✓） | 旁边加 `selectedArchived` ✓：`archivedIds.has(selected.id) || (selectedDetail?.id === selected.id && selectedDetail.archived === true)` ✓ ——**与 `selectedQueued` 一字同形** ✓（列表来源 + 详情来源，缺一不可 ✓） |
+| 2 | 同文件 `:601-604` `<WikiPanel` ✓（`item={selected}` ✓ `scheduled={selectedQueued}` ✓） | 在 `scheduled` 之后加 `archived={selectedArchived}` ✓ |
+| 3 | `WikiPanel.tsx:34` `scheduled?: boolean` ✓ | 接口加 `archived?: boolean` ✓（同形 ✓） |
+| 4 | 同文件解构处（`scheduled` 与会话同级 ✓） | 解构出 `archived,` ✓ |
+| 5 | 同文件 `:207` `const [archivedHere, setArchivedHere] = useState(false)` ✓ | 改成 `useState(archived ?? false)` ✓ ——**外部传入 + 本地覆盖** ✓：打开时就是已归档 ⇒ 显示「取消归档」✓；刚点过 ⇒ 本地状态立刻生效 ✓（`setArchivedHere` 那几处不动 ✓） |
+| 6 | 用例 | 深链接打开一条已归档条目 ⇒ 按钮显示「取消归档」✓（`Knowledge.test.tsx` 里 `getKnowledge` 的 mock 加 `archived: true` ✓） |
+| 7 | 契约 | `/knowledge/{id}` 那行字段表加 `archived` ✓（第 211 轮那行 ✓） |
+
+- ⇒ **下一轮纯打字** ✓（七个锚点全部核实 ✓）。这条修改从第 288 轮读到问题、289 修正成本估计、
+  290-293 落数据层与接口与类型 ✓，最后一步就是**让按钮说出实话** ✓。
+- 本轮无代码改动；工作区与远端一致 ✓（无待推送 ✓）。
+
 ### 前端第一步：`KnowledgeItem.archived?`（可选，注释说明"只有单条读取答它"）
 
 - 与它上面的 `scheduled?` **同一形状** ✓：可选字段 ✓ + 注释说明**为什么只有单条读取有** ✓
