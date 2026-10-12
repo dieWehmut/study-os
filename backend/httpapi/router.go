@@ -717,10 +717,29 @@ func handleKnowledgeRelated(response http.ResponseWriter, request *http.Request,
 			siblings = append(siblings, member)
 		}
 	}
+	// Same shape as the list: the response answers which siblings are 已归档, because a 词族
+	// keeps archived items (only the default list hides them, §8.1) and the panel cannot guess.
+	// Built from the rows in hand, so an empty family answers with [] rather than null.
+	ids := make([]string, 0, len(siblings))
+	for _, sibling := range siblings {
+		ids = append(ids, sibling.ID)
+	}
+	archived, err := application.Store.ArchivedKnowledgeIDs(ctx, ids)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取归档状态失败"})
+		return
+	}
+	archivedIDs := make([]string, 0, len(archived))
+	for _, sibling := range siblings {
+		if archived[sibling.ID] {
+			archivedIDs = append(archivedIDs, sibling.ID)
+		}
+	}
 	writeJSON(response, http.StatusOK, map[string]any{
-		"items":  siblings,
-		"count":  len(siblings),
-		"groups": groups,
+		"items":        siblings,
+		"count":        len(siblings),
+		"groups":       groups,
+		"archived_ids": archivedIDs,
 	})
 }
 
