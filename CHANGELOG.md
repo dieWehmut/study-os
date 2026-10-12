@@ -2,6 +2,23 @@
 
 ## 未发布
 
+### 修好 e2e 之后，sweep 又停在**另一个**用例上（如实报告，留给下一轮）
+
+- 本轮把 `english-article-workflow` 的 PDF 导出修好 ✓（**单跑 2/2 通过** ✓，原因与处置见上一条 ✓）。
+- 但完整 sweep 这次停在 **vitest** 步 ✗（我这一轮只改了 e2e ✗）：
+  `
+  failed 1/1346
+  editing subject-specific mistake evidence restores and saves a math derivation
+  TestingLibraryElementError: Unable to find an accessible element with the role "status"
+  `
+- **本轮不改它**：余量已尽 ✗，而这是**首见**的一条（既不是前两轮那两条，也不在我改动的范围内 ✗）。
+  按第 218 轮的教训：**先复现、再判断、再动手** ✓ —— 下一轮**第一件事是单独重跑这一条**：
+  - 若单跑通过 ⇒ 与环境（这套机器上一再出现的资源争抢 ✓）有关，记录并观察 ✓；
+  - 若单跑也红 ⇒ 按真 bug 查：`role="status"` 是**断言过早**（第 151/169 轮那类的老毛病 ✓）
+    还是**该出现的状态没出现**（真 bug ✓），两者处理方式完全不同 ✓。
+- 当前状态：功能改动（归档收尾 + e2e 修复）都已提交并推送 ✓；**sweep 尚欠一次全绿** ✓ ——
+  这是下一轮必须收回的账 ✓。
+
 ### 那条稳定失败修好了：**PDF 导出需要的时间超过默认 90 秒**（不是功能坏了）
 
 - 上一轮的排查链条：e2e 步耗时 885s ✗ ⇒ 先复现（单跑 19 passed / 1 failed ✓）⇒
