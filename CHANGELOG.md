@@ -2,6 +2,18 @@
 
 ## 未发布
 
+### 契约补第 12 条路由：`/knowledge/{id}/related`
+
+- 知识面板的「**所属分组**」与**词族**列表都从这里读（`items` + `groups`）；
+  它此前在契约之外 ⇒ 这两个键若在演示版缺掉，面板上的分组行会**静默消失** ✗。
+- 契约行：`["/knowledge/knowledge-last/related", ["items","groups"]]`。
+  刻意**只要求这两个键**、不要求里面有内容——**"空答案"是合法答案**（没有同族词是正常的），
+  契约要守的是"接口没有偷偷改形状"，不是"必须有数据"。
+- 本轮回合全过 ✓（又一次是补护栏）。
+- 契约覆盖：**12 条路由**（`/english/articles` · `/lessons` · `/lessons/{id}` · `/groups` ·
+  `/knowledge` · `/knowledge/{id}` · `/knowledge/{id}/related` · `/mistakes` · `/reviews/due` ·
+  `/reviews/forecast` · `/dashboard` · `/error-causes`）。
+
 ### 同一条事实链再走一步：写进去之后，**两个接口要一起变**
 
 - 上一轮证明了「列表的 `scheduled_ids` 与单条的 `scheduled` 说法一致」；这一轮把**写操作**接上：
