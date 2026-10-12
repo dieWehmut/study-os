@@ -191,3 +191,21 @@ test("撤与不撤：计划有撤销路由，证据没有被删除的路由", ()
   // 同理：练习作答也没有"删掉那次作答"的路由。
   assert.doesNotMatch(router, /api\.Delete\(\s*"\/lessons\/[^"]*practice[^"]*"/, "练习作答是证据，不该有删除路由")
 })
+test("归档 只写标记，不删任何行（§8.1 验收 ④）", () => {
+  // 归档 的意义是"藏起来"，不是"抹掉"：被作答过的条目根本删不掉（外键 RESTRICT），
+  // 而删掉它就会连证据一起毁。所以这条检查守两件事：
+  //   ① 归档的 store 方法只 UPDATE，不含 DELETE；
+  //   ② 没有"删除知识条目"的路由 —— 这条是**反向**的：它守"某样东西必须一直不在"。
+  const store = read("backend/db/store.go")
+  const archiveFn = /func \(s \*Store\) SetKnowledgeArchived[\s\S]*?\n}/.exec(store)
+  assert.ok(archiveFn, "SetKnowledgeArchived 不在了")
+  assert.match(archiveFn[0], /UPDATE knowledge_items SET/, "归档应该是 UPDATE")
+  assert.doesNotMatch(archiveFn[0], /DELETE FROM/, "归档不许删行")
+
+  const router = read("backend/httpapi/router.go")
+  // 归档的两个方向都在。
+  assert.match(router, /api\.Post\("\/knowledge\/\{knowledgeID\}\/archive"/, "缺少归档路由")
+  assert.match(router, /api\.Delete\("\/knowledge\/\{knowledgeID\}\/archive"/, "缺少取消归档路由")
+  // 而知识条目本身**没有**删除路由：§8.1 的「明确不做」。
+  assert.doesNotMatch(router, /api\.Delete\("\/knowledge\/\{knowledgeID\}"\s*,/, "知识条目不该有删除路由")
+})
