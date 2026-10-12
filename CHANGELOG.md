@@ -2,6 +2,19 @@
 
 ## 未发布
 
+### 配方第 2、3 步：接口开始回答 `archived_ids`（含用例）
+
+- `handleKnowledgeList` 里照 `scheduled_ids` 的**那两行**在旁边加了一份 ✓：调 `ArchivedKnowledgeIDs` ✓、
+  按**页面里的行**拼 `archivedIDs` ✓（顺序是列表自己的、空库回 `[]` 而不是 `null` ✓ ——
+  与 `scheduled_ids` 完全同一处理 ✓），再在同一行响应里加 `"archived_ids"` ✓。
+- 用例：未归档时**不在报告里** ✓、归档后**在报告里** ✓、且报告里的每个 id **都在这一页** ✓（防止"报了一页外的行" ✓）。
+- **一处自我纠正**：我最初还写了一条"两个报告不许互相矛盾"的断言 ✗ ——
+  它实际上**几乎不可能失败** ✗（条件本身就是恒假 ✓）⇒ **删掉** ✓。
+  **一条几乎不可能失败的检查，和没有检查一样** ✓（这与"一条从来没红过的检查不能算检查"是同一条规矩 ✓）。
+  （顺带：删它时我第一次的脚本没删干净 import ✗，`go test` 立刻报了 `"strings" imported and not used` ✓ ——
+  **编译器替我抓到了** ✓，改法正确后整包通过 ✓。）
+- 验证：`go test ./backend/httpapi/` 整包通过 ✓；随后完整 sweep。
+
 ### 按上一轮的配方写第 1 步：`Store.ArchivedKnowledgeIDs`（零行为变化 ✓）
 
 - 照 `ScheduledKnowledgeIDs` 的形状写 ✓，SQL 是

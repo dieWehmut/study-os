@@ -594,8 +594,22 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 			scheduledIDs = append(scheduledIDs, item.ID)
 		}
 	}
+	// Which of these are 已归档, in the same shape and for the same reason: the widened view
+	// (?archived=yes) is the only place an archived row can appear, and without this the
+	// reader can see them but not tell which ones they put away themselves.
+	archived, err := application.Store.ArchivedKnowledgeIDs(request.Context(), ids)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	archivedIDs := make([]string, 0, len(archived))
+	for _, item := range items {
+		if archived[item.ID] {
+			archivedIDs = append(archivedIDs, item.ID)
+		}
+	}
 	writeJSON(response, http.StatusOK, map[string]any{
-		"items": items, "count": total, "scheduled_ids": scheduledIDs,
+		"items": items, "count": total, "scheduled_ids": scheduledIDs, "archived_ids": archivedIDs,
 	})
 }
 
