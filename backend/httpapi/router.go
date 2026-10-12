@@ -530,18 +530,36 @@ func handleKnowledgeList(response http.ResponseWriter, request *http.Request, ap
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "scheduled must be yes or no"})
 		return
 	}
+	// 归档 narrows nothing by default (the store hides archived items unless asked), so
+	// this reads as a widening flag rather than a filter: `?archived=yes` is "show me the
+	// ones I put away too". Anything else is a bad request rather than a silent no-op --
+	// the same discipline `?scheduled=` follows, so a typo does not look like an empty
+	// library.
+	includeArchived := false
+	if rawArchived := strings.TrimSpace(request.URL.Query().Get("archived")); rawArchived != "" {
+		switch rawArchived {
+		case "yes":
+			includeArchived = true
+		case "no":
+			includeArchived = false
+		default:
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": "archived must be yes or no"})
+			return
+		}
+	}
 	var items []models.KnowledgeItem
 	var total int
 	var err error
 	if groupID := strings.TrimSpace(request.URL.Query().Get("group")); groupID != "" {
-		groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"), Tag: request.URL.Query().Get("tag"), Limit: limit, Offset: offset}
+		groupOptions := models.KnowledgeListOptions{IncludeArchived: includeArchived, Scheduled: scheduledFilter, Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"), Tag: request.URL.Query().Get("tag"), Limit: limit, Offset: offset}
 		items, err = application.Store.ListItemsByGroup(request.Context(), groupID, groupOptions)
 		if err == nil {
 			total, err = application.Store.CountItemsByGroup(request.Context(), groupID, groupOptions)
 		}
 	} else {
 		options := models.KnowledgeListOptions{
-			Query: request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"),
+			IncludeArchived: includeArchived,
+			Query:           request.URL.Query().Get("q"), Subject: request.URL.Query().Get("subject"),
 			Tag: request.URL.Query().Get("tag"), Scheduled: scheduledFilter, Limit: limit, Offset: offset,
 		}
 		items, err = application.Store.ListKnowledgeItems(request.Context(), options)

@@ -2,6 +2,19 @@
 
 ## 未发布
 
+### 归档之后：列表可以「**要了就给我看**」——`?archived=yes`
+
+- store 从第 232 轮起就支持 `IncludeArchived` ✓，但**接口没透出** ✗ ⇒ 归档之后那些条目
+  在应用里**再也见不到**（深链接能打开 ✓，可列表里无从找起）✗。现在 `GET /api/knowledge?archived=yes`
+  把它们带回来 ✓（分组列表那条路径同样透传 ✓）。
+- **语义写清楚了**：这不是"筛选"，是**加宽** ✓ ——默认视图隐藏已归档，想要回来看就得**说出来** ✓；
+  与 `?scheduled=` 一样，`archived=` 只接受 `yes`/`no`，**其他值一律 400** ✓ ——
+  **一个被静默忽略的参数，看起来和一个空库一模一样** ✗（这是第 119 轮 `?scheduled=` 定下的规矩 ✓）。
+- 用例 `TestKnowledgeListShowsArchivedItemsOnlyWhenAsked`：建条目 → 归档 →
+  默认列表里没有 ✗ → `?archived=yes` 里有 ✓ → `?archived=maybe` 返回 **400** ✓。
+- 验证：httpapi 整包 ✓；随后完整 sweep。
+- **仍差界面**：知识页还没有「显示已归档」的开关（接口已就绪 ✓ 下一轮）。
+
 ### 归档第五步（收口）：可执行检查守住「**只写标记，不删任何行**」（验收 ④）
 
 - 新增第 9 条脚本检查（`architecture-docs-consistency`）：
