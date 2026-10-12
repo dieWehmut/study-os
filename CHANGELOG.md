@@ -2,6 +2,16 @@
 
 ## 未发布
 
+### 详情 `archived` 字段有了用例（两个方向都验）
+
+- `TestKnowledgeDetailReportsArchivedState`：新条目报告 `archived: false` ✓ → 归档后 `true` ✓ →
+  **取消归档后回到 `false`** ✓ ——**两个方向都验** ✓（只验一个方向的话，"永远为 true"的实现也能过 ✗，
+  这正是第 285 轮那条"两个方向都要"的规矩 ✓）。
+- 用例的写法刻意**把读取收成一个闭包** ✓（`read() bool`✓）：三次断言看着同一件事 ✓，
+  不必三处各写一遍请求与解码 ✓ ——代码短了，**失败信息也更集中**（哪一步不对一眼看得出 ✓）。
+- 验证：该用例通过 ✓；随后完整 sweep。
+- 剩余：前端 `selectedArchived`（与 `selectedQueued` 同形 ✓）与面板初始化 ✓ + 一条界面用例 ✓。
+
 ### 详情读取开始回答 `archived`（与它已有的 `scheduled` 并列）
 
 - `knowledgeItemResponse` 加 `Archived bool` ✓，`handleKnowledgeGet` 里在算 `queued` 的**旁边**
