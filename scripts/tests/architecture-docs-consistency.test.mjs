@@ -303,3 +303,31 @@ test("每一条真机路由都必须在演示版有分支或属于本地才有�
   const missing = [...roots].filter((root) => !demo.includes(`root === "${root}"`))
   assert.deepEqual(missing, [], `演示版没有这些根的分支：${missing.join(", ")}（共 ${roots.size} 个根）`)
 })
+test("前端调用的每一条路径，真机都有对应的路由", () => {
+  // 第 366 轮那条守的是真机 → 演示版；这条是它的镜像：前端调用 → 真机路由。前端写了
+  // /mistakes/export 而后端没有这条，用户点一下就 404，而此前没有任何东西会发现它。
+  //
+  // 两个坑都踩过：① 字面量大多是前缀（路径带插值，/knowledge/${id} 只留下 /knowledge/），
+  // 所以去掉结尾斜杠、比"真机里有一条以它开头的路由"，而不是比相等；② Patch 也算路由 ——
+  // 第一版只写了 Get|Post|Put|Delete，于是 /settings、/agent/active 这些 PATCH 全被误报；
+  // ③ "/api" 是 client.ts 拼 base 的产物，不是谁调用的路由。
+  const router = read("backend/httpapi/router.go")
+  const routes = [...router.matchAll(/api\.(?:Get|Post|Put|Patch|Delete)\("(\/[^"]*)"/g)].map((match) => match[1])
+  assert.ok(routes.length > 50, `只认出 ${routes.length} 条真机路由，正则可能失效了`)
+
+  const files = fs
+    .readdirSync(path.join(repositoryRoot, "frontend/src/api"))
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts") && name !== "static-demo.ts")
+  const calls = new Set()
+  for (const name of files) {
+    const source = read(`frontend/src/api/${name}`)
+    for (const match of source.matchAll(/[`"'](\/[A-Za-z0-9_\-/]*)/g)) {
+      const literal = match[1].replace(/\/$/, "")
+      if (literal.length > 1 && literal !== "/api") calls.add(literal)
+    }
+  }
+  assert.ok(calls.size > 10, `只认出 ${calls.size} 条前端路径，正则可能失效了`)
+
+  const missing = [...calls].filter((call) => !routes.some((route) => route.startsWith(call)))
+  assert.deepEqual(missing, [], `前端调用了真机没有的路径：${missing.join(", ")}`)
+})
