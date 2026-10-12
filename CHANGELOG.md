@@ -2,6 +2,18 @@
 
 ## 未发布
 
+### 字段契约再补一条：单条知识读取的 `scheduled`
+
+- 上一轮把课程详情纳入契约，这一轮补**单条知识读取**（`/knowledge/{id}`）——
+  它是**唯一**回答 `scheduled` 的地方（列表只通过 `scheduled_ids` 说复习状态），
+  而知识面板的「取消排复习」按钮**正挂在它上面** ⇒ 这个字段一旦没了，
+  按钮会**只是不出现**，**没有任何东西会说话** ✗ 这正是契约存在的理由。
+- 契约行：`["/knowledge/knowledge-last", ["id","item_type","term","concise_definition","scheduled"]]`；
+  **本轮回合全过** ✓ ⇒ 又一次是**补护栏，不是补 bug**（如实说明：未发现缺口）。
+- 契约现在的覆盖：`/english/articles` · `/lessons` · `/lessons/{id}` · `/groups` · `/knowledge` ·
+  `/knowledge/{id}` · `/mistakes` · `/reviews/due` · `/reviews/forecast` · `/dashboard` ·
+  `/error-causes` = **11 条路由**。
+
 ### 字段契约补上课程详情路由（此前在契约之外）
 
 - 演示版的字段契约（第 154 轮）覆盖 9 条路由，但 **`/lessons/{id}` 在契约之外**——
