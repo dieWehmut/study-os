@@ -2,6 +2,30 @@
 
 ## 未发布
 
+### 实验给出了确定答案：**是「版本号动了、阶梯没跟上」**
+
+按上一轮写下的起点，这一轮只把 `currentSchemaVersion` 从 19 改成 20、**别的什么都不加**，跑那 4 条：
+
+`
+--- FAIL: TestStoreRejectsSchemaVersionFourteenWithoutLessonDependencies
+    open error = unsupported migration version 20, want missing lesson dependencies
+--- FAIL: …SeventeenWithoutQARecordSessionIndex
+--- FAIL: …SeventeenWithMissingQARecordColumn
+--- FAIL: TestStoreRejectsSchemaWithOnlyOneQuestionTable
+`
+
+**答案就在第一行**：迁移阶梯走到 20 时撞上 `default: unsupported migration version 20` ✗ ——
+所以**加版本号必须同时给出 `case 20`**，否则 `Open` 直接失败，而那些"老库"用例期望的是
+**阶梯跑完后 `verifySchema` 按版本报出的具体错误**（"lesson dependencies"、"missing qa_records…"）✗。
+
+- 这也**回过头解释**了第 199 轮：那次我确实加了 `case 20`，但那些用例依然红——
+  说明**还缺一层**：`verifySchema` 里也要有对应新版本的处理（就像 19 那样），
+  否则阶梯升到 20 之后，校验环节不会再报出它们期望的那些错误。
+- **下一轮的具体动作**（两步，各自可验证）：
+  1. `currentSchemaVersion = 20` + `case 20`（带 `hasTable`/`hasColumn` 守卫，不提前 return）；
+  2. 对照 `case 19` 看 `verifySchema` 是否需要 `case 20`，跑那 4 条"老库"用例直到全绿。
+- 本轮无净代码改动（实验后已 `git checkout` 还原，`go test ./backend/db/` 全绿 ✓）。
+
 ### 那 4 条迁移用例为什么红：**我的第一个假设被实验否掉了**
 
 上一轮说"下一轮先读那 4 条用例为什么红"。这一轮做了这件事，但**没有解决**——如实记下：
