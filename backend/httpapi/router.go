@@ -806,7 +806,7 @@ func nonNilStrings(values []string) []string {
 	return values
 }
 
-// evaluationFromSelfRating converts a learner's 1-3 self-report into the same
+// evaluationFromSelfRating converts a learner's 1-4 self-report into the same
 // Evaluation shape that EvaluateAnswer produces, so the scheduler and the
 // attempt history stay on one code path.
 func evaluationFromSelfRating(rating int) memory.Evaluation {
@@ -815,6 +815,8 @@ func evaluationFromSelfRating(rating int) memory.Evaluation {
 		return memory.Evaluation{Outcome: memory.OutcomeIncorrect, Rating: memory.RatingAgain, Feedback: "需要重学"}
 	case 2:
 		return memory.Evaluation{Outcome: memory.OutcomePartial, Rating: memory.RatingHard, Feedback: "模糊记忆"}
+	case 4:
+		return memory.Evaluation{Outcome: memory.OutcomeCorrect, Rating: memory.RatingEasy, Feedback: "一眼就会"}
 	default:
 		return memory.Evaluation{Outcome: memory.OutcomeCorrect, Rating: memory.RatingGood, Feedback: "认识"}
 	}
@@ -1060,7 +1062,7 @@ func handleAnswer(response http.ResponseWriter, request *http.Request, applicati
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "familiarity must be between 1 and 5"})
 		return
 	}
-	if input.SelfRating != nil && (*input.SelfRating < 1 || *input.SelfRating > 3) {
+	if input.SelfRating != nil && (*input.SelfRating < 1 || *input.SelfRating > int(memory.RatingEasy)) {
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "self_rating must be between 1 and 3"})
 		return
 	}

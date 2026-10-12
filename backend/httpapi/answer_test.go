@@ -143,7 +143,9 @@ func TestAnswerSelfRatingAgainMapsToRatingOne(t *testing.T) {
 func TestAnswerRejectsOutOfRangeSelfRating(t *testing.T) {
 	application := newSelfRatingApp(t)
 
-	for _, body := range []string{`{"self_rating":0}`, `{"self_rating":4}`} {
+	// 0 and 5 are out of range; 4 stopped being out of range when 一眼就会 (§十) became the
+	// fourth rating -- the bound lives in one place so this test moved with it.
+	for _, body := range []string{`{"self_rating":0}`, `{"self_rating":5}`} {
 		response := postSelfRating(t, application, body)
 		if response.Code != http.StatusBadRequest {
 			t.Errorf("body %s: status = %d, want %d", body, response.Code, http.StatusBadRequest)
