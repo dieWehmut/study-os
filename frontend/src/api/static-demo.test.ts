@@ -419,6 +419,9 @@ describe("static Pages API fixtures", () => {
       // 「所属分组」 and the word-family list come from here; an empty answer is a valid
       // answer, so the contract asks for the two keys rather than for rows inside them.
       ["/knowledge/knowledge-last/related", ["items", "groups"]],
+      // 作答面: the practice attempt log. Section ids are the section type (`practice`),
+      // which is what the client's practicePath() passes.
+      ["/lessons/lesson-newton/practice/practice/attempts", ["items", "count"]],
       ["/mistakes", ["items", "count"]],
       ["/reviews/due", ["items"]],
       ["/reviews/forecast", ["days"]],

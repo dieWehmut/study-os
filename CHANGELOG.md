@@ -2,6 +2,14 @@
 
 ## 未发布
 
+### 契约补第 13 条：课程作答记录（`/lessons/{id}/practice/{section}/attempts`）
+
+- 上一轮只查了地址，这一轮**照抄**：先看演示版该分支的返回 ⇒ `{ items, count }` ✓，
+  再确认**节 id 就是节的类型名**（`practice`，ROADMAP 里那条"`LessonSection.ID` 就等于类型名"）✓ ⇒
+  契约行 `["/lessons/lesson-newton/practice/practice/attempts", ["items","count"]]`。
+- **一次成功，没有返工** ✓ ——上一轮"只查不动手"的那一次花费，换来的就是这个。
+- 契约覆盖：**13 条路由**；45 条用例全过；随后完整 sweep。
+
 ### 先只查：课程作答的契约该加在哪里（不动手）
 
 按上一轮定下的做法，这一轮**只查地址**，把下一轮的一步变成"照抄"：
