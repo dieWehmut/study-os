@@ -415,6 +415,10 @@ describe("static Pages API fixtures", () => {
       // The chip form: 复习状态 narrowed to 「已排复习」. Same envelope as the unfiltered
       // one, and the consistency test below already walks its `scheduled_ids`.
       ["/knowledge?scheduled=yes", ["items", "count", "scheduled_ids"]],
+      // 归档 widens rather than filters: the default view hides what was put away, and this
+      // is the caller saying "show me those too". Same envelope; a bad value is a 400, which
+      // the behaviour test above covers.
+      ["/knowledge?archived=yes", ["items", "count", "scheduled_ids"]],
       // The single-item read is the only place `scheduled` is answered (the list reports
       // it through `scheduled_ids`), and the panel's 取消排复习 button hangs off it: if
       // this field went missing the button would just never appear, with nothing to say so.
