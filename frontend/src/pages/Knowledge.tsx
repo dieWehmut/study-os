@@ -309,6 +309,9 @@ function KnowledgePage({
         subject: subject === "all" ? undefined : subject,
         tag: tag || undefined,
         scheduled: scheduled || undefined,
+        // The same widening the list is showing: 归档 switched on means the file has to
+        // hold what was put away too, or the export silently disagrees with the screen.
+        archived: archived ? "yes" : undefined,
       })
       saveTextFile(text, `study-os-知识库-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8")
     } catch (reason) {

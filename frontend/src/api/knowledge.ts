@@ -74,7 +74,7 @@ export function getKnowledge(id: string): Promise<KnowledgeItem> {
  * expects. The same filters as the list, so what leaves matches what is on screen.
  */
 export async function exportKnowledge(
-  options: { format?: "csv" | "jsonl"; query?: string; group?: string; subject?: string; tag?: string; scheduled?: "yes" | "no" } = {},
+  options: { format?: "csv" | "jsonl"; query?: string; group?: string; subject?: string; tag?: string; scheduled?: "yes" | "no"; archived?: "yes" | "no" } = {},
 ): Promise<string> {
   const params = new URLSearchParams({ format: options.format ?? "csv" })
   if (options.query) params.set("q", options.query)
@@ -82,6 +82,9 @@ export async function exportKnowledge(
   if (options.subject) params.set("subject", options.subject)
   if (options.tag) params.set("tag", options.tag)
   if (options.scheduled) params.set("scheduled", options.scheduled)
+  // 归档 widens the file the same way it widens the list: without this, exporting from a
+  // 「显示已归档 · 开」 view handed over a smaller library than the screen was showing.
+  if (options.archived) params.set("archived", options.archived)
   // apiRequestText, so this shares the client's one file-request path: the error
   // envelope is unwrapped, the desktop token travels with it, and the demo build
   // refuses here instead of at the button.

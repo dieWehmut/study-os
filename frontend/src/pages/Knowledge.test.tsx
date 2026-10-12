@@ -130,6 +130,13 @@ describe("Knowledge page", () => {
     await waitFor(() =>
       expect(mocks.listKnowledge).toHaveBeenCalledWith(expect.objectContaining({ archived: "yes" })),
     )
+
+    // And the file follows the switch: exporting from this view must not hand over a
+    // smaller library than the screen is showing.
+    fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }))
+    await waitFor(() =>
+      expect(mocks.exportKnowledge).toHaveBeenCalledWith(expect.objectContaining({ archived: "yes" })),
+    )
   })
 
   it("says on each row whether it is in the review plan", async () => {
