@@ -1127,3 +1127,15 @@ it("narrows 恢复模式 to the two recall card types, the way the backend does"
     expect(["en_to_zh", "context_cloze"]).toContain(entry.prompt.prompt_type)
   }
 })
+it("normalises ?subject= the way the backend does, so casing and stray spaces still filter", async () => {
+  // db/store.go:230 lowercases and trims before comparing. The demo compared the raw value, so
+  // ?subject=English answered an empty list -- invisible while the app always sends its own
+  // canonical value, which is exactly why it needed reading rather than running.
+  const plain = await staticDemoRequest<{ items: unknown[] }>("/knowledge?subject=english&limit=50")
+  const shouty = await staticDemoRequest<{ items: unknown[] }>("/knowledge?subject=English&limit=50")
+  const padded = await staticDemoRequest<{ items: unknown[] }>("/knowledge?subject=%20english%20&limit=50")
+
+  expect(plain.items.length).toBeGreaterThan(0)
+  expect(shouty.items.length).toBe(plain.items.length)
+  expect(padded.items.length).toBe(plain.items.length)
+})

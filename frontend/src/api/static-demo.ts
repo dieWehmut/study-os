@@ -652,7 +652,11 @@ function qaRecordFromBody(sessionID: string, body: Record<string, unknown>): Sta
 }
 
 function subjectFrom(value: string | null): string | undefined {
-  return value && value !== "all" ? value : undefined
+  // Same normalisation as the backend (db/store.go:230): ?subject=English and " english "
+  // both mean english, so a caller that does not know the canonical casing still gets a filter
+  // instead of an empty page. `all` is checked after normalising, so " ALL " is not a subject.
+  const subject = value?.trim().toLowerCase() ?? ""
+  return subject && subject !== "all" ? subject : undefined
 }
 
 function dashboard(subject: string | undefined): DashboardData {
