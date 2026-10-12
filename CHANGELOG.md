@@ -2,6 +2,25 @@
 
 ## 未发布
 
+### 那 4 条迁移用例为什么红：**我的第一个假设被实验否掉了**
+
+上一轮说"下一轮先读那 4 条用例为什么红"。这一轮做了这件事，但**没有解决**——如实记下：
+
+- 读完 `TestStoreRejectsSchemaVersionFourteenWithoutLessonDependencies` 的写法：它造一个
+  **只有 `lesson_attempts`、版本号停在 14** 的库，然后 `db.Open` 它，**期望报错里含 "lesson dependencies"**。
+  也就是说：这些用例依赖的是**迁移阶梯跑完之后 `verifySchema` 的逐版本校验**。
+- **我的假设**：`case 20` 里那句 `if !hasTable(… ) { return nil }`（照 `case 19` 抄的）会**提前退出
+  `migrate`**，从而跳过 `verifySchema`，让它们变成静默通过 ⇒ 全部变红。
+- **实验否掉了它**：把 `case 20` 改写成**没有提前返回**的写法
+  （`if hasTable(...) && !hasColumn(...) { ALTER ... }`）后，**同样 4 条依旧红**，一字不差。
+  ⇒ 真正的原因在别处（可能是 `schema_migrations` 的写入方式、`verifySchema` 里对 head 的判断，
+  或那些用例对"最终版本号"的隐含假设）；**未查清，不再猜。**
+- 三个文件 `git checkout` 还原，`go build` 与 `go test ./backend/db/` 回到全绿 ✓。
+- **给下一轮的起点（比上一轮更具体）**：不要从加列开始，也不要从"改 case 20"开始，而是
+  **先只把 `currentSchemaVersion` 改成 20、什么都不加，跑那 4 条用例**——
+  如果那时就红，原因在"版本号本身"而不是新列；如果不红，再逐步加 `case 20`。
+  **一次只动一个变量**，这正是这一程反复证明有效的做法。
+
 ### 归档第 1 步（schema 加列）也退回了：**迁移阶梯的测试不是"小步骤"**
 
 - 按 §8.1 的计划，第一步是 `knowledge_items` 加 `archived_at` 并升 schema 版本。改动本身很小
