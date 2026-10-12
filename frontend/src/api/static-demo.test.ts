@@ -586,6 +586,10 @@ describe("static Pages API fixtures", () => {
     expect(detail.id).toBe(target)
 
     await expect(staticDemoRequest("/knowledge?archived=maybe")).rejects.toThrow()
+    // "no" is not a typo to be refused -- it is the default view said out loud, and it has
+    // to behave exactly like no parameter at all.
+    const explicitNo = await staticDemoRequest<{ items: Array<{ id: string }> }>("/knowledge?archived=no")
+    expect(explicitNo.items.map((entry) => entry.id)).not.toContain(target)
 
     const restored = await staticDemoRequest<{ status: string }>(`/knowledge/${target}/archive`, { method: "DELETE" })
     expect(restored.status).toBe("unarchived")
