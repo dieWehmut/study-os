@@ -839,7 +839,7 @@ func TestKnowledgeWikiSaveIsNotFoundForUnknownItem(t *testing.T) {
 	}
 }
 
-func TestDueReviewsRecoveryModeFiltersEasyPrompts(t *testing.T) {
+func TestDueReviewsRecoveryModeKeepsOnlyRecallPromptTypes(t *testing.T) {
 	application := testApplication(t, config.Config{})
 	ctx := context.Background()
 	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
