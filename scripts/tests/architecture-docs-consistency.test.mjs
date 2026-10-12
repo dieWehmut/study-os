@@ -220,3 +220,17 @@ test("§8.1 的归档已落地：文档说法与代码一致", () => {
   const router = read("backend/httpapi/router.go")
   assert.doesNotMatch(router, /api\.Delete\("\/knowledge\/\{knowledgeID\}"\s*,/, "知识条目不该有删除路由")
 })
+test("ROADMAP 开头的索引与它自己的小节一一对应", () => {
+  // 这张索引是"这份文件有哪几节"的答案，而它自己被改过三次：194 轮建立、195 轮加第八节、
+  // 300 轮加第九节——每次漏掉都会让索引变成漂移源（§七 那条规矩）。所以让机器记着：
+  // 小节标题与索引行必须一一对应，多一个少一个都不行。
+  const numerals = "一二三四五六七八九十"
+  const headings = [...roadmap.matchAll(new RegExp(`^## ([${numerals}]+)、`, "gm"))].map((m) => m[1])
+  const indexed = [...roadmap.matchAll(new RegExp(`^\\| ([${numerals}]+)、`, "gm"))].map((m) => m[1])
+  assert.ok(headings.length >= 9, `ROADMAP 只找到 ${headings.length} 个小节`)
+  assert.deepEqual(
+    [...new Set(indexed)].sort(),
+    [...new Set(headings)].sort(),
+    "索引行与小节标题对不上：索引是这份文件的地图，地图错了比没有地图更糟",
+  )
+})
