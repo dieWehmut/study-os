@@ -706,7 +706,7 @@ function knowledgeList(url: URL): KnowledgeListResponse {
     return true
   })
   const items = filtered.slice(offset, offset + limit)
-  return { items: clone(items), count: filtered.length, scheduled_ids: items.filter((item) => state.scheduled.has(item.id)).map((item) => item.id) }
+  return { items: clone(items), count: filtered.length, scheduled_ids: items.filter((item) => state.scheduled.has(item.id)).map((item) => item.id), archived_ids: items.filter((item) => state.archived.has(item.id)).map((item) => item.id) }
 }
 
 function chatConversations(subject: string | undefined) {

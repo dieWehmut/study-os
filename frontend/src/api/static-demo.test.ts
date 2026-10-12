@@ -431,7 +431,7 @@ describe("static Pages API fixtures", () => {
       // 归档 widens rather than filters: the default view hides what was put away, and this
       // is the caller saying "show me those too". Same envelope; a bad value is a 400, which
       // the behaviour test above covers.
-      ["/knowledge?archived=yes", ["items", "count", "scheduled_ids"]],
+      ["/knowledge?archived=yes", ["items", "count", "scheduled_ids", "archived_ids"]],
       // The single-item read is the only place `scheduled` is answered (the list reports
       // it through `scheduled_ids`), and the panel's 取消排复习 button hangs off it: if
       // this field went missing the button would just never appear, with nothing to say so.
