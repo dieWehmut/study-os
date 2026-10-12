@@ -54,6 +54,21 @@ describe("static Pages API fixtures", () => {
     expect(backDetail.scheduled).toBe(true)
     const backList = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
     expect(backList.scheduled_ids).toContain(scheduled)
+
+    // The chip and the state it reports have to agree: `?scheduled=yes` must contain
+    // exactly the ids the same list calls scheduled, and `?scheduled=no` exactly the
+    // others. A filter that disagreed with `scheduled_ids` would make the 复习状态 chip
+    // and the row badges contradict each other on one screen.
+    const queuedPage = await staticDemoRequest<{ items: Array<{ id: string }>; scheduled_ids: string[] }>(
+      "/knowledge?scheduled=yes",
+    )
+    expect(queuedPage.items.map((entry) => entry.id).sort()).toEqual([...queuedPage.scheduled_ids].sort())
+
+    const restPage = await staticDemoRequest<{ items: Array<{ id: string }>; scheduled_ids: string[] }>(
+      "/knowledge?scheduled=no",
+    )
+    expect(restPage.items.map((entry) => entry.id)).not.toContain(scheduled)
+    expect(restPage.scheduled_ids).toHaveLength(0)
   })
 
   it("supports knowledge filtering and a local lookup", async () => {
