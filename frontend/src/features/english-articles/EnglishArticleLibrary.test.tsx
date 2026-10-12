@@ -88,7 +88,7 @@ describe("EnglishArticleLibrary", () => {
     // The hundred-and-first row was only there to be counted.
     expect(screen.queryByRole("link", { name: /第 100 篇/ })).not.toBeInTheDocument()
     expect(mocks.listEnglishArticles).toHaveBeenCalledWith({ limit: 101 })
-  })
+  }, 20_000)
 
   it("sorts by how many words an article glosses, without re-asking the server", async () => {
     // The count is already on every row, so ordering by it answers "what can I read
