@@ -100,6 +100,11 @@ describe("WikiPanel node renaming", () => {
 
     await waitFor(() => expect(mocks.archiveKnowledge).toHaveBeenCalledWith("k1"))
     expect(await screen.findByText(/已归档 · 默认列表里不再显示它，链接仍能打开/)).toBeInTheDocument()
+    // And a way to go look: the switch on the list is what shows it again.
+    expect(screen.getByRole("link", { name: "去「显示已归档」里找它" })).toHaveAttribute(
+      "href",
+      "/knowledge?archived=yes",
+    )
 
     // And back again: the control flips, so nothing is a one-way door.
     fireEvent.click(screen.getByRole("button", { name: "取消归档" }))

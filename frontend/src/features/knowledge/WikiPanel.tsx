@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
@@ -390,6 +391,14 @@ export function WikiPanel({
             the sentence is gone rather than left to become a lie. */}
         {scheduleNote ? (
           <p className={`text-xs ${scheduleNoteClass[scheduleNote.tone]}`}>{scheduleNote.text}</p>
+        ) : null}
+        {/* 归档 puts the item out of sight, and the note says so -- but saying where it went
+            without a way to go there leaves the reader to work out that the list has a switch
+            for it. The switch is what shows it again, so link straight to it. */}
+        {archivedHere ? (
+          <Link to="/knowledge?archived=yes" className="text-xs text-primary underline underline-offset-4">
+            去「显示已归档」里找它
+          </Link>
         ) : null}
         <h2 className="font-heading text-3xl font-semibold tracking-tight">{item.term}</h2>
         {item.part_of_speech || item.pronunciation ? (
