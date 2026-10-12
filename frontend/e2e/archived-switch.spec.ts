@@ -33,6 +33,9 @@ test("shows archived items behind the switch and hides them again", async ({ pag
     const toggleOn = page.getByRole("button", { name: "显示已归档 · 开", exact: true })
     await expect(toggleOn).toBeVisible()
     await expect(page.getByText(new RegExp(marker)).first()).toBeVisible()
+    // And the row says which one it is: the switch widened the list, and the marker is what
+    // stops the reader having to guess which entries they put away themselves.
+    await expect(page.locator("[data-archived-marker='true']")).toHaveCount(1)
 
     // And it survives a reload, because the state lives in the link.
     await page.reload()
