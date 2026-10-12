@@ -2,6 +2,21 @@
 
 ## 未发布
 
+### §十 界面那一步：**锚点已定位**（下一轮照抄）
+
+- 用 `grep`（不是 `Select-String -Recurse` ✗ ——PowerShell 没这个参数 ✓）把这条链找全了 ✓：
+
+  | 层 | 位置 |
+  |---|---|
+  | 组件 | `frontend/src/features/memory/RecognitionPrompt.tsx:30` ✓ `await submitSelfRating(current.prompt.id, value)` ✓ |
+  | API | `frontend/src/api/reviews.ts:73` ✓（请求体 `{ self_rating: rating }` ✓，第 318 轮读到的那个字段 ✓） |
+  | 组件用例 | `RecognitionPrompt.test.tsx:46` ✓ `toHaveBeenCalledWith("p1", rating)` ✓（**看起来是一个遍历评分的循环** ✓，很可能就是 `[1,2,3]` ✗ ⇒ 加第四档时要一起改 ✓，**与第 317 轮那条越界用例同族** ✓：规则变了，钉着旧规则的用例跟着变 ✓） |
+- ⇒ **下一轮三步** ✓：读 `RecognitionPrompt.tsx` 的评分行（键位与文案 ✓）→ 加第四个（`4` 键 + 「一眼就会」✓）→
+  把它那条遍历用例扩到四个 ✓，并新增一条"按 4 ⇒ 传 `self_rating: 4`"✓。
+- 也顺带确认了**谁在渲染它** ✓：`ReviewSession.tsx`（`ReviewSession.test.tsx:94` 断言传 3 ✓）与记忆页 ✓
+  ⇒ 改一处评分行，两条会话路径都会用到 ✓（**改之前先看它们怎么复用组件** ✗ ——下一轮第一步 ✓）。
+- 本轮无代码改动（定位 ✓）；工作区与远端一致 ✓。
+
 ### 第四档的**正向证明**：「一眼就会」真的让人少被问几次
 
 - 新增 `backend/memory/scheduler_easy_test.go` ✓ ——**在调度器上断言** ✓（不走 HTTP ✓）：
