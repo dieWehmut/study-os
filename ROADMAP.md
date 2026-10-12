@@ -424,3 +424,17 @@ markdown 可写，不传 `onRename` 就不画 ✎。
 ④ 归档只写 `archived_at`：断言**没有任何一条代码路径**因归档而 `DELETE` 行。
 
 **明确不做**：`DELETE /knowledge/{id}`。它要么失败、要么毁证据，两种都不是读者要的。
+
+**动手清单（锚点在第 225 轮复核过；这四处 + 一处同步必须*一起*提交）**
+
+| # | 文件 | 锚点 | 改动 |
+|---|---|---|---|
+| 1 | `backend/db/db.go` | `const currentSchemaVersion` | 19 → **20** |
+| 2 | `backend/db/db.go` | migrate 的 `case 19:` 之后 | 加 `case 20:` 加列（带 `hasTable`/`hasColumn` 守卫，**不提前 return**——第 202 轮证明会跳过 verifySchema） |
+| 3 | `backend/db/db.go` | verifySchema 的 `case 19:` 之后 | 加 `case 20:`：**先 `verifySchema(19)`**（链式回溯，15/16/17 的 "lesson dependencies" 靠它报出），再校验 `archived_at` |
+| 4 | `backend/db/schema.sql` | `knowledge_items` 里的 `level TEXT …` | 其后加 `archived_at TEXT NOT NULL DEFAULT ''` |
+| 5 | 本文件第 26 行 | `schema 版本 19` | 19 → **20** |
+
+只改常量会让 `unsupported migration version 20` 大面积变红（第 203 轮实验）✗ ⇒ **原子改动，不可拆**。
+判官用例：`TestStoreRejects*`（4 条老库）+ `TestStoreUpgrades*`；成功判据：`go test ./backend/db/` 全绿
+且 `node scripts/sweep.mjs` 15 步全绿。之后才是 store / 接口 / 界面三步（上面四条验收在那些步里逐条对）。
