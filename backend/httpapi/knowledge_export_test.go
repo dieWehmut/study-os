@@ -117,6 +117,25 @@ func TestKnowledgeExportNarrowsWithTheListFilters(t *testing.T) {
 	if badScheduled := exportRequest(t, router, "?scheduled=maybe"); badScheduled.Code != http.StatusBadRequest {
 		t.Fatalf("bad scheduled = %d", badScheduled.Code)
 	}
+	if badArchived := exportRequest(t, router, "?archived=maybe"); badArchived.Code != http.StatusBadRequest {
+		t.Fatalf("bad archived = %d", badArchived.Code)
+	}
+
+	// 归档 widens the list (the reader switched 显示已归档 on), so the file has to widen with
+	// it -- an export that ignored the switch would hand back a smaller library than the
+	// screen is showing. The single-item read is never filtered by it, which is why the row
+	// survives 归档 in the first place.
+	if code := requestJSON(t, router, http.MethodPost, "/api/knowledge/k-abandon/archive", nil).Code; code != http.StatusOK {
+		t.Fatalf("archive = %d", code)
+	}
+	hidden := exportRequest(t, router, "?format=csv")
+	if strings.Contains(hidden.Body.String(), "abandon") {
+		t.Fatalf("archived item leaked into a default export: %s", hidden.Body.String())
+	}
+	shown := exportRequest(t, router, "?format=csv&archived=yes")
+	if !strings.Contains(shown.Body.String(), "abandon") {
+		t.Fatalf("?archived=yes did not widen the export: %s", shown.Body.String())
+	}
 
 	// 知识分组 narrows the list, so it has to narrow the file: an export taken
 	// from inside a group view used to contain the whole library.

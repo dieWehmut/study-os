@@ -82,12 +82,29 @@ func handleKnowledgeExport(response http.ResponseWriter, request *http.Request, 
 		writeJSON(response, http.StatusBadRequest, map[string]string{"error": "scheduled must be yes or no"})
 		return
 	}
+	// 归档 is a widening the reader may have switched on in the list, and an export that
+	// ignored it would hand back a smaller library than the screen is showing -- the same
+	// mistake as ignoring 知识分组, only the other way round. Bad values are refused rather
+	// than treated as "no", so a typo cannot quietly shrink someone's export.
+	includeArchived := false
+	if rawArchived := strings.TrimSpace(request.URL.Query().Get("archived")); rawArchived != "" {
+		switch rawArchived {
+		case "yes":
+			includeArchived = true
+		case "no":
+			includeArchived = false
+		default:
+			writeJSON(response, http.StatusBadRequest, map[string]string{"error": "archived must be yes or no"})
+			return
+		}
+	}
 	options := models.KnowledgeListOptions{
-		Query:     request.URL.Query().Get("q"),
-		Subject:   request.URL.Query().Get("subject"),
-		Tag:       request.URL.Query().Get("tag"),
-		Scheduled: scheduledFilter,
-		Limit:     exportPageSize,
+		Query:           request.URL.Query().Get("q"),
+		Subject:         request.URL.Query().Get("subject"),
+		Tag:             request.URL.Query().Get("tag"),
+		Scheduled:       scheduledFilter,
+		IncludeArchived: includeArchived,
+		Limit:           exportPageSize,
 	}
 	// 知识分组 is a filter the list can be narrowed by, and an export that ignored
 	// it would hand someone the whole library while they are looking at one group
@@ -95,7 +112,7 @@ func handleKnowledgeExport(response http.ResponseWriter, request *http.Request, 
 	groupID := strings.TrimSpace(request.URL.Query().Get("group"))
 	readPage := func(offset int) ([]models.KnowledgeItem, error) {
 		if groupID != "" {
-			groupOptions := models.KnowledgeListOptions{Scheduled: scheduledFilter, Query: options.Query, Subject: options.Subject, Tag: options.Tag, Limit: exportPageSize, Offset: offset}
+			groupOptions := models.KnowledgeListOptions{IncludeArchived: includeArchived, Scheduled: scheduledFilter, Query: options.Query, Subject: options.Subject, Tag: options.Tag, Limit: exportPageSize, Offset: offset}
 			return application.Store.ListItemsByGroup(request.Context(), groupID, groupOptions)
 		}
 		options.Offset = offset

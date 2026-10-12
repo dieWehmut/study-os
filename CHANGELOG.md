@@ -2,6 +2,19 @@
 
 ## 未发布
 
+### 导出缺口（前半）：**后端认识 `?archived=` 了**
+
+- 上一轮查到的缺口：导出把列表的每个筛选都带上了 ✓，唯独 `archived` 没有 ✗，
+  而 `knowledge_export.go` 也不解析它 ✗ ⇒ 「显示已归档 · 开」的视图导出的却是**更小的一份** ✓✗。
+- 这一轮补后端：比照 `scheduled` 解析 `archived`（**错值 400** ✓ ——「一个被静默忽略的参数，
+  看起来和一个空库一模一样」，第 119 轮那条规矩 ✓）并设 `IncludeArchived` ✓，
+  **分组那条分支同样带上** ✓（不然从分组视图导出又会漏 ✓，与第 172 轮修的是同一类 ✓）。
+- 用例：在既有的 `TestKnowledgeExportNarrowsWithTheListFilters` 里补三条——
+  `?archived=maybe` ⇒ 400 ✓；归档一条后**默认导出不含它** ✓；`?archived=yes` **导出含它** ✓。
+- 验证：该文件两条用例通过 ✓、httpapi 整包 ✓；随后完整 sweep。
+- **仍差客户端两处**（下一轮）：`knowledge.ts` 的导出选项加 `archived` 并拼查询串、
+  `Knowledge.tsx` 的导出调用传 `archived: archived ? "yes" : undefined` ✓。
+
 ### 查到一处真实缺口（本轮只记不动手）：**导出不认识 `?archived=`**
 
 - `Knowledge.tsx` 的导出调用很讲究，注释就是这么写的：
