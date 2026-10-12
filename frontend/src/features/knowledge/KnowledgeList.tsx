@@ -35,6 +35,7 @@ export function KnowledgeList({
   loadingMore = false,
   onLoadMore,
   scheduledIds,
+  archivedIds,
 }: KnowledgeListProps) {
   if (loading) return <p className="py-10 text-center text-sm text-muted-foreground">正在整理知识点…</p>
   if (items.length === 0) return <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">没有找到匹配的知识点</p>
@@ -64,7 +65,11 @@ export function KnowledgeList({
                   {item.level ? <span className="text-xs text-muted-foreground">{item.level}</span> : null}
                   {/* Said on the row, not only in the 复习状态 filter: the fact decides
                       whether this item will ever come back to you. */}
-                  {scheduledIds ? (
+                        {archivedIds?.has(item.id) ? (
+        <span className="text-xs text-muted-foreground" data-archived-marker="true">
+          已归档
+        </span>
+      ) : null}      {scheduledIds ? (
                     <span
                       data-scheduled-marker={scheduledIds.has(item.id) ? "yes" : "no"}
                       className={
