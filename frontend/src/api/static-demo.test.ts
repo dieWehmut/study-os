@@ -435,7 +435,7 @@ describe("static Pages API fixtures", () => {
       // The single-item read is the only place `scheduled` is answered (the list reports
       // it through `scheduled_ids`), and the panel's 取消排复习 button hangs off it: if
       // this field went missing the button would just never appear, with nothing to say so.
-      ["/knowledge/knowledge-last", ["id", "item_type", "term", "concise_definition", "scheduled"]],
+      ["/knowledge/knowledge-last", ["id", "item_type", "term", "concise_definition", "scheduled", "archived"]],
       // 「所属分组」 and the word-family list come from here; an empty answer is a valid
       // answer, so the contract asks for the two keys rather than for rows inside them.
       ["/knowledge/knowledge-last/related", ["items", "groups"]],

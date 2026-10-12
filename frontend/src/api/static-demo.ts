@@ -1081,7 +1081,7 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     const item = state.knowledge.find((entry) => entry.id === id)
     if (!item) throw new StaticDemoError("Static demo knowledge item not found")
     // Same contract as the local backend: the single-item read carries 复习状态.
-    return responseFor({ ...item, scheduled: state.scheduled.has(id) }) as T
+    return responseFor({ ...item, scheduled: state.scheduled.has(id), archived: state.archived.has(id) }) as T
   }
 
   if (root === "reviews" && id === "due" && method === "GET") {
