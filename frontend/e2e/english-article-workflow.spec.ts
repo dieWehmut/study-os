@@ -98,6 +98,11 @@ test("creates, reads, deep-links, and exports a Mock AI English article", async 
   await expect(directoryLinks.nth(1)).toHaveAttribute("aria-current", "true")
 
   await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-english-article.png`), fullPage: true })
+  // The PDF export is the heaviest step in the suite (a full-page screenshot before it, a
+// server-side render inside it). Under load it needs more than the default 90s, and
+// Playwright reports a download that is still in flight when the test is torn down as
+// `download.path: canceled` -- which reads like a bug in the app rather than a stopwatch.
+  test.setTimeout(180_000)
   const downloadPromise = page.waitForEvent("download")
   await page.getByRole("button", { name: "导出 PDF" }).click()
   const download = await downloadPromise
