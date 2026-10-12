@@ -69,6 +69,19 @@ describe("static Pages API fixtures", () => {
     )
     expect(restPage.items.map((entry) => entry.id)).not.toContain(scheduled)
     expect(restPage.scheduled_ids).toHaveLength(0)
+
+    // 归档 is the third state this one fact now has to survive: hiding an item must move
+    // it out of the default view AND the ?scheduled views, and asking for archived items
+    // must bring it back -- without any of the other three lists changing their answer.
+    await staticDemoRequest(`/knowledge/${scheduled}/archive`, { method: "POST" })
+    const archivedDefault = await staticDemoRequest<{ items: Array<{ id: string }> }>("/knowledge")
+    expect(archivedDefault.items.map((entry) => entry.id)).not.toContain(scheduled)
+    const archivedAsked = await staticDemoRequest<{ items: Array<{ id: string }> }>("/knowledge?archived=yes")
+    expect(archivedAsked.items.map((entry) => entry.id)).toContain(scheduled)
+    // The single read is not filtered by 归档: a link someone already has still opens.
+    const archivedDetail = await staticDemoRequest<{ id: string }>(`/knowledge/${scheduled}`)
+    expect(archivedDetail.id).toBe(scheduled)
+    await staticDemoRequest(`/knowledge/${scheduled}/archive`, { method: "DELETE" })
   })
 
   it("supports knowledge filtering and a local lookup", async () => {
