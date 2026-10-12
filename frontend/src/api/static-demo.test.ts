@@ -36,6 +36,15 @@ describe("static Pages API fixtures", () => {
 
     const notQueued = await staticDemoRequest<{ scheduled?: boolean }>(`/knowledge/${unscheduled}`)
     expect(notQueued.scheduled).toBe(false)
+
+    // And the write→read loop closes: after 取消排复习 both answers change together. A
+    // demo where the DELETE only flipped the list would leave the panel reading
+    // 「已排进复习」 on the very item it just took out.
+    await staticDemoRequest(`/knowledge/${scheduled}/schedule`, { method: "DELETE" })
+    const afterDetail = await staticDemoRequest<{ scheduled?: boolean }>(`/knowledge/${scheduled}`)
+    expect(afterDetail.scheduled).toBe(false)
+    const afterList = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
+    expect(afterList.scheduled_ids).not.toContain(scheduled)
   })
 
   it("supports knowledge filtering and a local lookup", async () => {
