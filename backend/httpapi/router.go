@@ -219,6 +219,15 @@ func NewRouter(application *app.App) http.Handler {
 		api.Delete("/knowledge/{knowledgeID}/schedule", func(response http.ResponseWriter, request *http.Request) {
 			handleKnowledgeUnschedule(response, request, application)
 		})
+		// 归档: POST puts an item away, DELETE brings it back. Nothing is deleted either
+		// way (ROADMAP §8.1), and the single-item GET keeps answering for an archived item
+		// so a link to it still opens.
+		api.Post("/knowledge/{knowledgeID}/archive", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeArchive(response, request, application)
+		})
+		api.Delete("/knowledge/{knowledgeID}/archive", func(response http.ResponseWriter, request *http.Request) {
+			handleKnowledgeArchive(response, request, application)
+		})
 		api.Post("/chat", func(response http.ResponseWriter, request *http.Request) {
 			handleChatSend(response, request, application)
 		})

@@ -2,6 +2,19 @@
 
 ## 未发布
 
+### 归档第三步：接口 `POST / DELETE /api/knowledge/{id}/archive`
+
+- 新文件 `backend/httpapi/archive.go`：`POST` 归档、`DELETE` 取消归档，**两个方向都不删任何东西** ✓；
+  幂等 ✓（连按两次不是错 ✓，与「排进复习 / 取消排复习」同一态度 ✓）；找不到条目返回 404 ✓。
+- 注释里写清了**为什么不能真的删**：`attempts.prompt_id REFERENCES prompts(id) ON DELETE RESTRICT`
+  ⇒ "删掉这条"要么失败、要么连证据一起删 ✗（§8.1「明确不做」那一条的落点 ✓）。
+- 用例 `TestArchiveEndpointHidesAnItemAndKeepsTheLinkWorking`：
+  建条目 ⇒ 它在列表里 ⇒ **归档** ⇒ **列表里没有了** ⇒ **深链接仍 200** ✓（验收 ①）⇒
+  再归档一次仍 200（幂等 ✓）⇒ **取消归档** ⇒ 列表里回来了 ✓（验收 ③）；
+  另有 404 用例 ✓。
+- 验证：httpapi 整包通过 ✓；随后完整 sweep。
+- **仍差两步**：界面（详情页「归档 / 取消归档」），以及"断言没有路径因归档而 `DELETE` 行"的检查（验收 ④）。
+
 ### 归档第二步：store —— **默认隐藏、显式可取、深链接照旧**，且**一行都不删**
 
 - `knowledgeFilter` 加一条 `archived_at = ''`（**默认**隐藏已归档）✓ ——
