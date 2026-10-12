@@ -2,6 +2,15 @@
 
 ## 未发布
 
+### 前端第一步：`KnowledgeItem.archived?`（可选，注释说明"只有单条读取答它"）
+
+- 与它上面的 `scheduled?` **同一形状** ✓：可选字段 ✓ + 注释说明**为什么只有单条读取有** ✓
+  （"列表用 `archived_ids` 答它，而深链接没有列表可看" ✓ ——这正是这一整条修改的理由 ✓）。
+- **如实说明**：还没有读取方 ✗ ⇒ 行为零变化 ✓、`pnpm build` 通过 ✓（这一步与第 290 轮那次"先落数据层"同样切法 ✓）。
+- 验证：`pnpm build` ✓；随后完整 sweep。
+- 剩余三处（下一轮，锚点都在 ✓）：`selectedArchived`（与 `selectedQueued` 同形 ✓）、
+  传进面板 ✓（`archivedHere` 改为外部传入 + 本地覆盖 ✓）、界面用例（深链接打开已归档条目 → 按钮显示「取消归档」✓）。
+
 ### 详情 `archived` 字段有了用例（两个方向都验）
 
 - `TestKnowledgeDetailReportsArchivedState`：新条目报告 `archived: false` ✓ → 归档后 `true` ✓ →

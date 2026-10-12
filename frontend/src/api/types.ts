@@ -17,6 +17,11 @@ export interface KnowledgeItem {
    * not be read as "not scheduled".
    */
   scheduled?: boolean
+  /**
+   * 归档 state for one item (§8.1). Only the single-item read answers this -- the list
+   * reports it through `archived_ids`, and a deep link has no list to look in.
+   */
+  archived?: boolean
 }
 
 export interface ImportInspection {
