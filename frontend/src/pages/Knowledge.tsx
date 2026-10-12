@@ -85,6 +85,9 @@ function KnowledgePage({
   // Ids the server says already carry review cards, so 排进复习 tells the truth
   // on first paint instead of only after being pressed.
   const [scheduledIds, setScheduledIds] = useState<ReadonlySet<string>>(new Set())
+  // 归档（§8.1）: which rows in hand were put away. Same shape as scheduledIds, because the
+  // server answers both through *ids lists rather than a field on every row.
+  const [archivedIds, setArchivedIds] = useState<ReadonlySet<string>>(new Set())
   const [count, setCount] = useState(0)
   const [fallbackSelectedId, setFallbackSelectedId] = useState<string | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<KnowledgeItem | null>(null)
@@ -155,6 +158,7 @@ function KnowledgePage({
       })
       setCount(result.count)
       setScheduledIds((current) => new Set([...current, ...(result.scheduled_ids ?? [])]))
+      setArchivedIds((current) => new Set([...current, ...(result.archived_ids ?? [])]))
     } catch (reason: unknown) {
       setError(failureMessage(reason, "读取更多知识点失败"))
     } finally {
@@ -171,6 +175,7 @@ function KnowledgePage({
         setItems(result.items)
         setCount(result.count)
         setScheduledIds(new Set(result.scheduled_ids ?? []))
+      setArchivedIds(new Set(result.archived_ids ?? []))
         setFallbackSelectedId((current) =>
           current && result.items.some((item) => item.id === current) ? current : result.items[0]?.id ?? null,
         )
@@ -584,6 +589,7 @@ function KnowledgePage({
           <div className="grid gap-4 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
             <KnowledgeList
               items={items}
+              archivedIds={archivedIds}
               selectedId={selectedId ?? undefined}
               loading={loading}
               onSelect={(item) => selectItem(item.id)}

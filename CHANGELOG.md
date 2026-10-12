@@ -2,6 +2,20 @@
 
 ## 未发布
 
+### 配方第 2-4 项落地（+ 第 5 项的 prop 声明）：`archived_ids` 已从接口流到组件门口
+
+- `Knowledge.tsx`：新增 `archivedIds` 状态 ✓（照 `scheduledIds` 那一行 ✓），
+  并在**两处**喂值各加一份 ✓：`:157` 追加下一页 ✓ 与 `:173` 整页替换 ✓ ——
+  **两处都改** ✓（只改一处会让"加载更多"之后标记错乱 ✗，与第 236 轮那个分页教训同族 ✓）；
+  `<KnowledgeList>` 上加了 `archivedIds={archivedIds}` ✓。
+- `KnowledgeList.tsx`：props 接口里声明 `archivedIds?: ReadonlySet<string>` ✓（与 `scheduledIds` 同形 ✓）。
+- **如实说明：还差"行上那一个标记"** ✗ ⇒ **读者现在还看不到任何变化** ✓（数据已经流到组件门口 ✓，
+  但没人用它 ✓）。**这一轮刻意不假装完成** ✓ ——标记是下一轮的事 ✓。
+- 过程里两处编译错误**当场暴露、当场修** ✓：① `setArchivedIds` 被声明却没被使用 ✓（因为喂值还没写 ✓）；
+  ② `<KnowledgeList>` 不认识新 prop ✓（因为接口还没声明 ✓）——
+  **类型系统两次把"半截改动"拦在了提交之前** ✓（这与第 277 轮"删 import 被编译器抓到"是同一种保护 ✓）。
+- 验证：`pnpm build` ✓；随后完整 sweep。
+
 ### 配方第 1 项落地：`KnowledgeListResponse.archived_ids`（可选，注释说明"旧后端可能不答"）
 
 - 照 `scheduled_ids` 的写法 ✓：**可选字段** ✓ + **注释说明为什么可选** ✓（"缺失的答案不能被读成'一条都没有'" ✓

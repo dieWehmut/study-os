@@ -22,6 +22,8 @@ interface KnowledgeListProps {
    * it is the difference between "I know this" and "I will be tested on this".
    */
   scheduledIds?: ReadonlySet<string>
+  /** Same shape, same reason: which of these rows were 已归档 (§8.1). */
+  archivedIds?: ReadonlySet<string>
 }
 
 export function KnowledgeList({
