@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const currentSchemaVersion = 19
+const currentSchemaVersion = 20
 
 // SchemaVersion is the version a freshly opened store is migrated to. Exported
 // so migration tests can express "the head of the ladder" instead of a literal
@@ -516,6 +516,18 @@ func applyMigration(ctx context.Context, tx *sql.Tx, version int) error {
 				ON lesson_attempts(lesson_id, section_id, question_id, created_at DESC, id DESC)`); err != nil {
 			return fmt.Errorf("apply schema version %d: %w", version, err)
 		}
+	case 20:
+		// 归档（ROADMAP §8.1）：知识条目是"造出来的东西"，不给删除，给一个计划层标记。
+		// 空串 = 未归档，旧数据不需要迁移；归档**永远不删行**——被作答过的条目一旦删除就会
+		// 牵动作答（`ON DELETE RESTRICT`），而那条约束在保护历史。
+		//
+		// 缺表时**不提前 return**：migrate 之后 verifySchema 还要逐版本回溯校验，
+		// 好几个"老库"用例（v14/v17…）正是靠那次校验报出 "lesson dependencies" 的。
+		if hasTable(ctx, tx, "knowledge_items") && !hasColumn(ctx, tx, "knowledge_items", "archived_at") {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE knowledge_items ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''`); err != nil {
+				return fmt.Errorf("apply schema version %d: %w", version, err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported migration version %d", version)
 	}
@@ -648,6 +660,15 @@ func verifySchema(ctx context.Context, tx *sql.Tx, version int) error {
 		}
 		if !hasColumn(ctx, tx, "lesson_attempts", "question_id") {
 			return errors.New("schema version 19 is recorded but lesson_attempts.question_id is missing")
+		}
+	case 20:
+		// 逐版本校验是**链式**的（20 校验 19，19 校验 18…）：新版本必须接上这一环，
+		// 否则"老库"用例拿不到它们期望的那条具体错误，只会静默通过。
+		if err := verifySchema(ctx, tx, 19); err != nil {
+			return err
+		}
+		if hasTable(ctx, tx, "knowledge_items") && !hasColumn(ctx, tx, "knowledge_items", "archived_at") {
+			return errors.New("schema version 20 is recorded but knowledge_items.archived_at is missing")
 		}
 	}
 	return nil
