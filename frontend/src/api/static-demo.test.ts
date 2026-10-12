@@ -356,6 +356,9 @@ describe("static Pages API fixtures", () => {
     const required: Array<[string, string[]]> = [
       ["/english/articles", ["items[].vocabulary_count", "items[].section_count"]],
       ["/lessons", ["items[].sections_count", "items[].filled_sections", "items[].practice_questions"]],
+      // The detail route is what the editor and 环节速览 read, and it sat outside the
+      // contract: a field those screens depend on could have gone missing here silently.
+      ["/lessons/lesson-newton", ["id", "title", "version", "document", "sections"]],
       ["/groups", ["items[].item_count"]],
       ["/knowledge", ["items", "count", "scheduled_ids"]],
       ["/mistakes", ["items", "count"]],
