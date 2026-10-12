@@ -2,6 +2,24 @@
 
 ## 未发布
 
+### 归档第 1 步（schema 加列）也退回了：**迁移阶梯的测试不是"小步骤"**
+
+- 按 §8.1 的计划，第一步是 `knowledge_items` 加 `archived_at` 并升 schema 版本。改动本身很小
+  （`currentSchemaVersion` 19→20、`case 20:` 加列、`schema.sql` 同步、ROADMAP 顶部改 19→20），
+  `go build` 通过、docs 检查 8/8 通过 ✓。
+- 但 `go test ./backend/db/` **红了 4 条**，全部是迁移阶梯的"老库"用例：
+  `TestStoreRejectsSchemaVersionFourteenWithoutLessonDependencies`、
+  `…SeventeenWithoutQARecordSessionIndex`、`…SeventeenWithMissingQARecordColumn`、
+  `TestStoreRejectsSchemaWithOnlyOneQuestionTable`。
+- **原因没查清就退回**：这些用例在验证"从某个旧版本升上来会怎样"，加一个版本会牵动它们对
+  **阶梯形状**的假设（可能与 `verifySchema` 的逐版本校验有关 ✗ 未确认）。
+  我的余量已经不足以把它查清 ⇒ **四个文件 `git checkout` 还原，`go build` 与 `go test ./backend/db/`
+  回到全绿** ✓。
+- **教训（对下一次动手有用）**：在第 199 轮之前，我一直把"加一列"当成小步骤 ✗ ——
+  它同时牵动**迁移阶梯 + 逐版本校验 + 那些用老 schema 构造的用例**，所以它是一个**需要完整余量的改动**，
+  不是收尾时能顺手做的。**下一轮应当从"先读那 4 条用例为什么红"开始**，而不是从加列开始。
+- 本轮无净代码改动；工作区仍是第 193 轮那次完整 sweep 的绿灯状态 ✓。
+
 ### 把「归档知识条目」的形状先写下来（第 197 轮查出的那个缺口的解法）
 
 上一轮确认了"误收进知识库的条目删不掉，而删掉它又是错的方向"。这一轮不写代码，**先把形状定下来**
