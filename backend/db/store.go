@@ -187,9 +187,41 @@ func updateKnowledgeItem(ctx context.Context, database queryer, item models.Know
  * response used to report `len(items)` as `count`, which every caller reads as
  * "how many there are" -- so a library of 140 called itself 100.
  */
+// SetKnowledgeArchived hides an item from the default list without touching anything else.
+//
+// 归档 is a *plan-level* mark (ROADMAP §8.1): it writes one column and deletes nothing.
+// The item keeps its cards, its review states and every attempt, so 取消归档 puts it back
+// exactly as it was -- and a reader who filed something by accident loses no history.
+// Deleting instead would either fail on the foreign key or take evidence with it.
+func (s *Store) SetKnowledgeArchived(ctx context.Context, id string, archived bool) error {
+	value := ""
+	if archived {
+		value = formatTime(time.Now().UTC())
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE knowledge_items SET archived_at = ?, updated_at = ? WHERE id = ?`,
+		value, formatTime(time.Now().UTC()), id)
+	if err != nil {
+		return fmt.Errorf("set knowledge archived: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count archived rows: %w", err)
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func knowledgeFilter(options models.KnowledgeListOptions) (string, []any) {
-	where := make([]string, 0, 4)
+	where := make([]string, 0, 5)
 	arguments := make([]any, 0, 6)
+	// 归档（ROADMAP §8.1）：归档只影响**默认可见性**。这条写在共享的过滤器里，是因为
+	// 列表与计数都从这里取 WHERE —— "一件事一个定义"：两处口径不可能再分叉。
+	// 直接读某一条（GetKnowledgeItem）不走这里，所以深链接仍能打开已归档条目 ✓。
+	if !options.IncludeArchived {
+		where = append(where, `archived_at = ''`)
+	}
 	if strings.TrimSpace(options.Query) != "" {
 		where = append(where, `(term LIKE ? ESCAPE '\' OR concise_definition LIKE ? ESCAPE '\')`)
 		pattern := "%" + escapeLike(strings.TrimSpace(options.Query)) + "%"

@@ -43,8 +43,13 @@ type KnowledgeListOptions struct {
 	// Nil means either, which is what every caller wanted before this existed --
 	// so a field left unset cannot quietly hide half the library.
 	Scheduled *bool
-	Limit     int
-	Offset    int
+	// IncludeArchived widens the list to 已归档 items. Unset means the default view,
+	// which hides them -- deliberately the opposite default of Scheduled: "everything I
+	// can see" should not have to ask for itself, while "everything, including what I put
+	// away" should (ROADMAP §8.1).
+	IncludeArchived bool
+	Limit           int
+	Offset          int
 }
 
 type KnowledgeGroup struct {
