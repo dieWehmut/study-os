@@ -2,6 +2,19 @@
 
 ## 未发布
 
+### 详情读取开始回答 `archived`（与它已有的 `scheduled` 并列）
+
+- `knowledgeItemResponse` 加 `Archived bool` ✓，`handleKnowledgeGet` 里在算 `queued` 的**旁边**
+  调 `application.Store.KnowledgeArchived` ✓ 并写进同一个响应字面量 ✓ ——
+  与 `Scheduled` **完全同形** ✓（同一个结构体、同一个位置、同一种"单条读取答单条状态"✓）。
+- **一处过程要如实记**：我先用脚本按"我以为的原文"改处理函数 ✗ ⇒ **锚点没命中** ✓（脚本如实打出
+  `handler anchor: False` ✓，什么都没改 ✓），而**结构体那一处却改成功了** ✗ ⇒ 于是出现过一瞬间
+  "字段存在但永远为 false" ✗ ——**那比没有这个字段更糟**（详情会说"没有归档"，而它其实归档了 ✗）。
+  ⇒ 我**立刻去读原文、用编辑工具补上处理函数** ✓，构建与整包通过 ✓。
+  **教训**：脚本改不动的地方，用**读原文 + 编辑工具**，不要靠记忆重拼字符串 ✗。
+- 验证：`go build ./...` ✓、`go test ./backend/httpapi/` 整包通过 ✓；随后完整 sweep。
+- **还差**：一条专门断言这个字段的用例 ✗（下一轮 ✓），以及前端 `selectedArchived` 与面板初始化 ✓。
+
 ### 面板那处的第 1 步：`Store.KnowledgeArchived`（单条查询，零行为变化 ✓）
 
 - 与 `ArchivedKnowledgeIDs` 并排 ✓，一行 SQL：

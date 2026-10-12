@@ -640,6 +640,10 @@ func parseScheduledFilter(raw string) (*bool, bool) {
 // at an item on another page, or another subject's page, and that reads as
 // "nothing is scheduled" for something that is.
 type knowledgeItemResponse struct {
+	// Archived is 归档 state for this one item (§8.1). The list reports it through
+	// `archived_ids`; a deep link has no list, and without this the panel offered 归档
+	// for something already put away.
+	Archived bool `json:"archived"`
 	models.KnowledgeItem
 	Scheduled bool `json:"scheduled"`
 }
@@ -659,7 +663,12 @@ func handleKnowledgeGet(response http.ResponseWriter, request *http.Request, app
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取复习状态失败"})
 		return
 	}
-	writeJSON(response, http.StatusOK, knowledgeItemResponse{KnowledgeItem: item, Scheduled: queued > 0})
+	archived, err := application.Store.KnowledgeArchived(request.Context(), item.ID)
+	if err != nil {
+		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": "读取归档状态失败"})
+		return
+	}
+	writeJSON(response, http.StatusOK, knowledgeItemResponse{KnowledgeItem: item, Scheduled: queued > 0, Archived: archived})
 }
 
 // handleKnowledgeRelated answers with the other items sharing a group with
