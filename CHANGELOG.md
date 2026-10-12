@@ -2,6 +2,19 @@
 
 ## 未发布
 
+### 先只查：课程作答的契约该加在哪里（不动手）
+
+按上一轮定下的做法，这一轮**只查地址**，把下一轮的一步变成"照抄"：
+
+- 客户端**不在** `lessons.ts`，而在 **`frontend/src/api/lesson-practice.ts`** ✓；
+- 路由由 `practicePath(lessonID, sectionID)` 拼出：
+  `/lessons/{lessonID}/practice/{sectionID}/attempts`（**GET 列表 + POST 提交**同一个地址，两种方法 ✓）；
+- 演示适配器**已有**这一条分支 ✓（GET/POST 都处理了）；
+- **下一轮要补的契约行**（需要先确认 GET 的返回形状再写死）：
+  `GET /lessons/<id>/practice/<section>/attempts`；
+- **还差一个未知数**：GET 回的是 `{items: [...]}` 还是数组 ✗ ——下一轮先看演示版该分支的返回，
+  再决定契约里写 `items` 还是别的键。**不知道就先不写**（这正是"先读证据"的意思）。
+
 ### 再加一条跨接口一致：`?scheduled=` 筛选和它报出的 `scheduled_ids` 必须对上
 
 - 知识页的「复习状态」筛选与行上的徽标是**同一条事实的两种呈现**；若两者不一致，
