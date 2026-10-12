@@ -26,6 +26,12 @@ export interface KnowledgeListResponse {
   items: KnowledgeItem[]
   count: number
   /**
+   * Which of the returned items are 已归档 (ROADMAP §8.1). Optional for the same reason as
+   * `scheduled_ids` above: an older backend answers without it, and a missing answer must
+   * not be read as none-of-them-are -- only `?archived=yes` ever makes it non-empty.
+   */
+  archived_ids?: string[]
+  /**
    * Which of the returned items already carry review cards. Optional because
    * an older backend answers without it, and a missing answer must not be read
    * as "queued" -- that would lock the control on every item in the library.
