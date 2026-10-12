@@ -2,6 +2,25 @@
 
 ## 未发布
 
+### 查到一处真实缺口（本轮只记不动手）：**导出不认识 `?archived=`**
+
+- `Knowledge.tsx` 的导出调用很讲究，注释就是这么写的：
+  > "Every filter the list is narrowed by, 知识分组 included: an export that ignored one would hand
+  > over the whole library from inside a group view."
+  它把 `query / group / subject / tag / scheduled` **全都带上了** ✓ ——**唯独没有 `archived`** ✗。
+- 而且后端也不认识它：`knowledge_export.go` 只解析 `scheduled` ✗，构造
+  `KnowledgeListOptions` 时**没有 `IncludeArchived`** ✗ ⇒ 在「**显示已归档 · 开**」的视图里导出，
+  拿到的却是**不含已归档**的那一份 ✓✗ ——读取者按下的开关**没有跟着走** ✓。
+- **为什么这一轮只记不动手**：修它要动三处（导出处理器解析参数、客户端导出选项、页面传参 ✓）
+  外加一条 Go 用例 ✓，余量不足以完成 ✓。按承诺**不切它** ✓（199-203 的教训 ✓）。
+- **下一轮的第一步（已具体到可直接照做）**：
+  1. `knowledge_export.go`：比照 `scheduled` 解析 `archived`（错值 400 ✓）并设 `IncludeArchived` ✓
+     （分组那条分支同样要带 ✓）；
+  2. `frontend/src/api/knowledge.ts` 的导出选项加 `archived?: "yes" | "no"` ✓ 并拼进查询串 ✓；
+  3. `Knowledge.tsx` 的导出调用加 `archived: archived ? "yes" : undefined` ✓；
+  4. Go 用例：归档一条 ⇒ 默认导出不含它 ✓、`?archived=yes` 含它 ✓。
+- 本轮无代码改动；工作区绿灯 ✓。
+
 ### 那条「一件事一个定义」的链再走一步：把 **归档** 接进同一组断言
 
 - 第 212/215/216 轮把 `scheduled_ids` ↔ 单条 `scheduled` ↔ 写操作 ↔ `?scheduled=` 连成了一条一致的链 ✓；
