@@ -45,6 +45,15 @@ describe("static Pages API fixtures", () => {
     expect(afterDetail.scheduled).toBe(false)
     const afterList = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
     expect(afterList.scheduled_ids).not.toContain(scheduled)
+
+    // And back in again, so the loop is closed in both directions: 排进复习 has to make
+    // the single read say true as well, or the panel would keep offering the button it
+    // just pressed.
+    await staticDemoRequest(`/knowledge/${scheduled}/schedule`, { method: "POST" })
+    const backDetail = await staticDemoRequest<{ scheduled?: boolean }>(`/knowledge/${scheduled}`)
+    expect(backDetail.scheduled).toBe(true)
+    const backList = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
+    expect(backList.scheduled_ids).toContain(scheduled)
   })
 
   it("supports knowledge filtering and a local lookup", async () => {
