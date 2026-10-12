@@ -404,7 +404,7 @@ markdown 可写，不传 `onRename` 就不画 ✎。
 才看清"队列资格是状态、不是卡"；第 195 轮去查"订正能不能撤"，发现它根本不是一类东西。
 第 197 轮列出全部六条 DELETE 路由，发现 `DELETE /knowledge/{id}` **不存在**——误收进知识库的条目删不掉。
 
-### 8.1 第三个类别：**做出来的东西**——不给删除，给归档（形状已定，未实现）
+### 8.1 第三个类别：**做出来的东西**——不给删除，给归档（**已实现**，第 231-241 轮）
 
 知识条目既不是"打算"也不是"发生过的事"，是**你造出来的东西**。它看起来最该能删，实际最不能：
 
@@ -425,16 +425,17 @@ markdown 可写，不传 `onRename` 就不画 ✎。
 
 **明确不做**：`DELETE /knowledge/{id}`。它要么失败、要么毁证据，两种都不是读者要的。
 
-**动手清单（锚点在第 225 轮复核过；这四处 + 一处同步必须*一起*提交）**
+**执行记录**（这一节从"形状"变成"已落地"的过程，留着是因为清单本身就是方法）
 
-| # | 文件 | 锚点 | 改动 |
-|---|---|---|---|
-| 1 | `backend/db/db.go` | `const currentSchemaVersion` | 19 → **20** |
-| 2 | `backend/db/db.go` | migrate 的 `case 19:` 之后 | 加 `case 20:` 加列（带 `hasTable`/`hasColumn` 守卫，**不提前 return**——第 202 轮证明会跳过 verifySchema） |
-| 3 | `backend/db/db.go` | verifySchema 的 `case 19:` 之后 | 加 `case 20:`：**先 `verifySchema(19)`**（链式回溯，15/16/17 的 "lesson dependencies" 靠它报出），再校验 `archived_at` |
-| 4 | `backend/db/schema.sql` | `knowledge_items` 里的 `level TEXT …` | 其后加 `archived_at TEXT NOT NULL DEFAULT ''` |
-| 5 | 本文件第 26 行 | 顶部那行 `schema 版本 19` | 19 → **20**（**只改第 26 行**：这一行自身也含该字样，整篇替换会把它一起改掉） |
+上面那条"锚点在第 225 轮复核过"的清单**已全部执行**（第 231 轮一次做完 ✓）：
+常量 20 ✓、migrate 的 `case 20` ✓、**verifySchema 的 `case 20`** ✓（这一处是第 199/202 两次红的关键 ✓）、
+`schema.sql` 的 `archived_at` ✓、本文件第 26 行基线 19→20（**只改第 26 行** ✓，清单里那句警告派上了用场 ✓）。
 
-只改常量会让 `unsupported migration version 20` 大面积变红（第 203 轮实验）✗ ⇒ **原子改动，不可拆**。
-判官用例：`TestStoreRejects*`（4 条老库）+ `TestStoreUpgrades*`；成功判据：`go test ./backend/db/` 全绿
-且 `node scripts/sweep.mjs` 15 步全绿。之后才是 store / 接口 / 界面三步（上面四条验收在那些步里逐条对）。
+之后三步也已落地：**store**（默认隐藏 / 显式可取 / 深链接照旧 / 只写一列，第 232 轮 ✓）、
+**接口**（`POST`/`DELETE /knowledge/{id}/archive`，第 233 轮 ✓）、**界面**（详情页「归档 / 取消归档」，
+第 234 轮 ✓），外加**列表加宽** `?archived=yes`（第 236 轮 ✓）、**浏览器级来回验收**（第 237 轮 ✓）、
+**演示版同义实现**（第 238 轮 ✓）、**契约与一致性**（第 239、245 轮 ✓）、**导出两端**（第 247、248 轮 ✓）。
+
+上面四条验收的落点：① 深链接仍可打开（store 用例 + HTTP 用例 ✓）；② 已有卡与作答不被删（数据层用例 ✓）；
+③ 取消归档恢复（store / HTTP / 界面三层 ✓）；④ **归档只写 `archived_at`**（第 235 轮的可执行检查 ✓，
+它同时守着"没有 `DELETE /knowledge/{id}`"这条反向断言 ✓）。
