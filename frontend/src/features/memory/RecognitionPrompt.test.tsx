@@ -35,6 +35,7 @@ describe("RecognitionPrompt", () => {
   })
 
   it.each<[string, 1 | 2 | 3]>([
+    ["一眼就会", 4],
     ["认识", 3],
     ["模糊", 2],
     ["不认识", 1],
