@@ -20,6 +20,24 @@ describe("static Pages API fixtures", () => {
     expect(dashboard.recent_items[0]?.term).toBeTruthy()
   })
 
+  it("answers `scheduled` for one item the same way the list answers it", async () => {
+    // The contract test above only checks that the field is *there*; a demo that always
+    // answered `scheduled: false` would pass it while the panel's 取消排复习 button never
+    // appeared. One fact, one definition: the detail read and the list's `scheduled_ids`
+    // have to agree, both ways round.
+    const list = await staticDemoRequest<{ items: Array<{ id: string }>; scheduled_ids: string[] }>("/knowledge")
+    const scheduled = list.scheduled_ids[0]
+    const unscheduled = list.items.map((entry) => entry.id).find((id) => !list.scheduled_ids.includes(id))
+    expect(scheduled).toBeTruthy()
+    expect(unscheduled).toBeTruthy()
+
+    const queued = await staticDemoRequest<{ scheduled?: boolean }>(`/knowledge/${scheduled}`)
+    expect(queued.scheduled).toBe(true)
+
+    const notQueued = await staticDemoRequest<{ scheduled?: boolean }>(`/knowledge/${unscheduled}`)
+    expect(notQueued.scheduled).toBe(false)
+  })
+
   it("supports knowledge filtering and a local lookup", async () => {
     const page = await staticDemoRequest<{ items: Array<{ id: string; term: string }>; count: number }>(
       "/knowledge?q=last&limit=20",
