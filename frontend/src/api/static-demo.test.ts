@@ -1101,4 +1101,8 @@ it("reads the fourth self-rating back, and refuses one that is out of range", as
       body: JSON.stringify({ answer: "", self_rating: 9 }),
     }),
   ).rejects.toThrow("self_rating must be 1, 2, 3, or 4")
+  // Refused without taking the card: a validation that runs after the queue is mutated
+  // would make a rejected request cost the reader a review.
+  const after = await staticDemoRequest<{ items: { prompt: { id: string } }[] }>("/reviews/due?limit=50")
+  expect(after.items.map((entry) => entry.prompt.id)).toContain(due.items[1].prompt.id)
 })

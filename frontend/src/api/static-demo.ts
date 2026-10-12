@@ -1113,6 +1113,13 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     return responseFor({ days: result, horizon: days }) as T
   }
   if (root === "reviews" && id && action === "answer" && method === "POST") {
+    // Validated before anything is mutated: an out-of-range request must not take the card
+    // out of the queue on its way to being refused (the real handler validates first too).
+    const selfRating = Number(body.self_rating ?? 0)
+    if (body.self_rating !== undefined && body.self_rating !== null &&
+        (!Number.isInteger(selfRating) || selfRating < 1 || selfRating > 4)) {
+      throw new StaticDemoError("self_rating must be 1, 2, 3, or 4", 400)
+    }
     const due = state.due.find((entry) => entry.prompt.id === id)
     if (!due) throw new StaticDemoError("Static demo review prompt not found")
     state.due = state.due.filter((entry) => entry.prompt.id !== id)
@@ -1128,11 +1135,7 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     // A self-rating (self_rating 1-4) comes from the reader rather than from judging the text,
     // and 4 means 一眼就会 (§十). The Pages app has no scheduler, so it just has to report the
     // rating back honestly -- but it must do that, or the 4 button does nothing here.
-    const selfRating = Number(body.self_rating ?? 0)
-    if (body.self_rating !== undefined && body.self_rating !== null &&
-        (!Number.isInteger(selfRating) || selfRating < 1 || selfRating > 4)) {
-      throw new StaticDemoError("self_rating must be 1, 2, 3, or 4", 400)
-    }
+
     const graded: ReviewEvaluation["outcome"] = expected === "" ? "partial" : correct ? "correct" : "incorrect"
     const selfRated = body.self_rating === undefined || body.self_rating === null ? null : (
       { 1: "incorrect", 2: "partial", 3: "correct", 4: "correct" } as const
