@@ -685,16 +685,17 @@ function knowledgeList(url: URL): KnowledgeListResponse {
   const tag = url.searchParams.get("tag")?.trim().toLowerCase() ?? ""
   const group = url.searchParams.get("group")?.trim().toLowerCase() ?? ""
   const scheduled = url.searchParams.get("scheduled")
+  // 归档 hides by default and comes back when asked, exactly like the real list:
+  // `?archived=yes` widens, anything else is a bad request rather than a silent empty page
+  // (the real handler answers 400 the same way). Read once, beside the other parameters,
+  // rather than inside the filter -- the check belongs to the request, not to each item.
+  const archivedParam = url.searchParams.get("archived")
+  if (archivedParam !== null && archivedParam !== "" && archivedParam !== "yes" && archivedParam !== "no") {
+    throw new StaticDemoError("archived must be yes or no", 400)
+  }
   const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0)
   const limit = Math.max(1, Number(url.searchParams.get("limit") ?? 100) || 100)
   const filtered = state.knowledge.filter((item) => {
-    // 归档 hides by default and comes back when asked, exactly like the real list:
-    // `?archived=yes` widens, anything else is a bad request rather than a silent empty
-    // page (the real handler answers 400 the same way).
-    const archivedParam = url.searchParams.get("archived")
-    if (archivedParam !== null && archivedParam !== "" && archivedParam !== "yes" && archivedParam !== "no") {
-      throw new StaticDemoError("archived must be yes or no", 400)
-    }
     if (archivedParam !== "yes" && state.archived.has(item.id)) return false
     if (subject && item.subject !== subject) return false
     if (query && !`${item.term} ${item.concise_definition}`.toLowerCase().includes(query)) return false
