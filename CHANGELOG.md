@@ -2,6 +2,17 @@
 
 ## 未发布
 
+### 修掉一个**说错了的注释**：`sweep` 头部的步骤顺序
+
+- `scripts/sweep.mjs` 头部写着 `Steps: go, vitest, lint, build, e2e, pages, docs` ✗ ——
+  而它实际跑的是 **go, vitest, lint, e2e, pages, docs, build**（`build` 在 `steps` 里是最后一个键 ✓，
+  且 `--only=docs` 会插入 `pages-build` 从而在末尾再拖一个 `build` ✓）。
+- 为什么值得专门改：**过时的说明读起来和错的说明一模一样** ✗ ——这正是 ROADMAP §七 那条规矩
+  （"要么由数据决定，要么跟着改动一起删"）**应用到工具自己的注释上** ✓。
+- 顺带把两件"看起来奇怪但故意如此"的事写在同一处：`build` 在最后是为了让仓库停在普通构建 ✓；
+  `--only=docs` 自动插 `pages-build` 是为了让 artifact 测试有东西可读 ✓。
+- 改动只动注释 ✓；`--only=docs` 九步全过（脚本本身照常工作 ✓）。
+
 ### 契约补第 17 条：带订正筛选的错题列表（`/mistakes?corrected=yes`）
 
 - 同第 222 轮 `?subject=` 那一条的道理：**读者按下「订正过」chip 时请求的正是这条** ✓，

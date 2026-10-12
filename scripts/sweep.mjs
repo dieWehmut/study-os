@@ -10,7 +10,13 @@
 //
 //   node scripts/sweep.mjs [--only=<step>]...
 //
-// Steps: go, vitest, lint, build, e2e, pages, docs
+// Steps, in the order they run: go, vitest, lint, e2e, pages, docs, build.
+//
+// build is last on purpose (it validates the normal variant and leaves the repository
+// with that build in dist), and --only=docs inserts a pages-build before the docs tests,
+// which drags a second, final build behind it. The list used to say "build" before
+// "e2e", which is not what this file does -- an outdated sentence reads exactly like a
+// wrong one (§七 of ROADMAP).
 import { mkdirSync, readdirSync, rmSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import { dirname, join, resolve } from "node:path"
