@@ -2,6 +2,23 @@
 
 ## 未发布
 
+### 自我更正：上一轮那句"**只动详情那一处**"是错的 —— 但换来的形状更便宜
+
+- 上一轮我写下三步形状，其中第 2 步说"给 `models.KnowledgeItem` 加 `Archived` 并让**详情那一处**
+  SELECT/scan 带上它"✗。这一轮先去看了一眼详情查询（`store.go:143` ✓）⇒ **它和另外三处一样，
+  都汇到同一个 `scanKnowledgeItem`** ✓ ⇒ **给 scan 加一列，就要求四处 SELECT 全加** ✗
+  ⇒ 我上一轮说的"只动一处"**根本不可能** ✗（我又一次在没看代码前把成本估低了 ✓——与第 274 轮同一个毛病 ✓）。
+- **更好的形状**（照第 274 轮那个成功判断再做一次 ✓）：**不要碰 scan，也不要碰任何 SELECT** ✓，
+  而是加一个**只查一处的小方法** ✓ ——
+  `Store.KnowledgeArchived(ctx, id) (bool, error)` ✓（''SELECT 1 FROM knowledge_items WHERE id = ? AND
+  archived_at != '''' '' 一行 ✓，与 `ArchivedKnowledgeIDs` 并排 ✓），
+  在**详情读取**的响应里多答一个 `archived` ✓（就像它已经答 `scheduled` ✓）。
+- ⇒ 成本从"模型 + 4 处 SELECT + scan"（6 处 ✗）降到"**1 个新方法 + 详情响应 1 个字段**" ✓（2-3 处 ✓），
+  而且**与 `scheduled` 的既有做法完全同形** ✓（详情读答单条状态、列表答 `*_ids` ✓——两边各司其职 ✓）。
+- 前端那两步不变 ✓：`selectedArchived` 写成与 `selectedQueued` 同形的一行 ✓（列表来源 `archivedIds` ✓
+  + 详情来源 `selectedDetail.archived` ✓），面板用它初始化按钮文案 ✓。
+- 本轮无代码改动；工作区与远端一致 ✓（无待推送 ✓）。
+
 ### 下一处的形状查清了：**详情面板的「归档 / 取消归档」也要看得到已归档状态**
 
 - **问题**（读代码确认 ✓，不是猜 ✗）：面板的 `archivedHere` 是**面板自己的局部状态** ✓（第 234 轮 ✓），
