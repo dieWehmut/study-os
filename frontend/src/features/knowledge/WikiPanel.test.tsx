@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react"
+import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WikiPanel } from "./WikiPanel"
@@ -42,7 +43,13 @@ const item: KnowledgeItem = {
  */
 function Harness({ start, scheduled = false }: { start: KnowledgeItem; scheduled?: boolean }) {
   const [current, setCurrent] = useState(start)
-  return <WikiPanel item={current} onUpdated={setCurrent} scheduled={scheduled} />
+  // A Router, because the panel links to the list's 显示已归档 switch: rendering it bare
+  // would fail the moment a Link appears, and that failure would say nothing about the panel.
+  return (
+    <MemoryRouter>
+      <WikiPanel item={current} onUpdated={setCurrent} scheduled={scheduled} />
+    </MemoryRouter>
+  )
 }
 
 function openMap() {
