@@ -209,3 +209,14 @@ test("归档 只写标记，不删任何行（§8.1 验收 ④）", () => {
   // 而知识条目本身**没有**删除路由：§8.1 的「明确不做」。
   assert.doesNotMatch(router, /api\.Delete\("\/knowledge\/\{knowledgeID\}"\s*,/, "知识条目不该有删除路由")
 })
+test("§8.1 的归档已落地：文档说法与代码一致", () => {
+  // 这一节从"形状"变成"已实现"花了 231-241 轮，而文档一度还挂着「未实现」。
+  // 过时的说明读起来和错的一模一样（§七），所以把它绑在代码上：方法在 ⇒ 文档不许再说未实现。
+  const store = read("backend/db/store.go")
+  assert.match(store, /func \(s \*Store\) SetKnowledgeArchived/, "归档的 store 方法不在了")
+  assert.match(roadmap, /8\.1[^\n]*已实现/, "§8.1 没说清它已实现")
+  assert.doesNotMatch(roadmap, /8\.1[^\n]*未实现/, "§8.1 仍写着未实现，而它已经落地")
+  // 反向那条也要在：归档不许退化成删除。
+  const router = read("backend/httpapi/router.go")
+  assert.doesNotMatch(router, /api\.Delete\("\/knowledge\/\{knowledgeID\}"\s*,/, "知识条目不该有删除路由")
+})
