@@ -283,3 +283,23 @@ test("演示版的 limit 默认值与上限，和真机的 parseLimit 是同一�
   assert.match(demo, new RegExp(`Math\\.min\\([\\s\\S]*?,\\s*${ceiling}\\)`), `演示版没有 ${ceiling} 这个上限`)
   assert.match(demo, new RegExp(`:\\s*${fallback}\\b`), `演示版没有 ${fallback} 这个默认值`)
 })
+test("每一条真机路由都必须在演示版有分支或属于本地才有名单", () => {
+  // 整体视角的护栏（第 364 轮数出来：真机 85 条、演示版 70 个分支）。逐点核对只能保证同名同义，
+  // 保不住整块漏掉 —— 这条守的就是后者。
+  // Two kinds, one list, because both mean "the Pages app cannot answer this": routes that need the
+  // local machine (audio, speech, agent, update, system, health), and the lesson feature, which the
+  // demo deliberately keeps backend-only (its writes are refused there, so its links are too).
+  const BACKEND_ONLY = ["/health", "/system", "/agent", "/update", "/audio", "/speech", "/lessons", "/lesson-links"]
+  const router = read("backend/httpapi/router.go")
+  const roots = new Set()
+  for (const match of router.matchAll(/api\.(?:Get|Post|Put|Delete)\("(\/[^"]*)"/g)) {
+    const path = match[1]
+    if (BACKEND_ONLY.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) continue
+    roots.add(path.split("/")[1])
+  }
+  assert.ok(roots.size > 10, `只认出 ${roots.size} 个根，正则可能失效了`)
+
+  const demo = read("frontend/src/api/static-demo.ts")
+  const missing = [...roots].filter((root) => !demo.includes(`root === "${root}"`))
+  assert.deepEqual(missing, [], `演示版没有这些根的分支：${missing.join(", ")}（共 ${roots.size} 个根）`)
+})
