@@ -427,6 +427,10 @@ describe("static Pages API fixtures", () => {
       ["/lessons/lesson-newton/practice/practice/attempts", ["items", "count"]],
       ["/mistakes", ["items", "count"]],
       ["/reviews/due", ["items"]],
+      // The same queue under a subject chip. It answers the same envelope; an empty page
+      // is fine (the demo may have nothing due for that subject), but a different shape
+      // would break 记忆 as soon as a chip was pressed.
+      ["/reviews/due?subject=math", ["items"]],
       ["/reviews/forecast", ["days"]],
       ["/dashboard", ["knowledge_count", "due_count", "reviewed_today", "current_streak", "subjects_due"]],
       ["/error-causes", ["items"]],
