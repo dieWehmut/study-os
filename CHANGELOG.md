@@ -2,6 +2,24 @@
 
 ## 未发布
 
+### 前端三处的锚点**已查到大半**（第 5 次"先只读一步"）
+
+- 上一轮把后端接好了 ✓，这一轮读前端三处的地址 ✓：
+  - `Knowledge.tsx:87` ⇒ `const [scheduledIds, setScheduledIds] = useState<ReadonlySet<string>>(new Set())` ✓
+    ——**这就是要照抄的那一行** ✓（加一个 `archivedIds` 状态 ✓）；
+  - 它由 `result.scheduled_ids` 喂：`:157`（追加下一页 ✓）与 `:173`（整页替换 ✓）
+    ⇒ **同样两处各加一份** `result.archived_ids` ✓；
+  - `:214` 用它决定"当前选中条目是否已排复习" ✓（与 `selectedDetail.scheduled` 兜底 ✓）——
+    归档标记若也要在**详情面板**上显示，可以走同一条路 ✓（下一轮决定要不要 ✓）。
+- **还差两处没看**（下一轮第一步，各一次 grep 即可 ✓）：
+  1. `KnowledgeListResponse` **不在** `types.ts` ✗（grep 无命中 ✓）⇒ 它应该在 `api/knowledge.ts` 或就地内联 ✓
+     （要给它加 `archived_ids?: string[]` ✓）；
+  2. `scheduledIds` **怎么传给 `KnowledgeList`** ✗ ——前 6 条命中里没看到传 prop 的那处 ✓
+     （`KnowledgeList.tsx:24` 确实声明了 `scheduledIds?: ReadonlySet<string>` ✓，所以传参一定在某处 ✓）。
+- ⇒ 下一轮就是：**两处 grep → 三处编辑（类型 / 状态与喂值 / prop 与行标记）→ 用例 → 完整 sweep** ✓ ——
+  形状清楚、锚点剩两个 ✓，**不再需要"只记不动手"** ✓。
+- 本轮无代码改动；工作区与远端一致 ✓（无待推送 ✓）。
+
 ### 配方第 2、3 步：接口开始回答 `archived_ids`（含用例）
 
 - `handleKnowledgeList` 里照 `scheduled_ids` 的**那两行**在旁边加了一份 ✓：调 `ArchivedKnowledgeIDs` ✓、
