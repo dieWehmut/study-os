@@ -548,6 +548,34 @@ describe("static Pages API fixtures", () => {
     expect(articles.items).toHaveLength(1)
   })
 
+  it("hides an archived item from the demo list and brings it back when asked", async () => {
+    // 归档 shipped in the panel; without this the demo's 归档 button threw
+    // 「展示模式没有实现这个操作」. Same shape as the real one: default hides, ?archived=yes
+    // widens, anything else is a bad request, and the single read keeps answering.
+    const list = await staticDemoRequest<{ items: Array<{ id: string }> }>("/knowledge")
+    const target = list.items[0]!.id
+
+    const archived = await staticDemoRequest<{ status: string }>(`/knowledge/${target}/archive`, { method: "POST" })
+    expect(archived.status).toBe("archived")
+
+    const hidden = await staticDemoRequest<{ items: Array<{ id: string }> }>("/knowledge")
+    expect(hidden.items.map((entry) => entry.id)).not.toContain(target)
+
+    const asked = await staticDemoRequest<{ items: Array<{ id: string }> }>("/knowledge?archived=yes")
+    expect(asked.items.map((entry) => entry.id)).toContain(target)
+
+    // The deep link keeps working -- that is the point of 归档 rather than 删除.
+    const detail = await staticDemoRequest<{ id: string }>(`/knowledge/${target}`)
+    expect(detail.id).toBe(target)
+
+    await expect(staticDemoRequest("/knowledge?archived=maybe")).rejects.toThrow()
+
+    const restored = await staticDemoRequest<{ status: string }>(`/knowledge/${target}/archive`, { method: "DELETE" })
+    expect(restored.status).toBe("unarchived")
+    const back = await staticDemoRequest<{ items: Array<{ id: string }> }>("/knowledge")
+    expect(back.items.map((entry) => entry.id)).toContain(target)
+  })
+
   it("restores the demo to its fixture instead of refusing the operation", async () => {
     // 恢复备份 is wired to DELETE /backups/restore. In the demo it can honestly mean
     // "put the sample data back": without a branch the button threw

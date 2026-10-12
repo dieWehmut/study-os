@@ -82,6 +82,10 @@ interface StaticState {
   sequence: number
   knowledge: KnowledgeItem[]
   scheduled: Set<string>
+  // 归档（§8.1）: items put away. The demo needs this for the same reason the real one
+  // does -- 归档 shipped in the panel, and a demo where that button throws is worse than
+  // one without the button.
+  archived: Set<string>
   groups: KnowledgeGroup[]
   due: DueReview[]
   // The cards this session answered wrong, which is what 恢复模式 asks for. Without
@@ -416,6 +420,7 @@ function makeInitialState(): StaticState {
     // neither -- which is what three probes were spent finding.
     sequence: 1000,
     knowledge,
+    archived: new Set<string>(),
     scheduled: new Set(["knowledge-last", "knowledge-spaced-repetition"]),
     groups: [
       { id: "english-core", name: "English core", kind: "tag" },
@@ -683,6 +688,14 @@ function knowledgeList(url: URL): KnowledgeListResponse {
   const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0)
   const limit = Math.max(1, Number(url.searchParams.get("limit") ?? 100) || 100)
   const filtered = state.knowledge.filter((item) => {
+    // 归档 hides by default and comes back when asked, exactly like the real list:
+    // `?archived=yes` widens, anything else is a bad request rather than a silent empty
+    // page (the real handler answers 400 the same way).
+    const archivedParam = url.searchParams.get("archived")
+    if (archivedParam !== null && archivedParam !== "" && archivedParam !== "yes" && archivedParam !== "no") {
+      throw new StaticDemoError("archived must be yes or no", 400)
+    }
+    if (archivedParam !== "yes" && state.archived.has(item.id)) return false
     if (subject && item.subject !== subject) return false
     if (query && !`${item.term} ${item.concise_definition}`.toLowerCase().includes(query)) return false
     if (tag && !(item.tags ?? []).some((entry) => entry.toLowerCase() === tag)) return false
@@ -1010,6 +1023,20 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
   }
   if (root === "knowledge" && id && action === "mastery" && method === "GET") {
     return responseFor(staticKnowledgeMastery(id)) as T
+  }
+  if (root === "knowledge" && id && action === "archive" && (method === "POST" || method === "DELETE")) {
+    // 归档 / 取消归档. Neither deletes anything: the item keeps its cards and attempts and
+    // stays readable by id -- "I do not want to see this in the library" is not "this
+    // never existed" (ROADMAP §8.1).
+    const item = state.knowledge.find((entry) => entry.id === id)
+    if (!item) throw new StaticDemoError("Static demo knowledge item not found", 404)
+    const archiving = method === "POST"
+    if (archiving) {
+      state.archived.add(id)
+    } else {
+      state.archived.delete(id)
+    }
+    return responseFor({ status: archiving ? "archived" : "unarchived", knowledge_id: id }) as T
   }
   if (root === "knowledge" && id && action === "schedule" && method === "POST") {
     const item = state.knowledge.find((entry) => entry.id === id)
