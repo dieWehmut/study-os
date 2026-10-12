@@ -467,6 +467,33 @@ describe("static Pages API fixtures", () => {
     expect(articles.items).toHaveLength(1)
   })
 
+  it("takes a scheduled item back out of the queue, the way the real endpoint does", async () => {
+    // 取消排复习 shipped before the demo learned it: the button existed and threw
+    // 「展示模式没有实现这个操作」. A control that exists and fails is worse than one that
+    // is not offered.
+    const before = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
+    const scheduledID = before.scheduled_ids[0]
+    expect(scheduledID).toBeTruthy()
+
+    const removed = await staticDemoRequest<{ status: string; prompts_removed: number }>(
+      `/knowledge/${scheduledID}/schedule`,
+      { method: "DELETE" },
+    )
+    expect(removed.status).toBe("unscheduled")
+    expect(removed.prompts_removed).toBe(1)
+
+    const after = await staticDemoRequest<{ scheduled_ids: string[] }>("/knowledge")
+    expect(after.scheduled_ids).not.toContain(scheduledID)
+
+    // And the queue agrees: it is not due any more.
+    const due = await staticDemoRequest<{ items: Array<{ knowledge: { id: string } }> }>("/reviews/due?limit=50")
+    expect(due.items.map((entry) => entry.knowledge.id)).not.toContain(scheduledID)
+
+    // Idempotent, like the real one: nothing left to remove is not an error.
+    const again = await staticDemoRequest<{ prompts_removed: number }>(`/knowledge/${scheduledID}/schedule`, { method: "DELETE" })
+    expect(again.prompts_removed).toBe(0)
+  })
+
   it("narrows the demo mistake list by search and 错因, not just by subject", async () => {
     // A filter the demo ignores is one a visitor spends a request on and sees
     // nothing change, which reads as broken rather than as a demo limitation.

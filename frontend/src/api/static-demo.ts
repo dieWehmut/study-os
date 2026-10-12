@@ -1021,6 +1021,18 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     }
     return responseFor({ status: already ? "already_scheduled" : "scheduled", knowledge_id: id, prompt_count: 1 }) as T
   }
+  if (root === "knowledge" && id && action === "schedule" && method === "DELETE") {
+    // 取消排复习. Without this the button threw 「展示模式没有实现这个操作」 on the Pages
+    // demo -- a control that exists and fails is worse than one that is not offered.
+    // Mirrors the real endpoint: the plan goes, the cards stay, and 200 comes back
+    // whether or not anything was there.
+    const item = state.knowledge.find((entry) => entry.id === id)
+    if (!item) throw new StaticDemoError("Static demo knowledge item not found")
+    const wasScheduled = state.scheduled.has(id)
+    state.scheduled.delete(id)
+    state.due = state.due.filter((entry) => entry.knowledge.id !== id)
+    return responseFor({ status: "unscheduled", knowledge_id: id, prompts_removed: wasScheduled ? 1 : 0 }) as T
+  }
   if (root === "knowledge" && id && action === "wiki" && method === "PUT") {
     const item = state.knowledge.find((entry) => entry.id === id)
     if (!item) throw new StaticDemoError("Static demo knowledge item not found")
