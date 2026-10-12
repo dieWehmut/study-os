@@ -47,13 +47,18 @@ describe("RecognitionPrompt", () => {
     await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalledWith("p1", rating))
   })
 
-  it("takes 1, 2 and 3 from the keyboard while a card is being rated", async () => {
+  it.each<[string, 1 | 2 | 3 | 4]>([
+    ["1", 1],
+    ["2", 2],
+    ["3", 3],
+    ["4", 4],
+  ])("takes %s from the keyboard while a card is being rated", async (key, rating) => {
     // Drilling is repetitive: reaching for the mouse on every card is the slow part.
     render(<RecognitionPrompt current={current} onNext={vi.fn()} onError={vi.fn()} />)
 
-    fireEvent.keyDown(window, { key: "2" })
+    fireEvent.keyDown(window, { key })
 
-    await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalledWith("p1", 2))
+    await waitFor(() => expect(mocks.submitSelfRating).toHaveBeenCalledWith("p1", rating))
   })
 
   it("moves on with Enter once the answer is shown", async () => {
