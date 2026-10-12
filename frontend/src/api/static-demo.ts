@@ -90,7 +90,7 @@ interface StaticState {
   due: DueReview[]
   // The cards this session answered wrong, which is what 恢复模式 asks for. Without
   // them the recovery toggle had nothing to recover and simply redrew the queue.
-  recovery: DueReview[]
+
   messages: ChatMessage[]
   qaRecords: Map<string, StaticQARecord>
   notes: IntegratedNote[]
@@ -428,7 +428,7 @@ function makeInitialState(): StaticState {
       { id: "mechanics", name: "Mechanics", kind: "tag" },
     ],
     due: [makeDue(knowledge[0], 0), makeDue(knowledge[1], 1), makeDue(knowledge[2], 2)],
-    recovery: [],
+
     messages,
     qaRecords: new Map(),
     notes: [makeNote()],
@@ -1146,7 +1146,7 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
       { 1: "incorrect", 2: "partial", 3: "correct", 4: "correct" } as const
     )[selfRating as 1 | 2 | 3 | 4]
     const outcome: ReviewEvaluation["outcome"] = selfRated ?? graded
-    if (outcome === "incorrect") state.recovery = [...state.recovery.filter((entry) => entry.prompt.id !== id), due]
+    // No bookkeeping for "answered wrong": 恢复模式 is a prompt-type filter (db/store.go:624-626),
     const evaluation: ReviewEvaluation = {
       attempt_id: newID("attempt"),
       outcome,
