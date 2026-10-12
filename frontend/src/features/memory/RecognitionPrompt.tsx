@@ -4,10 +4,12 @@ import { submitSelfRating } from "@/api/reviews"
 import type { DueReview, ReviewEvaluation } from "@/api/types"
 import { Button } from "@/components/ui/button"
 
-const ratings: { value: 1 | 2 | 3; label: string; variant: "outline" | "default" }[] = [
+const ratings: { value: 1 | 2 | 3 | 4; label: string; variant: "outline" | "default" }[] = [
   { value: 1, label: "不认识", variant: "outline" },
   { value: 2, label: "模糊", variant: "outline" },
   { value: 3, label: "认识", variant: "default" },
+  // 一眼就会 (§十): the far end of the ladder -- 认识 still asks again soon, this one does not.
+  { value: 4, label: "一眼就会", variant: "outline" },
 ]
 
 interface RecognitionPromptProps {
@@ -23,7 +25,7 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
   const [submitting, setSubmitting] = useState(false)
 
   // Stable so the key listener is not torn down and rebuilt on every render.
-  const rate = useCallback(async (value: 1 | 2 | 3) => {
+  const rate = useCallback(async (value: 1 | 2 | 3 | 4) => {
     if (submitting || evaluation) return
     setSubmitting(true)
     try {
@@ -56,7 +58,7 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
         onNext()
         return
       }
-      const rating = { "1": 1, "2": 2, "3": 3 }[event.key] as 1 | 2 | 3 | undefined
+      const rating = { "1": 1, "2": 2, "3": 3, "4": 4 }[event.key] as 1 | 2 | 3 | 4 | undefined
       if (!rating || submitting) return
       event.preventDefault()
       void rate(rating)
@@ -88,7 +90,7 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
       ) : (
         <fieldset className="grid gap-2" aria-label="自评掌握程度">
           <legend className="text-sm font-medium">先在心里回答，再选择你的掌握程度</legend>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {ratings.map(({ value, label, variant }) => (
               <Button
                 key={value}
@@ -104,7 +106,7 @@ export function RecognitionPrompt({ current, onNext, onError, onRated }: Recogni
             ))}
           </div>
           {/* Drilling is repetitive by design, so the keys are worth saying out loud. */}
-          <p className="text-xs text-muted-foreground">键盘：1 不认识 · 2 模糊 · 3 认识</p>
+          <p className="text-xs text-muted-foreground">键盘：1 不认识 · 2 模糊 · 3 认识 · 4 一眼就会</p>
         </fieldset>
       )}
 

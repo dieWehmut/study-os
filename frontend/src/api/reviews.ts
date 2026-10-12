@@ -61,7 +61,7 @@ export async function answerReview(
 
 export async function overrideAttempt(
   attemptId: string,
-  rating: 1 | 2 | 3,
+  rating: 1 | 2 | 3 | 4,
 ): Promise<ReviewEvaluation> {
   const evaluation = await apiRequest<AnswerPayload>(`/attempts/${attemptId}/override`, {
     method: "POST",
@@ -72,7 +72,7 @@ export async function overrideAttempt(
 
 export async function submitSelfRating(
   promptId: string,
-  rating: 1 | 2 | 3,
+  rating: 1 | 2 | 3 | 4,
 ): Promise<ReviewEvaluation> {
   const evaluation = await apiRequest<AnswerPayload>(`/reviews/${promptId}/answer`, {
     method: "POST",
