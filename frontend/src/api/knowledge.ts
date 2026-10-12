@@ -12,6 +12,12 @@ export interface ListKnowledgeOptions {
    * union is deliberately not `string`.
    */
   scheduled?: "yes" | "no"
+  /**
+   * Widen to 已归档 items as well ("yes"). Omitted means the default view, which hides
+   * them -- deliberately the opposite default of `scheduled`, because everything you can
+   * see should not have to ask for itself (ROADMAP §8.1).
+   */
+  archived?: "yes" | "no"
   limit?: number
   offset?: number
 }
@@ -47,6 +53,9 @@ export function listKnowledge(options: ListKnowledgeOptions = {}): Promise<Knowl
   if (options.subject !== undefined) params.set("subject", options.subject)
   if (options.tag !== undefined) params.set("tag", options.tag)
   if (options.scheduled !== undefined) params.set("scheduled", options.scheduled)
+  // 归档 widens rather than filters: the list hides what was put away unless the caller
+  // says "show me those too" (ROADMAP §8.1). Only "yes" is ever worth sending.
+  if (options.archived !== undefined) params.set("archived", options.archived)
   if (options.limit !== undefined) params.set("limit", String(options.limit))
   if (options.offset !== undefined) params.set("offset", String(options.offset))
   const suffix = params.toString()

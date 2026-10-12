@@ -2,6 +2,16 @@
 
 ## 未发布
 
+### 归档收尾（前半）：客户端 `listKnowledge` 支持 `archived`
+
+- 接口（236）、演示版（238）、契约（239）都已就绪 ✓，差的只是**谁知道要问** ✗。
+  这一轮补上客户端：`ListKnowledgeOptions.archived?: "yes" | "no"` ✓ + 拼进查询串 ✓ ——
+  文档注释里写明它是**加宽**而不是筛选，且**默认与 `scheduled` 相反**（"能看到的全部"不该反过来申请 ✓ §8.1）。
+- **这一轮刻意只做前半**：完整的前端开关要动 `Knowledge.tsx` 的 chip 行与取数（约 3-4 处编辑 ✗），
+  本轮余量不足 ✗ ⇒ 不做"接了半根线"的界面 ✗，只把**下一轮要用到的那个参数**备好 ✓。
+  **下一轮就是用它**（不像 `IncludeArchived` 那样搁了四轮才有人用 ✗ ——第 236 轮的教训 ✓）。
+- 验证：`pnpm build` ✓、`static-demo` 与 `Knowledge` 两个测试文件 **92 条全过** ✓；随后完整 sweep。
+
 ### 契约补第 19 条：`/knowledge?archived=yes`
 
 - 与 `?scheduled=yes` / `?subject=` / `?corrected=` 同一类：**读者要"全部（含归档）"时请求的正是这条** ✓，
