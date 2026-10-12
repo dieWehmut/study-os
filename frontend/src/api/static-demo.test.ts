@@ -1075,3 +1075,30 @@ describe("static Pages API fixtures", () => {
     })).rejects.toMatchObject({ status: 404 })
   })
 })
+
+it("reads the fourth self-rating back, and refuses one that is out of range", async () => {
+  // 一眼就会 (§十) has to survive the demo's own answer path: the fourth button is drawn from
+  // the same request the real backend answers, so a demo that ignored self_rating would make
+  // that button do nothing at all -- while still looking like it worked.
+  //
+  // Two details, both read out of static-demo.ts rather than guessed: the route is
+  // `POST /reviews/{promptId}/answer` (not /prompts/…), and answering takes the card out of
+  // the queue, so the second call needs a different one.
+  const due = await staticDemoRequest<{ items: { prompt: { id: string } }[] }>("/reviews/due?limit=50")
+  expect(due.items.length).toBeGreaterThan(1)
+
+  const rated = await staticDemoRequest<{ rating: number; outcome: string }>(
+    `/reviews/${due.items[0].prompt.id}/answer`,
+    { method: "POST", body: JSON.stringify({ answer: "", self_rating: 4 }) },
+  )
+  expect(rated.rating).toBe(4)
+  expect(rated.outcome).toBe("correct")
+
+  // And the refusal travels too: the real handler answers 400, so the demo must not accept 9.
+  await expect(
+    staticDemoRequest(`/reviews/${due.items[1].prompt.id}/answer`, {
+      method: "POST",
+      body: JSON.stringify({ answer: "", self_rating: 9 }),
+    }),
+  ).rejects.toThrow("self_rating must be 1, 2, 3, or 4")
+})
