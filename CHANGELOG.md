@@ -2,6 +2,24 @@
 
 ## 未发布
 
+### 实验证明：schema 版本升级是**原子的**，不能拆成小步——因此这一步应当**推迟到有余量的一轮**
+
+- 上一轮写下的动手顺序是"四步、每步可验证"。这一轮先验证"第一步单独提交"是否成立：**不成立**。
+  只把 `currentSchemaVersion` 改成 20（不加 `case 20`）⇒ `go test ./backend/db/` **大面积变红**：
+  `
+  --- FAIL: TestStoreUpgradesSchemaVersionFifteenWithErrorCauseTaxonomy
+      upgrade version 15 store: unsupported migration version 20
+  --- FAIL: TestStoreUpgradesSchemaVersionTwoWithGroupsAndAudioColumns
+  --- FAIL: TestStoreUpgradesSchemaVersionThirteenWithLessonAttemptTable
+  `
+  ⇒ **常量、`migrate` 的 `case 20`、`verifySchema` 的 `case 20`（以及 `schema.sql` 与 ROADMAP 顶部版本号）
+  必须一起落地**，中间任何状态都是红的 ⇒ 这不是"四个小提交"，是**一个原子改动 + 两个同步点**。
+- 这与"分步 commit 拆小任务"的原则表面冲突，实际不冲突：**能拆的是功能，不是版本号**。
+  硬拆只会得到一连串红的中间态（第 199、201、202 轮已经各得到一次）。
+- **诚实结论**：为一个"加一列"的需求，我在 199-203 这五轮里花的都是准备与失败排查。**这是信号，不是进度**——
+  正确的做法是**把它推迟到一轮余量充足时一次做完**，而不是继续用零碎余量切它。
+- 本轮无净代码改动，工作区绿灯 ✓；§8.1 的归档计划与三处改动清单完整保留，随时可以直接执行。
+
 ### 归档第一步：形状已经查清（**三处**），但**脚本式多处替换连续第三次把文件改坏** ⇒ 再次还原
 
 - 这一轮把机制彻底读懂了。加一个 schema 版本需要在**三处**同时接上：
