@@ -200,3 +200,15 @@ describe("ImportWizard", () => {
     expect(mocks.uploadImport).toHaveBeenCalledTimes(2)
   })
 })
+
+  it("names all four stages, and none of the three-stage wording it used to show", () => {
+    // The wizard's own description says 上传 → 映射 → 预览 → 提交, and the badges beside it used to
+    // show three (folding 映射 into 预览), so the row contradicted itself at a glance. This asserts
+    // the wording, not the markup: a class rename should not break it, a step going missing should.
+    render(<ImportWizard />)
+
+    for (const label of ["1 上传", "2 映射", "3 预览", "4 提交"]) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+    expect(screen.queryByText("3 完成")).toBeNull()
+  })
