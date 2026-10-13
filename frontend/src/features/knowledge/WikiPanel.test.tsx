@@ -66,7 +66,7 @@ function rename(from: string, to: string) {
 describe("WikiPanel node renaming", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [], archived_ids: [] })
     mocks.getKnowledgeMastery.mockResolvedValue({
       knowledge_item_id: "k1",
       subject: "english",
@@ -91,7 +91,7 @@ describe("WikiPanel node renaming", () => {
   it("puts an item away without deleting it, and says where it went", async () => {
     // 归档 is not 删除: the cards, the review states and every attempt stay, and a link to
     // the item still opens -- so the note has to say what actually happened.
-    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [], archived_ids: [] })
     mocks.archiveKnowledge.mockResolvedValue({ status: "archived", knowledge_id: "k1" })
     mocks.unarchiveKnowledge.mockResolvedValue({ status: "unarchived", knowledge_id: "k1" })
     render(<Harness start={item} />)
@@ -116,7 +116,7 @@ describe("WikiPanel node renaming", () => {
     // 排进复习 used to be one-way and the panel said so. Now there is an undo, so the
     // sentence is gone and the control is here -- a note that outlives its truth is
     // worse than no note.
-    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [], archived_ids: [] })
     mocks.unscheduleKnowledge.mockResolvedValue({ status: "unscheduled", knowledge_id: "k1", prompts_removed: 3 })
     render(<Harness start={item} scheduled />)
 
@@ -203,7 +203,7 @@ describe("WikiPanel node renaming", () => {
 describe("WikiPanel English mastery", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [] })
+    mocks.listRelatedKnowledge.mockResolvedValue({ items: [], groups: [], archived_ids: [] })
     mocks.getKnowledgeMastery.mockResolvedValue({
       knowledge_item_id: "word-last",
       subject: "english",
@@ -244,3 +244,22 @@ describe("WikiPanel 信息图 tab", () => {
     expect(screen.getByRole("img", { name: /流程/ })).toBeInTheDocument()
   })
 })
+
+  it("marks the sibling the server reports as 已归档, and only that one", async () => {
+    // A 词族 keeps archived items (§8.1 hides them from the default list only), so the panel has
+    // to say which ones the reader put away -- otherwise the family looks like it always did.
+    mocks.listRelatedKnowledge.mockResolvedValue({
+      items: [
+        { ...item, id: "k2", term: "兄弟已归档" },
+        { ...item, id: "k3", term: "兄弟未归档" },
+      ],
+      groups: [],
+      archived_ids: ["k2"],
+    })
+    render(<Harness start={item} />)
+
+    const marker = await screen.findByText("已归档")
+    expect(marker).toHaveAttribute("data-archived-marker", "true")
+    // One marker for two siblings: it belongs to the archived one, not to the section.
+    expect(screen.getAllByText("已归档")).toHaveLength(1)
+  })
