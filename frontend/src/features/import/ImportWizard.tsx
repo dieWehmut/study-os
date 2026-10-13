@@ -133,9 +133,14 @@ export function ImportWizard() {
             <CardDescription className="mt-1">上传 → 映射 → 预览 → 提交</CardDescription>
           </div>
           <div className="flex flex-wrap gap-1.5" aria-label="导入进度">
-            <Badge variant={uploadResult ? "default" : "secondary"}>1 上传</Badge>
-            <Badge variant={preview ? "default" : "secondary"}>2 预览</Badge>
-            <Badge variant={commit ? "default" : "secondary"}>3 完成</Badge>
+            {/* Four badges, because there are four screens: 上传 -> 字段映射 -> 预览 -> 提交, which is
+                what the description right beside this says. It used to be three, folding the mapping
+                step into 预览 -- so the row contradicted itself at a glance. Each badge still tracks a
+                real state, so this is live progress rather than a second description. */}
+            <Badge variant={!uploadResult ? "default" : "secondary"}>1 上传</Badge>
+            <Badge variant={uploadResult && !preview && !commit ? "default" : "secondary"}>2 映射</Badge>
+            <Badge variant={preview && !commit ? "default" : "secondary"}>3 预览</Badge>
+            <Badge variant={commit ? "default" : "secondary"}>4 提交</Badge>
           </div>
         </div>
       </CardHeader>
