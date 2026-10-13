@@ -11,6 +11,9 @@ interface BreadcrumbProps {
 export function Breadcrumb({ className }: BreadcrumbProps) {
   const location = useLocation()
 
+  // 首页 has no crumb on purpose: you are already at 学习 OS, so a crumb would only repeat it.
+  // The spacer is not an oversight -- it keeps the row full-width so the buttons on the right
+  // stay put. It is the crumb that is absent, not the header.
   if (location.pathname === "/") {
     return <div className="flex-1" />
   }
