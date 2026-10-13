@@ -2,6 +2,22 @@
 
 ## 未发布
 
+### 相关条目归档标记：**三处编辑的目标行都定位了**（下一轮照抄 ✓）
+
+- 这一轮把剩下的两处也读了 ✓（第 377 轮做的是后端 ✓）：
+  | 处 | 位置 | 要改什么 |
+  |---|---|---|
+  | 类型 | `api/knowledge.ts:130-133` ✓ | `RelatedKnowledge` 加 `archived_ids: string[]` ✓ |
+  | 面板状态 | `WikiPanel.tsx:83` ✓ | `emptyFamily: RelatedKnowledge = { items: [], groups: [] }` ✗ ⇒ **补 `archived_ids: []`** ✓（**否则新字段在这里是 undefined** ✗——这类"空初值漏字段"最容易在运行时才炸 ✗） |
+  | 面板数据 | `WikiPanel.tsx:115/155` ✓ | `family` 状态与 `listRelatedKnowledge` 的加载处 ✓（**不必改** ✓，字段随响应一起来 ✓） |
+  | 演示版 | `static-demo.ts:1021` ✓ | `root === "knowledge" && action === "related"` ✓ 的返回里加 `archived_ids` ✓ |
+  | 契约 | `static-demo.test.ts` ✓ | `/knowledge/{knowledgeId}/related` 那行字段表加 `archived_ids` ✓ |
+- **还差一眼** ✗：面板**渲染 family 的那段行标记** ✗（要照第 282 轮主列表那段的 `data-archived-marker` 手法 ✓）；
+  它的行号没在这一轮读到 ✓ ⇒ **下一轮第一步就是读那一段** ✓（**不盲改** ✗）。
+- **下一轮仍是"一次做完"** ✓：类型 ✓ + `emptyFamily` ✓ + 面板行标记 ✓ + 演示版 ✓ + 契约与用例 ✓
+  ⇒ **先跑 `vitest`** ✓（前端的改动能立刻验 ✓），**再跑完整 sweep** ✓。
+- 本轮无代码改动（读证 ✓）；工作区与远端一致 ✓。
+
 ### 相关条目的 `archived_ids`：**后端两行落地**（第三处复用 `ArchivedKnowledgeIDs` ✓）
 
 - 按第 376 轮读清的落点做完 ✓：`handleKnowledgeRelated`（`router.go:684` ✓）的兄弟条目收集完之后 ✓，
@@ -73,6 +89,22 @@
 ### 一个该决定、而不是该动手的事：**这份 CHANGELOG 已经 1888 行**（结论：不切分 ✓）
 
 - 数出来 ✓：`CHANGELOG.md` **1888** 行 ✓，其中 `## 未发布
+
+### 相关条目归档标记：**三处编辑的目标行都定位了**（下一轮照抄 ✓）
+
+- 这一轮把剩下的两处也读了 ✓（第 377 轮做的是后端 ✓）：
+  | 处 | 位置 | 要改什么 |
+  |---|---|---|
+  | 类型 | `api/knowledge.ts:130-133` ✓ | `RelatedKnowledge` 加 `archived_ids: string[]` ✓ |
+  | 面板状态 | `WikiPanel.tsx:83` ✓ | `emptyFamily: RelatedKnowledge = { items: [], groups: [] }` ✗ ⇒ **补 `archived_ids: []`** ✓（**否则新字段在这里是 undefined** ✗——这类"空初值漏字段"最容易在运行时才炸 ✗） |
+  | 面板数据 | `WikiPanel.tsx:115/155` ✓ | `family` 状态与 `listRelatedKnowledge` 的加载处 ✓（**不必改** ✓，字段随响应一起来 ✓） |
+  | 演示版 | `static-demo.ts:1021` ✓ | `root === "knowledge" && action === "related"` ✓ 的返回里加 `archived_ids` ✓ |
+  | 契约 | `static-demo.test.ts` ✓ | `/knowledge/{knowledgeId}/related` 那行字段表加 `archived_ids` ✓ |
+- **还差一眼** ✗：面板**渲染 family 的那段行标记** ✗（要照第 282 轮主列表那段的 `data-archived-marker` 手法 ✓）；
+  它的行号没在这一轮读到 ✓ ⇒ **下一轮第一步就是读那一段** ✓（**不盲改** ✗）。
+- **下一轮仍是"一次做完"** ✓：类型 ✓ + `emptyFamily` ✓ + 面板行标记 ✓ + 演示版 ✓ + 契约与用例 ✓
+  ⇒ **先跑 `vitest`** ✓（前端的改动能立刻验 ✓），**再跑完整 sweep** ✓。
+- 本轮无代码改动（读证 ✓）；工作区与远端一致 ✓。
 
 ### 相关条目的 `archived_ids`：**后端两行落地**（第三处复用 `ArchivedKnowledgeIDs` ✓）
 
