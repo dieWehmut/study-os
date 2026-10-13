@@ -130,6 +130,8 @@ export function listGroups(): Promise<KnowledgeGroupListResponse> {
 export interface RelatedKnowledge {
   items: KnowledgeItem[]
   groups: KnowledgeGroup[]
+  /** Which of these siblings are 已归档 (§8.1). Optional: the Pages demo answers without it. */
+  archived_ids?: string[]
 }
 
 /**

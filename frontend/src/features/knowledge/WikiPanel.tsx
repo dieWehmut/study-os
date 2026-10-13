@@ -80,7 +80,7 @@ function chunkMarkdown(markdown: string): string[] {
 
 // One shared value, so a failed or absent answer is the same object every
 // render and the loading effect cannot depend on its identity.
-const emptyFamily: RelatedKnowledge = { items: [], groups: [] }
+const emptyFamily: RelatedKnowledge = { items: [], groups: [], archived_ids: [] }
 
 /**
  * What to call the block.
@@ -523,6 +523,14 @@ export function WikiPanel({
                   onClick={() => onSelectRelated?.(sibling.id)}
                 >
                   {sibling.term}
+                  {/* 归档 siblings stay in a 词族 (§8.1 keeps them everywhere but the default list),
+                      so the reader learns here which ones they put away -- same data attribute as the
+                      list rows, so one test idiom covers both. */}
+                  {family.archived_ids?.includes(sibling.id) ? (
+                    <span className="ml-1 text-[10px] text-muted-foreground" data-archived-marker="true">
+                      已归档
+                    </span>
+                  ) : null}
                 </Button>
               ))}
             </div>
