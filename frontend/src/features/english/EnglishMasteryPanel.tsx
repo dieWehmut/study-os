@@ -115,7 +115,7 @@ export function EnglishMasteryPanel({ item }: EnglishMasteryPanelProps) {
             <div
               key={group.dimension}
               role="listitem"
-              className="grid min-h-20 gap-2 rounded-lg border bg-background px-3 py-2.5 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-start"
+              className="grid min-h-20 gap-2 rounded-lg border bg-background px-3 py-2.5 sm:grid-cols-[5rem_minmax(0,1fr)] sm:items-start"
             >
               <div className="flex items-center justify-between gap-2 sm:grid sm:justify-start">
                 <h3 className="text-sm font-medium">{group.label}</h3>
