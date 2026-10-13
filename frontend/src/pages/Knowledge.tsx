@@ -591,7 +591,7 @@ function KnowledgePage({
               </Button>
             </div>
           ) : null}
-          <div className="grid gap-4 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(20rem,1fr)]">
             <KnowledgeList
               items={items}
               archivedIds={archivedIds}
