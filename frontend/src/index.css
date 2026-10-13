@@ -118,7 +118,7 @@
   }
 
   body {
-    @apply min-w-80 bg-background text-foreground;
+    @apply min-w-[320px] bg-background text-foreground;
     min-height: 100dvh;
     background-image:
       linear-gradient(hsl(var(--border) / 0.22) 1px, transparent 1px),
