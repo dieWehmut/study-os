@@ -52,7 +52,7 @@
     --card-foreground: 144 17% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 144 17% 10%;
-    --primary: 121 71% 36%;
+    --primary: 121 71% 30.5%;
     --primary-foreground: 0 0% 100%;
     --secondary: 120 25% 94%;
     --secondary-foreground: 130 30% 18%;
@@ -64,16 +64,16 @@
     --destructive-foreground: 0 0% 100%;
     --border: 135 12% 86%;
     --input: 135 12% 82%;
-    --ring: 121 71% 36%;
+    --ring: 121 71% 30.5%;
     --radius: 0.75rem;
     --sidebar: 120 15% 96%;
     --sidebar-foreground: 144 17% 10%;
-    --sidebar-primary: 121 71% 36%;
+    --sidebar-primary: 121 71% 30.5%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 120 28% 91%;
     --sidebar-accent-foreground: 126 43% 20%;
     --sidebar-border: 135 12% 85%;
-    --sidebar-ring: 121 71% 36%;
+    --sidebar-ring: 121 71% 30.5%;
     --font-sans: "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
     --font-heading: "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   }
