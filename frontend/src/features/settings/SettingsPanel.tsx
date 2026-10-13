@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { AudioLines, Bot, Database, Download, FolderOpen, HardDrive, Loader2, RefreshCw, Save, ShieldCheck, Square, UploadCloud, Users, Volume2 } from "lucide-react"
+import { AudioLines, Bot, Database, Download, FolderOpen, HardDrive, Loader2, RefreshCw, Save, Shield, Square, UploadCloud, Users, Volume2 } from "lucide-react"
 
 import type { VendorConfigInput } from "@/api/agent"
 import {
@@ -657,7 +657,7 @@ export default function SettingsPanel() {
               <>
                 <div className="grid gap-2.5 rounded-xl border border-border bg-muted/25 px-3 py-2.5">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck aria-hidden="true" className="size-3.5 text-primary" />
+                    <Shield aria-hidden="true" className="size-3.5 text-primary" />
                     <strong className="text-sm">默认接口</strong>
                     <span className="text-xs text-muted-foreground">{speech.key_configured ? "密钥已配置（仅显示状态）" : "尚未配置密钥"}</span>
                   </div>
@@ -914,7 +914,7 @@ export default function SettingsPanel() {
                 </div>
                 {vendor.implemented && vendor.id !== "mock" ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <ShieldCheck aria-hidden="true" className="size-3.5 text-primary" />
+                    <Shield aria-hidden="true" className="size-3.5 text-primary" />
                     {vendor.key_configured ? "API key 已配置（仅显示状态）" : "未配置 API key"}
                   </div>
                 ) : null}
