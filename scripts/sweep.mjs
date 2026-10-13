@@ -97,6 +97,11 @@ const steps = {
   e2e: () => [run("npx", ["playwright", "test"], { cwd: frontend, title: "e2e (desktop + mobile)" })],
   pages: () => [
     run("pnpm", ["--dir", "frontend", "build"], { env: { VITE_STATIC_DEMO: "true", VITE_BASE_PATH: "/study-os/" }, title: "pages build" }),
+    // The deploy gate runs these two before it publishes (deploy-pages.yml:46,79). They were the
+    // one thing CI checked and this sweep did not, so "green locally" was a slightly weaker claim
+    // than it sounded. They inspect the artifact, so they belong after the build above.
+    run("node", ["scripts/tests/github-pages.test.mjs"], { title: "pages contract" }),
+    run("node", ["scripts/tests/github-pages-artifact.test.mjs"], { title: "pages artifact" }),
     run("npx", ["playwright", "test", "--config=playwright.pages.config.ts"], { cwd: frontend, env: { PAGES_PREVIEW: "true" }, title: "pages smoke" }),
   ],
   docs: () => {
