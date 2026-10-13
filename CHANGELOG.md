@@ -2,6 +2,30 @@
 
 ## 未发布
 
+### 读出一件我**完全不知道存在**的事：Pages 部署前有 **8 道验证**，其中两道是我从没跑过的
+
+- 继续查假定 ✓（第 399 轮）⇒ 我原以为"部署前只跑 vitest + lint"✗，读出来是**一整串** ✓：
+  | # | 步骤 | 命令 |
+  |---|---|---|
+  | 1 | Verify static Pages contract | `node scripts/tests/github-pages.test.mjs` ✓ |
+  | 2 | Install frontend dependencies | `pnpm install --frozen-lockfile` ✓ |
+  | 3 | Test static frontend runtime | （vitest ✓） |
+  | 4 | Lint frontend | `pnpm lint` ✓ |
+  | 5 | Build frontend showcase | `pnpm build` ✓ |
+  | 6 | **Verify Pages artifact** | `node scripts/tests/github-pages-artifact.test.mjs` ✓ |
+  | 7 | Install Chromium for Pages smoke | `playwright install --with-deps chromium` ✓ |
+  | 8 | **Smoke test built Pages artifact** | `playwright test --config=playwright.pages.config.ts` ✓ |
+- ⇒ **两个发现** ✓：
+  1. **线上演示在发布前会被真浏览器 smoke 测一遍** ✓ ——**这比我以为的严得多** ✓（我以为只有 vitest + lint ✗）；
+  2. **有两个脚本 + 一个 Playwright 配置，只在 CI 里跑** ✗ ——
+     `github-pages.test.mjs` ✓、`github-pages-artifact.test.mjs` ✓、`playwright.pages.config.ts` ✓
+     ⇒ **我本地的 `sweep` 不跑它们** ✗ ⇒ **"本地全绿"与"线上会绿"之间，隔着我没跑过的两步** ✗。
+- **下一轮的第一步** ✓：**在本地把它们跑一遍** ✓（它们**应该**绿 ✓；若不绿 ⇒ **我的 sweep 缺了一步** ✗，
+  而"本地绿"这个说法就得修正 ✓）。
+- **这一条线索（查"我在假定什么"）四轮四中** ✓ ——而且**这一轮查出的东西最有用** ✓：
+  **它改变了我对"已验证"边界的认识** ✗。
+- 本轮无代码改动（查证 ✓）；工作区与远端一致 ✓。
+
 ### 交付链**闭环验证完了**：工作流给的两个变量，构建配置**确实都在用**（负结果 ✓）
 
 - 第 397 轮验了"工作流**给**了 `VITE_STATIC_DEMO` 与 `VITE_BASE_PATH`"✓，但**没验构建有没有用** ✗ ——
@@ -354,6 +378,30 @@
 ### 一个该决定、而不是该动手的事：**这份 CHANGELOG 已经 1888 行**（结论：不切分 ✓）
 
 - 数出来 ✓：`CHANGELOG.md` **1888** 行 ✓，其中 `## 未发布
+
+### 读出一件我**完全不知道存在**的事：Pages 部署前有 **8 道验证**，其中两道是我从没跑过的
+
+- 继续查假定 ✓（第 399 轮）⇒ 我原以为"部署前只跑 vitest + lint"✗，读出来是**一整串** ✓：
+  | # | 步骤 | 命令 |
+  |---|---|---|
+  | 1 | Verify static Pages contract | `node scripts/tests/github-pages.test.mjs` ✓ |
+  | 2 | Install frontend dependencies | `pnpm install --frozen-lockfile` ✓ |
+  | 3 | Test static frontend runtime | （vitest ✓） |
+  | 4 | Lint frontend | `pnpm lint` ✓ |
+  | 5 | Build frontend showcase | `pnpm build` ✓ |
+  | 6 | **Verify Pages artifact** | `node scripts/tests/github-pages-artifact.test.mjs` ✓ |
+  | 7 | Install Chromium for Pages smoke | `playwright install --with-deps chromium` ✓ |
+  | 8 | **Smoke test built Pages artifact** | `playwright test --config=playwright.pages.config.ts` ✓ |
+- ⇒ **两个发现** ✓：
+  1. **线上演示在发布前会被真浏览器 smoke 测一遍** ✓ ——**这比我以为的严得多** ✓（我以为只有 vitest + lint ✗）；
+  2. **有两个脚本 + 一个 Playwright 配置，只在 CI 里跑** ✗ ——
+     `github-pages.test.mjs` ✓、`github-pages-artifact.test.mjs` ✓、`playwright.pages.config.ts` ✓
+     ⇒ **我本地的 `sweep` 不跑它们** ✗ ⇒ **"本地全绿"与"线上会绿"之间，隔着我没跑过的两步** ✗。
+- **下一轮的第一步** ✓：**在本地把它们跑一遍** ✓（它们**应该**绿 ✓；若不绿 ⇒ **我的 sweep 缺了一步** ✗，
+  而"本地绿"这个说法就得修正 ✓）。
+- **这一条线索（查"我在假定什么"）四轮四中** ✓ ——而且**这一轮查出的东西最有用** ✓：
+  **它改变了我对"已验证"边界的认识** ✗。
+- 本轮无代码改动（查证 ✓）；工作区与远端一致 ✓。
 
 ### 交付链**闭环验证完了**：工作流给的两个变量，构建配置**确实都在用**（负结果 ✓）
 
