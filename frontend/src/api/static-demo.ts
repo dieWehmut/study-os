@@ -1022,7 +1022,13 @@ export async function staticDemoRequest<T>(path: string, init?: RequestInit): Pr
     const item = state.knowledge.find((entry) => entry.id === id)
     const tags = new Set(item?.tags ?? [])
     const items = state.knowledge.filter((entry) => entry.id !== id && (entry.tags ?? []).some((tag) => tags.has(tag)))
-    return responseFor({ items, groups: state.groups.filter((group) => tags.has(group.id) || tags.has(group.name.toLowerCase())) }) as T
+    // Same shape as the real handler: the panel marks which siblings are 已归档 (§8.1 keeps them in a
+    // 词族, only the default list hides them), and without this the marker would never appear here.
+    return responseFor({
+      items,
+      groups: state.groups.filter((group) => tags.has(group.id) || tags.has(group.name.toLowerCase())),
+      archived_ids: items.filter((entry) => state.archived.has(entry.id)).map((entry) => entry.id),
+    }) as T
   }
   if (root === "knowledge" && id && action === "mastery" && method === "GET") {
     return responseFor(staticKnowledgeMastery(id)) as T
