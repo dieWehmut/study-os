@@ -126,7 +126,7 @@ export function EnglishMasteryPanel({ item }: EnglishMasteryPanelProps) {
                   <span
                     key={question.id}
                     title={question.description}
-                    className="inline-flex min-h-6 items-center rounded-md border bg-muted/30 px-2 text-xs text-muted-foreground"
+                    className="inline-flex min-h-6 items-center whitespace-nowrap rounded-md border bg-muted/30 px-2 text-xs text-muted-foreground"
                   >
                     {question.label}
                   </span>
