@@ -2,6 +2,21 @@
 
 ## 未发布
 
+### `pages` 那一步的原文读到手了 ⇒ **下一轮是一处机械编辑**（写在这里，照抄即可 ✓）
+
+- 第 400 轮的切片 ✓（把"演示产物 + 那两个 CI 脚本"接进本地 `sweep` ✓），这一轮把落点读清 ✓：
+  `scripts/sweep.mjs` 的步骤表是 `const steps = { … }` ✓（`:90` ✓），
+  `pages` 那一步现在是两行 ✓（`:98-101` ✓）：
+  - **建演示产物** ✓（`pnpm --dir frontend build` ✓，带 `VITE_STATIC_DEMO` ✓ + `VITE_BASE_PATH` ✓）；
+  - **跑 Pages smoke** ✓（`playwright test --config=playwright.pages.config.ts` ✓，带 `PAGES_PREVIEW` ✓）。
+- **缺的正是中间两道** ✗：`node scripts/tests/github-pages.test.mjs` ✓ 与
+  `node scripts/tests/github-pages-artifact.test.mjs` ✓（第 399-400 轮读出来的 ✓）。
+- ⇒ **下一轮的编辑（三行，位置要紧 ✓）** ✓：在**产物建好之后** ✓、**smoke 之前** ✓ 插进去两行 ✓ ——
+  **顺序不能错** ✗：artifact 那道**就是检查产物的** ✓，放在构建前会红 ✓（第 400 轮实测过一次 ✓）。
+- ⇒ 那一轮要跑 `sweep --only=pages` ✓ 验证（**它自己就是被改的那一步** ✓），再跑**完整 sweep** ✓，
+  最后提交 ✓——**改动落在"我每轮都靠的那个工具"上** ✗，所以验证要更实在 ✗。
+- 本轮无代码改动（读证 ✓）；工作区与远端一致 ✓。
+
 ### 在本地跑那两个 CI 脚本：**一个直接过 ✓，另一个先红后绿** —— 而红的原因正是我要找的东西 ✓
 
 - 第 399 轮发现的两个"只在 CI 跑"的脚本 ✓，这一轮在本地跑了 ✓：
@@ -396,6 +411,21 @@
 ### 一个该决定、而不是该动手的事：**这份 CHANGELOG 已经 1888 行**（结论：不切分 ✓）
 
 - 数出来 ✓：`CHANGELOG.md` **1888** 行 ✓，其中 `## 未发布
+
+### `pages` 那一步的原文读到手了 ⇒ **下一轮是一处机械编辑**（写在这里，照抄即可 ✓）
+
+- 第 400 轮的切片 ✓（把"演示产物 + 那两个 CI 脚本"接进本地 `sweep` ✓），这一轮把落点读清 ✓：
+  `scripts/sweep.mjs` 的步骤表是 `const steps = { … }` ✓（`:90` ✓），
+  `pages` 那一步现在是两行 ✓（`:98-101` ✓）：
+  - **建演示产物** ✓（`pnpm --dir frontend build` ✓，带 `VITE_STATIC_DEMO` ✓ + `VITE_BASE_PATH` ✓）；
+  - **跑 Pages smoke** ✓（`playwright test --config=playwright.pages.config.ts` ✓，带 `PAGES_PREVIEW` ✓）。
+- **缺的正是中间两道** ✗：`node scripts/tests/github-pages.test.mjs` ✓ 与
+  `node scripts/tests/github-pages-artifact.test.mjs` ✓（第 399-400 轮读出来的 ✓）。
+- ⇒ **下一轮的编辑（三行，位置要紧 ✓）** ✓：在**产物建好之后** ✓、**smoke 之前** ✓ 插进去两行 ✓ ——
+  **顺序不能错** ✗：artifact 那道**就是检查产物的** ✓，放在构建前会红 ✓（第 400 轮实测过一次 ✓）。
+- ⇒ 那一轮要跑 `sweep --only=pages` ✓ 验证（**它自己就是被改的那一步** ✓），再跑**完整 sweep** ✓，
+  最后提交 ✓——**改动落在"我每轮都靠的那个工具"上** ✗，所以验证要更实在 ✗。
+- 本轮无代码改动（读证 ✓）；工作区与远端一致 ✓。
 
 ### 在本地跑那两个 CI 脚本：**一个直接过 ✓，另一个先红后绿** —— 而红的原因正是我要找的东西 ✓
 
