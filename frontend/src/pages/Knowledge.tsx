@@ -345,7 +345,7 @@ function KnowledgePage({
       <Card>
         <CardHeader className="gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base">搜索知识库</CardTitle>
+            <CardTitle className="whitespace-nowrap text-base">搜索知识库</CardTitle>
             <div className="flex flex-wrap items-center gap-3">
               <SubjectChips subject={subject} onSelect={chooseSubject} />
               <label className="flex items-center gap-2 text-sm font-medium" htmlFor="knowledge-group">

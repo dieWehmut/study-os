@@ -50,3 +50,6 @@ frontend/package.json.md5
 
 # vitest coverage output (frontend)
 frontend/coverage/
+
+# screenshots taken while reviewing the UI by eye
+frontend/shots/
