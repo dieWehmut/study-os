@@ -438,7 +438,7 @@ describe("static Pages API fixtures", () => {
       ["/knowledge/knowledge-last", ["id", "item_type", "term", "concise_definition", "scheduled", "archived"]],
       // 「所属分组」 and the word-family list come from here; an empty answer is a valid
       // answer, so the contract asks for the two keys rather than for rows inside them.
-      ["/knowledge/knowledge-last/related", ["items", "groups"]],
+      ["/knowledge/knowledge-last/related", ["items", "groups", "archived_ids"]],
       // 四个掌握维度 (recognition / comprehension / retrieval / use). The page renders one
       // block per dimension, so a missing `dimensions` key here is a blank panel.
       ["/knowledge/knowledge-last/mastery", ["dimensions"]],
