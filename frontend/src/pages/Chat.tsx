@@ -670,7 +670,7 @@ export default function Chat() {
       </div>
       <SubjectChips subject={subject} onSelect={changeSubject} />
 
-      <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <Card className="h-fit lg:sticky lg:top-20">
           <CardHeader className="gap-2">
             <div className="flex items-center justify-between gap-3">
