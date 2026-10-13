@@ -331,3 +331,20 @@ test("前端调用的每一条路径，真机都有对应的路由", () => {
   const missing = [...calls].filter((call) => !routes.some((route) => route.startsWith(call)))
   assert.deepEqual(missing, [], `前端调用了真机没有的路径：${missing.join(", ")}`)
 })
+test("不给 HTTP server 加 WriteTimeout", () => {
+  // ROADMAP §六 明确不做：WriteTimeout 会切断 SSE 与 120s 的对话。这是个"看起来像优化"的改动
+  // （给它设个超时多稳妥），所以它值得一条护栏 —— 而"不做"的清单此前只守了路由那一条。
+  const files = []
+  const walk = (relative) => {
+    for (const entry of fs.readdirSync(path.join(repositoryRoot, relative), { withFileTypes: true })) {
+      const next = `${relative}/${entry.name}`
+      if (entry.isDirectory()) walk(next)
+      else if (entry.name.endsWith(".go")) files.push(next)
+    }
+  }
+  walk("backend")
+  assert.ok(files.length > 30, `只找到 ${files.length} 个 go 文件`)
+
+  const offenders = files.filter((file) => /WriteTimeout\s*:/.test(read(file)))
+  assert.deepEqual(offenders, [], `§六 说不加 WriteTimeout（会切断 SSE），但这些文件设了：${offenders.join(", ")}`)
+})
